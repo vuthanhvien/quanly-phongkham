@@ -1,0 +1,765 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── NHÓM 1: NGƯỜI DÙNG & PHÂN QUYỀN ───────────────────────────────────────
+
+model Branch {
+  id       String  @id @default(cuid())
+  name     String
+  slug     String  @unique
+  address  String?
+  phone    String?
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users                 User[]
+  customers             Customer[]
+  appointments          Appointment[]
+  medicalEpisodes       MedicalEpisode[]
+  invoices              Invoice[]
+  expenses              Expense[]
+  stockBatches          StockBatch[]
+  resources             Resource[]
+  publicBookingRequests PublicBookingRequest[]
+
+  @@map("branches")
+}
+
+model Role {
+  id          String @id @default(cuid())
+  name        String @unique
+  permissions Json   @default("[]")
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  phone        String?
+  isActive     Boolean  @default(true)
+  role         Role     @relation(fields: [roleId], references: [id])
+  roleId       String
+  branch       Branch?  @relation(fields: [branchId], references: [id])
+  branchId     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdCustomers     Customer[]             @relation("CustomerCreator")
+  assignedCustomers    Customer[]             @relation("SaleCustomer")
+  appointments         Appointment[]          @relation("AppointmentCreator")
+  doctorEpisodes       MedicalEpisode[]       @relation("DoctorEpisode")
+  vitalSigns           VitalSign[]
+  postOpNotes          PostOpNote[]
+  uploadedPhotos       PatientPhoto[]
+  customerNotes        CustomerNote[]
+  phoneViewLogs        PhoneViewLog[]
+  stockBatchesCreated  StockBatch[]
+  stockMovements       StockMovement[]
+  dispensings          StockDispensing[]
+  invoicesCreated      Invoice[]
+  paymentsReceived     Payment[]
+  expenses             Expense[]
+  commissions          Commission[]
+  auditLogs            AuditLog[]
+  processedBookings    PublicBookingRequest[]
+  treatmentPlans       TreatmentPlan[]
+
+  @@map("users")
+}
+
+// ─── NHÓM 2: KHÁCH HÀNG ─────────────────────────────────────────────────────
+
+model Customer {
+  id            String         @id @default(cuid())
+  code          String         @unique
+  fullName      String
+  phone         String
+  phoneHash     String
+  email         String?
+  dateOfBirth   DateTime?
+  gender        Gender         @default(OTHER)
+  idNumber      String?
+  address       String?
+  source        String?
+  referredById  String?
+
+  status        CustomerStatus @default(CONSULTING)
+  tier          CustomerTier   @default(BRONZE)
+  totalSpent    Decimal        @default(0) @db.Decimal(15, 2)
+  discountRate  Decimal        @default(0) @db.Decimal(5, 2)
+
+  hasAllergy         Boolean @default(false)
+  allergyNote        String?
+  hasChronicDisease  Boolean @default(false)
+  chronicDiseaseNote String?
+
+  branch         Branch  @relation(fields: [branchId], references: [id])
+  branchId       String
+  createdBy      User    @relation("CustomerCreator", fields: [createdById], references: [id])
+  createdById    String
+  assignedSale   User?   @relation("SaleCustomer", fields: [assignedSaleId], references: [id])
+  assignedSaleId String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastVisitAt DateTime?
+
+  episodes      MedicalEpisode[]
+  appointments  Appointment[]
+  photos        PatientPhoto[]
+  invoices      Invoice[]
+  notes         CustomerNote[]
+  phoneViewLogs PhoneViewLog[]
+
+  @@index([branchId, fullName])
+  @@index([branchId, status])
+  @@index([branchId, tier])
+  @@index([phoneHash])
+  @@map("customers")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum CustomerStatus {
+  CONSULTING
+  WAITING_SURGERY
+  IN_TREATMENT
+  COMPLETED
+  INACTIVE
+}
+
+enum CustomerTier {
+  BRONZE
+  SILVER
+  GOLD
+  DIAMOND
+}
+
+model CustomerNote {
+  id          String    @id @default(cuid())
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  customerId  String
+  content     String
+  type        String    @default("GENERAL")
+  resolvedAt  DateTime?
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  @@map("customer_notes")
+}
+
+model PhoneViewLog {
+  id          String   @id @default(cuid())
+  customer    Customer @relation(fields: [customerId], references: [id])
+  customerId  String
+  viewedBy    User     @relation(fields: [viewedById], references: [id])
+  viewedById  String
+  ipAddress   String
+  viewedAt    DateTime @default(now())
+
+  @@map("phone_view_logs")
+}
+
+// ─── NHÓM 3: HỒ SƠ BỆNH ÁN ─────────────────────────────────────────────────
+
+model MedicalEpisode {
+  id           String        @id @default(cuid())
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  customerId   String
+  branch       Branch        @relation(fields: [branchId], references: [id])
+  branchId     String
+  serviceType  String
+  serviceCode  String?
+  doctor       User          @relation("DoctorEpisode", fields: [doctorId], references: [id])
+  doctorId     String
+  status       EpisodeStatus @default(ACTIVE)
+  chiefComplaint String?
+  diagnosis      String?
+  operationDate  DateTime?
+  completedAt    DateTime?
+  kit            SurgeryKit? @relation(fields: [kitId], references: [id])
+  kitId          String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  vitalSigns        VitalSign[]
+  postOpNotes       PostOpNote[]
+  dispensings       StockDispensing[]
+  photos            PatientPhoto[]
+  documents         MedicalDocument[]
+  treatmentSessions TreatmentSession[]
+  invoices          Invoice[]
+
+  @@index([branchId, customerId])
+  @@map("medical_episodes")
+}
+
+enum EpisodeStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model VitalSign {
+  id           String         @id @default(cuid())
+  episode      MedicalEpisode @relation(fields: [episodeId], references: [id])
+  episodeId    String
+  recordedAt   DateTime       @default(now())
+  pulse        Int?
+  systolicBP   Int?
+  diastolicBP  Int?
+  spO2         Decimal?       @db.Decimal(5, 2)
+  temperature  Decimal?       @db.Decimal(4, 1)
+  note         String?
+  recordedBy   User           @relation(fields: [recordedById], references: [id])
+  recordedById String
+
+  @@map("vital_signs")
+}
+
+model PostOpNote {
+  id          String         @id @default(cuid())
+  episode     MedicalEpisode @relation(fields: [episodeId], references: [id])
+  episodeId   String
+  day         Int
+  note        String
+  status      String?
+  createdBy   User           @relation(fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime       @default(now())
+
+  @@map("post_op_notes")
+}
+
+model MedicalDocument {
+  id           String         @id @default(cuid())
+  episode      MedicalEpisode @relation(fields: [episodeId], references: [id])
+  episodeId    String
+  type         String
+  fileName     String
+  fileUrl      String
+  signedAt     DateTime?
+  signedBy     String?
+  signatureUrl String?
+  createdAt    DateTime       @default(now())
+
+  @@map("medical_documents")
+}
+
+model PatientPhoto {
+  id           String          @id @default(cuid())
+  customer     Customer        @relation(fields: [customerId], references: [id])
+  customerId   String
+  episode      MedicalEpisode? @relation(fields: [episodeId], references: [id])
+  episodeId    String?
+  milestone    String
+  fileUrl      String
+  takenAt      DateTime
+  uploadedBy   User            @relation(fields: [uploadedById], references: [id])
+  uploadedById String
+  createdAt    DateTime        @default(now())
+
+  @@map("patient_photos")
+}
+
+// ─── NHÓM 4: LỊCH HẸN ───────────────────────────────────────────────────────
+
+model Appointment {
+  id           String            @id @default(cuid())
+  customer     Customer          @relation(fields: [customerId], references: [id])
+  customerId   String
+  branch       Branch            @relation(fields: [branchId], references: [id])
+  branchId     String
+  type         AppointmentType
+  startTime    DateTime
+  endTime      DateTime
+  status       AppointmentStatus @default(SCHEDULED)
+  note         String?
+  noShowReason String?
+  source       String?           @default("INTERNAL")
+  createdBy    User?             @relation("AppointmentCreator", fields: [createdById], references: [id])
+  createdById  String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  resources            AppointmentResource[]
+  publicBookingRequest PublicBookingRequest?
+
+  @@index([branchId, startTime, endTime])
+  @@map("appointments")
+}
+
+enum AppointmentType {
+  CONSULTATION
+  SURGERY
+  FOLLOWUP
+  TREATMENT
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+  PENDING_CONFIRMATION
+}
+
+model Resource {
+  id       String       @id @default(cuid())
+  name     String
+  type     ResourceType
+  branch   Branch       @relation(fields: [branchId], references: [id])
+  branchId String
+  userId   String?
+  isActive Boolean      @default(true)
+
+  appointments AppointmentResource[]
+
+  @@map("resources")
+}
+
+enum ResourceType {
+  DOCTOR
+  ROOM
+  EQUIPMENT
+}
+
+model AppointmentResource {
+  id            String      @id @default(cuid())
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+  appointmentId String
+  resource      Resource    @relation(fields: [resourceId], references: [id])
+  resourceId    String
+
+  @@unique([appointmentId, resourceId])
+  @@index([resourceId, appointmentId])
+  @@map("appointment_resources")
+}
+
+model PublicBookingRequest {
+  id              String    @id @default(cuid())
+  branch          Branch    @relation(fields: [branchId], references: [id])
+  branchId        String
+  fullName        String
+  phone           String
+  serviceInterest String
+  preferredDate   DateTime?
+  note            String?
+  status          String    @default("PENDING")
+  appointment     Appointment? @relation(fields: [appointmentId], references: [id])
+  appointmentId   String?      @unique
+  submittedAt     DateTime  @default(now())
+  processedBy     User?     @relation(fields: [processedById], references: [id])
+  processedById   String?
+  processedAt     DateTime?
+
+  @@index([branchId, status, submittedAt])
+  @@map("public_booking_requests")
+}
+
+// ─── NHÓM 5: LIỆU TRÌNH ─────────────────────────────────────────────────────
+
+model TreatmentPlan {
+  id              String  @id @default(cuid())
+  name            String
+  totalSessions   Int
+  sessionInterval Int
+  description     String?
+  createdBy       User    @relation(fields: [createdById], references: [id])
+  createdById     String
+
+  kitItems TreatmentKitItem[]
+  sessions TreatmentSession[]
+
+  @@map("treatment_plans")
+}
+
+model TreatmentKitItem {
+  id        String        @id @default(cuid())
+  plan      TreatmentPlan @relation(fields: [planId], references: [id])
+  planId    String
+  product   Product       @relation(fields: [productId], references: [id])
+  productId String
+  quantity  Decimal       @db.Decimal(10, 2)
+  unit      String
+
+  @@map("treatment_kit_items")
+}
+
+model TreatmentSession {
+  id              String         @id @default(cuid())
+  plan            TreatmentPlan  @relation(fields: [planId], references: [id])
+  planId          String
+  episode         MedicalEpisode @relation(fields: [episodeId], references: [id])
+  episodeId       String
+  sessionNumber   Int
+  scheduledDate   DateTime
+  actualDate      DateTime?
+  status          SessionStatus  @default(SCHEDULED)
+  note            String?
+  technicalParams Json?
+  createdAt       DateTime       @default(now())
+
+  dispensings StockDispensing[]
+
+  @@map("treatment_sessions")
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  LATE
+  SKIPPED
+  RESCHEDULED
+}
+
+// ─── NHÓM 6: KHO & VẬT TƯ ──────────────────────────────────────────────────
+
+model Supplier {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  name            String
+  address         String?
+  contactName     String?
+  phone           String?
+  email           String?
+  taxCode         String?
+  debtLimit       Decimal? @db.Decimal(15, 2)
+  paymentTermDays Int?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  documents    SupplierDocument[]
+  products     Product[]
+  stockBatches StockBatch[]
+
+  @@map("suppliers")
+}
+
+model SupplierDocument {
+  id         String    @id @default(cuid())
+  supplier   Supplier  @relation(fields: [supplierId], references: [id])
+  supplierId String
+  type       String
+  name       String
+  fileUrl    String
+  expiryDate DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@map("supplier_documents")
+}
+
+model ProductCategory {
+  id       String  @id @default(cuid())
+  name     String
+  type     String
+  parentId String?
+
+  parent   ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children ProductCategory[] @relation("CategoryTree")
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id               String          @id @default(cuid())
+  code             String          @unique
+  barcode          String?         @unique
+  name             String
+  category         ProductCategory @relation(fields: [categoryId], references: [id])
+  categoryId       String
+  supplier         Supplier        @relation(fields: [supplierId], references: [id])
+  supplierId       String
+  productType      ProductType
+  purchaseUnit     String
+  usageUnit        String
+  conversionFactor Decimal         @db.Decimal(10, 4)
+  purchasePrice    Decimal         @db.Decimal(15, 2)
+  sellingPrice     Decimal         @db.Decimal(15, 2)
+  tierPrices       Json?
+  minStockLevel    Int             @default(0)
+  isActive         Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+
+  batches        StockBatch[]
+  movements      StockMovement[]
+  kitItems       SurgeryKitItem[]
+  treatmentItems TreatmentKitItem[]
+  dispensings    StockDispensing[]
+
+  @@map("products")
+}
+
+enum ProductType {
+  CONSUMABLE
+  REUSABLE
+  RETAIL
+}
+
+model StockBatch {
+  id              String    @id @default(cuid())
+  product         Product   @relation(fields: [productId], references: [id])
+  productId       String
+  branch          Branch    @relation(fields: [branchId], references: [id])
+  branchId        String
+  supplier        Supplier  @relation(fields: [supplierId], references: [id])
+  supplierId      String
+  batchNumber     String
+  expiryDate      DateTime?
+  quantityIn      Decimal   @db.Decimal(10, 2)
+  quantityInUsage Decimal   @db.Decimal(10, 2)
+  remainingQty    Decimal   @db.Decimal(10, 2)
+  purchasePrice   Decimal   @db.Decimal(15, 2)
+  receivedAt      DateTime
+  note            String?
+  createdBy       User      @relation(fields: [createdById], references: [id])
+  createdById     String
+
+  movements   StockMovement[]
+  dispensings StockDispensing[]
+
+  @@index([branchId, productId, expiryDate])
+  @@index([branchId, productId, remainingQty])
+  @@map("stock_batches")
+}
+
+model StockMovement {
+  id            String       @id @default(cuid())
+  product       Product      @relation(fields: [productId], references: [id])
+  productId     String
+  batch         StockBatch?  @relation(fields: [batchId], references: [id])
+  batchId       String?
+  type          MovementType
+  quantity      Decimal      @db.Decimal(10, 2)
+  unit          String
+  reference     String?
+  referenceType String?
+  note          String?
+  createdBy     User         @relation(fields: [createdById], references: [id])
+  createdById   String
+  createdAt     DateTime     @default(now())
+
+  @@map("stock_movements")
+}
+
+enum MovementType {
+  IN
+  OUT
+  LOAN
+  RETURN
+  ADJUSTMENT
+  EXPIRED
+}
+
+model StockDispensing {
+  id           String            @id @default(cuid())
+  episode      MedicalEpisode    @relation(fields: [episodeId], references: [id])
+  episodeId    String
+  session      TreatmentSession? @relation(fields: [sessionId], references: [id])
+  sessionId    String?
+  product      Product           @relation(fields: [productId], references: [id])
+  productId    String
+  batch        StockBatch        @relation(fields: [batchId], references: [id])
+  batchId      String
+  quantity     Decimal           @db.Decimal(10, 2)
+  unit         String
+  isAdditional Boolean           @default(false)
+  dispensedBy  User              @relation(fields: [dispensedById], references: [id])
+  dispensedById String
+  dispensedAt  DateTime          @default(now())
+
+  @@map("stock_dispensings")
+}
+
+model SurgeryKit {
+  id          String  @id @default(cuid())
+  name        String
+  serviceCode String?
+  description String?
+  isActive    Boolean @default(true)
+
+  items    SurgeryKitItem[]
+  episodes MedicalEpisode[]
+
+  @@map("surgery_kits")
+}
+
+model SurgeryKitItem {
+  id         String     @id @default(cuid())
+  kit        SurgeryKit @relation(fields: [kitId], references: [id])
+  kitId      String
+  product    Product    @relation(fields: [productId], references: [id])
+  productId  String
+  quantity   Decimal    @db.Decimal(10, 2)
+  unit       String
+  isReusable Boolean    @default(false)
+
+  @@map("surgery_kit_items")
+}
+
+// ─── NHÓM 7: THU CHI & HÓA ĐƠN ─────────────────────────────────────────────
+
+model Invoice {
+  id          String          @id @default(cuid())
+  code        String          @unique
+  customer    Customer        @relation(fields: [customerId], references: [id])
+  customerId  String
+  branch      Branch          @relation(fields: [branchId], references: [id])
+  branchId    String
+  episode     MedicalEpisode? @relation(fields: [episodeId], references: [id])
+  episodeId   String?
+  status      InvoiceStatus   @default(UNPAID)
+  totalAmount Decimal         @db.Decimal(15, 2)
+  discount    Decimal         @default(0) @db.Decimal(15, 2)
+  finalAmount Decimal         @db.Decimal(15, 2)
+  note        String?
+  createdBy   User            @relation(fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime        @default(now())
+  dueDate     DateTime?
+
+  items       InvoiceItem[]
+  payments    Payment[]
+  commissions Commission[]
+
+  @@index([branchId, createdAt])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+  invoiceId   String
+  description String
+  quantity    Decimal @db.Decimal(10, 2)
+  unitPrice   Decimal @db.Decimal(15, 2)
+  amount      Decimal @db.Decimal(15, 2)
+  type        String
+
+  @@map("invoice_items")
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  invoice      Invoice       @relation(fields: [invoiceId], references: [id])
+  invoiceId    String
+  amount       Decimal       @db.Decimal(15, 2)
+  method       PaymentMethod
+  reference    String?
+  paidAt       DateTime      @default(now())
+  receivedBy   User          @relation(fields: [receivedById], references: [id])
+  receivedById String
+  note         String?
+
+  @@map("payments")
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CREDIT_CARD
+  DEBIT_CARD
+  MOMO
+  VNPAY
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  branch      Branch   @relation(fields: [branchId], references: [id])
+  branchId    String
+  category    String
+  description String
+  amount      Decimal  @db.Decimal(15, 2)
+  paidAt      DateTime
+  receiptUrl  String?
+  paidBy      User     @relation(fields: [paidById], references: [id])
+  paidById    String
+  createdAt   DateTime @default(now())
+
+  @@index([branchId, paidAt])
+  @@map("expenses")
+}
+
+// ─── NHÓM 8: HOA HỒNG ───────────────────────────────────────────────────────
+
+model CommissionRule {
+  id          String  @id @default(cuid())
+  roleType    String
+  userId      String?
+  serviceCode String?
+  type        String
+  value       Decimal @db.Decimal(15, 2)
+  isActive    Boolean @default(true)
+
+  @@map("commission_rules")
+}
+
+model Commission {
+  id        String    @id @default(cuid())
+  invoice   Invoice   @relation(fields: [invoiceId], references: [id])
+  invoiceId String
+  user      User      @relation(fields: [userId], references: [id])
+  userId    String
+  role      String
+  amount    Decimal   @db.Decimal(15, 2)
+  status    String    @default("PENDING")
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@map("commissions")
+}
+
+// ─── NHÓM 9: AUDIT LOG ───────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  user       User?    @relation(fields: [userId], references: [id])
+  userId     String?
+  userName   String
+  branchId   String?
+  action     String
+  module     String
+  targetId   String?
+  targetType String?
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([branchId, createdAt])
+  @@index([action, createdAt])
+  @@index([module, targetId])
+  @@map("audit_logs")
+}
