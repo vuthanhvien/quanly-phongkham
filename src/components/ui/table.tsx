@@ -1,160 +1,135 @@
-import * as React from "react";
-import { cn } from "@/lib/utils";
+import React from "react";
+import styled from "styled-components";
+import { tokens as t } from "./tokens";
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="w-full overflow-auto">
-      <table
-        ref={ref}
-        className={cn("w-full caption-bottom text-sm border-collapse", className)}
-        {...props}
-      />
-    </div>
-  )
-);
-Table.displayName = "Table";
+// ─── Container ────────────────────────────────────────────────────────────────
 
-const TableHeader = React.forwardRef<
-  HTMLTableSectionElement,
-  React.HTMLAttributes<HTMLTableSectionElement>
->(({ className, ...props }, ref) => (
-  <thead
-    ref={ref}
-    className={cn("border-b border-[var(--color-border)]", className)}
-    {...props}
-  />
-));
-TableHeader.displayName = "TableHeader";
+export const TableContainer = styled.div`
+  width: 100%;
+  overflow-x: auto;
+  border-radius: ${t.radiusLg};
+  border: 1px solid ${t.colorBorder};
+  background: white;
+  box-shadow: ${t.shadowCard};
+`;
 
-const TableBody = React.forwardRef<
-  HTMLTableSectionElement,
-  React.HTMLAttributes<HTMLTableSectionElement>
->(({ className, ...props }, ref) => (
-  <tbody ref={ref} className={cn("divide-y divide-[var(--color-border)]", className)} {...props} />
-));
-TableBody.displayName = "TableBody";
+// ─── Table ────────────────────────────────────────────────────────────────────
 
-const TableFooter = React.forwardRef<
-  HTMLTableSectionElement,
-  React.HTMLAttributes<HTMLTableSectionElement>
->(({ className, ...props }, ref) => (
-  <tfoot
-    ref={ref}
-    className={cn(
-      "border-t border-[var(--color-border)] bg-[var(--color-neutral-20)] text-[var(--color-text-subtle)] font-medium",
-      className
-    )}
-    {...props}
-  />
-));
-TableFooter.displayName = "TableFooter";
+export const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  font-family: ${t.fontFamily};
+  font-size: ${t.fontSizeMd};
+`;
 
-interface TableRowProps extends React.HTMLAttributes<HTMLTableRowElement> {
-  isSelected?: boolean;
-}
+// ─── Head ─────────────────────────────────────────────────────────────────────
 
-const TableRow = React.forwardRef<HTMLTableRowElement, TableRowProps>(
-  ({ className, isSelected, ...props }, ref) => (
-    <tr
-      ref={ref}
-      className={cn(
-        "transition-colors duration-fast bg-white hover:bg-[var(--color-neutral-10)]",
-        isSelected && "bg-[var(--color-bg-selected)] hover:bg-[var(--color-bg-selected-hovered)]",
-        className
-      )}
-      {...props}
-    />
-  )
-);
-TableRow.displayName = "TableRow";
+export const TableHeader = styled.thead`
+  border-bottom: 2px solid ${t.colorBorder};
+`;
 
-interface TableHeadProps extends React.ThHTMLAttributes<HTMLTableCellElement> {
-  sortable?: boolean;
-  sortDirection?: "asc" | "desc" | null;
-  onSort?: () => void;
-}
+export const Th = styled.th<{ sortable?: boolean; width?: string | number }>`
+  height: 36px;
+  padding: 0 12px;
+  text-align: left;
+  font-size: ${t.fontSizeSm};
+  font-weight: 600;
+  color: ${t.colorTextSubtle};
+  background: ${t.colorBgNeutral};
+  white-space: nowrap;
+  width: ${(p) => p.width != null ? (typeof p.width === "number" ? `${p.width}px` : p.width) : "auto"};
+  cursor: ${(p) => p.sortable ? "pointer" : "default"};
+  user-select: ${(p) => p.sortable ? "none" : "auto"};
+  transition: background ${t.durationFast}, color ${t.durationFast};
 
-const TableHead = React.forwardRef<HTMLTableCellElement, TableHeadProps>(
-  ({ className, sortable, sortDirection, onSort, children, ...props }, ref) => (
-    <th
-      ref={ref}
-      className={cn(
-        "h-9 px-3 text-left text-xs font-semibold text-[var(--color-text-subtle)] whitespace-nowrap",
-        "bg-[var(--color-neutral-20)]",
-        sortable && "cursor-pointer select-none hover:text-[var(--color-text)] hover:bg-[var(--color-neutral-30)] transition-colors",
-        className
-      )}
-      onClick={sortable ? onSort : undefined}
-      {...props}
-    >
-      {sortable ? (
-        <span className="inline-flex items-center gap-1">
-          {children}
-          <span className="text-[var(--color-text-subtlest)] text-xs">
-            {sortDirection === "asc" ? "↑" : sortDirection === "desc" ? "↓" : "⇅"}
-          </span>
-        </span>
-      ) : (
-        children
-      )}
-    </th>
-  )
-);
-TableHead.displayName = "TableHead";
+  &:hover {
+    ${(p) => p.sortable && `background: ${t.colorBgNeutralHovered}; color: ${t.colorText};`}
+  }
+`;
 
-const TableCell = React.forwardRef<
-  HTMLTableCellElement,
-  React.TdHTMLAttributes<HTMLTableCellElement>
->(({ className, ...props }, ref) => (
-  <td
-    ref={ref}
-    className={cn("px-3 py-2 text-sm text-[var(--color-text)] align-middle", className)}
-    {...props}
-  />
-));
-TableCell.displayName = "TableCell";
+// ─── Body ─────────────────────────────────────────────────────────────────────
 
-const TableCaption = React.forwardRef<
-  HTMLTableCaptionElement,
-  React.HTMLAttributes<HTMLTableCaptionElement>
->(({ className, ...props }, ref) => (
-  <caption
-    ref={ref}
-    className={cn("mt-4 text-sm text-[var(--color-text-subtle)]", className)}
-    {...props}
-  />
-));
-TableCaption.displayName = "TableCaption";
+export const TableBody = styled.tbody`
+  & tr + tr { border-top: 1px solid ${t.colorBorder}; }
+`;
+
+export const Tr = styled.tr<{ selected?: boolean; clickable?: boolean }>`
+  background: ${(p) => p.selected ? t.colorBgSelected : "white"};
+  cursor: ${(p) => p.clickable ? "pointer" : "default"};
+  transition: background ${t.durationFast};
+
+  &:hover {
+    background: ${(p) => p.selected ? t.colorBgSelectedHover : t.colorBgNeutral};
+  }
+`;
+
+export const Td = styled.td<{ muted?: boolean; bold?: boolean; center?: boolean }>`
+  padding: 10px 12px;
+  font-size: ${t.fontSizeMd};
+  color: ${(p) => p.muted ? t.colorTextSubtle : t.colorText};
+  font-weight: ${(p) => p.bold ? 600 : 400};
+  text-align: ${(p) => p.center ? "center" : "left"};
+  vertical-align: middle;
+  white-space: nowrap;
+`;
+
+// ─── Footer ───────────────────────────────────────────────────────────────────
+
+export const TableFooter = styled.tfoot`
+  border-top: 2px solid ${t.colorBorder};
+  background: ${t.colorBgNeutral};
+
+  td {
+    padding: 8px 12px;
+    font-size: ${t.fontSizeMd};
+    font-weight: 600;
+    color: ${t.colorTextSubtle};
+  }
+`;
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
 
 interface TableEmptyProps {
   colSpan: number;
   icon?: React.ReactNode;
   message?: string;
+  action?: React.ReactNode;
 }
 
-function TableEmpty({ colSpan, icon, message = "Không có dữ liệu" }: TableEmptyProps) {
+const EmptyCell = styled.td`
+  padding: 56px 24px;
+  text-align: center;
+`;
+
+const EmptyInner = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: ${t.colorTextSubtle};
+
+  svg { width: 40px; height: 40px; opacity: 0.3; }
+  span { font-size: ${t.fontSizeMd}; }
+`;
+
+export function TableEmpty({ colSpan, icon, message = "Không có dữ liệu", action }: TableEmptyProps) {
   return (
     <tr>
-      <td colSpan={colSpan} className="py-16 text-center text-sm text-[var(--color-text-subtle)]">
-        <div className="flex flex-col items-center gap-2">
-          {icon && <span className="opacity-30 [&_svg]:size-10">{icon}</span>}
+      <EmptyCell colSpan={colSpan}>
+        <EmptyInner>
+          {icon}
           <span>{message}</span>
-        </div>
-      </td>
+          {action}
+        </EmptyInner>
+      </EmptyCell>
     </tr>
   );
 }
 
-function TableContainer({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={cn("rounded-lg border border-[var(--color-border)] bg-white overflow-hidden shadow-[var(--shadow-card)]", className)}>
-      {children}
-    </div>
-  );
-}
+// ─── Sort indicator ───────────────────────────────────────────────────────────
 
-export {
-  Table, TableHeader, TableBody, TableFooter,
-  TableHead, TableRow, TableCell, TableCaption,
-  TableEmpty, TableContainer,
-};
+export function SortIcon({ direction }: { direction?: "asc" | "desc" | null }) {
+  if (direction === "asc")  return <span style={{ marginLeft: 4 }}>↑</span>;
+  if (direction === "desc") return <span style={{ marginLeft: 4 }}>↓</span>;
+  return <span style={{ marginLeft: 4, opacity: 0.3 }}>⇅</span>;
+}

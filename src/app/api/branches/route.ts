@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { message: parsed.error.errors[0].message },
+      { message: parsed.error.issues[0].message },
       { status: 400 }
     );
   }

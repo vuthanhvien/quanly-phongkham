@@ -20,7 +20,7 @@ export default function RootLayout({
     <html lang="vi" className={inter.variable}>
       <body className="font-sans antialiased">
         <Providers>{children}</Providers>
-        <Toaster richColors position="top-right" />
+        <Toaster />
       </body>
     </html>
   );

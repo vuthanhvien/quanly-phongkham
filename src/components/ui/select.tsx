@@ -1,162 +1,176 @@
 "use client";
+import React from "react";
+import * as RadixSelect from "@radix-ui/react-select";
+import styled from "styled-components";
+import { ChevronDown, Check } from "lucide-react";
+import { tokens as t } from "./tokens";
 
-import * as React from "react";
-import * as SelectPrimitive from "@radix-ui/react-select";
-import { Check, ChevronDown, ChevronUp } from "lucide-react";
-import { cn } from "@/lib/utils";
+// ─── Trigger ─────────────────────────────────────────────────────────────────
 
-const Select = SelectPrimitive.Root;
-const SelectGroup = SelectPrimitive.Group;
-const SelectValue = SelectPrimitive.Value;
+const Trigger = styled(RadixSelect.Trigger)<{ compact?: boolean; $invalid?: boolean }>`
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  height: ${(p) => p.compact ? "28px" : "32px"};
+  padding: 0 10px;
+  border-radius: ${t.radiusMd};
+  border: 2px solid ${(p) => p.$invalid ? t.colorBorderDanger : t.colorBorderInput};
+  background: ${t.colorBgInput};
+  font-family: ${t.fontFamily};
+  font-size: ${t.fontSizeMd};
+  color: ${t.colorText};
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: border-color ${t.durationFast}, background ${t.durationFast};
 
-const SelectTrigger = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> & { compact?: boolean; isInvalid?: boolean }
->(({ className, children, compact, isInvalid, ...props }, ref) => (
-  <SelectPrimitive.Trigger
-    ref={ref}
-    className={cn(
-      "flex w-full items-center justify-between rounded-sm border bg-[var(--color-bg-input)]",
-      "px-2.5 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-subtlest)]",
-      "transition-colors duration-fast outline-none",
-      "focus:border-[var(--color-border-focused)] focus:ring-2 focus:ring-[var(--color-border-focused)]/30",
-      "disabled:cursor-not-allowed disabled:bg-[var(--color-neutral-20)] disabled:opacity-60",
-      "data-[placeholder]:text-[var(--color-text-subtlest)]",
-      compact ? "h-7" : "h-8",
-      isInvalid
-        ? "border-[var(--color-border-danger)]"
-        : "border-[var(--color-border-input)] hover:border-[var(--color-border-input-hovered)]",
-      className
-    )}
-    {...props}
-  >
-    {children}
-    <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 text-[var(--color-text-subtle)] shrink-0 ml-1" />
-    </SelectPrimitive.Icon>
-  </SelectPrimitive.Trigger>
-));
-SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
+  &[data-placeholder] { color: ${t.colorTextSubtlest}; }
 
-const SelectScrollUpButton = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.ScrollUpButton>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollUpButton>
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.ScrollUpButton
-    ref={ref}
-    className={cn("flex cursor-default items-center justify-center py-1", className)}
-    {...props}
-  >
-    <ChevronUp className="h-4 w-4" />
-  </SelectPrimitive.ScrollUpButton>
-));
-SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName;
+  &:hover { background: ${t.colorBgNeutral}; border-color: ${t.colorBorderInputHovered}; }
 
-const SelectScrollDownButton = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.ScrollDownButton>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollDownButton>
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.ScrollDownButton
-    ref={ref}
-    className={cn("flex cursor-default items-center justify-center py-1", className)}
-    {...props}
-  >
-    <ChevronDown className="h-4 w-4" />
-  </SelectPrimitive.ScrollDownButton>
-));
-SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayName;
+  &:focus {
+    border-color: ${t.colorBorderFocused};
+    box-shadow: 0 0 0 2px ${t.colorBrandSubtlest};
+  }
 
-const SelectContent = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
-  <SelectPrimitive.Portal>
-    <SelectPrimitive.Content
-      ref={ref}
-      className={cn(
-        "relative z-50 min-w-[8rem] overflow-hidden",
-        "rounded-lg border border-[var(--color-border)] bg-white",
-        "shadow-[var(--shadow-overlay)]",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out",
-        "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-        "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
-        position === "popper" &&
-          "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
-        className
-      )}
-      position={position}
-      {...props}
-    >
-      <SelectScrollUpButton />
-      <SelectPrimitive.Viewport
-        className={cn(
-          "p-1",
-          position === "popper" &&
-            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
-        )}
-      >
-        {children}
-      </SelectPrimitive.Viewport>
-      <SelectScrollDownButton />
-    </SelectPrimitive.Content>
-  </SelectPrimitive.Portal>
-));
-SelectContent.displayName = SelectPrimitive.Content.displayName;
+  &[data-disabled] { opacity: 0.6; cursor: not-allowed; }
 
-const SelectLabel = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Label>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Label>
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.Label
-    ref={ref}
-    className={cn("px-2 py-1.5 text-xs font-semibold text-[var(--color-text-subtle)]", className)}
-    {...props}
-  />
-));
-SelectLabel.displayName = SelectPrimitive.Label.displayName;
+  svg { width: 14px; height: 14px; color: ${t.colorTextSubtle}; flex-shrink: 0; }
+`;
 
-const SelectItem = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
-  <SelectPrimitive.Item
-    ref={ref}
-    className={cn(
-      "relative flex w-full cursor-pointer select-none items-center rounded-sm",
-      "py-1.5 pl-2 pr-8 text-sm text-[var(--color-text)] outline-none",
-      "hover:bg-[var(--color-bg-neutral-hovered)]",
-      "focus:bg-[var(--color-bg-neutral-hovered)]",
-      "data-[state=checked]:bg-[var(--color-bg-selected)] data-[state=checked]:text-[var(--color-text-brand)]",
-      "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className
-    )}
-    {...props}
-  >
-    <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
-      <SelectPrimitive.ItemIndicator>
-        <Check className="h-4 w-4 text-[var(--color-brand-bold)]" />
-      </SelectPrimitive.ItemIndicator>
-    </span>
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-  </SelectPrimitive.Item>
-));
-SelectItem.displayName = SelectPrimitive.Item.displayName;
+// ─── Content / Dropdown ───────────────────────────────────────────────────────
 
-const SelectSeparator = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Separator>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>
->(({ className, ...props }, ref) => (
-  <SelectPrimitive.Separator
-    ref={ref}
-    className={cn("my-1 h-px bg-[var(--color-border)]", className)}
-    {...props}
-  />
-));
-SelectSeparator.displayName = SelectPrimitive.Separator.displayName;
+const Content = styled(RadixSelect.Content)`
+  overflow: hidden;
+  background: white;
+  border-radius: ${t.radiusLg};
+  border: 1px solid ${t.colorBorder};
+  box-shadow: ${t.shadowOverlay};
+  z-index: 100;
+  min-width: var(--radix-select-trigger-width);
+  max-height: 280px;
+`;
 
-export {
-  Select, SelectGroup, SelectValue, SelectTrigger,
-  SelectContent, SelectLabel, SelectItem, SelectSeparator,
-  SelectScrollUpButton, SelectScrollDownButton,
-};
+const Viewport = styled(RadixSelect.Viewport)`
+  padding: 4px;
+`;
+
+// ─── Item ─────────────────────────────────────────────────────────────────────
+
+const Item = styled(RadixSelect.Item)`
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 28px;
+  border-radius: ${t.radiusSm};
+  font-family: ${t.fontFamily};
+  font-size: ${t.fontSizeMd};
+  color: ${t.colorText};
+  cursor: pointer;
+  position: relative;
+  transition: background ${t.durationFast};
+
+  &[data-highlighted] { background: ${t.colorBgNeutralHovered}; }
+  &[data-state="checked"] { color: ${t.colorTextBrand}; background: ${t.colorBgSelected}; }
+  &[data-disabled] { opacity: 0.5; cursor: not-allowed; }
+`;
+
+const ItemIndicator = styled(RadixSelect.ItemIndicator)`
+  position: absolute;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  color: ${t.colorBrandBold};
+  svg { width: 14px; height: 14px; }
+`;
+
+const GroupLabel = styled(RadixSelect.Label)`
+  padding: 6px 8px 2px;
+  font-size: ${t.fontSizeXs};
+  font-weight: 600;
+  color: ${t.colorTextSubtlest};
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+`;
+
+export const SelectSeparator = styled(RadixSelect.Separator)`
+  height: 1px;
+  background: ${t.colorBorder};
+  margin: 4px 0;
+`;
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+export interface SelectOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+}
+
+export interface SelectOptionGroup {
+  label: string;
+  options: SelectOption[];
+}
+
+interface SelectProps {
+  options: SelectOption[] | SelectOptionGroup[];
+  value?: string;
+  onChange?: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  isInvalid?: boolean;
+  compact?: boolean;
+  defaultValue?: string;
+}
+
+function isGrouped(opts: SelectOption[] | SelectOptionGroup[]): opts is SelectOptionGroup[] {
+  return opts.length > 0 && "options" in opts[0];
+}
+
+export function Select({
+  options,
+  value,
+  onChange,
+  placeholder = "Chọn...",
+  disabled,
+  isInvalid,
+  compact,
+  defaultValue,
+}: SelectProps) {
+  return (
+    <RadixSelect.Root value={value} onValueChange={onChange} disabled={disabled} defaultValue={defaultValue}>
+      <Trigger compact={compact} $invalid={isInvalid}>
+        <RadixSelect.Value placeholder={placeholder} />
+        <ChevronDown />
+      </Trigger>
+
+      <RadixSelect.Portal>
+        <Content position="popper" sideOffset={4}>
+          <Viewport>
+            {isGrouped(options)
+              ? options.map((group) => (
+                  <RadixSelect.Group key={group.label}>
+                    <GroupLabel>{group.label}</GroupLabel>
+                    {group.options.map((opt) => (
+                      <Item key={opt.value} value={opt.value} disabled={opt.disabled}>
+                        <ItemIndicator><Check /></ItemIndicator>
+                        <RadixSelect.ItemText>{opt.label}</RadixSelect.ItemText>
+                      </Item>
+                    ))}
+                  </RadixSelect.Group>
+                ))
+              : (options as SelectOption[]).map((opt) => (
+                  <Item key={opt.value} value={opt.value} disabled={opt.disabled}>
+                    <ItemIndicator><Check /></ItemIndicator>
+                    <RadixSelect.ItemText>{opt.label}</RadixSelect.ItemText>
+                  </Item>
+                ))}
+          </Viewport>
+        </Content>
+      </RadixSelect.Portal>
+    </RadixSelect.Root>
+  );
+}

@@ -1,144 +1,203 @@
 "use client";
-
-import * as React from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import React from "react";
+import { Button } from "./button";
+import * as RadixDialog from "@radix-ui/react-dialog";
+import styled, { keyframes } from "styled-components";
 import { X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { tokens as t } from "./tokens";
 
-const Dialog = DialogPrimitive.Root;
-const DialogTrigger = DialogPrimitive.Trigger;
-const DialogPortal = DialogPrimitive.Portal;
-const DialogClose = DialogPrimitive.Close;
+// ─── Animations ───────────────────────────────────────────────────────────────
 
-const DialogOverlay = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Overlay
-    ref={ref}
-    className={cn(
-      "fixed inset-0 z-50 bg-black/50",
-      "data-[state=open]:animate-in data-[state=closed]:animate-out",
-      "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      className
-    )}
-    {...props}
-  />
-));
-DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
+const fadeIn  = keyframes`from { opacity: 0; } to { opacity: 1; }`;
+const fadeOut = keyframes`from { opacity: 1; } to { opacity: 0; }`;
+const slideIn = keyframes`from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); }`;
+const slideOut= keyframes`from { opacity: 1; transform: translate(-50%, -50%) scale(1); } to { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }`;
 
-interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
-  size?: "xs" | "sm" | "default" | "lg" | "xl" | "full";
-  hideClose?: boolean;
-}
+// ─── Overlay ──────────────────────────────────────────────────────────────────
+
+const Overlay = styled(RadixDialog.Overlay)`
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(9, 30, 66, 0.54);
+
+  &[data-state="open"]  { animation: ${fadeIn}  200ms ${t.ease}; }
+  &[data-state="closed"]{ animation: ${fadeOut} 150ms ${t.ease}; }
+`;
+
+// ─── Content ──────────────────────────────────────────────────────────────────
 
 const sizeMap = {
-  xs:      "max-w-sm",
-  sm:      "max-w-md",
-  default: "max-w-lg",
-  lg:      "max-w-2xl",
-  xl:      "max-w-4xl",
-  full:    "max-w-[90vw]",
+  xs:      "380px",
+  sm:      "480px",
+  default: "560px",
+  lg:      "768px",
+  xl:      "1024px",
 };
 
-const DialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  DialogContentProps
->(({ className, children, size = "default", hideClose, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
-        "w-full bg-white rounded-lg shadow-[var(--shadow-overlay)]",
-        "border border-[var(--color-border)]",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out",
-        "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-        "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
-        "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
-        sizeMap[size],
-        className
-      )}
-      {...props}
-    >
-      {children}
-      {!hideClose && (
-        <DialogPrimitive.Close
-          className={cn(
-            "absolute right-3 top-3 rounded-sm p-1",
-            "text-[var(--color-text-subtle)] hover:text-[var(--color-text)]",
-            "hover:bg-[var(--color-bg-neutral-hovered)]",
-            "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focused)]",
+const Content = styled(RadixDialog.Content)<{ $size?: keyof typeof sizeMap }>`
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 1001;
+  width: calc(100vw - 32px);
+  max-width: ${(p) => sizeMap[p.$size ?? "default"]};
+  background: white;
+  border-radius: ${t.radiusLg};
+  border: 1px solid ${t.colorBorder};
+  box-shadow: ${t.shadowOverlay};
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+
+  &[data-state="open"]  { animation: ${slideIn}  200ms ${t.ease}; }
+  &[data-state="closed"]{ animation: ${slideOut} 150ms ${t.ease}; }
+`;
+
+// ─── Header ───────────────────────────────────────────────────────────────────
+
+const HeaderEl = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid ${t.colorBorder};
+  flex-shrink: 0;
+`;
+
+const TitleEl = styled(RadixDialog.Title)`
+  font-family: ${t.fontFamily};
+  font-size: ${t.fontSizeLg};
+  font-weight: 600;
+  color: ${t.colorText};
+  margin: 0;
+  line-height: 1.3;
+`;
+
+const DescriptionEl = styled(RadixDialog.Description)`
+  font-family: ${t.fontFamily};
+  font-size: ${t.fontSizeMd};
+  color: ${t.colorTextSubtle};
+  margin: 4px 0 0;
+`;
+
+const CloseBtn = styled(RadixDialog.Close)`
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: ${t.radiusMd};
+  color: ${t.colorTextSubtle};
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: -2px;
+  transition: background ${t.durationFast}, color ${t.durationFast};
+
+  &:hover { background: ${t.colorBgNeutralHovered}; color: ${t.colorText}; }
+  &:focus-visible { outline: 2px solid ${t.colorBorderFocused}; }
+
+  svg { width: 16px; height: 16px; }
+`;
+
+// ─── Body ─────────────────────────────────────────────────────────────────────
+
+const BodyEl = styled.div`
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+`;
+
+// ─── Footer ───────────────────────────────────────────────────────────────────
+
+const FooterEl = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 24px;
+  border-top: 1px solid ${t.colorBorder};
+  background: ${t.colorBgNeutral};
+  flex-shrink: 0;
+  border-radius: 0 0 ${t.radiusLg} ${t.radiusLg};
+`;
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+interface ModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title?: string;
+  description?: string;
+  size?: keyof typeof sizeMap;
+  hideClose?: boolean;
+  children: React.ReactNode;
+}
+
+export function Modal({ open, onOpenChange, title, description, size, hideClose, children }: ModalProps) {
+  return (
+    <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
+      <RadixDialog.Portal>
+        <Overlay />
+        <Content $size={size}>
+          {(title || !hideClose) && (
+            <HeaderEl>
+              <div>
+                {title && <TitleEl>{title}</TitleEl>}
+                {description && <DescriptionEl>{description}</DescriptionEl>}
+              </div>
+              {!hideClose && (
+                <CloseBtn aria-label="Đóng"><X /></CloseBtn>
+              )}
+            </HeaderEl>
           )}
+          {children}
+        </Content>
+      </RadixDialog.Portal>
+    </RadixDialog.Root>
+  );
+}
+
+export const ModalBody   = BodyEl;
+export const ModalFooter = FooterEl;
+
+// Re-export trigger
+export const ModalTrigger = RadixDialog.Trigger;
+
+// ─── Confirm dialog helper ────────────────────────────────────────────────────
+
+interface ConfirmProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  appearance?: "danger" | "primary" | "warning";
+  onConfirm: () => void;
+  children?: React.ReactNode;
+}
+
+export function ConfirmModal({
+  open, onOpenChange, title, description,
+  confirmLabel = "Xác nhận", cancelLabel = "Hủy",
+  appearance = "primary", onConfirm, children,
+}: ConfirmProps) {
+  return (
+    <Modal open={open} onOpenChange={onOpenChange} title={title} description={description} size="xs">
+      {children && <ModalBody>{children}</ModalBody>}
+      <ModalFooter>
+        <Button appearance="subtle" onClick={() => onOpenChange(false)}>{cancelLabel}</Button>
+        <Button
+          appearance={appearance}
+          onClick={() => { onConfirm(); onOpenChange(false); }}
         >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Đóng</span>
-        </DialogPrimitive.Close>
-      )}
-    </DialogPrimitive.Content>
-  </DialogPortal>
-));
-DialogContent.displayName = DialogPrimitive.Content.displayName;
-
-function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn(
-        "flex flex-col space-y-1 px-6 pt-5 pb-4 border-b border-[var(--color-border)]",
-        className
-      )}
-      {...props}
-    />
+          {confirmLabel}
+        </Button>
+      </ModalFooter>
+    </Modal>
   );
 }
-
-function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--color-border)]",
-        "bg-[var(--color-neutral-20)] rounded-b-lg",
-        className
-      )}
-      {...props}
-    />
-  );
-}
-
-function DialogBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div className={cn("px-6 py-5", className)} {...props} />
-  );
-}
-
-const DialogTitle = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Title
-    ref={ref}
-    className={cn("text-base font-semibold text-[var(--color-text)] leading-snug", className)}
-    {...props}
-  />
-));
-DialogTitle.displayName = DialogPrimitive.Title.displayName;
-
-const DialogDescription = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Description
-    ref={ref}
-    className={cn("text-sm text-[var(--color-text-subtle)]", className)}
-    {...props}
-  />
-));
-DialogDescription.displayName = DialogPrimitive.Description.displayName;
-
-export {
-  Dialog, DialogPortal, DialogOverlay, DialogClose, DialogTrigger,
-  DialogContent, DialogHeader, DialogFooter, DialogBody,
-  DialogTitle, DialogDescription,
-};

@@ -3,78 +3,73 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { navItems } from "./nav-items";
-import { cn } from "@/lib/utils";
-import { Building2 } from "lucide-react";
+import { LogOut, Building2 } from "lucide-react";
+import {
+  SidebarRoot, SidebarLogo, SidebarLogoIcon, SidebarLogoText,
+  SidebarLogoTitle, SidebarLogoBranch,
+  SidebarNav, SidebarSection,
+  NavItem, NavItemText,
+  SidebarUser, UserAvatar, UserInfo, UserName, UserRole,
+} from "@/components/ui/sidebar";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const userRole = session?.user?.role ?? "";
+  const role = session?.user?.role ?? "";
 
   const visibleItems = navItems.filter(
-    (item) => !item.roles || item.roles.includes(userRole)
+    (item) => !item.roles || item.roles.includes(role)
   );
 
-  return (
-    <aside className="flex h-screen w-60 flex-col border-r bg-white">
-      {/* Logo */}
-      <div className="flex h-14 items-center gap-2 border-b px-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
-          <Building2 className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold leading-none">Phòng Khám</p>
-          {session?.user?.branchName && (
-            <p className="text-xs text-muted-foreground">
-              {session.user.branchName}
-            </p>
-          )}
-        </div>
-      </div>
+  const initials = session?.user?.name
+    ?.split(" ")
+    .slice(-2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase() ?? "?";
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-2">
-        <ul className="space-y-0.5">
+  return (
+    <SidebarRoot>
+      {/* Logo */}
+      <SidebarLogo>
+        <SidebarLogoIcon>
+          <Building2 />
+        </SidebarLogoIcon>
+        <SidebarLogoText>
+          <SidebarLogoTitle>Phòng Khám</SidebarLogoTitle>
+          {session?.user?.branchName && (
+            <SidebarLogoBranch>{session.user.branchName}</SidebarLogoBranch>
+          )}
+        </SidebarLogoText>
+      </SidebarLogo>
+
+      {/* Nav */}
+      <SidebarNav>
+        <SidebarSection>
           {visibleItems.map((item) => {
             const isActive =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+              item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                    isActive
-                      ? "bg-blue-50 text-blue-700 font-medium"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  )}
-                >
-                  <item.icon className="h-4 w-4 shrink-0" />
-                  {item.title}
-                </Link>
-              </li>
+              <NavItem key={item.href} as={Link} href={item.href} $active={isActive}>
+                <item.icon />
+                <NavItemText>{item.title}</NavItemText>
+              </NavItem>
             );
           })}
-        </ul>
-      </nav>
+        </SidebarSection>
+      </SidebarNav>
 
-      {/* User info */}
-      <div className="border-t p-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
-            {session?.user?.name?.[0]?.toUpperCase() ?? "?"}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="truncate text-sm font-medium">{session?.user?.name}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {session?.user?.role}
-            </p>
-          </div>
-        </div>
-      </div>
-    </aside>
+      {/* User */}
+      <SidebarUser onClick={() => signOut({ callbackUrl: "/login" })}>
+        <UserAvatar>{initials}</UserAvatar>
+        <UserInfo>
+          <UserName>{session?.user?.name}</UserName>
+          <UserRole>{session?.user?.role}</UserRole>
+        </UserInfo>
+        <LogOut style={{ width: 14, height: 14, color: "rgba(255,255,255,0.4)", flexShrink: 0 }} />
+      </SidebarUser>
+    </SidebarRoot>
   );
 }

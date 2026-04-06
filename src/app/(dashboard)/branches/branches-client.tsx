@@ -6,46 +6,39 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import styled from "styled-components";
+import { tokens as t } from "@/components/ui/tokens";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, TextField } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Table, TableHeader, TableBody, Th, Tr, Td, TableEmpty, TableContainer } from "@/components/ui/table";
+import { Modal, ModalBody, ModalFooter } from "@/components/ui/dialog";
+import { SectionHeader } from "@/components/ui/card";
 import { Plus, Building2 } from "lucide-react";
 
 const branchSchema = z.object({
-  name: z.string().min(1, "Tên chi nhánh không được để trống"),
-  slug: z
-    .string()
-    .min(1, "Slug không được để trống")
-    .regex(/^[a-z0-9-]+$/, "Slug chỉ gồm chữ thường, số và dấu gạch ngang"),
+  name:    z.string().min(1, "Tên chi nhánh không được để trống"),
+  slug:    z.string().min(1, "Slug không được để trống").regex(/^[a-z0-9-]+$/, "Slug chỉ gồm chữ thường, số và dấu -"),
   address: z.string().optional(),
-  phone: z.string().optional(),
+  phone:   z.string().optional(),
 });
-
 type BranchForm = z.infer<typeof branchSchema>;
 
+const FormGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+`;
+
+const Count = styled.span`
+  font-family: ${t.fontFamily};
+  font-size: ${t.fontSizeSm};
+  color: ${t.colorTextSubtle};
+`;
+
 interface Branch {
-  id: string;
-  name: string;
-  slug: string;
-  address: string | null;
-  phone: string | null;
-  isActive: boolean;
+  id: string; name: string; slug: string;
+  address: string | null; phone: string | null; isActive: boolean;
   _count: { users: number; customers: number };
 }
 
@@ -54,12 +47,9 @@ export function BranchesClient({ branches }: { branches: Branch[] }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<BranchForm>({ resolver: zodResolver(branchSchema) });
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<BranchForm>({
+    resolver: zodResolver(branchSchema),
+  });
 
   const onSubmit = async (data: BranchForm) => {
     setLoading(true);
@@ -69,126 +59,89 @@ export function BranchesClient({ branches }: { branches: Branch[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message ?? "Lỗi không xác định");
-      }
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       toast.success("Tạo chi nhánh thành công");
-      setOpen(false);
-      reset();
-      router.refresh();
-    } catch (err: any) {
-      toast.error(err.message);
+      setOpen(false); reset(); router.refresh();
+    } catch (err) {
+      toast.error((err as Error).message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {branches.length} chi nhánh
-        </p>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm">
-              <Plus className="h-4 w-4 mr-1" />
-              Thêm chi nhánh
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Thêm chi nhánh mới</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
-              <div className="space-y-2">
-                <Label>Tên chi nhánh *</Label>
-                <Input placeholder="VD: Cơ sở Quận 1" {...register("name")} />
-                {errors.name && (
-                  <p className="text-xs text-red-500">{errors.name.message}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Slug (URL) *</Label>
-                <Input placeholder="VD: co-so-quan-1" {...register("slug")} />
-                {errors.slug && (
-                  <p className="text-xs text-red-500">{errors.slug.message}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Địa chỉ</Label>
-                <Input placeholder="Địa chỉ chi nhánh" {...register("address")} />
-              </div>
-              <div className="space-y-2">
-                <Label>Số điện thoại</Label>
-                <Input placeholder="0901234567" {...register("phone")} />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setOpen(false)}
-                >
-                  Hủy
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Đang lưu..." : "Lưu"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+    <>
+      <SectionHeader>
+        <Count>{branches.length} chi nhánh</Count>
+        <Button appearance="primary" onClick={() => setOpen(true)}>
+          <Plus /> Thêm chi nhánh
+        </Button>
+      </SectionHeader>
 
-      <div className="rounded-lg border bg-white">
+      <TableContainer>
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Chi nhánh</TableHead>
-              <TableHead>Slug</TableHead>
-              <TableHead>Địa chỉ</TableHead>
-              <TableHead>Điện thoại</TableHead>
-              <TableHead className="text-center">NV</TableHead>
-              <TableHead className="text-center">KH</TableHead>
-              <TableHead>Trạng thái</TableHead>
-            </TableRow>
+            <tr>
+              <Th>Chi nhánh</Th>
+              <Th>Slug</Th>
+              <Th>Địa chỉ</Th>
+              <Th>Điện thoại</Th>
+              <Th width={60} style={{ textAlign: "center" }}>NV</Th>
+              <Th width={60} style={{ textAlign: "center" }}>KH</Th>
+              <Th width={100}>Trạng thái</Th>
+            </tr>
           </TableHeader>
           <TableBody>
-            {branches.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={7}
-                  className="text-center text-muted-foreground py-10"
-                >
-                  <Building2 className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  Chưa có chi nhánh nào
-                </TableCell>
-              </TableRow>
-            ) : (
-              branches.map((b) => (
-                <TableRow key={b.id}>
-                  <TableCell className="font-medium">{b.name}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {b.slug}
-                  </TableCell>
-                  <TableCell className="text-sm">{b.address ?? "–"}</TableCell>
-                  <TableCell className="text-sm">{b.phone ?? "–"}</TableCell>
-                  <TableCell className="text-center">{b._count.users}</TableCell>
-                  <TableCell className="text-center">
-                    {b._count.customers}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={b.isActive ? "default" : "secondary"}>
+            {branches.length === 0
+              ? <TableEmpty colSpan={7} icon={<Building2 />} message="Chưa có chi nhánh nào" />
+              : branches.map((b) => (
+                <Tr key={b.id}>
+                  <Td bold>{b.name}</Td>
+                  <Td muted>{b.slug}</Td>
+                  <Td>{b.address ?? "–"}</Td>
+                  <Td>{b.phone ?? "–"}</Td>
+                  <Td center>{b._count.users}</Td>
+                  <Td center>{b._count.customers}</Td>
+                  <Td>
+                    <Badge appearance={b.isActive ? "success" : "neutral"} styleVariant="subtle">
                       {b.isActive ? "Hoạt động" : "Đã đóng"}
                     </Badge>
-                  </TableCell>
-                </TableRow>
+                  </Td>
+                </Tr>
               ))
-            )}
+            }
           </TableBody>
         </Table>
-      </div>
-    </div>
+      </TableContainer>
+
+      <Modal open={open} onOpenChange={setOpen} title="Thêm chi nhánh mới" size="sm">
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <ModalBody>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <FormGrid>
+                <Field label="Tên chi nhánh" required error={errors.name?.message}>
+                  <TextField placeholder="Cơ sở Quận 1" isInvalid={!!errors.name} {...register("name")} />
+                </Field>
+                <Field label="Slug (URL)" required error={errors.slug?.message} hint="VD: co-so-quan-1">
+                  <TextField placeholder="co-so-quan-1" isInvalid={!!errors.slug} {...register("slug")} />
+                </Field>
+              </FormGrid>
+              <Field label="Địa chỉ">
+                <TextField placeholder="123 Nguyễn Huệ, Quận 1..." {...register("address")} />
+              </Field>
+              <Field label="Số điện thoại">
+                <TextField placeholder="028 xxxx xxxx" {...register("phone")} />
+              </Field>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button appearance="subtle" type="button" onClick={() => { setOpen(false); reset(); }}>Hủy</Button>
+            <Button appearance="primary" type="submit" isDisabled={loading}>
+              {loading ? "Đang lưu..." : "Tạo chi nhánh"}
+            </Button>
+          </ModalFooter>
+        </form>
+      </Modal>
+    </>
   );
 }
