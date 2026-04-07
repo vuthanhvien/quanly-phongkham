@@ -6,9 +6,9 @@ export default withAuth(
     const token = req.nextauth.token;
     const pathname = req.nextUrl.pathname;
 
-    // Chỉ SUPER_ADMIN mới vào được /branches
-    if (pathname.startsWith("/branches") && token?.role !== "SUPER_ADMIN") {
-      return NextResponse.redirect(new URL("/", req.url));
+    // Chỉ SUPER_ADMIN mới vào được /admin/branches
+    if (pathname.startsWith("/admin/branches") && token?.role !== "SUPER_ADMIN") {
+      return NextResponse.redirect(new URL("/admin", req.url));
     }
 
     return NextResponse.next();
@@ -21,7 +21,5 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: [
-    "/((?!api/auth|login|booking|_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/admin/:path*"],
 };

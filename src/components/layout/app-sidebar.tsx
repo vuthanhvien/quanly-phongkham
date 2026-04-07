@@ -50,7 +50,7 @@ export function AppSidebar() {
         <SidebarSection>
           {visibleItems.map((item) => {
             const isActive =
-              item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
             return (
               <NavItem key={item.href} as={Link} href={item.href} $active={isActive}>
                 <item.icon />
@@ -62,7 +62,7 @@ export function AppSidebar() {
       </SidebarNav>
 
       {/* User */}
-      <SidebarUser onClick={() => signOut({ callbackUrl: "/login" })}>
+      <SidebarUser onClick={() => signOut({ callbackUrl: "/admin/login" })}>
         <UserAvatar>{initials}</UserAvatar>
         <UserInfo>
           <UserName>{session?.user?.name}</UserName>
