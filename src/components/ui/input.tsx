@@ -89,25 +89,28 @@ interface TextFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   compact?: boolean;
 }
 
-export function TextField({ iconBefore, iconAfter, compact, isInvalid, ...props }: TextFieldProps) {
-  if (!iconBefore && !iconAfter) {
-    return <Input compact={compact} isInvalid={isInvalid} {...props} />;
+export const TextField = React.forwardRef<HTMLInputElement, TextFieldProps>(
+  function TextField({ iconBefore, iconAfter, compact, isInvalid, ...props }, ref) {
+    if (!iconBefore && !iconAfter) {
+      return <Input ref={ref} compact={compact} isInvalid={isInvalid} {...props} />;
+    }
+    return (
+      <InputWrapper compact={compact}>
+        {iconBefore && <IconSlot side="left">{iconBefore}</IconSlot>}
+        <InputWithIcon
+          ref={ref}
+          hasLeft={!!iconBefore}
+          hasRight={!!iconAfter}
+          compact={compact}
+          isInvalid={isInvalid}
+          style={{ height: "100%" }}
+          {...props}
+        />
+        {iconAfter && <IconSlot side="right">{iconAfter}</IconSlot>}
+      </InputWrapper>
+    );
   }
-  return (
-    <InputWrapper compact={compact}>
-      {iconBefore && <IconSlot side="left">{iconBefore}</IconSlot>}
-      <InputWithIcon
-        hasLeft={!!iconBefore}
-        hasRight={!!iconAfter}
-        compact={compact}
-        isInvalid={isInvalid}
-        style={{ height: "100%" }}
-        {...props}
-      />
-      {iconAfter && <IconSlot side="right">{iconAfter}</IconSlot>}
-    </InputWrapper>
-  );
-}
+);
 
 // ─── Label ────────────────────────────────────────────────────────────────────
 

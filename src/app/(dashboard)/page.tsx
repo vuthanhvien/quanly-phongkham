@@ -1,93 +1,101 @@
 import { AppHeader } from "@/components/layout/app-header";
-import { PageBody } from "@/components/ui/sidebar";
-import { StatCard } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, CalendarDays, Package, TrendingUp } from "lucide-react";
-import styled from "styled-components";
-import { tokens as t } from "@/components/ui/tokens";
 
-const Grid4 = styled.div`
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  @media (max-width: 1200px) { grid-template-columns: repeat(2, 1fr); }
-  @media (max-width: 640px)  { grid-template-columns: 1fr; }
-`;
-
-const Grid3 = styled.div`
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 16px;
-  @media (max-width: 900px) { grid-template-columns: 1fr; }
-`;
-
-const PlaceholderCard = styled.div`
-  background: white;
-  border-radius: ${t.radiusLg};
-  border: 1px solid ${t.colorBorder};
-  box-shadow: ${t.shadowCard};
-  overflow: hidden;
-`;
-
-const PlaceholderHeader = styled.div`
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid ${t.colorBorder};
-  font-family: ${t.fontFamily};
-  font-size: ${t.fontSizeMd};
-  font-weight: 600;
-  color: ${t.colorText};
-`;
-
-const PlaceholderBody = styled.div`
-  padding: 20px 16px;
-  font-family: ${t.fontFamily};
-  font-size: ${t.fontSizeSm};
-  color: ${t.colorTextSubtle};
-`;
-
-const StatusRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  border-bottom: 1px solid ${t.colorBorder};
-  font-family: ${t.fontFamily};
-  font-size: ${t.fontSizeMd};
-  color: ${t.colorText};
-
-  &:last-child { border-bottom: none; }
-
-  span:last-child { font-weight: 600; color: ${t.colorTextSubtle}; }
-`;
+const stats = [
+  {
+    title: "Khách hàng",
+    value: "–",
+    description: "Tổng số khách",
+    icon: Users,
+    color: "text-blue-600",
+    bg: "bg-blue-50",
+  },
+  {
+    title: "Lịch hẹn hôm nay",
+    value: "–",
+    description: "Đã đặt lịch",
+    icon: CalendarDays,
+    color: "text-green-600",
+    bg: "bg-green-50",
+  },
+  {
+    title: "Cảnh báo kho",
+    value: "–",
+    description: "Sản phẩm sắp hết",
+    icon: Package,
+    color: "text-orange-600",
+    bg: "bg-orange-50",
+  },
+  {
+    title: "Doanh thu tháng",
+    value: "–",
+    description: "Tháng hiện tại",
+    icon: TrendingUp,
+    color: "text-purple-600",
+    bg: "bg-purple-50",
+  },
+];
 
 export default function DashboardPage() {
   return (
-    <>
+    <div>
       <AppHeader title="Tổng quan" />
-      <PageBody>
-        <Grid4 style={{ marginBottom: 16 }}>
-          <StatCard label="Khách hàng" value="–" description="Tổng số khách" icon={<Users />} color="blue" />
-          <StatCard label="Lịch hẹn hôm nay" value="–" description="Đã đặt lịch" icon={<CalendarDays />} color="green" />
-          <StatCard label="Cảnh báo kho" value="–" description="Sắp hết hàng" icon={<Package />} color="red" />
-          <StatCard label="Doanh thu tháng" value="–" description="Tháng hiện tại" icon={<TrendingUp />} color="purple" />
-        </Grid4>
+      <div className="p-6 space-y-6">
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-4">
+          {stats.map((stat) => (
+            <Card key={stat.title}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {stat.title}
+                </CardTitle>
+                <div className={`rounded-lg p-2 ${stat.bg}`}>
+                  <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stat.value}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stat.description}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-        <Grid3>
-          <PlaceholderCard>
-            <PlaceholderHeader>Lịch hẹn hôm nay</PlaceholderHeader>
-            <PlaceholderBody>Hệ thống đang được thiết lập. Dữ liệu sẽ hiển thị khi có lịch hẹn.</PlaceholderBody>
-          </PlaceholderCard>
-
-          <PlaceholderCard>
-            <PlaceholderHeader>Trạng thái phòng khám</PlaceholderHeader>
-            {["Đang chờ", "Đang tư vấn", "Đang phẫu thuật", "Hậu phẫu"].map((s) => (
-              <StatusRow key={s}>
-                <span>{s}</span>
-                <span>–</span>
-              </StatusRow>
-            ))}
-          </PlaceholderCard>
-        </Grid3>
-      </PageBody>
-    </>
+        {/* Placeholder cho dashboard content */}
+        <div className="grid grid-cols-3 gap-4">
+          <Card className="col-span-2">
+            <CardHeader>
+              <CardTitle className="text-base">Lịch hẹn hôm nay</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Chưa có dữ liệu. Hệ thống đang được thiết lập.
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Trạng thái phòng khám</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {["Đang chờ", "Đang tư vấn", "Đang phẫu thuật", "Hậu phẫu"].map(
+                (status) => (
+                  <div
+                    key={status}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span>{status}</span>
+                    <span className="font-medium">–</span>
+                  </div>
+                )
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
   );
 }
