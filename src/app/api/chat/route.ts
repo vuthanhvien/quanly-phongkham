@@ -75,7 +75,7 @@ const tools: Anthropic.Tool[] = [
   },
 ];
 
-async function handleToolCall(toolName: string, toolInput: Record<string, string>): Promise<string> {
+async function handleToolCall (toolName: string, toolInput: Record<string, string>): Promise<string> {
   if (toolName === "get_branches") {
     const branches = await prisma.branch.findMany({
       where: { isActive: true },
@@ -89,7 +89,7 @@ async function handleToolCall(toolName: string, toolInput: Record<string, string
       let branchId = toolInput.branchId;
       if (!branchId) {
         const branch = await prisma.branch.findFirst({ where: { isActive: true } });
-        branchId = branch?.id;
+        branchId = branch?.id || '';
       }
       if (!branchId) return JSON.stringify({ error: "Không tìm thấy chi nhánh" });
 
@@ -120,7 +120,7 @@ async function handleToolCall(toolName: string, toolInput: Record<string, string
   return JSON.stringify({ error: "Unknown tool" });
 }
 
-export async function POST(req: NextRequest) {
+export async function POST (req: NextRequest) {
   const { messages } = await req.json();
 
   if (!process.env.ANTHROPIC_API_KEY) {
