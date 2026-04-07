@@ -6,6 +6,7 @@ export const tokens = {
   colorBrandBoldPressed:  "#09326C",
   colorBrand:             "#388BFF",
   colorBrandSubtlest:     "#E9F2FF",
+  colorBrandSubtle:       "#E9F2FF",
 
   // Text
   colorText:          "#172B4D",
