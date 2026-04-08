@@ -3,7 +3,7 @@ import { Inter } from "next/font/google"
 import { Toaster } from "@/components/ui/sonner"
 import { Providers } from "@/components/providers"
 import { StyledComponentsRegistry } from "@/lib/styled-registry"
-import "./globals.scss"
+    import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
