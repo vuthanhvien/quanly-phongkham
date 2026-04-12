@@ -326,7 +326,7 @@ export function CustomersClient({ sales, isSuperAdmin, branches = [] }: {
               <Tr
                 key={c.id}
                 clickable
-                onClick={() => nav.push(`/customers/${c.id}`)}
+                onClick={() => nav.push(`/admin/customers/${c.id}`)}
                 style={{ cursor: "pointer" }}
               >
                 <Td muted style={{ fontFamily: "monospace", fontSize: 12 }}>{c.code}</Td>
