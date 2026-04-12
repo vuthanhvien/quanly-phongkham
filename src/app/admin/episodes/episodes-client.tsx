@@ -107,9 +107,11 @@ const CountBubble = styled.span`
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function EpisodesClient({ doctors }: {
+export function EpisodesClient({ doctors, branches, isSuperAdmin, currentBranchId }: {
   doctors: { id: string; fullName: string }[];
+  branches: { id: string; name: string }[];
   isSuperAdmin: boolean;
+  currentBranchId: string | null;
 }) {
   const router = useRouter();
 
@@ -129,6 +131,7 @@ export function EpisodesClient({ doctors }: {
   const [serviceType, setServiceType] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [customerOptions, setCustomerOptions] = useState<{ value: string; label: string }[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState(currentBranchId ?? "");
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
@@ -170,6 +173,7 @@ export function EpisodesClient({ doctors }: {
   const onClose = () => {
     setOpen(false); reset();
     setDoctorId(""); setServiceType(""); setSelectedCustomerId("");
+    setSelectedBranchId(currentBranchId ?? "");
   };
 
   const onSubmit = async (data: CreateForm) => {
@@ -179,7 +183,10 @@ export function EpisodesClient({ doctors }: {
     try {
       const res = await fetch("/api/episodes", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, serviceType, customerId: selectedCustomerId, doctorId }),
+        body: JSON.stringify({
+          ...data, serviceType, customerId: selectedCustomerId, doctorId,
+          ...(isSuperAdmin ? { branchId: selectedBranchId } : {}),
+        }),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       const ep = await res.json();
@@ -306,6 +313,16 @@ export function EpisodesClient({ doctors }: {
                   clearable
                 />
               </Field>
+              {isSuperAdmin && (
+                <Field label="Chi nhánh" required>
+                  <Select
+                    options={branches.map(b => ({ value: b.id, label: b.name }))}
+                    value={selectedBranchId}
+                    onChange={setSelectedBranchId}
+                    placeholder="Chọn chi nhánh"
+                  />
+                </Field>
+              )}
               <FormGrid>
                 <Field label="Loại dịch vụ" required error={errors.serviceType?.message}>
                   <Select

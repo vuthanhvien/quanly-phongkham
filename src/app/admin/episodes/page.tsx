@@ -13,17 +13,27 @@ export default async function EpisodesPage() {
   const isSuperAdmin = session.user.role === "SUPER_ADMIN";
   const branchFilter = isSuperAdmin ? {} : { branchId: session.user.branchId ?? undefined };
 
-  const doctors = await prisma.user.findMany({
-    where: { isActive: true, role: { name: "DOCTOR" }, ...branchFilter },
-    select: { id: true, fullName: true },
-    orderBy: { fullName: "asc" },
-  });
+  const [doctors, branches] = await Promise.all([
+    prisma.user.findMany({
+      where: { isActive: true, role: { name: "DOCTOR" }, ...branchFilter },
+      select: { id: true, fullName: true },
+      orderBy: { fullName: "asc" },
+    }),
+    isSuperAdmin
+      ? prisma.branch.findMany({ select: { id: true, name: true }, orderBy: { createdAt: "asc" } })
+      : [],
+  ]);
 
   return (
     <>
       <AppHeader title="Hồ sơ bệnh án" />
       <PageBody>
-        <EpisodesClient doctors={doctors} isSuperAdmin={isSuperAdmin} />
+        <EpisodesClient
+          doctors={doctors}
+          branches={branches}
+          isSuperAdmin={isSuperAdmin}
+          currentBranchId={session.user.branchId ?? null}
+        />
       </PageBody>
     </>
   );

@@ -151,8 +151,11 @@ const SectionTitle = styled.div`
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function VisitsClient({ doctors }: {
+export function VisitsClient({ doctors, branches, isSuperAdmin, currentBranchId }: {
   doctors: { id: string; fullName: string }[];
+  branches: { id: string; name: string }[];
+  isSuperAdmin: boolean;
+  currentBranchId: string | null;
 }) {
   const [visits, setVisits]       = useState<VisitRecord[]>([]);
   const [total, setTotal]         = useState(0);
@@ -171,6 +174,7 @@ export function VisitsClient({ doctors }: {
   const [visitStatus, setVisitStatus]         = useState("WAITING");
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [customerOptions, setCustomerOptions] = useState<{ value: string; label: string }[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState(currentBranchId ?? "");
 
   // Detail panel
   const [detail, setDetail] = useState<VisitRecord | null>(null);
@@ -216,6 +220,7 @@ export function VisitsClient({ doctors }: {
   const onClose = () => {
     setOpen(false); reset();
     setDoctorId(""); setVisitStatus("WAITING"); setSelectedCustomerId("");
+    setSelectedBranchId(currentBranchId ?? "");
   };
 
   const parseNum = (v: string | undefined) => {
@@ -235,6 +240,7 @@ export function VisitsClient({ doctors }: {
         body: JSON.stringify({
           customerId: selectedCustomerId,
           doctorId,
+          ...(isSuperAdmin ? { branchId: selectedBranchId } : {}),
           visitDate:  data.visitDate || undefined,
           status:     visitStatus,
           pulse:      parseNum(data.pulse) ? Math.round(parseNum(data.pulse)!) : null,
@@ -388,6 +394,16 @@ export function VisitsClient({ doctors }: {
                   clearable
                 />
               </Field>
+              {isSuperAdmin && (
+                <Field label="Chi nhánh" required>
+                  <Select
+                    options={branches.map(b => ({ value: b.id, label: b.name }))}
+                    value={selectedBranchId}
+                    onChange={setSelectedBranchId}
+                    placeholder="Chọn chi nhánh"
+                  />
+                </Field>
+              )}
               <FormGrid>
                 <Field label="Bác sĩ phụ trách" required>
                   <Select
