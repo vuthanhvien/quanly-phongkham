@@ -134,10 +134,11 @@ const SectionLabel = styled.p`margin: 0 0 10px; font-family: ${t.fontFamily}; fo
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function CustomersClient({ sales }: {
+export function CustomersClient({ sales, isSuperAdmin, branches = [] }: {
   sales: { id: string; fullName: string }[];
   isSuperAdmin: boolean;
   currentBranchId: string | null;
+  branches?: { id: string; name: string }[];
 }) {
   const nav = useNav();
 
@@ -159,6 +160,7 @@ export function CustomersClient({ sales }: {
   const [genderValue, setGenderValue] = useState("OTHER");
   const [sourceValue, setSourceValue] = useState("");
   const [assignedSaleId, setAssignedSaleId] = useState("");
+  const [selectedBranchId, setSelectedBranchId] = useState(branches[0]?.id ?? "");
 
   // Revealed phones cache
   const [revealedPhones, setRevealedPhones] = useState<Record<string, string>>({});
@@ -199,6 +201,7 @@ export function CustomersClient({ sales }: {
   const onClose = () => {
     setOpen(false); reset();
     setGenderValue("OTHER"); setSourceValue(""); setAssignedSaleId("");
+    setSelectedBranchId(branches[0]?.id ?? "");
   };
 
   const onSubmit = async (data: CreateForm) => {
@@ -206,7 +209,13 @@ export function CustomersClient({ sales }: {
     try {
       const res = await fetch("/api/customers", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, gender: genderValue, source: sourceValue || undefined, assignedSaleId: assignedSaleId || undefined }),
+        body: JSON.stringify({
+          ...data,
+          gender: genderValue,
+          source: sourceValue || undefined,
+          assignedSaleId: assignedSaleId || undefined,
+          ...(isSuperAdmin ? { branchId: selectedBranchId } : {}),
+        }),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       toast.success("Thêm khách hàng thành công");
@@ -382,6 +391,16 @@ export function CustomersClient({ sales }: {
         <form onSubmit={handleSubmit(onSubmit)}>
           <ModalBody>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {isSuperAdmin && branches.length > 0 && (
+                <Field label="Chi nhánh" required>
+                  <Select
+                    options={branches.map(b => ({ value: b.id, label: b.name }))}
+                    value={selectedBranchId}
+                    onChange={setSelectedBranchId}
+                    placeholder="Chọn chi nhánh"
+                  />
+                </Field>
+              )}
               <FormGrid>
                 <Field label="Họ và tên" required error={errors.fullName?.message}>
                   <TextField placeholder="Nguyễn Thị A" isInvalid={!!errors.fullName} {...register("fullName")} />

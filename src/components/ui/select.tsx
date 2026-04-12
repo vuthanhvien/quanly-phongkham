@@ -67,7 +67,7 @@ const Content = styled(RadixSelect.Content)`
   border-radius: ${t.radiusLg};
   border: 1px solid ${t.colorBorder};
   box-shadow: ${t.shadowOverlay};
-  z-index: 100;
+  z-index: 1100;
   min-width: var(--radix-select-trigger-width);
   max-height: 280px;
 `

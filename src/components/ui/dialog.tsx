@@ -41,8 +41,9 @@ const sizeMap = {
 
 const Content = styled(RadixDialog.Content)<{ $size?: keyof typeof sizeMap }>`
   position: fixed;
-  top: calc(50% - 560px);
-  left: calc(50% - 560px);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   z-index: 1001;
   width: calc(100vw - 32px);
   max-width: ${(p) => sizeMap[p.$size ?? "default"]};
