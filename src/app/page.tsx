@@ -9,7 +9,6 @@ import {
   Syringe, Eye, Zap, Leaf, Shield, HeartPulse,
   CheckCircle2, ArrowRight, Share2, Link2, Play,
 } from "lucide-react";
-import Link from "next/link";
 
 // ─── Keyframes ──────────────────────────────────────────────────────────────
 
@@ -116,18 +115,18 @@ const HeaderActions = styled.div`
   gap: 10px;
 `;
 
-const BtnOutline = styled.a`
-  font-size: 13px;
-  font-weight: 500;
-  color: ${t.colorTextSubtle};
-  text-decoration: none;
-  padding: 7px 16px;
-  border: 1px solid ${t.colorBorder};
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 100ms;
-  &:hover { color: ${t.colorText}; border-color: ${t.colorBorderInputHovered}; }
-`;
+// const BtnOutline = styled.a`
+//   font-size: 13px;
+//   font-weight: 500;
+//   color: ${t.colorTextSubtle};
+//   text-decoration: none;
+//   padding: 7px 16px;
+//   border: 1px solid ${t.colorBorder};
+//   border-radius: 8px;
+//   cursor: pointer;
+//   transition: all 100ms;
+//   &:hover { color: ${t.colorText}; border-color: ${t.colorBorderInputHovered}; }
+// `;
 
 const BtnPrimary = styled.a`
   font-size: 13px;

@@ -13,9 +13,8 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, Th, Tr, Td, TableEmpty, TableContainer } from "@/components/ui/table";
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/dialog";
-import { SectionHeader } from "@/components/ui/card";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, ClipboardPlus, Search, ChevronLeft, ChevronRight, Activity, X, Edit2 } from "lucide-react";
+import { SectionHeader, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, ClipboardPlus, Search, ChevronLeft, ChevronRight, Activity, X } from "lucide-react";
 import { Autocomplete } from "@/components/ui/autocomplete";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
@@ -61,9 +60,9 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED:   "Đã hủy",
 };
 
-const STATUS_APPEARANCE: Record<string, "warning" | "info" | "success" | "danger"> = {
+const STATUS_APPEARANCE: Record<string, "warning" | "success" | "danger"> = {
   WAITING:     "warning",
-  IN_PROGRESS: "info",
+  IN_PROGRESS: "warning",
   COMPLETED:   "success",
   CANCELLED:   "danger",
 };
@@ -174,10 +173,9 @@ export function VisitsClient({ doctors }: {
   const [customerOptions, setCustomerOptions] = useState<{ value: string; label: string }[]>([]);
 
   // Detail panel
-  const [detail, setDetail]   = useState<VisitRecord | null>(null);
-  const [editing, setEditing] = useState(false);
+  const [detail, setDetail] = useState<VisitRecord | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateForm>({
+  const { register, handleSubmit, reset } = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
   });
 
@@ -283,11 +281,6 @@ export function VisitsClient({ doctors }: {
     if (!d) return "–";
     try { return format(new Date(d), "dd/MM/yyyy HH:mm", { locale: vi }); } catch { return "–"; }
   }
-  function fmtDateOnly(d: string | null) {
-    if (!d) return "–";
-    try { return format(new Date(d), "dd/MM/yyyy", { locale: vi }); } catch { return "–"; }
-  }
-
   return (
     <>
       <SectionHeader>
@@ -470,7 +463,7 @@ export function VisitsClient({ doctors }: {
 
       {/* ─── Detail slide-over panel ─────────────────────────────── */}
       {detail && (
-        <DetailOverlay onClick={() => { setDetail(null); setEditing(false); }}>
+        <DetailOverlay onClick={() => setDetail(null)}>
           <DetailPanel onClick={e => e.stopPropagation()}>
             <DetailHeader>
               <div>
@@ -485,7 +478,7 @@ export function VisitsClient({ doctors }: {
                 <Badge appearance={STATUS_APPEARANCE[detail.status] ?? "neutral"} styleVariant="subtle">
                   {STATUS_LABELS[detail.status] ?? detail.status}
                 </Badge>
-                <Button appearance="subtle" onClick={() => { setDetail(null); setEditing(false); }}>
+                <Button appearance="subtle" onClick={() => setDetail(null)}>
                   <X size={16} />
                 </Button>
               </div>
