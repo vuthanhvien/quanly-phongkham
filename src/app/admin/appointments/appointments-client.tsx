@@ -278,7 +278,7 @@ export function AppointmentsClient({ isSuperAdmin: _sa, currentBranchId: _bid }:
                   <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                     <span
                       style={{ fontWeight: 600, fontFamily: t.fontFamily, color: t.colorTextBrand, cursor: "pointer" }}
-                      onClick={() => router.push(`/customers/${a.customer.id}`)}
+                      onClick={() => router.push(`/admin/customers/${a.customer.id}`)}
                     >
                       {a.customer.fullName}
                     </span>

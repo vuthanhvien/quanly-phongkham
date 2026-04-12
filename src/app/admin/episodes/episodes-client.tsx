@@ -185,7 +185,7 @@ export function EpisodesClient({ doctors }: {
       const ep = await res.json();
       toast.success("Tạo hồ sơ bệnh án thành công");
       onClose();
-      router.push(`/episodes/${ep.id}`);
+      router.push(`/admin/episodes/${ep.id}`);
     } catch (err) {
       toast.error((err as Error).message);
     } finally { setSaving(false); }
@@ -246,7 +246,7 @@ export function EpisodesClient({ doctors }: {
             ) : episodes.length === 0 ? (
               <TableEmpty colSpan={8} icon={<Stethoscope />} message="Chưa có hồ sơ bệnh án nào" />
             ) : episodes.map(ep => (
-              <Tr key={ep.id} clickable onClick={() => router.push(`/episodes/${ep.id}`)}>
+              <Tr key={ep.id} clickable onClick={() => router.push(`/admin/episodes/${ep.id}`)}>
                 <Td>
                   <div>
                     <div style={{ fontWeight: 600, fontFamily: t.fontFamily, color: t.colorText }}>{ep.customer.fullName}</div>

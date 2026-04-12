@@ -267,7 +267,7 @@ export function EpisodeDetailClient({ episode, doctors }: {
           <ChevronLeft size={14} /> Hồ sơ bệnh án
         </Link>
         <span style={{ color: t.colorBorder }}>›</span>
-        <Link href={`/customers/${episode.customer.id}`} style={{ color: t.colorTextSubtle, fontFamily: t.fontFamily, fontSize: t.fontSizeSm, textDecoration: "none" }}>
+        <Link href={`/admin/customers/${episode.customer.id}`} style={{ color: t.colorTextSubtle, fontFamily: t.fontFamily, fontSize: t.fontSizeSm, textDecoration: "none" }}>
           {episode.customer.fullName}
         </Link>
       </div>
@@ -304,7 +304,7 @@ export function EpisodeDetailClient({ episode, doctors }: {
               <InfoRow>
                 <InfoLabel>Khách hàng</InfoLabel>
                 <InfoValue>
-                  <Link href={`/customers/${episode.customer.id}`} style={{ color: t.colorTextBrand, textDecoration: "none" }}>
+                  <Link href={`/admin/customers/${episode.customer.id}`} style={{ color: t.colorTextBrand, textDecoration: "none" }}>
                     {episode.customer.fullName}
                   </Link>
                 </InfoValue>
