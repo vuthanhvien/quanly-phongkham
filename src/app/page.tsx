@@ -1542,7 +1542,7 @@ export default function LandingPage() {
                 <Stars>
                   {[...Array(5)].map((_, i) => <Star key={i} fill="currentColor" />)}
                 </Stars>
-                <TestiText>"{t.text}"</TestiText>
+                <TestiText>{'"'}{t.text}{'"'}</TestiText>
                 <TestiAuthor>
                   <TestiAvatar $color={t.color}>{t.initials}</TestiAvatar>
                   <div>
