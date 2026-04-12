@@ -1363,7 +1363,7 @@ export default function LandingPage() {
           <NavLink onClick={() => scrollToSection("contact")}>Liên hệ</NavLink>
         </Nav>
         <HeaderActions>
-          <BtnOutline as={Link} href="/admin/login">Quản lý</BtnOutline>
+          {/* <BtnOutline as={Link} href="/login">Quản lý</BtnOutline> */}
           <BtnPrimary onClick={() => setChatOpen(true)}>Đặt lịch ngay</BtnPrimary>
         </HeaderActions>
       </HeaderWrap>
