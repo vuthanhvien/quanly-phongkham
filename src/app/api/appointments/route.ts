@@ -18,10 +18,12 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const date   = searchParams.get("date");   // YYYY-MM-DD
-  const status = searchParams.get("status") ?? "";
-  const page   = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
-  const pageSize = 30;
+  const date     = searchParams.get("date");      // YYYY-MM-DD (single day)
+  const dateFrom = searchParams.get("dateFrom"); // YYYY-MM-DD (range start)
+  const dateTo   = searchParams.get("dateTo");   // YYYY-MM-DD (range end)
+  const status   = searchParams.get("status") ?? "";
+  const page     = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
+  const pageSize = Math.min(parseInt(searchParams.get("pageSize") ?? "30"), 500);
 
   const isSuperAdmin = session.user.role === "SUPER_ADMIN";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -29,10 +31,9 @@ export async function GET(req: NextRequest) {
     ...(isSuperAdmin ? {} : { branchId: session.user.branchId! }),
     ...(status ? { status } : {}),
     ...(date ? {
-      startTime: {
-        gte: new Date(`${date}T00:00:00`),
-        lte: new Date(`${date}T23:59:59`),
-      },
+      startTime: { gte: new Date(`${date}T00:00:00`), lte: new Date(`${date}T23:59:59`) },
+    } : dateFrom && dateTo ? {
+      startTime: { gte: new Date(`${dateFrom}T00:00:00`), lte: new Date(`${dateTo}T23:59:59`) },
     } : {}),
   };
 
