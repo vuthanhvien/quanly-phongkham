@@ -14,15 +14,20 @@ export default async function CustomersPage() {
   const branchId = session.user.branchId;
 
   // Prefetch sales staff for assign dropdown
-  const sales = await prisma.user.findMany({
-    where: {
-      isActive: true,
-      role: { name: { in: ["SALE", "ADMIN", "SUPER_ADMIN", "DOCTOR"] } },
-      ...(isSuperAdmin ? {} : { branchId: branchId ?? undefined }),
-    },
-    select: { id: true, fullName: true },
-    orderBy: { fullName: "asc" },
-  });
+  const [sales, branches] = await Promise.all([
+    prisma.user.findMany({
+      where: {
+        isActive: true,
+        role: { name: { in: ["SALE", "ADMIN", "SUPER_ADMIN", "DOCTOR"] } },
+        ...(isSuperAdmin ? {} : { branchId: branchId ?? undefined }),
+      },
+      select: { id: true, fullName: true },
+      orderBy: { fullName: "asc" },
+    }),
+    isSuperAdmin
+      ? prisma.branch.findMany({ select: { id: true, name: true }, orderBy: { createdAt: "asc" } })
+      : Promise.resolve([]),
+  ]);
 
   return (
     <>
@@ -32,6 +37,7 @@ export default async function CustomersPage() {
           sales={sales}
           isSuperAdmin={isSuperAdmin}
           currentBranchId={branchId ?? null}
+          branches={branches}
         />
       </PageBody>
     </>
