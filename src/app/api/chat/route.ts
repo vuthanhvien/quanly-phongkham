@@ -138,7 +138,29 @@ const tools: Anthropic.Tool[] = [
   },
 ];
 
-async function handleToolCall(toolName: string, toolInput: Record<string, string>): Promise<string> {
+type ReadableMsg = { role: "user" | "assistant"; content: string };
+
+function extractReadableMessages(messages: Anthropic.MessageParam[]): ReadableMsg[] {
+  const result: ReadableMsg[] = [];
+  for (const msg of messages) {
+    if (typeof msg.content === "string") {
+      if (msg.content.trim()) result.push({ role: msg.role as "user" | "assistant", content: msg.content });
+    } else if (Array.isArray(msg.content)) {
+      const texts = (msg.content as Array<{ type: string; text?: string }>)
+        .filter(b => b.type === "text" && b.text?.trim())
+        .map(b => b.text!)
+        .join("\n");
+      if (texts.trim()) result.push({ role: msg.role as "user" | "assistant", content: texts });
+    }
+  }
+  return result;
+}
+
+async function handleToolCall(
+  toolName: string,
+  toolInput: Record<string, string>,
+  ctx: { customerId?: string },
+): Promise<string> {
   if (toolName === "get_branches") {
     const branches = await prisma.branch.findMany({
       where: { isActive: true },
@@ -174,6 +196,7 @@ async function handleToolCall(toolName: string, toolInput: Record<string, string
       });
     }
 
+    ctx.customerId = customer.id;
     return JSON.stringify({
       exists: true,
       verified: true,
@@ -276,6 +299,8 @@ async function handleToolCall(toolName: string, toolInput: Record<string, string
         });
       }
 
+      ctx.customerId = customer.id;
+
       // Xử lý ngày giờ mong muốn
       let preferredDate: Date | null = null;
       let appointmentId: string | null = null;
@@ -345,6 +370,7 @@ async function handleToolCall(toolName: string, toolInput: Record<string, string
 
 export async function POST(req: NextRequest) {
   const { messages } = await req.json();
+  const chatCtx: { customerId?: string } = {};
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
@@ -381,7 +407,7 @@ export async function POST(req: NextRequest) {
 
       for (const block of response.content) {
         if (block.type === "tool_use") {
-          const result = await handleToolCall(block.name, block.input as Record<string, string>);
+          const result = await handleToolCall(block.name, block.input as Record<string, string>, chatCtx);
           toolResults.push({
             type: "tool_result",
             tool_use_id: block.id,
@@ -395,6 +421,15 @@ export async function POST(req: NextRequest) {
     }
 
     break;
+  }
+
+  if (chatCtx.customerId) {
+    const readable = extractReadableMessages(anthropicMessages);
+    if (readable.length > 0) {
+      await prisma.chatLog.create({
+        data: { customerId: chatCtx.customerId, messages: readable },
+      }).catch(err => console.error("[chat] failed to save ChatLog:", err));
+    }
   }
 
   return NextResponse.json({

@@ -154,6 +154,7 @@ model Customer {
   notes         CustomerNote[]
   phoneViewLogs PhoneViewLog[]
   visitRecords  VisitRecord[]
+  chatLogs      ChatLog[]
 
   @@index([branchId, fullName])
   @@index([branchId, status])
@@ -195,6 +196,18 @@ model CustomerNote {
   createdAt   DateTime  @default(now())
 
   @@map("customer_notes")
+}
+
+model ChatLog {
+  id         String   @id @default(cuid())
+  customer   Customer @relation(fields: [customerId], references: [id])
+  customerId String
+  messages   Json     // [{role: "user"|"assistant", content: string}]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([customerId, createdAt])
+  @@map("chat_logs")
 }
 
 model PhoneViewLog {

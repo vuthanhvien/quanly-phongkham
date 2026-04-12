@@ -36,6 +36,11 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
         take: 10,
         select: { id: true, totalAmount: true, status: true, createdAt: true },
       },
+      chatLogs: {
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: { id: true, messages: true, createdAt: true },
+      },
     },
   });
 

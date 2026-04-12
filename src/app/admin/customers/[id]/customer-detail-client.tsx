@@ -17,7 +17,7 @@ import { Tabs, TabList, Tab, TabPanel } from "@/components/ui/tabs";
 import { Modal, ModalBody, ModalFooter } from "@/components/ui/dialog";
 import {
   Phone, AlertTriangle, Edit2, MessageSquare, Send,
-  FileText, Calendar, Package, ChevronLeft,
+  FileText, Calendar, Package, ChevronLeft, Bot,
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -40,6 +40,7 @@ type Customer = {
   episodes: Episode[];
   appointments: Appointment[];
   invoices: Invoice[];
+  chatLogs: ChatLog[];
 };
 
 type Note = {
@@ -51,6 +52,11 @@ type Note = {
 type Episode  = { id: string; chiefComplaint: string | null; status: string; createdAt: string };
 type Appointment = { id: string; startTime: string; status: string; note: string | null };
 type Invoice  = { id: string; totalAmount: number; status: string; createdAt: string };
+type ChatLog  = {
+  id: string;
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  createdAt: string;
+};
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -153,6 +159,26 @@ const Divider  = styled.div`border-top: 1px solid ${t.colorBorder}; margin: 4px 
 const SectionLabel = styled.p`
   margin: 0 0 10px; font-family: ${t.fontFamily}; font-size: ${t.fontSizeSm};
   font-weight: 600; color: ${t.colorText};
+`;
+
+const ChatConversation = styled.div`
+  padding: 12px; border-radius: ${t.radiusMd};
+  background: ${t.colorBgNeutral}; border: 1px solid ${t.colorBorder};
+  margin-bottom: 12px;
+`;
+const ChatDate = styled.div`
+  font-family: ${t.fontFamily}; font-size: ${t.fontSizeXs};
+  color: ${t.colorTextSubtlest}; margin-bottom: 10px;
+`;
+const ChatMessages = styled.div`display: flex; flex-direction: column; gap: 8px;`;
+const ChatBubble = styled.div<{ $role: "user" | "assistant" }>`
+  max-width: 80%; padding: 8px 12px; border-radius: ${t.radiusMd};
+  font-family: ${t.fontFamily}; font-size: ${t.fontSizeSm}; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+  align-self: ${p => p.$role === "user" ? "flex-end" : "flex-start"};
+  background: ${p => p.$role === "user" ? t.colorBrandSubtlest : t.colorBgNeutral};
+  border: 1px solid ${p => p.$role === "user" ? t.colorBorderSelected : t.colorBorder};
+  color: ${t.colorText};
 `;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -383,6 +409,7 @@ export function CustomerDetailClient({ customer, sales }: {
               <Tab value="episodes"><FileText size={14} /> Hồ sơ bệnh án ({customer.episodes.length})</Tab>
               <Tab value="appointments"><Calendar size={14} /> Lịch hẹn ({customer.appointments.length})</Tab>
               <Tab value="invoices"><Package size={14} /> Hoá đơn ({customer.invoices.length})</Tab>
+              <Tab value="chatlogs"><Bot size={14} /> Chat AI ({customer.chatLogs.length})</Tab>
             </TabList>
 
             <TabPanel value="notes" style={{ paddingTop: 14 }}>
@@ -443,6 +470,24 @@ export function CustomerDetailClient({ customer, sales }: {
                     <NoteContent style={{ fontWeight: 600 }}>{inv.totalAmount.toLocaleString("vi-VN")} ₫</NoteContent>
                     <NoteMeta>{inv.status} · {fmtDate(inv.createdAt)}</NoteMeta>
                   </NoteItem>
+                ))
+              }
+            </TabPanel>
+
+            <TabPanel value="chatlogs" style={{ paddingTop: 14 }}>
+              {customer.chatLogs.length === 0
+                ? <EmptyState>Chưa có cuộc hội thoại nào</EmptyState>
+                : customer.chatLogs.map(log => (
+                  <ChatConversation key={log.id}>
+                    <ChatDate>{fmtDateTime(log.createdAt)}</ChatDate>
+                    <ChatMessages>
+                      {log.messages.map((msg, i) => (
+                        <ChatBubble key={i} $role={msg.role}>
+                          {msg.content}
+                        </ChatBubble>
+                      ))}
+                    </ChatMessages>
+                  </ChatConversation>
                 ))
               }
             </TabPanel>
