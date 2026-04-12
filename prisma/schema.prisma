@@ -58,6 +58,8 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  profile      UserProfile?
+
   createdCustomers     Customer[]             @relation("CustomerCreator")
   assignedCustomers    Customer[]             @relation("SaleCustomer")
   appointments         Appointment[]          @relation("AppointmentCreator")
@@ -79,6 +81,30 @@ model User {
   treatmentPlans       TreatmentPlan[]
 
   @@map("users")
+}
+
+model UserProfile {
+  id            String   @id @default(cuid())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String   @unique
+
+  // Bác sĩ & Y tá
+  specialty     String?   // Chuyên khoa / Chuyên môn
+  licenseNumber String?   // Số chứng chỉ hành nghề
+  experience    Int?      // Số năm kinh nghiệm
+  bio           String?   // Giới thiệu (Bác sĩ)
+
+  // Nhân viên
+  position      String?   // Chức danh
+  department    String?   // Phòng ban
+
+  // Lịch làm việc (JSON array of day keys: ["mon","tue",...])
+  workDays      Json?
+
+  avatarUrl     String?
+  updatedAt     DateTime @updatedAt
+
+  @@map("user_profiles")
 }
 
 // ─── NHÓM 2: KHÁCH HÀNG ─────────────────────────────────────────────────────
