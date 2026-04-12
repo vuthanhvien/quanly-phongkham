@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Stethoscope,
   BarChart3,
+  ClipboardPlus,
 } from "lucide-react";
 
 export type NavItem = {
@@ -34,6 +35,11 @@ export const navItems: NavItem[] = [
     title: "Lịch hẹn",
     href: "/admin/appointments",
     icon: CalendarDays,
+  },
+  {
+    title: "Khám bệnh",
+    href: "/admin/visits",
+    icon: ClipboardPlus,
   },
   {
     title: "Hồ sơ bệnh án",

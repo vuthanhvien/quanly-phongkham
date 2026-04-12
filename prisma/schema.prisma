@@ -30,6 +30,7 @@ model Branch {
   stockBatches          StockBatch[]
   resources             Resource[]
   publicBookingRequests PublicBookingRequest[]
+  visitRecords          VisitRecord[]
 
   @@map("branches")
 }
@@ -79,6 +80,8 @@ model User {
   auditLogs            AuditLog[]
   processedBookings    PublicBookingRequest[]
   treatmentPlans       TreatmentPlan[]
+  doctorVisits         VisitRecord[]          @relation("DoctorVisit")
+  visitRecordsCreated  VisitRecord[]          @relation("VisitCreator")
 
   @@map("users")
 }
@@ -150,6 +153,7 @@ model Customer {
   invoices      Invoice[]
   notes         CustomerNote[]
   phoneViewLogs PhoneViewLog[]
+  visitRecords  VisitRecord[]
 
   @@index([branchId, fullName])
   @@index([branchId, status])
@@ -234,6 +238,7 @@ model MedicalEpisode {
   documents         MedicalDocument[]
   treatmentSessions TreatmentSession[]
   invoices          Invoice[]
+  visitRecords      VisitRecord[]
 
   @@index([branchId, customerId])
   @@map("medical_episodes")
@@ -459,6 +464,54 @@ enum SessionStatus {
   LATE
   SKIPPED
   RESCHEDULED
+}
+
+// ─── NHÓM 5b: PHIẾU KHÁM BỆNH ───────────────────────────────────────────────
+
+model VisitRecord {
+  id          String      @id @default(cuid())
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  customerId  String
+  branch      Branch      @relation(fields: [branchId], references: [id])
+  branchId    String
+  doctor      User        @relation("DoctorVisit", fields: [doctorId], references: [id])
+  doctorId    String
+  visitDate   DateTime    @default(now())
+  status      VisitStatus @default(WAITING)
+
+  // Sinh hiệu
+  pulse       Int?
+  systolicBP  Int?
+  diastolicBP Int?
+  spO2        Decimal?    @db.Decimal(5, 2)
+  temperature Decimal?    @db.Decimal(4, 1)
+  weight      Decimal?    @db.Decimal(5, 1)
+
+  // Thông tin khám
+  chiefComplaint String?
+  diagnosis      String?
+  prescription   String?
+  note           String?
+
+  // Liên kết hồ sơ bệnh án (tùy chọn)
+  episode    MedicalEpisode? @relation(fields: [episodeId], references: [id])
+  episodeId  String?
+
+  createdBy   User     @relation("VisitCreator", fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([branchId, visitDate])
+  @@index([customerId])
+  @@map("visit_records")
+}
+
+enum VisitStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }
 
 // ─── NHÓM 6: KHO & VẬT TƯ ──────────────────────────────────────────────────
