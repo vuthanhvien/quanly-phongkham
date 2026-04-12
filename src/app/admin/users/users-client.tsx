@@ -294,7 +294,7 @@ export function UsersClient({
   const editRoleName   = roles.find(r => r.id === editRoleId)?.name ?? "";
 
   // ── Create Form ────────────────────────────────────────────────────
-  const { register: regC, handleSubmit: submitC, reset: resetC, formState: { errors: errC } } = useForm<CreateForm>({
+  const { register: regC, handleSubmit: submitC, reset: resetC, setValue: setValC, formState: { errors: errC } } = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
   });
 
@@ -328,7 +328,7 @@ export function UsersClient({
   };
 
   // ── Edit Form ──────────────────────────────────────────────────────
-  const { register: regE, handleSubmit: submitE, reset: resetE, formState: { errors: errE } } = useForm<EditForm>({
+  const { register: regE, handleSubmit: submitE, reset: resetE, setValue: setValE, formState: { errors: errE } } = useForm<EditForm>({
     resolver: zodResolver(editSchema),
   });
 
@@ -527,13 +527,13 @@ export function UsersClient({
                 <TextField type="password" placeholder="Tối thiểu 6 ký tự" isInvalid={!!errC.password} {...regC("password")} />
               </Field>
               <FormGrid>
-                <Field label="Vai trò" required>
+                <Field label="Vai trò" required error={errC.roleId?.message}>
                   <Select
                     options={roleOptions}
                     value={createRoleId}
-                    onChange={setCreateRoleId}
+                    onChange={v => { setCreateRoleId(v); setValC("roleId", v); }}
                     placeholder="Chọn vai trò"
-                    isInvalid={!createRoleId}
+                    isInvalid={!!errC.roleId}
                   />
                 </Field>
                 {isSuperAdmin && (
@@ -541,7 +541,7 @@ export function UsersClient({
                     <Select
                       options={branchOptions}
                       value={createBranchId || "none"}
-                      onChange={setCreateBranchId}
+                      onChange={v => { setCreateBranchId(v); setValC("branchId", v === "none" ? "" : v); }}
                       placeholder="Chọn chi nhánh"
                     />
                   </Field>
@@ -593,7 +593,7 @@ export function UsersClient({
                   <Select
                     options={roleOptions}
                     value={editRoleId}
-                    onChange={setEditRoleId}
+                    onChange={v => { setEditRoleId(v); setValE("roleId", v); }}
                     placeholder="Chọn vai trò"
                   />
                 </Field>
@@ -602,7 +602,7 @@ export function UsersClient({
                     <Select
                       options={branchOptions}
                       value={editBranchId || "none"}
-                      onChange={setEditBranchId}
+                      onChange={v => { setEditBranchId(v); setValE("branchId", v === "none" ? "" : v); }}
                       placeholder="Chọn chi nhánh"
                     />
                   </Field>
