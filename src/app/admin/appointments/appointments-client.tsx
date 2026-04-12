@@ -65,7 +65,6 @@ const STATUS_APPEARANCE: Record<string, "default" | "primary" | "warning" | "suc
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const createSchema = z.object({
-  type:      z.string().min(1, "Vui lòng chọn loại lịch hẹn"),
   startTime: z.string().min(1, "Vui lòng chọn giờ bắt đầu"),
   endTime:   z.string().min(1, "Vui lòng chọn giờ kết thúc"),
   note:      z.string().optional(),
@@ -105,10 +104,10 @@ function fmtTime(d: string) {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function AppointmentsClient({ isSuperAdmin: _sa, currentBranchId: _bid }: {
+export function AppointmentsClient({ isSuperAdmin, branches = [] }: {
   isSuperAdmin: boolean;
   currentBranchId: string | null;
+  branches?: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const today = startOfToday();
@@ -124,6 +123,7 @@ export function AppointmentsClient({ isSuperAdmin: _sa, currentBranchId: _bid }:
   const [apptType, setApptType] = useState("");
   const [customerOptions, setCustomerOptions] = useState<{ value: string; label: string }[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [selectedBranchId, setSelectedBranchId]     = useState(branches[0]?.id ?? "");
 
   // Status update
   const [updateTarget, setUpdateTarget]   = useState<Appointment | null>(null);
@@ -158,7 +158,7 @@ export function AppointmentsClient({ isSuperAdmin: _sa, currentBranchId: _bid }:
     })));
   };
 
-  const onClose = () => { setOpen(false); reset(); setApptType(""); setSelectedCustomerId(""); };
+  const onClose = () => { setOpen(false); reset(); setApptType(""); setSelectedCustomerId(""); setSelectedBranchId(branches[0]?.id ?? ""); };
 
   const onSubmit = async (data: CreateForm) => {
     if (!selectedCustomerId) return toast.error("Vui lòng chọn khách hàng");
@@ -174,6 +174,7 @@ export function AppointmentsClient({ isSuperAdmin: _sa, currentBranchId: _bid }:
           startTime:  `${dateStr}T${data.startTime}`,
           endTime:    `${dateStr}T${data.endTime}`,
           note:       data.note,
+          ...(isSuperAdmin ? { branchId: selectedBranchId } : {}),
         }),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
@@ -349,6 +350,16 @@ export function AppointmentsClient({ isSuperAdmin: _sa, currentBranchId: _bid }:
         <form onSubmit={handleSubmit(onSubmit)}>
           <ModalBody>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {isSuperAdmin && branches.length > 0 && (
+                <Field label="Chi nhánh" required>
+                  <Select
+                    options={branches.map(b => ({ value: b.id, label: b.name }))}
+                    value={selectedBranchId}
+                    onChange={setSelectedBranchId}
+                    placeholder="Chọn chi nhánh"
+                  />
+                </Field>
+              )}
               <Field label="Khách hàng" required>
                 <Autocomplete
                   options={customerOptions}
