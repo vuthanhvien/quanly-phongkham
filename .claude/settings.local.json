@@ -5,7 +5,8 @@
       "Bash(npx prisma:*)",
       "Bash(taskkill /F /IM node.exe)",
       "Bash(taskkill //F //IM node.exe)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(echo \"TSC EXIT: $?\")"
     ]
   }
 }
