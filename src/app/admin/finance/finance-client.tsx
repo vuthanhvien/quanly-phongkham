@@ -33,8 +33,12 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
+  BarChart2,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from "lucide-react"
-import { format } from "date-fns"
+import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from "date-fns"
 import { vi } from "date-fns/locale"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -71,6 +75,17 @@ type Expense = {
 type CustomerOption = { value: string; label: string; phone: string | null }
 type LineItem = { description: string; quantity: number; unitPrice: number }
 
+type ReportData = {
+  totalRevenue: number
+  totalExpenses: number
+  profit: number
+  paymentCount: number
+  expenseCount: number
+  paymentsByMethod: { method: string; amount: number }[]
+  expensesByCategory: { category: string; amount: number }[]
+  invoicesByStatus: { status: string; count: number; amount: number }[]
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const INVOICE_STATUS_LABELS: Record<string, string> = {
@@ -95,6 +110,25 @@ const PAYMENT_METHOD_OPTIONS = [
   { value: "CARD", label: "Thẻ" },
   { value: "OTHER", label: "Khác" },
 ]
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH:        "Tiền mặt",
+  BANK_TRANSFER: "Chuyển khoản",
+  CREDIT_CARD: "Thẻ tín dụng",
+  DEBIT_CARD:  "Thẻ ghi nợ",
+  MOMO:        "MoMo",
+  VNPAY:       "VNPay",
+}
+
+const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
+  SALARY:      "Lương",
+  RENT:        "Mặt bằng",
+  UTILITIES:   "Điện nước",
+  SUPPLIES:    "Vật tư",
+  MAINTENANCE: "Bảo trì",
+  MARKETING:   "Marketing",
+  OTHER:       "Khác",
+}
 
 const EXPENSE_CATEGORIES = [
   "SALARY",
@@ -205,6 +239,143 @@ const PageBtn = styled.button`
     cursor: not-allowed;
   }
 `
+const ReportFilterBar = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid ${t.colorBorder};
+  background: ${t.colorBgNeutral};
+`
+const PresetBtn = styled.button<{ $active?: boolean }>`
+  all: unset;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: ${t.radiusMd};
+  font-family: ${t.fontFamily};
+  font-size: ${t.fontSizeSm};
+  font-weight: 500;
+  background: ${({ $active }) => ($active ? t.colorBrandSubtle : "white")};
+  color: ${({ $active }) => ($active ? t.colorBrand : t.colorTextSubtle)};
+  border: 1px solid ${({ $active }) => ($active ? t.colorBrand : t.colorBorder)};
+  &:hover {
+    background: ${t.colorBrandSubtlest};
+    color: ${t.colorBrand};
+    border-color: ${t.colorBrand};
+  }
+`
+const StatGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 16px;
+`
+const StatCard = styled.div<{ $variant?: "success" | "danger" | "neutral" }>`
+  background: white;
+  border: 1px solid ${t.colorBorder};
+  border-radius: ${t.radiusLg};
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-left: 3px solid
+    ${({ $variant }) =>
+      $variant === "success"
+        ? t.colorTextSuccess
+        : $variant === "danger"
+          ? t.colorTextDanger
+          : t.colorBorder};
+`
+const StatLabel = styled.div`
+  font-family: ${t.fontFamily};
+  font-size: ${t.fontSizeSm};
+  color: ${t.colorTextSubtle};
+  display: flex;
+  align-items: center;
+  gap: 5px;
+`
+const StatValue = styled.div<{ $variant?: "success" | "danger" | "neutral" }>`
+  font-family: ${t.fontFamily};
+  font-size: 22px;
+  font-weight: 700;
+  color: ${({ $variant }) =>
+    $variant === "success"
+      ? t.colorTextSuccess
+      : $variant === "danger"
+        ? t.colorTextDanger
+        : t.colorText};
+`
+const ReportSection = styled.div`
+  padding: 0 16px 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+`
+const ReportBox = styled.div`
+  background: white;
+  border: 1px solid ${t.colorBorder};
+  border-radius: ${t.radiusLg};
+  overflow: hidden;
+`
+const ReportBoxTitle = styled.div`
+  font-family: ${t.fontFamily};
+  font-size: ${t.fontSizeMd};
+  font-weight: 600;
+  color: ${t.colorText};
+  padding: 10px 14px;
+  border-bottom: 1px solid ${t.colorBorder};
+  background: ${t.colorBgNeutral};
+`
+const BreakdownRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 14px;
+  border-bottom: 1px solid ${t.colorBorder};
+  font-family: ${t.fontFamily};
+  font-size: ${t.fontSizeSm};
+  &:last-child {
+    border-bottom: none;
+  }
+`
+const BarTrack = styled.div`
+  height: 4px;
+  background: ${t.colorBgNeutralHovered};
+  border-radius: 2px;
+  margin-top: 3px;
+  overflow: hidden;
+`
+const BarFill = styled.div<{ $pct: number; $color: string }>`
+  height: 100%;
+  width: ${({ $pct }) => $pct}%;
+  background: ${({ $color }) => $color};
+  border-radius: 2px;
+  transition: width 0.4s ease;
+`
+const DateInput = styled.input`
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid ${t.colorBorderInput};
+  border-radius: ${t.radiusMd};
+  font-family: ${t.fontFamily};
+  font-size: ${t.fontSizeMd};
+  color: ${t.colorText};
+  background: white;
+  outline: none;
+  &:focus {
+    border-color: ${t.colorBorderFocused};
+  }
+`
+const ReportEmpty = styled.div`
+  padding: 32px 16px;
+  text-align: center;
+  font-family: ${t.fontFamily};
+  font-size: ${t.fontSizeMd};
+  color: ${t.colorTextSubtlest};
+`
+
 const ItemRow = styled.div`
   display: grid;
   grid-template-columns: 1fr 80px 120px 32px;
@@ -271,6 +442,54 @@ export function FinanceClient({
   const [paySaving, setPaySaving] = useState(false)
   const payForm = useForm<PaymentForm>({ resolver: zodResolver(paymentSchema) })
   const payErrors = payForm.formState.errors
+
+  // ── Report ──────────────────────────────────────────────────────────────
+  const [reportFrom, setReportFrom] = useState(() =>
+    format(startOfMonth(new Date()), "yyyy-MM-dd"),
+  )
+  const [reportTo, setReportTo] = useState(() =>
+    format(endOfMonth(new Date()), "yyyy-MM-dd"),
+  )
+  const [reportData, setReportData] = useState<ReportData | null>(null)
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportPreset, setReportPreset] = useState<string>("thisMonth")
+
+  const fetchReport = useCallback(async (from: string, to: string) => {
+    setReportLoading(true)
+    try {
+      const res = await fetch(
+        `/api/finance/report?from=${from}&to=${to}`,
+      )
+      const json = await res.json()
+      setReportData(json)
+    } catch {
+      toast.error("Không thể tải báo cáo")
+    } finally {
+      setReportLoading(false)
+    }
+  }, [])
+
+  const applyPreset = (preset: string) => {
+    const now = new Date()
+    let from: Date, to: Date
+    if (preset === "thisMonth") {
+      from = startOfMonth(now)
+      to   = endOfMonth(now)
+    } else if (preset === "lastMonth") {
+      const last = subMonths(now, 1)
+      from = startOfMonth(last)
+      to   = endOfMonth(last)
+    } else {
+      from = startOfYear(now)
+      to   = endOfYear(now)
+    }
+    const f = format(from, "yyyy-MM-dd")
+    const t2 = format(to, "yyyy-MM-dd")
+    setReportFrom(f)
+    setReportTo(t2)
+    setReportPreset(preset)
+    fetchReport(f, t2)
+  }
 
   // ── Expenses ────────────────────────────────────────────────────────────
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -516,6 +735,10 @@ export function FinanceClient({
             <CreditCard size={15} style={{ marginRight: 6 }} />
             Chi phí
           </Tab>
+          <Tab value="report">
+            <BarChart2 size={15} style={{ marginRight: 6 }} />
+            Báo cáo
+          </Tab>
         </TabList>
 
         {/* ── Hóa đơn tab ───────────────────────────────────────────────── */}
@@ -705,6 +928,284 @@ export function FinanceClient({
               <ChevronRight size={16} />
             </PageBtn>
           </Pagination>
+        </TabPanel>
+
+        {/* ── Báo cáo tab ───────────────────────────────────────────────── */}
+        <TabPanel value="report">
+          {/* Filter bar */}
+          <ReportFilterBar>
+            <PresetBtn
+              $active={reportPreset === "thisMonth"}
+              onClick={() => applyPreset("thisMonth")}
+            >
+              Tháng này
+            </PresetBtn>
+            <PresetBtn
+              $active={reportPreset === "lastMonth"}
+              onClick={() => applyPreset("lastMonth")}
+            >
+              Tháng trước
+            </PresetBtn>
+            <PresetBtn
+              $active={reportPreset === "thisYear"}
+              onClick={() => applyPreset("thisYear")}
+            >
+              Năm nay
+            </PresetBtn>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginLeft: 8,
+              }}
+            >
+              <DateInput
+                type="date"
+                value={reportFrom}
+                onChange={(e) => {
+                  setReportFrom(e.target.value)
+                  setReportPreset("custom")
+                }}
+              />
+              <span
+                style={{
+                  fontFamily: t.fontFamily,
+                  fontSize: t.fontSizeSm,
+                  color: t.colorTextSubtle,
+                }}
+              >
+                →
+              </span>
+              <DateInput
+                type="date"
+                value={reportTo}
+                onChange={(e) => {
+                  setReportTo(e.target.value)
+                  setReportPreset("custom")
+                }}
+              />
+            </div>
+            <Button
+              appearance="primary"
+              spacing="compact"
+              isDisabled={reportLoading}
+              onClick={() => fetchReport(reportFrom, reportTo)}
+            >
+              {reportLoading ? "Đang tải..." : "Xem báo cáo"}
+            </Button>
+          </ReportFilterBar>
+
+          {reportData === null ? (
+            <ReportEmpty>
+              Chọn kỳ báo cáo và nhấn <strong>Xem báo cáo</strong>
+            </ReportEmpty>
+          ) : (
+            <>
+              {/* Summary cards */}
+              <StatGrid>
+                <StatCard $variant="success">
+                  <StatLabel>
+                    <TrendingUp size={14} /> Doanh thu đã thu
+                  </StatLabel>
+                  <StatValue $variant="success">
+                    {fmtCurrency(reportData.totalRevenue)}
+                  </StatValue>
+                  <div
+                    style={{
+                      fontFamily: t.fontFamily,
+                      fontSize: t.fontSizeSm,
+                      color: t.colorTextSubtle,
+                    }}
+                  >
+                    {reportData.paymentCount} lần thanh toán
+                  </div>
+                </StatCard>
+
+                <StatCard $variant="danger">
+                  <StatLabel>
+                    <TrendingDown size={14} /> Chi phí
+                  </StatLabel>
+                  <StatValue $variant="danger">
+                    {fmtCurrency(reportData.totalExpenses)}
+                  </StatValue>
+                  <div
+                    style={{
+                      fontFamily: t.fontFamily,
+                      fontSize: t.fontSizeSm,
+                      color: t.colorTextSubtle,
+                    }}
+                  >
+                    {reportData.expenseCount} khoản chi
+                  </div>
+                </StatCard>
+
+                <StatCard
+                  $variant={
+                    reportData.profit >= 0 ? "success" : "danger"
+                  }
+                >
+                  <StatLabel>
+                    <Minus size={14} /> Lợi nhuận
+                  </StatLabel>
+                  <StatValue
+                    $variant={
+                      reportData.profit >= 0 ? "success" : "danger"
+                    }
+                  >
+                    {fmtCurrency(reportData.profit)}
+                  </StatValue>
+                  <div
+                    style={{
+                      fontFamily: t.fontFamily,
+                      fontSize: t.fontSizeSm,
+                      color: t.colorTextSubtle,
+                    }}
+                  >
+                    {reportData.totalRevenue > 0
+                      ? `Tỉ suất: ${Math.round((reportData.profit / reportData.totalRevenue) * 100)}%`
+                      : "–"}
+                  </div>
+                </StatCard>
+              </StatGrid>
+
+              {/* Breakdown tables */}
+              <ReportSection>
+                {/* Thanh toán theo phương thức */}
+                <ReportBox>
+                  <ReportBoxTitle>Doanh thu theo phương thức</ReportBoxTitle>
+                  {reportData.paymentsByMethod.length === 0 ? (
+                    <ReportEmpty>Không có dữ liệu</ReportEmpty>
+                  ) : (
+                    (() => {
+                      const maxAmt = Math.max(
+                        ...reportData.paymentsByMethod.map((p) => p.amount),
+                        1,
+                      )
+                      return reportData.paymentsByMethod.map((p) => (
+                        <BreakdownRow key={p.method}>
+                          <div>
+                            <div
+                              style={{
+                                fontFamily: t.fontFamily,
+                                fontSize: t.fontSizeSm,
+                                color: t.colorText,
+                                fontWeight: 500,
+                              }}
+                            >
+                              {PAYMENT_METHOD_LABELS[p.method] ?? p.method}
+                            </div>
+                            <BarTrack>
+                              <BarFill
+                                $pct={(p.amount / maxAmt) * 100}
+                                $color={t.colorBrand}
+                              />
+                            </BarTrack>
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: t.fontFamily,
+                              fontSize: t.fontSizeSm,
+                              fontWeight: 600,
+                              color: t.colorTextSuccess,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {fmtCurrency(p.amount)}
+                          </div>
+                        </BreakdownRow>
+                      ))
+                    })()
+                  )}
+                </ReportBox>
+
+                {/* Chi phí theo danh mục */}
+                <ReportBox>
+                  <ReportBoxTitle>Chi phí theo danh mục</ReportBoxTitle>
+                  {reportData.expensesByCategory.length === 0 ? (
+                    <ReportEmpty>Không có dữ liệu</ReportEmpty>
+                  ) : (
+                    (() => {
+                      const maxAmt = Math.max(
+                        ...reportData.expensesByCategory.map((e) => e.amount),
+                        1,
+                      )
+                      return reportData.expensesByCategory.map((e) => (
+                        <BreakdownRow key={e.category}>
+                          <div>
+                            <div
+                              style={{
+                                fontFamily: t.fontFamily,
+                                fontSize: t.fontSizeSm,
+                                color: t.colorText,
+                                fontWeight: 500,
+                              }}
+                            >
+                              {EXPENSE_CATEGORY_LABELS[e.category] ??
+                                e.category}
+                            </div>
+                            <BarTrack>
+                              <BarFill
+                                $pct={(e.amount / maxAmt) * 100}
+                                $color={t.colorTextDanger}
+                              />
+                            </BarTrack>
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: t.fontFamily,
+                              fontSize: t.fontSizeSm,
+                              fontWeight: 600,
+                              color: t.colorTextDanger,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {fmtCurrency(e.amount)}
+                          </div>
+                        </BreakdownRow>
+                      ))
+                    })()
+                  )}
+                </ReportBox>
+
+                {/* Hóa đơn theo trạng thái */}
+                <ReportBox style={{ gridColumn: "1 / -1" }}>
+                  <ReportBoxTitle>Hóa đơn tạo trong kỳ</ReportBoxTitle>
+                  {reportData.invoicesByStatus.length === 0 ? (
+                    <ReportEmpty>Không có hóa đơn nào trong kỳ</ReportEmpty>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <tr>
+                          <Th>Trạng thái</Th>
+                          <Th align="right">Số lượng</Th>
+                          <Th align="right">Giá trị hóa đơn</Th>
+                        </tr>
+                      </TableHeader>
+                      <TableBody>
+                        {reportData.invoicesByStatus.map((s) => (
+                          <Tr key={s.status}>
+                            <Td>
+                              <Badge
+                                appearance={
+                                  INVOICE_STATUS_APPEARANCE[s.status] ??
+                                  "neutral"
+                                }
+                              >
+                                {INVOICE_STATUS_LABELS[s.status] ?? s.status}
+                              </Badge>
+                            </Td>
+                            <Td align="right">{s.count}</Td>
+                            <Td align="right">{fmtCurrency(s.amount)}</Td>
+                          </Tr>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </ReportBox>
+              </ReportSection>
+            </>
+          )}
         </TabPanel>
       </Tabs>
 
