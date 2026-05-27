@@ -1,0 +1,39 @@
+:root {
+  font-family: Inter, Arial, sans-serif;
+  color: #17253d;
+  background: #f6f8fc;
+}
+
+body {
+  margin: 0;
+}
+
+.login-shell {
+  align-items: center;
+  background: linear-gradient(125deg, #eef3ff, #fff7f1);
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.page-header h1 {
+  margin: 0;
+}
+
+.settings-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+}
+
+.print-sheet {
+  font-family: Arial, sans-serif;
+  margin: 32px;
+}
+

@@ -1,0 +1,27 @@
+{
+  "name": "thien-chanh-clinic-cms",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc && vite build",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@refinedev/core": "^5.0.5",
+    "@refinedev/react-router": "^2.0.2",
+    "antd": "^5.26.0",
+    "axios": "^1.10.0",
+    "dayjs": "^1.11.13",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^4.5.2",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}

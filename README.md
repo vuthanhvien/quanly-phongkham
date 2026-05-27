@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CMS Quản Lý Phòng Khám Thiện Chánh
 
-## Getting Started
+Ứng dụng quản trị được dựng từ hồ sơ nghiệp vụ `26.0505-GIS.BRD.TCB` (phiên bản trong PDF ngày 08/05/2026), tập trung vào feature và không sao chép hình UI tham khảo.
 
-First, run the development server:
+## Stack
+
+- CMS: React + Refine + Ant Design + Vite
+- Backend: NestJS + TypeORM + JWT
+- Database: PostgreSQL
+- Runtime: Docker Compose
+
+## Chạy Bằng Docker
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env
+docker compose up --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- CMS: <http://localhost:5173>
+- API: <http://localhost:3000/api>
+- PostgreSQL: `localhost:5432`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Tài khoản khởi tạo:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```text
+Email: admin@thienchanh.local
+Password: Admin@123
+```
 
-## Learn More
+Thay `JWT_SECRET` và mật khẩu admin trong `.env` trước khi sử dụng ngoài môi trường phát triển.
 
-To learn more about Next.js, take a look at the following resources:
+## Chức Năng MVP
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- CRUD các phân hệ: chi nhánh, khách hàng, hồ sơ bệnh án, lịch hẹn, nhà cung cấp, hàng hóa/vật tư, lô tồn kho, liệu trình, phiếu thu/hóa đơn, phiếu chi và hoa hồng.
+- Khách hàng tự phân hạng theo tổng chi; số điện thoại bị che trên danh sách/API thông thường.
+- Lịch hẹn kiểm tra trùng bác sĩ hoặc phòng trong cùng khung giờ.
+- Audit log cho thao tác tạo/sửa/xóa và API xem số điện thoại.
+- Cấu hình động theo từng model:
+  - Thêm `custom field` và lưu giá trị vào `customFields` JSONB.
+  - Chọn field hiển thị trên bảng dữ liệu.
+  - Chọn field xuất hiện trên form nhập liệu.
+  - Tạo mẫu in HTML với placeholder `{{field_key}}`, in từ bản ghi.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Cấu Trúc
 
-## Deploy on Vercel
+```text
+backend/                 NestJS REST API
+cms/                     Refine CMS
+docs/FEATURE_SCOPE.md    Phạm vi rút từ PDF
+docs/WORKLOG.md          Đã làm / cần làm tiếp
+docker-compose.yml       PostgreSQL + API + CMS
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## API Chính
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+POST   /api/auth/login
+GET    /api/records/:resource
+POST   /api/records/:resource
+PATCH  /api/records/:resource/:id
+DELETE /api/records/:resource/:id
+POST   /api/records/customers/:id/reveal-phone
+GET    /api/settings/custom-fields
+GET    /api/settings/views
+GET    /api/settings/print-templates
+GET    /api/settings/print-templates/:id/render/:recordId
+GET    /api/audit-logs
+```
+
+## Phát Triển Local
+
+Khởi động riêng PostgreSQL trước, sau đó:
+
+```bash
+cd backend && npm install && DATABASE_URL=postgresql://clinic:clinic_password@localhost:5432/clinic npm run start:dev
+cd cms && npm install && npm run dev
+```
+
