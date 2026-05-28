@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { hash } from 'bcryptjs';
 import { FindOptionsWhere, ILike, In, LessThan, MoreThan, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
 import {
@@ -20,9 +21,10 @@ import {
   StockBatch,
   Supplier,
   Treatment,
+  User,
 } from '../entities/entities';
 
-type ResourceRepository = Repository<ConfigurableEntity>;
+type ResourceRepository = Repository<any>;
 
 @Injectable()
 export class RecordsService {
@@ -31,6 +33,7 @@ export class RecordsService {
     @InjectRepository(Department) private readonly departments: Repository<Department>,
     @InjectRepository(Staff) private readonly staff: Repository<Staff>,
     @InjectRepository(BranchPermission) private readonly branchPermissions: Repository<BranchPermission>,
+    @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
     @InjectRepository(Supplier) private readonly suppliers: Repository<Supplier>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
@@ -51,6 +54,7 @@ export class RecordsService {
       departments: this.departments,
       staff: this.staff,
       'branch-permissions': this.branchPermissions,
+      'user-accounts': this.users,
       customers: this.customers,
       suppliers: this.suppliers,
       products: this.products,
@@ -80,6 +84,7 @@ export class RecordsService {
         departments: ['code', 'name'],
         staff: ['code', 'fullName', 'email', 'phone'],
         'branch-permissions': ['roleName'],
+        'user-accounts': ['email', 'fullName', 'role'],
       };
       where = (searchable[resource] || []).map((field) => ({ [field]: ILike(`%${search}%`) })) as FindOptionsWhere<ConfigurableEntity>[];
     }
@@ -106,9 +111,9 @@ export class RecordsService {
   }
 
   async create(resource: string, payload: Record<string, unknown>, user: AuthUser) {
+    this.assertPermission(user, resource, 'create', this.branchIdOf(resource, payload));
     await this.validateCustomFields(resource, payload, true);
-    const normalized = this.normalize(resource, payload);
-    this.assertPermission(user, resource, 'create', this.branchIdOf(resource, normalized));
+    const normalized = await this.normalizeInput(resource, payload, true);
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
     const repository = this.repository(resource);
     const record = await repository.save(repository.create(normalized));
@@ -119,11 +124,11 @@ export class RecordsService {
   async update(resource: string, id: string, payload: Record<string, unknown>, user: AuthUser) {
     const previous = await this.findRaw(resource, id);
     await this.validateCustomFields(resource, payload, false);
-    const normalized = this.normalize(resource, {
+    const normalized = await this.normalizeInput(resource, {
       ...previous,
       ...payload,
       customFields: { ...(previous.customFields || {}), ...((payload.customFields || {}) as Record<string, unknown>) },
-    });
+    }, false);
     this.assertPermission(user, resource, 'update', this.branchIdOf(resource, normalized) || this.branchIdOf(resource, previous));
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized, id);
     const repository = this.repository(resource);
@@ -157,6 +162,11 @@ export class RecordsService {
   }
 
   private protect(resource: string, record: ConfigurableEntity) {
+    if (resource === 'user-accounts') {
+      const user = { ...(record as unknown as Record<string, unknown>) };
+      delete user.passwordHash;
+      return user;
+    }
     if (resource !== 'customers') return record;
     const customer = { ...(record as Customer) };
     customer.phone = customer.phone.replace(/\d{3}$/, '***');
@@ -175,6 +185,21 @@ export class RecordsService {
       const spent = Number(value.totalSpent || 0);
       value.tier = spent >= 200_000_000 ? 'DIAMOND' : spent >= 50_000_000 ? 'GOLD' : spent >= 10_000_000 ? 'SILVER' : 'MEMBER';
     }
+    return value;
+  }
+
+  private async normalizeInput(resource: string, payload: Record<string, unknown>, creating = false) {
+    if (resource !== 'user-accounts') return this.normalize(resource, payload);
+    const value = { ...payload };
+    delete value.id;
+    delete value.createdAt;
+    delete value.updatedAt;
+    if (typeof value.password === 'string' && value.password) {
+      value.passwordHash = await hash(value.password, 10);
+    }
+    delete value.password;
+    if (creating && !value.passwordHash) throw new BadRequestException('Mat khau tai khoan la bat buoc');
+    if (!value.passwordHash) delete value.passwordHash;
     return value;
   }
 
@@ -244,9 +269,9 @@ export class RecordsService {
     return { ...where, ...scoped };
   }
 
-  private branchIdOf(resource: string, record: Record<string, unknown>) {
+  private branchIdOf(resource: string, record: object) {
     const field = this.branchField(resource);
-    return field ? String(record[field] || '') || undefined : undefined;
+    return field ? String((record as Record<string, unknown>)[field] || '') || undefined : undefined;
   }
 
   private branchField(resource: string) {
@@ -255,6 +280,7 @@ export class RecordsService {
       departments: 'branchId',
       staff: 'defaultBranchId',
       'branch-permissions': 'branchId',
+      'user-accounts': 'branchId',
       customers: 'branchId',
       'medical-episodes': 'branchId',
       appointments: 'branchId',

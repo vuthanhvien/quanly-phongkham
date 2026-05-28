@@ -3,13 +3,16 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
 import { Repository } from 'typeorm';
-import { Branch, CustomFieldDefinition, PrintTemplate, User, ViewSetting } from '../entities/entities';
+import { Branch, BranchPermission, CustomFieldDefinition, Department, PrintTemplate, Staff, User, ViewSetting } from '../entities/entities';
 
 @Injectable()
 export class SeedService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(Branch) private readonly branches: Repository<Branch>,
     @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(Department) private readonly departments: Repository<Department>,
+    @InjectRepository(Staff) private readonly staff: Repository<Staff>,
+    @InjectRepository(BranchPermission) private readonly branchPermissions: Repository<BranchPermission>,
     @InjectRepository(CustomFieldDefinition) private readonly fields: Repository<CustomFieldDefinition>,
     @InjectRepository(ViewSetting) private readonly views: Repository<ViewSetting>,
     @InjectRepository(PrintTemplate) private readonly templates: Repository<PrintTemplate>,
@@ -24,14 +27,49 @@ export class SeedService implements OnApplicationBootstrap {
       );
     }
     const email = this.config.get('ADMIN_EMAIL', 'admin@thienchanh.local');
-    if (!(await this.users.findOne({ where: { email } }))) {
-      await this.users.save(
+    let admin = await this.users.findOne({ where: { email } });
+    if (!admin) {
+      admin = await this.users.save(
         this.users.create({
           email,
           fullName: 'Quan tri he thong',
           passwordHash: await hash(this.config.get('ADMIN_PASSWORD', 'Admin@123'), 10),
           role: 'ADMIN',
           branchId: branch.id,
+        }),
+      );
+    }
+    let adminDepartment = await this.departments.findOne({ where: { code: 'BOD' } });
+    if (!adminDepartment) {
+      adminDepartment = await this.departments.save(
+        this.departments.create({ code: 'BOD', name: 'Ban dieu hanh', branchId: branch.id, isActive: true }),
+      );
+    }
+    let adminStaff = await this.staff.findOne({ where: { code: 'NV-ADMIN' } });
+    if (!adminStaff) {
+      adminStaff = await this.staff.save(
+        this.staff.create({
+          code: 'NV-ADMIN',
+          fullName: 'Quan tri he thong',
+          email,
+          position: 'System Administrator',
+          departmentId: adminDepartment.id,
+          defaultBranchId: branch.id,
+          userId: admin.id,
+          status: 'ACTIVE',
+        }),
+      );
+      admin.staffId = adminStaff.id;
+      await this.users.save(admin);
+    }
+    if (!(await this.branchPermissions.findOne({ where: { staffId: adminStaff.id, branchId: branch.id } }))) {
+      await this.branchPermissions.save(
+        this.branchPermissions.create({
+          staffId: adminStaff.id,
+          branchId: branch.id,
+          roleName: 'Quan tri chi nhanh',
+          permissions: ['*'],
+          isActive: true,
         }),
       );
     }
@@ -58,4 +96,3 @@ export class SeedService implements OnApplicationBootstrap {
     }
   }
 }
-

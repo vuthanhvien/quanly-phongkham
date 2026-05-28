@@ -1,7 +1,7 @@
 export interface FieldSpec {
   key: string;
   label: string;
-  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'textarea';
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea';
   required?: boolean;
   options?: string[];
 }
@@ -29,7 +29,59 @@ export const entityLabels: Record<string, string> = {
   invoices: 'Phiếu thu / hóa đơn',
   expenses: 'Phiếu chi',
   commissions: 'Hoa hồng',
+  departments: 'Phòng ban',
+  staff: 'Nhân viên',
+  'branch-permissions': 'Phân quyền chi nhánh',
+  'user-accounts': 'Tài khoản đăng nhập',
 };
+
+export const permissionOptions = [
+  '*',
+  'customers:view',
+  'customers:create',
+  'customers:update',
+  'customers:delete',
+  'customers:reveal-phone',
+  'appointments:view',
+  'appointments:create',
+  'appointments:update',
+  'appointments:delete',
+  'medical-episodes:view',
+  'medical-episodes:create',
+  'medical-episodes:update',
+  'medical-episodes:delete',
+  'treatments:view',
+  'treatments:create',
+  'treatments:update',
+  'treatments:delete',
+  'products:view',
+  'products:create',
+  'products:update',
+  'stock-batches:view',
+  'stock-batches:create',
+  'stock-batches:update',
+  'invoices:view',
+  'invoices:create',
+  'invoices:update',
+  'expenses:view',
+  'expenses:create',
+  'expenses:update',
+  'commissions:view',
+  'commissions:create',
+  'commissions:update',
+  'departments:view',
+  'departments:create',
+  'departments:update',
+  'staff:view',
+  'staff:create',
+  'staff:update',
+  'branch-permissions:view',
+  'branch-permissions:create',
+  'branch-permissions:update',
+  'user-accounts:view',
+  'user-accounts:create',
+  'user-accounts:update',
+];
 
 export const baseFields: Record<string, FieldSpec[]> = {
   branches: [
@@ -37,6 +89,40 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'name', label: 'Tên chi nhánh', required: true },
     { key: 'address', label: 'Địa chỉ' },
     { key: 'phone', label: 'Điện thoại' },
+  ],
+  departments: [
+    { key: 'code', label: 'Mã phòng ban', required: true },
+    { key: 'name', label: 'Tên phòng ban', required: true },
+    { key: 'branchId', label: 'ID chi nhánh' },
+    { key: 'managerStaffId', label: 'ID trưởng bộ phận' },
+    { key: 'description', label: 'Mô tả', type: 'textarea' },
+  ],
+  staff: [
+    { key: 'code', label: 'Mã nhân viên', required: true },
+    { key: 'fullName', label: 'Họ tên', required: true },
+    { key: 'phone', label: 'Điện thoại' },
+    { key: 'email', label: 'Email' },
+    { key: 'position', label: 'Chức danh' },
+    { key: 'departmentId', label: 'ID phòng ban' },
+    { key: 'defaultBranchId', label: 'ID chi nhánh mặc định' },
+    { key: 'userId', label: 'ID tài khoản đăng nhập' },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
+    { key: 'joinedAt', label: 'Ngày vào làm', type: 'date' },
+    { key: 'note', label: 'Ghi chú', type: 'textarea' },
+  ],
+  'branch-permissions': [
+    { key: 'staffId', label: 'ID nhân viên', required: true },
+    { key: 'branchId', label: 'ID chi nhánh', required: true },
+    { key: 'roleName', label: 'Vai trò tại chi nhánh', required: true },
+    { key: 'permissions', label: 'Quyền chức năng', type: 'multi-select', options: permissionOptions, required: true },
+  ],
+  'user-accounts': [
+    { key: 'email', label: 'Email đăng nhập', required: true },
+    { key: 'password', label: 'Mật khẩu mới' },
+    { key: 'fullName', label: 'Tên hiển thị', required: true },
+    { key: 'role', label: 'Vai trò hệ thống', type: 'select', options: ['ADMIN', 'STAFF'], required: true },
+    { key: 'branchId', label: 'ID chi nhánh mặc định' },
+    { key: 'staffId', label: 'ID nhân viên' },
   ],
   customers: [
     { key: 'code', label: 'Mã KH', required: true },
@@ -136,4 +222,3 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'status', label: 'Trạng thái', type: 'select', options: ['PENDING', 'PAID'] },
   ],
 };
-

@@ -26,6 +26,10 @@ const { Header, Content, Sider } = Layout;
 
 const menuIcons: Record<string, React.ReactNode> = {
   branches: <BankOutlined />,
+  departments: <SolutionOutlined />,
+  staff: <TeamOutlined />,
+  'branch-permissions': <AuditOutlined />,
+  'user-accounts': <SettingOutlined />,
   customers: <TeamOutlined />,
   'medical-episodes': <MedicineBoxOutlined />,
   appointments: <CalendarOutlined />,
@@ -67,7 +71,7 @@ const menuGroups = [
     key: 'admin',
     label: 'Quản trị hệ thống',
     icon: <SettingOutlined />,
-    resources: ['branches'],
+    resources: ['branches', 'departments', 'staff', 'user-accounts', 'branch-permissions'],
   },
 ];
 

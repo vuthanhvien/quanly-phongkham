@@ -391,6 +391,60 @@ body::before {
   max-width: 760px;
 }
 
+.quick-drawer .ant-drawer-content {
+  background:
+    linear-gradient(180deg, rgba(22, 13, 26, 0.98), rgba(8, 7, 11, 0.98)),
+    #110a14 !important;
+}
+
+.quick-drawer .ant-drawer-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.quick-drawer .ant-drawer-title {
+  color: #fff7fb !important;
+  font-weight: 800;
+}
+
+.detail-card {
+  margin-bottom: 18px;
+}
+
+.detail-card .ant-descriptions-view {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.detail-card .ant-descriptions-item-label {
+  background: rgba(255, 255, 255, 0.045) !important;
+  color: #eab4ca !important;
+  font-weight: 800;
+  width: 220px;
+}
+
+.detail-card .ant-descriptions-item-content {
+  background: rgba(255, 255, 255, 0.025) !important;
+}
+
+.profile-summary {
+  display: grid;
+  gap: 18px;
+}
+
+.profile-summary > div {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+}
+
+.profile-summary h3,
+.profile-summary h4 {
+  color: #fff7fb !important;
+  margin: 0 !important;
+}
+
 .settings-grid {
   display: grid;
   gap: 20px;

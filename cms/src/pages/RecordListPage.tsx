@@ -1,9 +1,10 @@
 import { useDelete, useList } from '@refinedev/core';
-import { Button, Card, Input, Popconfirm, Space, Table, Typography, message } from 'antd';
+import { Button, Card, Drawer, Input, Popconfirm, Space, Table, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api';
+import { RecordFormContent } from '../components/RecordFormContent';
 import { baseFields, CustomField, entityLabels } from '../models';
 
 export function RecordListPage() {
@@ -12,11 +13,13 @@ export function RecordListPage() {
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [configuredColumns, setConfiguredColumns] = useState<string[]>([]);
   const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([]);
+  const [creating, setCreating] = useState(false);
   const query = useList({ resource, pagination: { currentPage: 1, pageSize: 50 }, filters: [{ field: 'search', operator: 'contains', value: search }] }) as any;
   const response = query.result || query.query?.data || query.data?.data;
   const rows = response?.data || [];
   const loading = query.query?.isLoading || query.isLoading;
   const { mutate: deleteRecord } = useDelete();
+  const refresh = () => query.query?.refetch?.() || query.refetch?.();
 
   useEffect(() => {
     Promise.all([
@@ -46,10 +49,11 @@ export function RecordListPage() {
         key: 'action',
         render: (_: unknown, row: Record<string, any>) => (
           <Space>
+            <Link to={`/${resource}/${row.id}`}>Chi tiết</Link>
             <Link to={`/${resource}/${row.id}/edit`}>Sửa</Link>
             {resource === 'customers' && <Button type="link" onClick={() => revealPhone(row.id)}>Xem SĐT</Button>}
             {templates[0] && <Button type="link" onClick={() => printRecord(templates[0].id, row.id)}>In</Button>}
-            <Popconfirm title="Xóa bản ghi này?" onConfirm={() => deleteRecord({ resource, id: row.id }, { onSuccess: () => message.success('Đã xóa') })}>
+            <Popconfirm title="Xóa bản ghi này?" onConfirm={() => deleteRecord({ resource, id: row.id }, { onSuccess: () => { message.success('Đã xóa'); refresh(); } })}>
               <Button danger type="link">Xóa</Button>
             </Popconfirm>
           </Space>
@@ -82,12 +86,31 @@ export function RecordListPage() {
         </div>
         <Space>
           <Input.Search allowClear placeholder="Tìm kiếm" onSearch={setSearch} />
-          <Link to={`/${resource}/create`}><Button className="primary-glow" type="primary">Thêm mới</Button></Link>
+          <Button className="primary-glow" type="primary" onClick={() => setCreating(true)}>Thêm nhanh</Button>
         </Space>
       </div>
       <Card className="table-card">
         <Table columns={columns} dataSource={rows} loading={loading} rowKey="id" />
       </Card>
+      <Drawer
+        className="quick-drawer"
+        destroyOnClose
+        open={creating}
+        placement="right"
+        title={`Thêm nhanh ${entityLabels[resource] || resource}`}
+        width={560}
+        onClose={() => setCreating(false)}
+      >
+        <RecordFormContent
+          compact
+          resource={resource}
+          onCancel={() => setCreating(false)}
+          onSuccess={() => {
+            setCreating(false);
+            refresh();
+          }}
+        />
+      </Drawer>
     </>
   );
 }

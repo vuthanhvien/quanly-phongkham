@@ -34,14 +34,15 @@ Tài liệu đọc trực tiếp: `26.0505-GIS.BRD.TCB Ho so nghiep vu THIEN CHA
 
 - Nền tảng CMS/API/DB container hóa.
 - CRUD quản trị cho 11 model vận hành cốt lõi.
+- CRUD quản trị phòng ban, nhân viên, tài khoản đăng nhập và phân quyền theo chi nhánh.
 - Custom fields, table setting, form setting, print templates.
-- Auth admin JWT, audit CRUD và audit reveal số điện thoại.
+- Auth JWT, audit CRUD, audit reveal số điện thoại và RBAC theo `resource:action` + `branchId`.
 - Mask số điện thoại, phân hạng khách hàng, kiểm tra trùng lịch cơ bản.
 - Bảo vệ cập nhật hồ sơ: số điện thoại đang bị che không ghi đè lên giá trị thật khi lưu form.
 
 ## Ngoài MVP, Cần Làm Tiếp
 
-- RBAC chi tiết theo role/chi nhánh và lọc dữ liệu theo chi nhánh.
+- Nâng cấp RBAC thành role template/UI chọn quyền thân thiện hơn thay vì nhập theo mã quyền.
 - Hồ sơ y khoa đầy đủ: sinh hiệu, hậu phẫu, upload tài liệu/ảnh private, chữ ký điện tử.
 - Luồng kho giao dịch: đơn mua, nhập/xuất/chuyển, FIFO theo hạn dùng, kit, barcode và ảnh tem lô.
 - POS/bán hàng, thanh toán nhiều lần, công nợ và engine tính hoa hồng từ thực thu.

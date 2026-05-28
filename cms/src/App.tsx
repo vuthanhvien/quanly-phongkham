@@ -8,6 +8,7 @@ import { entityLabels } from './models';
 import { AuditPage } from './pages/AuditPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { RecordDetailPage } from './pages/RecordDetailPage';
 import { RecordFormPage } from './pages/RecordFormPage';
 import { RecordListPage } from './pages/RecordListPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -15,8 +16,8 @@ import { SettingsPage } from './pages/SettingsPage';
 const resources = Object.entries(entityLabels).map(([name, label]) => ({
   name,
   list: `/${name}`,
-  create: `/${name}/create`,
   edit: `/${name}/:id/edit`,
+  show: `/${name}/:id`,
   meta: { label },
 }));
 
@@ -59,8 +60,8 @@ export function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/audit-logs" element={<AuditPage />} />
             <Route path="/:resource" element={<RecordListPage />} />
-            <Route path="/:resource/create" element={<RecordFormPage />} />
             <Route path="/:resource/:id/edit" element={<RecordFormPage />} />
+            <Route path="/:resource/:id" element={<RecordDetailPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

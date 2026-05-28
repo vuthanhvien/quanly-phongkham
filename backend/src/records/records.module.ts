@@ -17,6 +17,7 @@ import {
   StockBatch,
   Supplier,
   Treatment,
+  User,
 } from '../entities/entities';
 import { RecordsController } from './records.controller';
 import { RecordsService } from './records.service';
@@ -28,6 +29,7 @@ import { RecordsService } from './records.service';
       Department,
       Staff,
       BranchPermission,
+      User,
       Customer,
       Supplier,
       Product,
