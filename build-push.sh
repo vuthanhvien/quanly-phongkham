@@ -10,9 +10,7 @@ TAG="${TAG:-latest}"
 
 BACKEND_IMAGE="${IMAGE_PREFIX}-backend:${TAG}"
 CMS_IMAGE="${IMAGE_PREFIX}-cms:${TAG}"
-
-# API dùng path tương đối vì cùng domain
-VITE_API_URL="${VITE_API_URL:-/api}"
+PROXY_IMAGE="${IMAGE_PREFIX}-proxy:${TAG}"
 
 # ============================================================
 echo "=> Docker user : $DOCKER_USER"
@@ -24,7 +22,7 @@ docker login
 
 # Build backend
 echo ""
-echo "[1/4] Building backend..."
+echo "[1/5] Building backend..."
 docker build \
   --platform linux/amd64 \
   -t "$BACKEND_IMAGE" \
@@ -32,25 +30,30 @@ docker build \
 
 # Build CMS
 echo ""
-echo "[2/4] Building cms..."
+echo "[2/5] Building cms..."
 docker build \
   --platform linux/amd64 \
-  --build-arg VITE_API_URL="$VITE_API_URL" \
+  --build-arg VITE_API_URL=/api \
   -t "$CMS_IMAGE" \
   ./cms
 
+# Build proxy
+echo ""
+echo "[3/5] Building proxy..."
+docker build \
+  --platform linux/amd64 \
+  -t "$PROXY_IMAGE" \
+  ./proxy
+
 # Push
 echo ""
-echo "[3/4] Pushing backend..."
+echo "[4/5] Pushing images..."
 docker push "$BACKEND_IMAGE"
-
-echo ""
-echo "[4/4] Pushing cms..."
 docker push "$CMS_IMAGE"
+docker push "$PROXY_IMAGE"
 
 echo ""
-echo "Done!"
+echo "[5/5] Done!"
 echo ""
-echo "Pull về máy khác:"
-echo "  docker pull $BACKEND_IMAGE"
-echo "  docker pull $CMS_IMAGE"
+echo "Trên server chỉ cần file docker-compose.yml, rồi chạy:"
+echo "  docker compose pull && docker compose up -d"

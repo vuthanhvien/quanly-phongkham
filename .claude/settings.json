@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x /Users/vienvu/Work/gratipos/quanly-phongkham/build-push.sh)"
+    ]
+  }
+}

@@ -23,8 +23,6 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@thienchanh.local}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@123}
       PORT: 3000
-    ports:
-      - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,11 +31,17 @@ services:
     build:
       context: ./cms
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
-    ports:
-      - "5173:80"
+        VITE_API_URL: /api
     depends_on:
       - backend
+
+  proxy:
+    image: vienvu/quanly-phongkham-proxy:${TAG:-latest}
+    ports:
+      - "${PORT:-80}:80"
+    depends_on:
+      - backend
+      - cms
 
 volumes:
   postgres_data:
