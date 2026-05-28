@@ -16,7 +16,7 @@ services:
       retries: 10
 
   backend:
-    build: ./backend
+    image: vienvu/quanly-phongkham-backend:${TAG:-latest}
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://clinic:clinic_password@postgres:5432/clinic}
       JWT_SECRET: ${JWT_SECRET:-development-only-secret}
@@ -28,10 +28,7 @@ services:
         condition: service_healthy
 
   cms:
-    build:
-      context: ./cms
-      args:
-        VITE_API_URL: /api
+    image: vienvu/quanly-phongkham-cms:${TAG:-latest}
     depends_on:
       - backend
 
