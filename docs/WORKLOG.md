@@ -9,6 +9,7 @@
 - [x] Tạo hệ thống `custom field` theo model, có kiểu dữ liệu, bắt buộc và lựa chọn.
 - [x] Tạo setting bố cục table/form và setting mẫu in HTML theo model.
 - [x] Tạo CMS Refine đọc cấu hình động để render danh sách và form.
+- [x] Làm lại giao diện CMS theo dark beauty theme: nền đen, sắc hồng nhẹ, font Plus Jakarta Sans, sidebar/header/card hiện đại hơn.
 - [x] Thêm mask điện thoại, endpoint reveal có audit, phân hạng khách theo chi tiêu và kiểm tra trùng lịch.
 - [x] Thêm Dockerfile/Compose và tài liệu khởi chạy.
 
@@ -16,6 +17,7 @@
 
 - [x] Cài dependencies; `npm run build` thành công cho backend và CMS; `npm audit --audit-level=high` không còn vulnerability.
 - [x] Khởi chạy toàn bộ stack bằng Docker Compose; PostgreSQL healthy, NestJS và nginx chạy trên port cấu hình.
+- [x] Rebuild CMS Docker sau khi đổi theme; `http://localhost:5173` trả asset UI mới.
 - [x] Kiểm tra API end-to-end: login, tạo khách, thêm custom field, cấu hình table/form, render mẫu in, mask/reveal điện thoại và audit log.
 - [x] Kiểm tra cập nhật form cục bộ: vẫn giữ số điện thoại thật phía backend, dữ liệu hiển thị đã mask và hạng khách được tính đúng.
 - [ ] Kiểm tra tương tác hình ảnh UI bằng trình duyệt tự động: công cụ Browser local không được cung cấp trong phiên xác minh này.

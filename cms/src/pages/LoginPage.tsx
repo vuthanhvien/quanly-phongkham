@@ -5,9 +5,19 @@ export function LoginPage() {
   const { mutate: login, isPending } = useLogin();
   return (
     <div className="login-shell">
-      <Card style={{ width: 420 }}>
-        <Typography.Title level={3}>Quản lý phòng khám</Typography.Title>
-        <Typography.Paragraph type="secondary">Đăng nhập CMS Thiện Chánh</Typography.Paragraph>
+      <div className="login-orb login-orb-one" />
+      <div className="login-orb login-orb-two" />
+      <Card className="login-card">
+        <div className="brand-card login-brand">
+          <div className="brand-mark">TC</div>
+          <div>
+            <Typography.Text className="brand-kicker">Aesthetic Clinic</Typography.Text>
+            <Typography.Title level={3}>Thiện Chánh CMS</Typography.Title>
+          </div>
+        </div>
+        <Typography.Paragraph className="login-copy">
+          Quản lý khách hàng, hồ sơ điều trị, kho, lịch hẹn và cấu hình động cho viện thẩm mỹ.
+        </Typography.Paragraph>
         <Form layout="vertical" initialValues={{ email: 'admin@thienchanh.local', password: 'Admin@123' }} onFinish={(values) => login(values)}>
           <Form.Item label="Email" name="email" rules={[{ required: true }]}>
             <Input />
@@ -15,10 +25,10 @@ export function LoginPage() {
           <Form.Item label="Mật khẩu" name="password" rules={[{ required: true }]}>
             <Input.Password />
           </Form.Item>
-          <Button block htmlType="submit" loading={isPending} type="primary">Đăng nhập</Button>
+          <Button block className="primary-glow" htmlType="submit" loading={isPending} type="primary">Đăng nhập CMS</Button>
         </Form>
+        <div className="login-footnote">Dark beauty theme · Custom field ready · Dynamic print template</div>
       </Card>
     </div>
   );
 }
-

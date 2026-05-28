@@ -1,5 +1,5 @@
 import { useLogout } from '@refinedev/core';
-import { Button, Layout, Menu, Typography } from 'antd';
+import { Button, Layout, Menu, Space, Tag, Typography } from 'antd';
 import { Link, useLocation } from 'react-router-dom';
 import { entityLabels } from '../models';
 
@@ -19,20 +19,30 @@ export function Shell({ children }: { children: React.ReactNode }) {
   ];
   const selected = items.find((item) => item.key !== '/' && location.pathname.startsWith(item.key))?.key || '/';
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider width={246} theme="light">
-        <Typography.Title level={4} style={{ padding: 22, margin: 0, color: '#234273' }}>
-          THIỆN CHÁNH CMS
-        </Typography.Title>
-        <Menu items={items} selectedKeys={[selected]} mode="inline" />
+    <Layout className="app-shell">
+      <Sider className="app-sider" width={282} theme="dark">
+        <div className="brand-card">
+          <div className="brand-mark">TC</div>
+          <div>
+            <Typography.Text className="brand-kicker">Aesthetic Clinic</Typography.Text>
+            <Typography.Title level={4}>Thiện Chánh</Typography.Title>
+          </div>
+        </div>
+        <Menu className="side-menu" items={items} selectedKeys={[selected]} mode="inline" theme="dark" />
       </Sider>
       <Layout>
-        <Header style={{ background: '#fff', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-          <Button onClick={() => logout()}>Đăng xuất</Button>
+        <Header className="app-header">
+          <div>
+            <Typography.Text className="eyebrow">CMS vận hành viện thẩm mỹ</Typography.Text>
+            <Typography.Title level={3}>Không gian quản trị</Typography.Title>
+          </div>
+          <Space>
+            <Tag className="soft-tag">Live</Tag>
+            <Button onClick={() => logout()}>Đăng xuất</Button>
+          </Space>
         </Header>
-        <Content style={{ padding: 28 }}>{children}</Content>
+        <Content className="app-content">{children}</Content>
       </Layout>
     </Layout>
   );
 }
-

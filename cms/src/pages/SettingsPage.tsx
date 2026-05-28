@@ -77,11 +77,14 @@ export function SettingsPage() {
   return (
     <>
       <div className="page-header">
-        <Typography.Title level={2}>Cấu hình động</Typography.Title>
+        <div>
+          <Typography.Text className="eyebrow">No-code operations</Typography.Text>
+          <Typography.Title level={2}>Cấu hình động</Typography.Title>
+        </div>
         <Select value={entityType} onChange={setEntityType} style={{ width: 240 }} options={Object.entries(entityLabels).map(([value, label]) => ({ value, label }))} />
       </div>
       <div className="settings-grid">
-        <Card title="Custom fields" extra={<Button onClick={() => setFieldModal(true)}>Thêm field</Button>}>
+        <Card className="glass-card" title="Custom fields" extra={<Button onClick={() => setFieldModal(true)}>Thêm field</Button>}>
           <Table size="small" pagination={false} rowKey="id" dataSource={fields} columns={[
             { title: 'Nhãn', dataIndex: 'label' },
             { title: 'Key', dataIndex: 'key' },
@@ -89,14 +92,14 @@ export function SettingsPage() {
             { title: '', render: (_, row) => <Button danger type="link" onClick={() => deleteField(row.id)}>Xóa</Button> },
           ]} />
         </Card>
-        <Card title="Hiển thị table / form">
+        <Card className="glass-card" title="Hiển thị table / form">
           <Typography.Text strong>Cột trên bảng</Typography.Text>
           <Checkbox.Group style={{ display: 'grid', margin: '12px 0 20px' }} options={options} value={tableColumns} onChange={(value) => setTableColumns(value as string[])} />
           <Typography.Text strong>Field trên form</Typography.Text>
           <Checkbox.Group style={{ display: 'grid', margin: '12px 0 20px' }} options={options} value={formFields} onChange={(value) => setFormFields(value as string[])} />
-          <Button type="primary" onClick={saveView}>Lưu bố cục</Button>
+          <Button className="primary-glow" type="primary" onClick={saveView}>Lưu bố cục</Button>
         </Card>
-        <Card title="Mẫu in" extra={<Button onClick={() => setTemplateModal(true)}>Thêm mẫu</Button>}>
+        <Card className="glass-card" title="Mẫu in" extra={<Button onClick={() => setTemplateModal(true)}>Thêm mẫu</Button>}>
           <Table size="small" pagination={false} rowKey="id" dataSource={templates} columns={[
             { title: 'Tên mẫu', dataIndex: 'name' },
             { title: 'Biến sử dụng', render: () => '{{field_key}}' },
@@ -111,7 +114,7 @@ export function SettingsPage() {
           <Form.Item name="options" label="Lựa chọn (ngăn cách dấu phẩy)"><Input /></Form.Item>
           <Form.Item name="sortOrder" label="Thứ tự" initialValue={0}><InputNumber /></Form.Item>
           <Form.Item name="required" valuePropName="checked"><Checkbox>Bắt buộc nhập</Checkbox></Form.Item>
-          <Button htmlType="submit" type="primary">Lưu field</Button>
+          <Button className="primary-glow" htmlType="submit" type="primary">Lưu field</Button>
         </Form>
       </Modal>
       <Modal title="Thêm mẫu in HTML" open={templateModal} footer={null} onCancel={() => setTemplateModal(false)}>
@@ -120,10 +123,9 @@ export function SettingsPage() {
           <Form.Item name="htmlTemplate" label="HTML, dùng {{key}} để lấy dữ liệu" rules={[{ required: true }]}>
             <Input.TextArea rows={9} placeholder={'<h1>Phiếu</h1><p>Khách: {{fullName}}</p>'} />
           </Form.Item>
-          <Button htmlType="submit" type="primary">Lưu mẫu in</Button>
+          <Button className="primary-glow" htmlType="submit" type="primary">Lưu mẫu in</Button>
         </Form>
       </Modal>
     </>
   );
 }
-

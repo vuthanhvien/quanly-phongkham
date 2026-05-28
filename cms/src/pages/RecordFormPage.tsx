@@ -57,18 +57,19 @@ export function RecordFormPage() {
   }
 
   return (
-    <Card>
+    <Card className="form-card">
+      <Typography.Text className="eyebrow">Dynamic form</Typography.Text>
       <Typography.Title level={2}>
         {editing ? 'Cập nhật' : 'Thêm'} {entityLabels[resource] || resource}
       </Typography.Title>
-      <Form form={form} layout="vertical" onFinish={submit} style={{ maxWidth: 720 }}>
+      <Form className="record-form" form={form} layout="vertical" onFinish={submit}>
         {fields.map((field) => (
           <Form.Item key={field.key} label={field.label} name={field.key} rules={[{ required: field.required, message: `Nhập ${field.label}` }]}>
             <FieldInput field={field} />
           </Form.Item>
         ))}
         <Space>
-          <Button htmlType="submit" type="primary">Lưu</Button>
+          <Button className="primary-glow" htmlType="submit" type="primary">Lưu</Button>
           <Button onClick={() => navigate(`/${resource}`)}>Hủy</Button>
         </Space>
       </Form>

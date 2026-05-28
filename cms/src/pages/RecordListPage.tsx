@@ -1,5 +1,5 @@
 import { useDelete, useList } from '@refinedev/core';
-import { Button, Input, Popconfirm, Space, Table, Typography, message } from 'antd';
+import { Button, Card, Input, Popconfirm, Space, Table, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -76,13 +76,18 @@ export function RecordListPage() {
   return (
     <>
       <div className="page-header">
-        <Typography.Title level={2}>{entityLabels[resource] || resource}</Typography.Title>
+        <div>
+          <Typography.Text className="eyebrow">Quản lý dữ liệu</Typography.Text>
+          <Typography.Title level={2}>{entityLabels[resource] || resource}</Typography.Title>
+        </div>
         <Space>
           <Input.Search allowClear placeholder="Tìm kiếm" onSearch={setSearch} />
-          <Link to={`/${resource}/create`}><Button type="primary">Thêm mới</Button></Link>
+          <Link to={`/${resource}/create`}><Button className="primary-glow" type="primary">Thêm mới</Button></Link>
         </Space>
       </div>
-      <Table columns={columns} dataSource={rows} loading={loading} rowKey="id" />
+      <Card className="table-card">
+        <Table columns={columns} dataSource={rows} loading={loading} rowKey="id" />
+      </Card>
     </>
   );
 }
