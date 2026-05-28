@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import Handlebars from 'handlebars';
 import { IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
-import { BranchPermission, CustomFieldDefinition, DynamicRoleDefinition, PrintTemplate, User, ViewSetting } from '../entities/entities';
+import { BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, PrintTemplate, User, ViewSetting } from '../entities/entities';
 import { RecordsService } from '../records/records.service';
 
 const DEFAULT_ROLE_SCOPE = 'ALL';
@@ -21,7 +21,7 @@ export class SettingsService {
     @InjectRepository(PrintTemplate) private readonly templates: Repository<PrintTemplate>,
     @InjectRepository(DynamicRoleDefinition) private readonly roles: Repository<DynamicRoleDefinition>,
     @InjectRepository(User) private readonly users: Repository<User>,
-    @InjectRepository(BranchPermission) private readonly branchRoles: Repository<BranchPermission>,
+    @InjectRepository(BranchRoleAssignment) private readonly branchRoles: Repository<BranchRoleAssignment>,
     private readonly records: RecordsService,
   ) {}
 
@@ -140,18 +140,20 @@ export class SettingsService {
     });
   }
 
-  async createBranchRoleAssignment(payload: Partial<BranchPermission>, user?: AuthUser) {
+  async createBranchRoleAssignment(payload: Partial<BranchRoleAssignment>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     if (!payload.userId || !payload.branchId) {
       throw new BadRequestException('userId va branchId la bat buoc');
     }
     const roleKeys = await this.resolveRoleKeys(payload.roleKeys || []);
+    const staffId = await this.resolveAssignmentStaffId(payload.userId);
     await this.assertAssignmentCompatible(payload.userId, roleKeys);
     const exists = await this.branchRoles.findOne({ where: { userId: payload.userId, branchId: payload.branchId } });
     if (exists) throw new BadRequestException('User da co role tai chi nhanh nay');
     return this.branchRoles.save(
       this.branchRoles.create({
         userId: payload.userId,
+        staffId,
         branchId: payload.branchId,
         roleKeys,
         roleName: roleKeys.join(', '),
@@ -160,15 +162,17 @@ export class SettingsService {
     );
   }
 
-  async updateBranchRoleAssignment(id: string, payload: Partial<BranchPermission>, user?: AuthUser) {
+  async updateBranchRoleAssignment(id: string, payload: Partial<BranchRoleAssignment>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const assignment = await this.branchRoles.findOne({ where: { id, userId: Not(IsNull()) } });
     if (!assignment) throw new NotFoundException('Khong tim thay gan role chi nhanh');
     const userId = String(payload.userId || assignment.userId || '');
     const roleKeys = await this.resolveRoleKeys(payload.roleKeys ?? assignment.roleKeys ?? []);
+    const staffId = await this.resolveAssignmentStaffId(userId);
     await this.assertAssignmentCompatible(userId, roleKeys);
     const next = this.branchRoles.merge(assignment, payload, {
       userId,
+      staffId,
       roleKeys,
       roleName: roleKeys.join(', '),
     });
@@ -246,6 +250,12 @@ export class SettingsService {
     if (incompatible) {
       throw new BadRequestException(`Role ${incompatible.key} khong phu hop voi main role cua user`);
     }
+  }
+
+  private async resolveAssignmentStaffId(userId: string) {
+    const account = await this.users.findOne({ where: { id: userId } });
+    if (!account) throw new NotFoundException('Khong tim thay user');
+    return account.staffId || undefined;
   }
 }
 

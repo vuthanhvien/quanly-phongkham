@@ -150,12 +150,12 @@ export class Staff extends ConfigurableEntity {
 }
 
 @Entity('branch_permissions')
-export class BranchPermission extends ConfigurableEntity {
+export class BranchRoleAssignment extends ConfigurableEntity {
   @Column({ nullable: true })
   userId?: string;
 
-  @Column()
-  staffId: string;
+  @Column({ nullable: true })
+  staffId?: string;
 
   @Column()
   branchId: string;
@@ -563,7 +563,7 @@ export const ENTITIES = [
   DynamicRoleDefinition,
   Department,
   Staff,
-  BranchPermission,
+  BranchRoleAssignment,
   Customer,
   Supplier,
   Product,

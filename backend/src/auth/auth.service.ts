@@ -3,14 +3,14 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { compare } from 'bcryptjs';
 import { In, Repository } from 'typeorm';
-import { BranchPermission, DynamicRoleDefinition, Staff, User } from '../entities/entities';
+import { BranchRoleAssignment, DynamicRoleDefinition, Staff, User } from '../entities/entities';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Staff) private readonly staff: Repository<Staff>,
-    @InjectRepository(BranchPermission) private readonly branchPermissions: Repository<BranchPermission>,
+    @InjectRepository(BranchRoleAssignment) private readonly branchPermissions: Repository<BranchRoleAssignment>,
     @InjectRepository(DynamicRoleDefinition) private readonly dynamicRoles: Repository<DynamicRoleDefinition>,
     private readonly jwtService: JwtService,
   ) {}

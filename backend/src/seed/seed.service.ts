@@ -2,8 +2,8 @@ import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
-import { Repository } from 'typeorm';
-import { Branch, BranchPermission, CustomFieldDefinition, Department, DynamicRoleDefinition, PrintTemplate, Staff, User, ViewSetting } from '../entities/entities';
+import { IsNull, Repository } from 'typeorm';
+import { Branch, BranchRoleAssignment, CustomFieldDefinition, Department, DynamicRoleDefinition, PrintTemplate, Staff, User, ViewSetting } from '../entities/entities';
 
 @Injectable()
 export class SeedService implements OnApplicationBootstrap {
@@ -12,7 +12,7 @@ export class SeedService implements OnApplicationBootstrap {
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Department) private readonly departments: Repository<Department>,
     @InjectRepository(Staff) private readonly staff: Repository<Staff>,
-    @InjectRepository(BranchPermission) private readonly branchPermissions: Repository<BranchPermission>,
+    @InjectRepository(BranchRoleAssignment) private readonly branchPermissions: Repository<BranchRoleAssignment>,
     @InjectRepository(DynamicRoleDefinition) private readonly roles: Repository<DynamicRoleDefinition>,
     @InjectRepository(CustomFieldDefinition) private readonly fields: Repository<CustomFieldDefinition>,
     @InjectRepository(ViewSetting) private readonly views: Repository<ViewSetting>,
@@ -21,6 +21,8 @@ export class SeedService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap() {
+    await this.cleanupLegacyBranchRoleAssignments();
+
     let branch = await this.branches.findOne({ where: { slug: 'thien-chanh' } });
     if (!branch) {
       branch = await this.branches.save(
@@ -107,6 +109,28 @@ export class SeedService implements OnApplicationBootstrap {
           htmlTemplate: '<h1>PHIEU THONG TIN KHACH HANG</h1><p>Ma: {{code}}</p><p>Ho ten: {{fullName}}</p><p>Dien thoai: {{phone}}</p><p>Nguon khach: {{nguon_khach}}</p>',
         }),
       );
+    }
+  }
+
+  private async cleanupLegacyBranchRoleAssignments() {
+    const legacyRows = await this.branchPermissions.find({ where: { userId: IsNull() } });
+    if (legacyRows.length > 0) {
+      await this.branchPermissions.remove(legacyRows);
+    }
+
+    const activeAssignments = await this.branchPermissions.find();
+    const usersById = new Map(
+      (await this.users.find())
+        .filter((user) => user.staffId)
+        .map((user) => [user.id, user.staffId as string]),
+    );
+
+    const rowsToBackfill = activeAssignments.filter((row) => row.userId && !row.staffId && usersById.has(row.userId));
+    if (rowsToBackfill.length > 0) {
+      for (const row of rowsToBackfill) {
+        row.staffId = usersById.get(row.userId!);
+      }
+      await this.branchPermissions.save(rowsToBackfill);
     }
   }
 }

@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Appointment,
   AuditLog,
-  BranchPermission,
+  BranchRoleAssignment,
   Branch,
   Commission,
   CustomFieldDefinition,
@@ -29,7 +29,7 @@ import { RecordsService } from './records.service';
       Branch,
       Department,
       Staff,
-      BranchPermission,
+      BranchRoleAssignment,
       User,
       DynamicRoleDefinition,
       Customer,

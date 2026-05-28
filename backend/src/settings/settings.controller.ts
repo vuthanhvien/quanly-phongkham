@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, Request } from '@nestjs/common';
 import { AuthUser } from '../common/auth';
-import { BranchPermission, CustomFieldDefinition, DynamicRoleDefinition, PrintTemplate } from '../entities/entities';
+import { BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, PrintTemplate } from '../entities/entities';
 import { SettingsService } from './settings.service';
 
 @Controller('settings')
@@ -73,12 +73,12 @@ export class SettingsController {
   }
 
   @Post('branch-role-assignments')
-  async createBranchRoleAssignment(@Body() payload: Partial<BranchPermission>, @Request() request?: { user: AuthUser }) {
+  async createBranchRoleAssignment(@Body() payload: Partial<BranchRoleAssignment>, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.createBranchRoleAssignment(payload, request?.user) };
   }
 
   @Patch('branch-role-assignments/:id')
-  async updateBranchRoleAssignment(@Param('id') id: string, @Body() payload: Partial<BranchPermission>, @Request() request?: { user: AuthUser }) {
+  async updateBranchRoleAssignment(@Param('id') id: string, @Body() payload: Partial<BranchRoleAssignment>, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.updateBranchRoleAssignment(id, payload, request?.user) };
   }
 

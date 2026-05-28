@@ -60,6 +60,7 @@ export const entityLabels: Record<string, string> = {
   commissions: 'Hoa hồng',
   departments: 'Phòng ban',
   staff: 'Nhân viên',
+  'branch-role-assignments': 'Gán role chi nhánh',
   'branch-permissions': 'Gán role chi nhánh',
   'user-accounts': 'Tài khoản đăng nhập',
 };
@@ -105,6 +106,11 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'note', label: 'Ghi chú', type: 'textarea' },
   ],
   'branch-permissions': [
+    { key: 'userId', label: 'Tài khoản', required: true },
+    { key: 'branchId', label: 'Chi nhánh', required: true },
+    { key: 'roleKeys', label: 'Các role tại chi nhánh', type: 'multi-select', required: true },
+  ],
+  'branch-role-assignments': [
     { key: 'userId', label: 'Tài khoản', required: true },
     { key: 'branchId', label: 'Chi nhánh', required: true },
     { key: 'roleKeys', label: 'Các role tại chi nhánh', type: 'multi-select', required: true },

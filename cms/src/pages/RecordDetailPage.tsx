@@ -280,7 +280,7 @@ async function loadRelated(
     const specs = [
       {
         title: "Quyền theo chi nhánh",
-        resource: "branch-permissions",
+        resource: "branch-role-assignments",
         field: "staffId",
         columns: ["branchId", "roleName", "roleKeys"],
       },
