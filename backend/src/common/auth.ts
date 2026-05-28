@@ -12,6 +12,7 @@ export interface AuthUser {
   roleMain?: string;
   branchId?: string;
   staffId?: string;
+  disabledModules?: string[];
   branchPermissions?: Array<{
     branchId: string;
     roleName?: string;

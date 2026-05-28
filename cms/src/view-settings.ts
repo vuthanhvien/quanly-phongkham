@@ -14,6 +14,13 @@ export interface ViewSettingRecord {
   config?: Record<string, unknown>
 }
 
+function getModuleEnabledValue(view: ViewSettingRecord | undefined) {
+  if (typeof view?.config?.moduleEnabled === 'boolean') {
+    return view.config.moduleEnabled
+  }
+  return undefined
+}
+
 export interface FieldLayoutConfig extends FieldSpec {
   visible: boolean
   disabled?: boolean
@@ -109,6 +116,32 @@ export function hasExactRoleSetting(
   )
 }
 
+export function resolveModuleEnabled(
+  views: ViewSettingRecord[],
+  role?: string,
+) {
+  const normalizedRole = normalizeRole(role)
+  const exactViews = views.filter(
+    (view) => normalizeRole(view.role) === normalizedRole,
+  )
+  const exactModuleEnabled = exactViews
+    .map((view) => getModuleEnabledValue(view))
+    .find((value) => typeof value === 'boolean')
+
+  if (typeof exactModuleEnabled === 'boolean') return exactModuleEnabled
+  if (exactViews.length > 0) return true
+
+  const defaultViews = views.filter(
+    (view) => normalizeRole(view.role) === DEFAULT_ROLE_SCOPE,
+  )
+  const defaultModuleEnabled = defaultViews
+    .map((view) => getModuleEnabledValue(view))
+    .find((value) => typeof value === 'boolean')
+
+  if (typeof defaultModuleEnabled === 'boolean') return defaultModuleEnabled
+  return true
+}
+
 export function buildFieldLayoutConfigs(
   catalog: FieldSpec[],
   view: ViewSettingRecord | undefined,
@@ -202,6 +235,7 @@ export function getVisibleFieldConfigs(
 export function serializeViewConfig(
   viewType: ViewType,
   configs: FieldLayoutConfig[],
+  moduleEnabled = true,
 ) {
   const items = configs.map((field) => {
     const next: Record<string, unknown> = {
@@ -218,5 +252,7 @@ export function serializeViewConfig(
     return next
   })
 
-  return viewType === 'TABLE' ? { columns: items } : { fields: items }
+  return viewType === 'TABLE'
+    ? { columns: items, moduleEnabled }
+    : { fields: items, moduleEnabled }
 }

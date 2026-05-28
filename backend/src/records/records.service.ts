@@ -300,8 +300,10 @@ export class RecordsService {
   }
 
   private assertResourceAccess(user: AuthUser | undefined, resource: string) {
-    void user;
-    void resource;
+    if (!user || this.isAdmin(user)) return;
+    if ((user.disabledModules || []).includes(resource)) {
+      throw new ForbiddenException('Role hien tai khong duoc su dung module nay');
+    }
   }
 
   private assertScreenAccess(user: AuthUser | undefined, screen: string) {

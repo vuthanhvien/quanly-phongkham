@@ -34,6 +34,7 @@ import {
   getStoredUserRole,
   hasExactRoleSetting,
   normalizeRole,
+  resolveModuleEnabled,
   serializeViewConfig,
   ViewSettingRecord,
   ViewType,
@@ -69,7 +70,7 @@ const DEFAULT_TEMPLATE_HTML = `<section>
 export function SettingsPage() {
   const [entityType, setEntityType] = useState("customers")
   const [selectedRole, setSelectedRole] = useState(getStoredUserRole())
-  const [newRole, setNewRole] = useState("")
+  const [moduleEnabled, setModuleEnabled] = useState(true)
   const [fields, setFields] = useState<CustomField[]>([])
   const [views, setViews] = useState<ViewSettingRecord[]>([])
   const [tableConfig, setTableConfig] = useState<FieldLayoutConfig[]>([])
@@ -94,10 +95,6 @@ export function SettingsPage() {
     () => fieldCatalog.map((field) => `{{${field.key}}}`),
     [fieldCatalog],
   )
-  const roleOptions = useMemo(
-    () => getRoleOptions(views, [selectedRole]),
-    [views, selectedRole],
-  )
   const selectableRoles = useMemo(
     () => getRoleOptions(views, [selectedRole, ...dynamicRoles.map((role) => role.key)]),
     [dynamicRoles, selectedRole, views],
@@ -118,6 +115,7 @@ export function SettingsPage() {
   }, [entityType])
 
   useEffect(() => {
+    setModuleEnabled(resolveModuleEnabled(views, selectedRole))
     setTableConfig(
       buildFieldLayoutConfigs(
         fieldCatalog,
@@ -234,18 +232,18 @@ export function SettingsPage() {
     await Promise.all([
       api.put(`/settings/views/${entityType}/TABLE`, {
         role: selectedRole,
-        config: serializeViewConfig("TABLE", tableConfig),
+        config: serializeViewConfig("TABLE", tableConfig, moduleEnabled),
       }),
       api.put(`/settings/views/${entityType}/FORM`, {
         role: selectedRole,
-        config: serializeViewConfig("FORM", formConfig),
+        config: serializeViewConfig("FORM", formConfig, moduleEnabled),
       }),
       api.put(`/settings/views/${entityType}/DETAIL`, {
         role: selectedRole,
-        config: serializeViewConfig("DETAIL", detailConfig),
+        config: serializeViewConfig("DETAIL", detailConfig, moduleEnabled),
       }),
     ])
-    message.success("Đã lưu cấu hình table / form / detail theo role")
+    message.success("Đã lưu cấu hình module theo role")
     await load()
   }
 
@@ -297,12 +295,6 @@ export function SettingsPage() {
         field.key === key ? { ...field, ...patch } : field,
       ),
     )
-  }
-
-  function addRoleScope() {
-    const nextRole = normalizeRole(newRole)
-    setSelectedRole(nextRole)
-    setNewRole("")
   }
 
   return (
@@ -414,17 +406,18 @@ export function SettingsPage() {
                               : role,
                         }))}
                       />
-                      <Input
-                        placeholder="Thêm role mới"
-                        value={newRole}
-                        onChange={(event) => setNewRole(event.target.value)}
-                        onPressEnter={addRoleScope}
-                        style={{ width: 160 }}
-                      />
-                      <Button onClick={addRoleScope}>Tạo role</Button>
+                      <Checkbox
+                        checked={moduleEnabled}
+                        onChange={(event) => setModuleEnabled(event.target.checked)}
+                      >
+                        Cho phép role sử dụng module này
+                      </Checkbox>
                     </Space>
                   </div>
                   <Space wrap>
+                    <Tag color={moduleEnabled ? "green" : "red"}>
+                      Module: {moduleEnabled ? "Được dùng" : "Bị khóa"}
+                    </Tag>
                     {VIEW_TYPES.map((viewType) => (
                       <Tag
                         color={viewStatus[viewType] ? "green" : "gold"}

@@ -3,7 +3,13 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { compare } from 'bcryptjs';
 import { In, Repository } from 'typeorm';
-import { BranchRoleAssignment, DynamicRoleDefinition, Staff, User } from '../entities/entities';
+import { BranchRoleAssignment, DynamicRoleDefinition, Staff, User, ViewSetting } from '../entities/entities';
+
+const DEFAULT_ROLE_SCOPE = 'ALL';
+
+function normalizeRole(role?: string) {
+  return role?.trim().toUpperCase() || DEFAULT_ROLE_SCOPE;
+}
 
 @Injectable()
 export class AuthService {
@@ -12,6 +18,7 @@ export class AuthService {
     @InjectRepository(Staff) private readonly staff: Repository<Staff>,
     @InjectRepository(BranchRoleAssignment) private readonly branchPermissions: Repository<BranchRoleAssignment>,
     @InjectRepository(DynamicRoleDefinition) private readonly dynamicRoles: Repository<DynamicRoleDefinition>,
+    @InjectRepository(ViewSetting) private readonly viewSettings: Repository<ViewSetting>,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -31,6 +38,7 @@ export class AuthService {
       branchPermissions.find((item) => item.branchId === user.branchId)?.roleKeys?.[0] ||
       branchPermissions[0]?.roleKeys?.[0] ||
       user.role;
+    const disabledModules = await this.resolveDisabledModules(activeRole);
     const profile = {
       id: user.id,
       email: user.email,
@@ -40,6 +48,7 @@ export class AuthService {
       roleMain: user.role,
       branchId: user.branchId,
       staffId: staff?.id || user.staffId,
+      disabledModules,
       branchPermissions: branchPermissions.map((item) => ({
         branchId: item.branchId,
         roleName: item.roleName,
@@ -51,5 +60,30 @@ export class AuthService {
       accessToken: this.jwtService.sign(profile),
       user: profile,
     };
+  }
+
+  private async resolveDisabledModules(role?: string) {
+    const normalizedRole = normalizeRole(role);
+    const views = await this.viewSettings.find();
+    const entityTypes = Array.from(new Set(views.map((view) => view.entityType).filter(Boolean)));
+
+    return entityTypes.filter((entityType) => {
+      const entityViews = views.filter((view) => view.entityType === entityType);
+      const exactViews = entityViews.filter((view) => normalizeRole(view.role) === normalizedRole);
+      const exactModuleEnabled = exactViews
+        .map((view) => view.config?.moduleEnabled)
+        .find((value) => typeof value === 'boolean');
+
+      if (typeof exactModuleEnabled === 'boolean') return !exactModuleEnabled;
+      if (exactViews.length > 0) return false;
+
+      const defaultViews = entityViews.filter((view) => normalizeRole(view.role) === DEFAULT_ROLE_SCOPE);
+      const defaultModuleEnabled = defaultViews
+        .map((view) => view.config?.moduleEnabled)
+        .find((value) => typeof value === 'boolean');
+
+      if (typeof defaultModuleEnabled === 'boolean') return !defaultModuleEnabled;
+      return false;
+    });
   }
 }

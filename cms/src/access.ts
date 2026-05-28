@@ -5,6 +5,7 @@ export interface StoredUserAccess {
   role: string
   activeRole?: string
   roleMain?: string
+  disabledModules?: string[]
 }
 
 function readStoredUser(): StoredUserAccess | null {
@@ -20,8 +21,9 @@ function isAdmin(user: StoredUserAccess | null) {
 }
 
 export function hasResourceAccess(resource: string) {
-  void resource
-  return true
+  const user = readStoredUser()
+  if (isAdmin(user)) return true
+  return !(user?.disabledModules || []).includes(resource)
 }
 
 export function hasScreenAccess(screen: string) {
