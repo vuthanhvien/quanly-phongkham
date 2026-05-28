@@ -8,6 +8,7 @@ import { Shell } from './components/Shell';
 import { entityLabels } from './models';
 import { AuditPage } from './pages/AuditPage';
 import { BranchRoleAssignmentsPage } from './pages/BranchRoleAssignmentsPage';
+import { CustomFieldsPage } from './pages/CustomFieldsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { RecordDetailPage } from './pages/RecordDetailPage';
@@ -70,6 +71,7 @@ export function App() {
           <Route element={<ProtectedLayout />}>
             <Route index element={<DashboardPage />} />
             <Route element={<ScreenGuard screen="settings" />}>
+              <Route path="/custom-fields" element={<CustomFieldsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/roles" element={<RolesPage />} />
               <Route path="/branch-role-assignments" element={<BranchRoleAssignmentsPage />} />

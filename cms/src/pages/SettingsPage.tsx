@@ -1,5 +1,4 @@
 import {
-  AppstoreOutlined,
   FileTextOutlined,
   SettingOutlined,
 } from "@ant-design/icons"
@@ -10,7 +9,6 @@ import {
   Divider,
   Form,
   Input,
-  InputNumber,
   Modal,
   Select,
   Space,
@@ -47,20 +45,6 @@ interface Template {
   htmlTemplate: string
 }
 
-const CUSTOM_FIELD_TYPES = [
-  "text",
-  "number",
-  "date",
-  "boolean",
-  "select",
-  "textarea",
-  "relative",
-]
-
-const RELATIVE_RESOURCE_OPTIONS = Object.entries(entityLabels).map(
-  ([value, label]) => ({ value, label }),
-)
-
 const DEFAULT_TEMPLATE_HTML = `<section>
   <h1>Phiếu điều trị</h1>
   <p>Khách hàng: {{fullName}}</p>
@@ -78,13 +62,9 @@ export function SettingsPage() {
   const [detailConfig, setDetailConfig] = useState<FieldLayoutConfig[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [dynamicRoles, setDynamicRoles] = useState<DynamicRole[]>([])
-  const [fieldModal, setFieldModal] = useState(false)
-  const [editingField, setEditingField] = useState<CustomField | null>(null)
   const [templateModal, setTemplateModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
-  const [fieldForm] = Form.useForm()
   const [templateForm] = Form.useForm()
-  const currentFieldType = Form.useWatch("dataType", fieldForm)
   const templateHtml = Form.useWatch("htmlTemplate", templateForm)
 
   const fieldCatalog = useMemo(
@@ -179,55 +159,6 @@ export function SettingsPage() {
     setDynamicRoles(roleResponse.data.data)
   }
 
-  async function saveField(values: Record<string, any>) {
-    const payload = {
-      ...values,
-      entityType,
-      required: false,
-      isActive: values.isActive ?? true,
-      options: values.dataType === "select" && values.options
-        ? String(values.options)
-            .split(",")
-            .map((value) => value.trim())
-            .filter(Boolean)
-        : undefined,
-      relationResource:
-        values.dataType === "relative" ? values.relationResource : undefined,
-    }
-    if (editingField) {
-      await api.patch(`/settings/custom-fields/${editingField.id}`, payload)
-      message.success("Đã cập nhật field")
-    } else {
-      await api.post("/settings/custom-fields", payload)
-      message.success("Đã thêm trường tùy biến")
-    }
-    setFieldModal(false)
-    setEditingField(null)
-    fieldForm.resetFields()
-    await load()
-  }
-
-  function openCreateField() {
-    setEditingField(null)
-    fieldForm.resetFields()
-    fieldForm.setFieldsValue({ dataType: "text", sortOrder: 0, isActive: true })
-    setFieldModal(true)
-  }
-
-  function openEditField(field: CustomField) {
-    setEditingField(field)
-    fieldForm.setFieldsValue({
-      ...field,
-      options: field.options?.join(", "),
-    })
-    setFieldModal(true)
-  }
-
-  async function deleteField(id: string) {
-    await api.delete(`/settings/custom-fields/${id}`)
-    await load()
-  }
-
   async function saveView() {
     await Promise.all([
       api.put(`/settings/views/${entityType}/TABLE`, {
@@ -306,79 +237,34 @@ export function SettingsPage() {
           </Typography.Text>
           <Typography.Title level={2}>Cấu hình động</Typography.Title>
         </div>
-        <Select
-          value={entityType}
-          onChange={setEntityType}
-          style={{ width: 240 }}
-          options={Object.entries(entityLabels).map(([value, label]) => ({
-            value,
-            label,
-          }))}
-        />
+        <Space wrap>
+          <Select
+            value={entityType}
+            onChange={setEntityType}
+            style={{ width: 240 }}
+            options={Object.entries(entityLabels).map(([value, label]) => ({
+              value,
+              label,
+            }))}
+          />
+          <Select
+            style={{ width: 220 }}
+            value={selectedRole}
+            onChange={(value) => setSelectedRole(normalizeRole(value))}
+            options={selectableRoles.map((role) => ({
+              value: role,
+              label:
+                dynamicRoles.find((item) => item.key === role)?.name
+                  ? `${dynamicRoles.find((item) => item.key === role)?.name} (${role})`
+                  : role,
+            }))}
+          />
+        </Space>
       </div>
       <Card className="glass-card settings-card">
         <Tabs
           className="settings-tabs"
           items={[
-            {
-              key: "custom-fields",
-              label: (
-                <span className="simple-tab-label">
-                  <AppstoreOutlined />
-                  <span>Custom fields</span>
-                </span>
-              ),
-              children: (
-                <div className="settings-tab-panel">
-                  <div className="settings-tab-header">
-                    <Typography.Paragraph type="secondary">
-                      Tại đây chỉ định nghĩa field, kiểu dữ liệu và liên kết. Quy tắc bắt buộc hiển thị được cấu hình riêng trong phần form nhập liệu.
-                    </Typography.Paragraph>
-                    <Button onClick={openCreateField}>Thêm field</Button>
-                  </div>
-                  <Table
-                    size="small"
-                    pagination={false}
-                    rowKey="id"
-                    dataSource={fields}
-                    columns={[
-                      { title: "Nhãn", dataIndex: "label" },
-                      { title: "Key", dataIndex: "key" },
-                      { title: "Kiểu", dataIndex: "dataType" },
-                      {
-                        title: "Liên kết",
-                        render: (_, row) =>
-                          row.relationResource
-                            ? entityLabels[row.relationResource] || row.relationResource
-                            : "-",
-                      },
-                      {
-                        title: "Hoạt động",
-                        dataIndex: "isActive",
-                        render: (value) => (value ? "Bật" : "Tắt"),
-                      },
-                      {
-                        title: "",
-                        render: (_, row) => (
-                          <Space>
-                            <Button type="link" onClick={() => openEditField(row)}>
-                              Sửa
-                            </Button>
-                            <Button
-                              danger
-                              type="link"
-                              onClick={() => deleteField(row.id)}
-                            >
-                              Xóa
-                            </Button>
-                          </Space>
-                        ),
-                      },
-                    ]}
-                  />
-                </div>
-              ),
-            },
             {
               key: "view-config",
               label: (
@@ -393,26 +279,12 @@ export function SettingsPage() {
                     <Typography.Text>
                       Module hiện tại là <strong>{entityLabels[entityType] || entityType}</strong>. Chọn role để cấu hình dữ liệu nào được hiển thị ở bảng, form và màn chi tiết. Nếu module này chưa có cấu hình riêng, hệ thống sẽ kế thừa từ role mặc định <strong>{DEFAULT_ROLE_SCOPE}</strong>.
                     </Typography.Text>
-                    <Space wrap>
-                      <Select
-                        style={{ width: 180 }}
-                        value={selectedRole}
-                        onChange={(value) => setSelectedRole(normalizeRole(value))}
-                        options={selectableRoles.map((role) => ({
-                          value: role,
-                          label:
-                            dynamicRoles.find((item) => item.key === role)?.name
-                              ? `${dynamicRoles.find((item) => item.key === role)?.name} (${role})`
-                              : role,
-                        }))}
-                      />
-                      <Checkbox
-                        checked={moduleEnabled}
-                        onChange={(event) => setModuleEnabled(event.target.checked)}
-                      >
-                        Cho phép role sử dụng module này
-                      </Checkbox>
-                    </Space>
+                    <Checkbox
+                      checked={moduleEnabled}
+                      onChange={(event) => setModuleEnabled(event.target.checked)}
+                    >
+                      Cho phép role sử dụng module này
+                    </Checkbox>
                   </div>
                   <Space wrap>
                     <Tag color={moduleEnabled ? "green" : "red"}>
@@ -547,63 +419,6 @@ export function SettingsPage() {
           ]}
         />
       </Card>
-      <Modal
-        title={editingField ? "Cập nhật custom field" : "Thêm custom field"}
-        open={fieldModal}
-        footer={null}
-        onCancel={() => {
-          setFieldModal(false)
-          setEditingField(null)
-        }}
-      >
-        <Form form={fieldForm} layout="vertical" onFinish={saveField}>
-          <Form.Item
-            name="label"
-            label="Tên hiển thị"
-            rules={[{ required: true }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="key"
-            label="Key dữ liệu"
-            rules={[{ required: true }]}
-          >
-            <Input placeholder="vi_du_field" />
-          </Form.Item>
-          <Form.Item name="dataType" label="Kiểu" initialValue="text">
-            <Select
-              options={CUSTOM_FIELD_TYPES.map((value) => ({
-                value,
-                label: value,
-              }))}
-            />
-          </Form.Item>
-          {currentFieldType === "select" && (
-            <Form.Item name="options" label="Lựa chọn (ngăn cách dấu phẩy)">
-              <Input />
-            </Form.Item>
-          )}
-          {currentFieldType === "relative" && (
-            <Form.Item
-              name="relationResource"
-              label="Bảng liên kết"
-              rules={[{ required: true, message: "Chọn bảng liên kết" }]}
-            >
-              <Select options={RELATIVE_RESOURCE_OPTIONS} />
-            </Form.Item>
-          )}
-          <Form.Item name="sortOrder" label="Thứ tự" initialValue={0}>
-            <InputNumber />
-          </Form.Item>
-          <Form.Item name="isActive" valuePropName="checked" initialValue>
-            <Checkbox>Cho phép sử dụng</Checkbox>
-          </Form.Item>
-          <Button className="primary-glow" htmlType="submit" type="primary">
-            {editingField ? "Cập nhật field" : "Lưu field"}
-          </Button>
-        </Form>
-      </Modal>
       <Modal
         title={editingTemplate ? "Cập nhật mẫu in HTML" : "Thêm mẫu in HTML"}
         open={templateModal}

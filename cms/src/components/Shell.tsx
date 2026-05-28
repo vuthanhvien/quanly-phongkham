@@ -1,4 +1,5 @@
 import {
+  AppstoreOutlined,
   AuditOutlined,
   BankOutlined,
   CalendarOutlined,
@@ -27,6 +28,7 @@ import { entityLabels } from "../models"
 const { Header, Content, Sider } = Layout
 
 const menuIcons: Record<string, React.ReactNode> = {
+  "custom-fields": <AppstoreOutlined />,
   branches: <BankOutlined />,
   roles: <SettingOutlined />,
   "branch-role-assignments": <DeploymentUnitOutlined />,
@@ -139,6 +141,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
       children: [
         hasScreenAccess("settings")
           ? {
+              key: "/custom-fields",
+              icon: menuIcons["custom-fields"],
+              label: <Link to="/custom-fields">Custom fields</Link>,
+            }
+          : null,
+        hasScreenAccess("settings")
+          ? {
               key: "/settings",
               icon: <SettingOutlined />,
               label: <Link to="/settings">Cấu hình động</Link>,
@@ -161,6 +170,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ? "admin"
       : undefined),
     location.pathname.startsWith("/settings") ||
+    location.pathname.startsWith("/custom-fields") ||
     location.pathname.startsWith("/audit-logs")
       ? "system-tools"
       : undefined,
