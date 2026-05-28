@@ -4,6 +4,9 @@ export interface FieldSpec {
   type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea';
   required?: boolean;
   options?: string[];
+  disabled?: boolean;
+  description?: string;
+  placeholder?: string;
 }
 
 export interface RelationSpec {
@@ -20,7 +23,10 @@ export interface CustomField {
   required: boolean;
   options?: string[];
   isActive: boolean;
+  sortOrder?: number;
 }
+
+export const systemRoleOptions = ['ADMIN', 'STAFF', 'DOCTOR'];
 
 export const entityLabels: Record<string, string> = {
   branches: 'Chi nhánh',
@@ -138,7 +144,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'email', label: 'Email đăng nhập', required: true },
     { key: 'password', label: 'Mật khẩu mới' },
     { key: 'fullName', label: 'Tên hiển thị', required: true },
-    { key: 'role', label: 'Vai trò hệ thống', type: 'select', options: ['ADMIN', 'STAFF'], required: true },
+    { key: 'role', label: 'Vai trò hệ thống', type: 'select', options: systemRoleOptions, required: true },
     { key: 'branchId', label: 'Chi nhánh mặc định' },
     { key: 'staffId', label: 'Nhân viên' },
   ],

@@ -466,6 +466,9 @@ export class ViewSetting {
   @Column()
   viewType: string;
 
+  @Column({ default: 'ALL' })
+  role: string;
+
   @Column({ type: 'jsonb', default: {} })
   config: Record<string, unknown>;
 

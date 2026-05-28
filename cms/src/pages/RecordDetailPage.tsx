@@ -10,11 +10,18 @@ import {
   Tag,
   Typography,
 } from "antd"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { api } from "../api"
-import { baseFields, entityLabels } from "../models"
+import { CustomField, entityLabels } from "../models"
 import { displayValue, loadRelationOptions, LookupMap } from "../relations"
+import {
+  FieldLayoutConfig,
+  getFieldCatalog,
+  getStoredUserRole,
+  getVisibleFieldConfigs,
+  ViewSettingRecord,
+} from "../view-settings"
 
 interface RelatedBlock {
   title: string
@@ -27,6 +34,7 @@ export function RecordDetailPage() {
   const { resource = "customers", id = "" } = useParams()
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [related, setRelated] = useState<RelatedBlock[]>([])
+  const [fields, setFields] = useState<FieldLayoutConfig[]>([])
   const [lookups, setLookups] = useState<LookupMap>({})
   const [loading, setLoading] = useState(true)
 
@@ -36,35 +44,47 @@ export function RecordDetailPage() {
     Promise.all([
       api.get(`/records/${resource}/${id}`),
       loadRelated(resource, id),
+      api.get("/settings/custom-fields", { params: { entityType: resource } }),
+      api.get("/settings/views", { params: { entityType: resource } }),
+    ]).then(([recordResponse, relatedResponse, fieldResponse, viewResponse]) => {
+      if (!mounted) return
+      const nextRecord = recordResponse.data.data
+      const customFields = fieldResponse.data.data.filter(
+        (field: CustomField) => field.isActive,
+      )
+      const catalog = getFieldCatalog(resource, customFields)
+      Object.keys(nextRecord?.customFields || {}).forEach((key) => {
+        if (catalog.some((field) => field.key === key)) return
+        catalog.push({ key, label: key })
+      })
+      const detailFields = getVisibleFieldConfigs(
+        catalog,
+        viewResponse.data.data as ViewSettingRecord[],
+        "DETAIL",
+        getStoredUserRole(),
+      )
+
+      setRecord(nextRecord)
+      setRelated(relatedResponse)
+      setFields(detailFields)
       loadRelationOptions([
-        ...(baseFields[resource] || []).map((field) => field.key),
+        ...detailFields.map((field) => field.key),
         "branchId",
         "defaultBranchId",
         "customerId",
         "staffId",
         "userId",
         "invoiceId",
-      ]),
-    ]).then(([recordResponse, relatedResponse, lookupResponse]) => {
-      if (!mounted) return
-      setRecord(recordResponse.data.data)
-      setRelated(relatedResponse)
-      setLookups(lookupResponse)
-      setLoading(false)
+      ]).then((lookupResponse) => {
+        if (!mounted) return
+        setLookups(lookupResponse)
+        setLoading(false)
+      })
     })
     return () => {
       mounted = false
     }
   }, [resource, id])
-
-  const fields = useMemo(() => {
-    const base = baseFields[resource] || []
-    const custom = Object.keys(record?.customFields || {}).map((key) => ({
-      key,
-      label: key,
-    }))
-    return [...base, ...custom]
-  }, [resource, record])
 
   if (!record && !loading) {
     return <Empty description="Không tìm thấy bản ghi" />
@@ -100,7 +120,21 @@ export function RecordDetailPage() {
             <Typography.Title level={4}>Thông tin chính</Typography.Title>
             <Descriptions column={1} bordered>
               {fields.map((field) => (
-                <Descriptions.Item key={field.key} label={field.label}>
+                <Descriptions.Item
+                  key={field.key}
+                  label={
+                    field.description ? (
+                      <Space direction="vertical" size={0}>
+                        <span>{field.label}</span>
+                        <Typography.Text type="secondary">
+                          {field.description}
+                        </Typography.Text>
+                      </Space>
+                    ) : (
+                      field.label
+                    )
+                  }
+                >
                   {displayValue(
                     field.key,
                     record?.[field.key] ?? record?.customFields?.[field.key],

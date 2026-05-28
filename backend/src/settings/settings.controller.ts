@@ -35,9 +35,9 @@ export class SettingsController {
   async saveView(
     @Param('entityType') entityType: string,
     @Param('viewType') viewType: string,
-    @Body() payload: { config: Record<string, unknown> },
+    @Body() payload: { config: Record<string, unknown>; role?: string },
   ) {
-    return { data: await this.settings.saveView(entityType, viewType, payload.config) };
+    return { data: await this.settings.saveView(entityType, viewType, payload.config, payload.role) };
   }
 
   @Get('print-templates')

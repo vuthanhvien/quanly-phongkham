@@ -9,12 +9,29 @@ import {
   Select,
   Space,
   Table,
+  Tabs,
+  Tag,
   Typography,
   message,
 } from "antd"
+import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
-import { baseFields, CustomField, entityLabels } from "../models"
+import { CustomField, entityLabels } from "../models"
+import {
+  buildFieldLayoutConfigs,
+  DEFAULT_ROLE_SCOPE,
+  FieldLayoutConfig,
+  getFieldCatalog,
+  getRoleOptions,
+  getStoredUserRole,
+  hasExactRoleSetting,
+  normalizeRole,
+  serializeViewConfig,
+  ViewSettingRecord,
+  ViewType,
+  VIEW_TYPES,
+} from "../view-settings"
 
 interface Template {
   id: string
@@ -24,18 +41,93 @@ interface Template {
 
 export function SettingsPage() {
   const [entityType, setEntityType] = useState("customers")
+  const [selectedRole, setSelectedRole] = useState(getStoredUserRole())
+  const [newRole, setNewRole] = useState("")
   const [fields, setFields] = useState<CustomField[]>([])
-  const [tableColumns, setTableColumns] = useState<string[]>([])
-  const [formFields, setFormFields] = useState<string[]>([])
+  const [views, setViews] = useState<ViewSettingRecord[]>([])
+  const [tableConfig, setTableConfig] = useState<FieldLayoutConfig[]>([])
+  const [formConfig, setFormConfig] = useState<FieldLayoutConfig[]>([])
+  const [detailConfig, setDetailConfig] = useState<FieldLayoutConfig[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [fieldModal, setFieldModal] = useState(false)
+  const [editingField, setEditingField] = useState<CustomField | null>(null)
   const [templateModal, setTemplateModal] = useState(false)
   const [fieldForm] = Form.useForm()
   const [templateForm] = Form.useForm()
 
+  const fieldCatalog = useMemo(
+    () => getFieldCatalog(entityType, fields),
+    [entityType, fields],
+  )
+  const roleOptions = useMemo(
+    () => getRoleOptions(views, [selectedRole]),
+    [views, selectedRole],
+  )
+  const viewStatus = useMemo(
+    () =>
+      Object.fromEntries(
+        VIEW_TYPES.map((viewType) => [
+          viewType,
+          hasExactRoleSetting(views, viewType, selectedRole),
+        ]),
+      ) as Record<ViewType, boolean>,
+    [views, selectedRole],
+  )
+
   useEffect(() => {
     void load()
   }, [entityType])
+
+  useEffect(() => {
+    setTableConfig(
+      buildFieldLayoutConfigs(
+        fieldCatalog,
+        views.find(
+          (view) =>
+            view.viewType === "TABLE" &&
+            normalizeRole(view.role) === selectedRole,
+        ) ||
+          views.find(
+            (view) =>
+              view.viewType === "TABLE" &&
+              normalizeRole(view.role) === DEFAULT_ROLE_SCOPE,
+          ),
+        "TABLE",
+      ),
+    )
+    setFormConfig(
+      buildFieldLayoutConfigs(
+        fieldCatalog,
+        views.find(
+          (view) =>
+            view.viewType === "FORM" &&
+            normalizeRole(view.role) === selectedRole,
+        ) ||
+          views.find(
+            (view) =>
+              view.viewType === "FORM" &&
+              normalizeRole(view.role) === DEFAULT_ROLE_SCOPE,
+          ),
+        "FORM",
+      ),
+    )
+    setDetailConfig(
+      buildFieldLayoutConfigs(
+        fieldCatalog,
+        views.find(
+          (view) =>
+            view.viewType === "DETAIL" &&
+            normalizeRole(view.role) === selectedRole,
+        ) ||
+          views.find(
+            (view) =>
+              view.viewType === "DETAIL" &&
+              normalizeRole(view.role) === DEFAULT_ROLE_SCOPE,
+          ),
+        "DETAIL",
+      ),
+    )
+  }, [fieldCatalog, selectedRole, views])
 
   async function load() {
     const [fieldResponse, viewResponse, templateResponse] = await Promise.all([
@@ -44,43 +136,49 @@ export function SettingsPage() {
       api.get("/settings/print-templates", { params: { entityType } }),
     ])
     setFields(fieldResponse.data.data)
-    const views = viewResponse.data.data
-    setTableColumns(
-      views.find((item: { viewType: string }) => item.viewType === "TABLE")
-        ?.config?.columns || [],
-    )
-    setFormFields(
-      views.find((item: { viewType: string }) => item.viewType === "FORM")
-        ?.config?.fields || [],
-    )
+    setViews(viewResponse.data.data)
     setTemplates(templateResponse.data.data)
   }
 
-  const options = useMemo(
-    () =>
-      [
-        ...(baseFields[entityType] || []),
-        ...fields
-          .filter((field) => field.isActive)
-          .map((field) => ({ key: field.key, label: field.label })),
-      ].map((field) => ({ label: field.label, value: field.key })),
-    [entityType, fields],
-  )
-
-  async function addField(values: Record<string, any>) {
-    await api.post("/settings/custom-fields", {
+  async function saveField(values: Record<string, any>) {
+    const payload = {
       ...values,
       entityType,
+      isActive: values.isActive ?? true,
       options: values.options
         ? String(values.options)
             .split(",")
             .map((value) => value.trim())
+            .filter(Boolean)
         : undefined,
-    })
+    }
+    if (editingField) {
+      await api.patch(`/settings/custom-fields/${editingField.id}`, payload)
+      message.success("Đã cập nhật field")
+    } else {
+      await api.post("/settings/custom-fields", payload)
+      message.success("Đã thêm trường tùy biến")
+    }
     setFieldModal(false)
+    setEditingField(null)
     fieldForm.resetFields()
-    message.success("Đã thêm trường tùy biến")
     await load()
+  }
+
+  function openCreateField() {
+    setEditingField(null)
+    fieldForm.resetFields()
+    fieldForm.setFieldsValue({ dataType: "text", sortOrder: 0, isActive: true })
+    setFieldModal(true)
+  }
+
+  function openEditField(field: CustomField) {
+    setEditingField(field)
+    fieldForm.setFieldsValue({
+      ...field,
+      options: field.options?.join(", "),
+    })
+    setFieldModal(true)
   }
 
   async function deleteField(id: string) {
@@ -91,13 +189,20 @@ export function SettingsPage() {
   async function saveView() {
     await Promise.all([
       api.put(`/settings/views/${entityType}/TABLE`, {
-        config: { columns: tableColumns },
+        role: selectedRole,
+        config: serializeViewConfig("TABLE", tableConfig),
       }),
       api.put(`/settings/views/${entityType}/FORM`, {
-        config: { fields: formFields },
+        role: selectedRole,
+        config: serializeViewConfig("FORM", formConfig),
+      }),
+      api.put(`/settings/views/${entityType}/DETAIL`, {
+        role: selectedRole,
+        config: serializeViewConfig("DETAIL", detailConfig),
       }),
     ])
-    message.success("Đã lưu cấu hình bảng và form")
+    message.success("Đã lưu cấu hình table / form / detail theo role")
+    await load()
   }
 
   async function addTemplate(values: Record<string, unknown>) {
@@ -106,6 +211,26 @@ export function SettingsPage() {
     templateForm.resetFields()
     message.success("Đã lưu mẫu in")
     await load()
+  }
+
+  function updateConfig(viewType: ViewType, key: string, patch: Partial<FieldLayoutConfig>) {
+    const setter =
+      viewType === "TABLE"
+        ? setTableConfig
+        : viewType === "FORM"
+          ? setFormConfig
+          : setDetailConfig
+    setter((current) =>
+      current.map((field) =>
+        field.key === key ? { ...field, ...patch } : field,
+      ),
+    )
+  }
+
+  function addRoleScope() {
+    const nextRole = normalizeRole(newRole)
+    setSelectedRole(nextRole)
+    setNewRole("")
   }
 
   return (
@@ -132,7 +257,7 @@ export function SettingsPage() {
           className="glass-card"
           title="Custom fields"
           extra={
-            <Button onClick={() => setFieldModal(true)}>Thêm field</Button>
+            <Button onClick={openCreateField}>Thêm field</Button>
           }
         >
           <Table
@@ -145,38 +270,110 @@ export function SettingsPage() {
               { title: "Key", dataIndex: "key" },
               { title: "Kiểu", dataIndex: "dataType" },
               {
+                title: "Bắt buộc",
+                dataIndex: "required",
+                render: (value) => (value ? "Có" : "Không"),
+              },
+              {
+                title: "Hoạt động",
+                dataIndex: "isActive",
+                render: (value) => (value ? "Bật" : "Tắt"),
+              },
+              {
                 title: "",
                 render: (_, row) => (
-                  <Button
-                    danger
-                    type="link"
-                    onClick={() => deleteField(row.id)}
-                  >
-                    Xóa
-                  </Button>
+                  <Space>
+                    <Button type="link" onClick={() => openEditField(row)}>
+                      Sửa
+                    </Button>
+                    <Button
+                      danger
+                      type="link"
+                      onClick={() => deleteField(row.id)}
+                    >
+                      Xóa
+                    </Button>
+                  </Space>
                 ),
               },
             ]}
           />
         </Card>
-        <Card className="glass-card" title="Hiển thị table / form">
-          <Typography.Text strong>Cột trên bảng</Typography.Text>
-          <Checkbox.Group
-            style={{ display: "grid", margin: "12px 0 20px" }}
-            options={options}
-            value={tableColumns}
-            onChange={(value) => setTableColumns(value as string[])}
-          />
-          <Typography.Text strong>Field trên form</Typography.Text>
-          <Checkbox.Group
-            style={{ display: "grid", margin: "12px 0 20px" }}
-            options={options}
-            value={formFields}
-            onChange={(value) => setFormFields(value as string[])}
-          />
-          <Button className="primary-glow" type="primary" onClick={saveView}>
-            Lưu bố cục
-          </Button>
+        <Card
+          className="glass-card"
+          title="Hiển thị table / form / detail theo role"
+          extra={
+            <Space wrap>
+              <Select
+                style={{ width: 180 }}
+                value={selectedRole}
+                onChange={(value) => setSelectedRole(normalizeRole(value))}
+                options={roleOptions.map((role) => ({ value: role, label: role }))}
+              />
+              <Input
+                placeholder="Thêm role mới"
+                value={newRole}
+                onChange={(event) => setNewRole(event.target.value)}
+                onPressEnter={addRoleScope}
+                style={{ width: 160 }}
+              />
+              <Button onClick={addRoleScope}>Tạo role</Button>
+            </Space>
+          }
+        >
+          <Space direction="vertical" size={12} style={{ width: "100%" }}>
+            <Typography.Text>
+              Cấu hình đang áp dụng cho role <strong>{selectedRole}</strong>.
+              Nếu một view chưa có cấu hình riêng, hệ thống sẽ kế thừa từ role mặc định <strong>{DEFAULT_ROLE_SCOPE}</strong>.
+            </Typography.Text>
+            <Space wrap>
+              {VIEW_TYPES.map((viewType) => (
+                <Tag color={viewStatus[viewType] ? "green" : "gold"} key={viewType}>
+                  {viewType}: {viewStatus[viewType] ? "riêng theo role" : "đang kế thừa ALL"}
+                </Tag>
+              ))}
+            </Space>
+            <Tabs
+              items={[
+                {
+                  key: "TABLE",
+                  label: "Table",
+                  children: (
+                    <ViewConfigTable
+                      dataSource={tableConfig}
+                      viewType="TABLE"
+                      onChange={updateConfig}
+                    />
+                  ),
+                },
+                {
+                  key: "FORM",
+                  label: "Form",
+                  children: (
+                    <ViewConfigTable
+                      dataSource={formConfig}
+                      viewType="FORM"
+                      onChange={updateConfig}
+                    />
+                  ),
+                },
+                {
+                  key: "DETAIL",
+                  label: "Detail",
+                  children: (
+                    <ViewConfigTable
+                      dataSource={detailConfig}
+                      viewType="DETAIL"
+                      onChange={updateConfig}
+                    />
+                  ),
+                },
+              ]}
+            />
+            <Button className="primary-glow" type="primary" onClick={saveView}>
+              Lưu cấu hình role
+            </Button>
+          </Space>
         </Card>
         <Card
           className="glass-card"
@@ -198,12 +395,15 @@ export function SettingsPage() {
         </Card>
       </div>
       <Modal
-        title="Thêm custom field"
+        title={editingField ? "Cập nhật custom field" : "Thêm custom field"}
         open={fieldModal}
         footer={null}
-        onCancel={() => setFieldModal(false)}
+        onCancel={() => {
+          setFieldModal(false)
+          setEditingField(null)
+        }}
       >
-        <Form form={fieldForm} layout="vertical" onFinish={addField}>
+        <Form form={fieldForm} layout="vertical" onFinish={saveField}>
           <Form.Item
             name="label"
             label="Tên hiển thị"
@@ -234,8 +434,11 @@ export function SettingsPage() {
           <Form.Item name="required" valuePropName="checked">
             <Checkbox>Bắt buộc nhập</Checkbox>
           </Form.Item>
+          <Form.Item name="isActive" valuePropName="checked" initialValue>
+            <Checkbox>Cho phép sử dụng</Checkbox>
+          </Form.Item>
           <Button className="primary-glow" htmlType="submit" type="primary">
-            Lưu field
+            {editingField ? "Cập nhật field" : "Lưu field"}
           </Button>
         </Form>
       </Modal>
@@ -265,5 +468,139 @@ export function SettingsPage() {
         </Form>
       </Modal>
     </>
+  )
+}
+
+function ViewConfigTable({
+  dataSource,
+  viewType,
+  onChange,
+}: {
+  dataSource: FieldLayoutConfig[]
+  viewType: ViewType
+  onChange: (
+    viewType: ViewType,
+    key: string,
+    patch: Partial<FieldLayoutConfig>,
+  ) => void
+}) {
+  const columns: ColumnsType<FieldLayoutConfig> = [
+    {
+      title: "Hiển thị",
+      dataIndex: "visible",
+      width: 96,
+      render: (value, row) => (
+        <Checkbox
+          checked={value}
+          onChange={(event) =>
+            onChange(viewType, row.key, { visible: event.target.checked })
+          }
+        />
+      ),
+    },
+    {
+      title: "Field",
+      key: "field",
+      width: 220,
+      render: (_, row) => (
+        <Space direction="vertical" size={0}>
+          <Typography.Text strong>{row.label}</Typography.Text>
+          <Typography.Text type="secondary">{row.key}</Typography.Text>
+        </Space>
+      ),
+    },
+    {
+      title: "Loại",
+      dataIndex: "type",
+      width: 120,
+      render: (value) => value || "text",
+    },
+    {
+      title: "Nhãn hiển thị",
+      key: "label",
+      render: (_, row) => (
+        <Input
+          value={row.label}
+          onChange={(event) =>
+            onChange(viewType, row.key, { label: event.target.value })
+          }
+          placeholder="Tên field hiển thị"
+        />
+      ),
+    },
+  ]
+
+  if (viewType !== "TABLE") {
+    columns.push(
+      {
+        title: "Bắt buộc",
+        dataIndex: "required",
+        width: 110,
+        render: (value, row) => (
+          <Checkbox
+            checked={Boolean(value)}
+            onChange={(event) =>
+              onChange(viewType, row.key, { required: event.target.checked })
+            }
+          />
+        ),
+      },
+      {
+        title: "Mô tả / hướng dẫn",
+        key: "description",
+        render: (_, row) => (
+          <Input.TextArea
+            autoSize={{ minRows: 1, maxRows: 3 }}
+            value={row.description}
+            onChange={(event) =>
+              onChange(viewType, row.key, { description: event.target.value })
+            }
+            placeholder="Nội dung hướng dẫn hiển thị cho field"
+          />
+        ),
+      },
+    )
+  }
+
+  if (viewType === "FORM") {
+    columns.push(
+      {
+        title: "Placeholder",
+        key: "placeholder",
+        render: (_, row) => (
+          <Input
+            value={row.placeholder}
+            onChange={(event) =>
+              onChange(viewType, row.key, { placeholder: event.target.value })
+            }
+            placeholder="Gợi ý nhập liệu"
+          />
+        ),
+      },
+      {
+        title: "Khóa sửa",
+        dataIndex: "disabled",
+        width: 100,
+        render: (value, row) => (
+          <Checkbox
+            checked={Boolean(value)}
+            onChange={(event) =>
+              onChange(viewType, row.key, { disabled: event.target.checked })
+            }
+          />
+        ),
+      },
+    )
+  }
+
+  return (
+    <Table
+      columns={columns}
+      dataSource={dataSource}
+      pagination={false}
+      rowKey="key"
+      scroll={{ x: 1120 }}
+      size="small"
+    />
   )
 }

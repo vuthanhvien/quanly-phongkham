@@ -15,14 +15,20 @@ import { useEffect, useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { api } from "../api"
 import { RecordFormContent } from "../components/RecordFormContent"
-import { baseFields, CustomField, entityLabels } from "../models"
+import { CustomField, entityLabels } from "../models"
 import { displayValue, loadRelationOptions, LookupMap } from "../relations"
+import {
+  FieldLayoutConfig,
+  getFieldCatalog,
+  getStoredUserRole,
+  getVisibleFieldConfigs,
+  ViewSettingRecord,
+} from "../view-settings"
 
 export function RecordListPage() {
   const { resource = "customers" } = useParams()
   const [search, setSearch] = useState("")
-  const [customFields, setCustomFields] = useState<CustomField[]>([])
-  const [configuredColumns, setConfiguredColumns] = useState<string[]>([])
+  const [displayFields, setDisplayFields] = useState<FieldLayoutConfig[]>([])
   const [templates, setTemplates] = useState<
     Array<{ id: string; name: string }>
   >([])
@@ -48,33 +54,23 @@ export function RecordListPage() {
       }),
     ])
       .then(([fields, views, prints]) => {
-        setCustomFields(
-          fields.data.data.filter((field: CustomField) => field.isActive),
+        const customFields = fields.data.data.filter(
+          (field: CustomField) => field.isActive,
         )
-        const table = views.data.data.find(
-          (view: { viewType: string }) => view.viewType === "TABLE",
+        const catalog = getFieldCatalog(resource, customFields)
+        const tableFields = getVisibleFieldConfigs(
+          catalog,
+          views.data.data as ViewSettingRecord[],
+          "TABLE",
+          getStoredUserRole(),
         )
-        setConfiguredColumns(table?.config?.columns || [])
+        setDisplayFields(tableFields)
         setTemplates(prints.data.data)
-        const custom = fields.data.data
-          .filter((field: CustomField) => field.isActive)
-          .map((field: CustomField) => field.key)
-        const tableColumns = table?.config?.columns || [
-          ...(baseFields[resource] || []).map((field) => field.key),
-          ...custom,
-        ]
-        return loadRelationOptions(tableColumns)
+        return loadRelationOptions(tableFields.map((field) => field.key))
       })
       .then(setLookups)
   }, [resource])
 
-  const allFields = [
-    ...(baseFields[resource] || []),
-    ...customFields.map((field) => ({ key: field.key, label: field.label })),
-  ]
-  const displayFields = configuredColumns.length
-    ? allFields.filter((field) => configuredColumns.includes(field.key))
-    : allFields.slice(0, 6)
   const columns: ColumnsType<Record<string, any>> = useMemo(
     () => [
       ...displayFields.map((field) => ({

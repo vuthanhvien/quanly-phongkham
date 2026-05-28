@@ -5,6 +5,12 @@ import { Repository } from 'typeorm';
 import { CustomFieldDefinition, PrintTemplate, ViewSetting } from '../entities/entities';
 import { RecordsService } from '../records/records.service';
 
+const DEFAULT_ROLE_SCOPE = 'ALL';
+
+function normalizeRole(role?: string) {
+  return role?.trim().toUpperCase() || DEFAULT_ROLE_SCOPE;
+}
+
 @Injectable()
 export class SettingsService {
   constructor(
@@ -42,12 +48,14 @@ export class SettingsService {
   }
 
   listViews(entityType?: string) {
-    return this.views.find({ where: entityType ? { entityType } : {}, order: { entityType: 'ASC', viewType: 'ASC' } });
+    return this.views.find({ where: entityType ? { entityType } : {}, order: { entityType: 'ASC', viewType: 'ASC', role: 'ASC' } });
   }
 
-  async saveView(entityType: string, viewType: string, config: Record<string, unknown>) {
-    let setting = await this.views.findOne({ where: { entityType, viewType } });
-    if (!setting) setting = this.views.create({ entityType, viewType, config });
+  async saveView(entityType: string, viewType: string, config: Record<string, unknown>, role?: string) {
+    const normalizedRole = normalizeRole(role);
+    let setting = await this.views.findOne({ where: { entityType, viewType, role: normalizedRole } });
+    if (!setting) setting = this.views.create({ entityType, viewType, role: normalizedRole, config });
+    setting.role = normalizedRole;
     setting.config = config;
     return this.views.save(setting);
   }

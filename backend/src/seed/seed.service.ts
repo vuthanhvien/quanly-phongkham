@@ -81,8 +81,9 @@ export class SeedService implements OnApplicationBootstrap {
     }
     if ((await this.views.count()) === 0) {
       await this.views.save([
-        this.views.create({ entityType: 'customers', viewType: 'TABLE', config: { columns: ['code', 'fullName', 'phone', 'status', 'tier', 'nguon_khach'] } }),
-        this.views.create({ entityType: 'customers', viewType: 'FORM', config: { fields: ['code', 'fullName', 'phone', 'email', 'status', 'branchId', 'nguon_khach'] } }),
+        this.views.create({ entityType: 'customers', viewType: 'TABLE', role: 'ALL', config: { columns: ['code', 'fullName', 'phone', 'status', 'tier', 'nguon_khach'] } }),
+        this.views.create({ entityType: 'customers', viewType: 'FORM', role: 'ALL', config: { fields: ['code', 'fullName', 'phone', 'email', 'status', 'branchId', 'nguon_khach'] } }),
+        this.views.create({ entityType: 'customers', viewType: 'DETAIL', role: 'ALL', config: { fields: ['code', 'fullName', 'phone', 'email', 'status', 'tier', 'branchId', 'nguon_khach'] } }),
       ]);
     }
     if ((await this.templates.count()) === 0) {
