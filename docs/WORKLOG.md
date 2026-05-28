@@ -14,6 +14,9 @@
 - [x] Gom menu sidebar theo nhóm role/nghiệp vụ: Lễ tân & CRM, Chuyên môn điều trị, Kho & mua hàng, Tài chính & lương, Quản trị hệ thống và Công cụ hệ thống.
 - [x] Thêm quản lý phòng ban, nhân viên, tài khoản đăng nhập và phân quyền chức năng theo từng chi nhánh.
 - [x] Backend kiểm tra RBAC theo `resource:action` và `branchId`; cùng một nhân viên có thể có quyền khác nhau ở các chi nhánh khác nhau.
+- [x] Chuyển tạo mới trên CMS sang quick add drawer bên phải, không điều hướng sang route tạo mới.
+- [x] Thêm trang detail chung cho tất cả phân hệ; khách hàng và nhân viên có thêm khu tổng quan và bảng dữ liệu liên quan.
+- [x] Ẩn UUID khỏi trải nghiệm CMS: các field quan hệ dùng select search, bảng/detail hiển thị dạng `code - name` hoặc nhãn dễ đọc.
 - [x] Thêm mask điện thoại, endpoint reveal có audit, phân hạng khách theo chi tiêu và kiểm tra trùng lịch.
 - [x] Thêm Dockerfile/Compose và tài liệu khởi chạy.
 
@@ -25,6 +28,8 @@
 - [x] Kiểm tra API end-to-end: login, tạo khách, thêm custom field, cấu hình table/form, render mẫu in, mask/reveal điện thoại và audit log.
 - [x] Kiểm tra cập nhật form cục bộ: vẫn giữ số điện thoại thật phía backend, dữ liệu hiển thị đã mask và hạng khách được tính đúng.
 - [x] Kiểm tra RBAC: tạo nhân viên/tài khoản/quyền chi nhánh, đăng nhập bằng tài khoản STAFF, cho phép `customers:view` và chặn `customers:create` bằng 403.
+- [x] Build CMS sau khi thêm drawer/detail; rebuild Docker CMS và kiểm tra route SPA detail trả asset mới.
+- [x] Build/rebuild CMS sau khi đổi relation select; kiểm tra API có dữ liệu `code - name` cho chi nhánh và khách hàng.
 - [ ] Kiểm tra tương tác hình ảnh UI bằng trình duyệt tự động: công cụ Browser local không được cung cấp trong phiên xác minh này.
 
 ## Sẽ Làm - Giai Đoạn Tiếp Theo

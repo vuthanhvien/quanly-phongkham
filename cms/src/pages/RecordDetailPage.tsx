@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { baseFields, entityLabels } from '../models';
+import { displayValue, loadRelationOptions, LookupMap } from '../relations';
 
 interface RelatedBlock {
   title: string;
@@ -15,6 +16,7 @@ export function RecordDetailPage() {
   const { resource = 'customers', id = '' } = useParams();
   const [record, setRecord] = useState<Record<string, any> | null>(null);
   const [related, setRelated] = useState<RelatedBlock[]>([]);
+  const [lookups, setLookups] = useState<LookupMap>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,10 +25,20 @@ export function RecordDetailPage() {
     Promise.all([
       api.get(`/records/${resource}/${id}`),
       loadRelated(resource, id),
-    ]).then(([recordResponse, relatedResponse]) => {
+      loadRelationOptions([
+        ...(baseFields[resource] || []).map((field) => field.key),
+        'branchId',
+        'defaultBranchId',
+        'customerId',
+        'staffId',
+        'userId',
+        'invoiceId',
+      ]),
+    ]).then(([recordResponse, relatedResponse, lookupResponse]) => {
       if (!mounted) return;
       setRecord(recordResponse.data.data);
       setRelated(relatedResponse);
+      setLookups(lookupResponse);
       setLoading(false);
     });
     return () => { mounted = false; };
@@ -62,10 +74,9 @@ export function RecordDetailPage() {
             <Descriptions column={1} bordered>
               {fields.map((field) => (
                 <Descriptions.Item key={field.key} label={field.label}>
-                  {formatValue(record?.[field.key] ?? record?.customFields?.[field.key])}
+                  {displayValue(field.key, record?.[field.key] ?? record?.customFields?.[field.key], lookups)}
                 </Descriptions.Item>
               ))}
-              <Descriptions.Item label="ID">{record?.id}</Descriptions.Item>
             </Descriptions>
           </Card>
         </Col>
@@ -98,7 +109,7 @@ export function RecordDetailPage() {
                     </div>
                     <div>
                       <Typography.Text type="secondary">Chi nhánh mặc định</Typography.Text>
-                      <Typography.Text>{record?.defaultBranchId || '-'}</Typography.Text>
+                      <Typography.Text>{displayValue('defaultBranchId', record?.defaultBranchId, lookups)}</Typography.Text>
                     </div>
                   </>
                 )}
@@ -112,7 +123,7 @@ export function RecordDetailPage() {
         <Card className="glass-card detail-card" key={block.title} title={block.title}>
           <Table
             columns={[
-              ...block.columns.map((key) => ({ title: key, dataIndex: key, key, render: formatValue })),
+              ...block.columns.map((key) => ({ title: key, dataIndex: key, key, render: (value: unknown) => displayValue(key, value, lookups) })),
               { title: '', key: 'action', render: (_: unknown, row: any) => <Link to={`/${block.resource}/${row.id}`}>Xem</Link> },
             ]}
             dataSource={block.rows}

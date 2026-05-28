@@ -2,7 +2,8 @@ import { useCreate, useOne, useUpdate } from '@refinedev/core';
 import { Button, Form, Input, InputNumber, Select, Space, Typography, message } from 'antd';
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import { baseFields, CustomField, entityLabels, FieldSpec } from '../models';
+import { baseFields, CustomField, entityLabels, FieldSpec, relationFields } from '../models';
+import { loadRelationOptions, LookupMap } from '../relations';
 
 interface RecordFormContentProps {
   resource: string;
@@ -16,6 +17,7 @@ export function RecordFormContent({ resource, id, compact, onCancel, onSuccess }
   const editing = Boolean(id);
   const [form] = Form.useForm();
   const [fields, setFields] = useState<FieldSpec[]>(baseFields[resource] || []);
+  const [lookups, setLookups] = useState<LookupMap>({});
   const { mutate: create } = useCreate();
   const { mutate: update } = useUpdate();
   const recordQuery = useOne({ resource, id: id || '', queryOptions: { enabled: editing } }) as any;
@@ -37,8 +39,10 @@ export function RecordFormContent({ resource, id, compact, onCancel, onSuccess }
         })),
       ];
       const configured = viewResponse.data.data.find((view: { viewType: string }) => view.viewType === 'FORM')?.config?.fields;
-      setFields(configured?.length ? expanded.filter((field) => configured.includes(field.key)) : expanded);
-    });
+      const nextFields = configured?.length ? expanded.filter((field) => configured.includes(field.key)) : expanded;
+      setFields(nextFields);
+      return loadRelationOptions(nextFields.map((field) => field.key));
+    }).then(setLookups);
   }, [resource]);
 
   useEffect(() => {
@@ -74,7 +78,7 @@ export function RecordFormContent({ resource, id, compact, onCancel, onSuccess }
       <Form className="record-form" form={form} layout="vertical" onFinish={submit}>
         {fields.map((field) => (
           <Form.Item key={field.key} label={field.label} name={field.key} rules={[{ required: field.required, message: `Nhập ${field.label}` }]}>
-            <FieldInput field={field} />
+            <FieldInput field={field} lookups={lookups} />
           </Form.Item>
         ))}
         <Space>
@@ -86,10 +90,22 @@ export function RecordFormContent({ resource, id, compact, onCancel, onSuccess }
   );
 }
 
-function FieldInput({ field }: { field: FieldSpec }) {
+function FieldInput({ field, lookups }: { field: FieldSpec; lookups: LookupMap }) {
   if (field.type === 'number') return <InputNumber style={{ width: '100%' }} />;
   if (field.type === 'select') return <Select options={(field.options || []).map((value) => ({ label: value, value }))} />;
   if (field.type === 'multi-select') return <Select mode="multiple" options={(field.options || []).map((value) => ({ label: value, value }))} />;
+  const relation = relationFields[field.key];
+  if (relation) {
+    return (
+      <Select
+        allowClear
+        showSearch
+        optionFilterProp="label"
+        options={Object.entries(lookups[relation.resource] || {}).map(([value, label]) => ({ value, label }))}
+        placeholder={`Chọn ${field.label.toLowerCase()}`}
+      />
+    );
+  }
   if (field.type === 'textarea') return <Input.TextArea rows={3} />;
   if (field.type === 'date') return <Input type="date" />;
   if (field.type === 'datetime') return <Input type="datetime-local" />;

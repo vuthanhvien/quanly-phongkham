@@ -6,6 +6,11 @@ export interface FieldSpec {
   options?: string[];
 }
 
+export interface RelationSpec {
+  resource: string;
+  labelFields: string[];
+}
+
 export interface CustomField {
   id: string;
   entityType: string;
@@ -33,6 +38,19 @@ export const entityLabels: Record<string, string> = {
   staff: 'Nhân viên',
   'branch-permissions': 'Phân quyền chi nhánh',
   'user-accounts': 'Tài khoản đăng nhập',
+};
+
+export const relationFields: Record<string, RelationSpec> = {
+  branchId: { resource: 'branches', labelFields: ['slug', 'name'] },
+  defaultBranchId: { resource: 'branches', labelFields: ['slug', 'name'] },
+  customerId: { resource: 'customers', labelFields: ['code', 'fullName'] },
+  productId: { resource: 'products', labelFields: ['code', 'name'] },
+  supplierId: { resource: 'suppliers', labelFields: ['code', 'name'] },
+  invoiceId: { resource: 'invoices', labelFields: ['code', 'status'] },
+  departmentId: { resource: 'departments', labelFields: ['code', 'name'] },
+  managerStaffId: { resource: 'staff', labelFields: ['code', 'fullName'] },
+  staffId: { resource: 'staff', labelFields: ['code', 'fullName'] },
+  userId: { resource: 'user-accounts', labelFields: ['email', 'fullName'] },
 };
 
 export const permissionOptions = [
@@ -93,8 +111,8 @@ export const baseFields: Record<string, FieldSpec[]> = {
   departments: [
     { key: 'code', label: 'Mã phòng ban', required: true },
     { key: 'name', label: 'Tên phòng ban', required: true },
-    { key: 'branchId', label: 'ID chi nhánh' },
-    { key: 'managerStaffId', label: 'ID trưởng bộ phận' },
+    { key: 'branchId', label: 'Chi nhánh' },
+    { key: 'managerStaffId', label: 'Trưởng bộ phận' },
     { key: 'description', label: 'Mô tả', type: 'textarea' },
   ],
   staff: [
@@ -103,16 +121,16 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'phone', label: 'Điện thoại' },
     { key: 'email', label: 'Email' },
     { key: 'position', label: 'Chức danh' },
-    { key: 'departmentId', label: 'ID phòng ban' },
-    { key: 'defaultBranchId', label: 'ID chi nhánh mặc định' },
-    { key: 'userId', label: 'ID tài khoản đăng nhập' },
+    { key: 'departmentId', label: 'Phòng ban' },
+    { key: 'defaultBranchId', label: 'Chi nhánh mặc định' },
+    { key: 'userId', label: 'Tài khoản đăng nhập' },
     { key: 'status', label: 'Trạng thái', type: 'select', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'] },
     { key: 'joinedAt', label: 'Ngày vào làm', type: 'date' },
     { key: 'note', label: 'Ghi chú', type: 'textarea' },
   ],
   'branch-permissions': [
-    { key: 'staffId', label: 'ID nhân viên', required: true },
-    { key: 'branchId', label: 'ID chi nhánh', required: true },
+    { key: 'staffId', label: 'Nhân viên', required: true },
+    { key: 'branchId', label: 'Chi nhánh', required: true },
     { key: 'roleName', label: 'Vai trò tại chi nhánh', required: true },
     { key: 'permissions', label: 'Quyền chức năng', type: 'multi-select', options: permissionOptions, required: true },
   ],
@@ -121,8 +139,8 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'password', label: 'Mật khẩu mới' },
     { key: 'fullName', label: 'Tên hiển thị', required: true },
     { key: 'role', label: 'Vai trò hệ thống', type: 'select', options: ['ADMIN', 'STAFF'], required: true },
-    { key: 'branchId', label: 'ID chi nhánh mặc định' },
-    { key: 'staffId', label: 'ID nhân viên' },
+    { key: 'branchId', label: 'Chi nhánh mặc định' },
+    { key: 'staffId', label: 'Nhân viên' },
   ],
   customers: [
     { key: 'code', label: 'Mã KH', required: true },
@@ -134,7 +152,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'address', label: 'Địa chỉ' },
     { key: 'status', label: 'Trạng thái', type: 'select', options: ['CONSULTING', 'WAITING_SURGERY', 'IN_TREATMENT', 'COMPLETED', 'INACTIVE'] },
     { key: 'totalSpent', label: 'Tổng chi tiêu', type: 'number' },
-    { key: 'branchId', label: 'ID chi nhánh', required: true },
+    { key: 'branchId', label: 'Chi nhánh', required: true },
     { key: 'note', label: 'Ghi chú', type: 'textarea' },
   ],
   suppliers: [
@@ -159,8 +177,8 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'minStockLevel', label: 'Tồn tối thiểu', type: 'number' },
   ],
   'medical-episodes': [
-    { key: 'customerId', label: 'ID khách hàng', required: true },
-    { key: 'branchId', label: 'ID chi nhánh', required: true },
+    { key: 'customerId', label: 'Khách hàng', required: true },
+    { key: 'branchId', label: 'Chi nhánh', required: true },
     { key: 'serviceName', label: 'Dịch vụ', required: true },
     { key: 'doctorName', label: 'Bác sĩ' },
     { key: 'status', label: 'Trạng thái', type: 'select', options: ['ACTIVE', 'COMPLETED', 'CANCELLED'] },
@@ -170,8 +188,8 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'operationDate', label: 'Ngày thực hiện', type: 'date' },
   ],
   appointments: [
-    { key: 'customerId', label: 'ID khách hàng', required: true },
-    { key: 'branchId', label: 'ID chi nhánh', required: true },
+    { key: 'customerId', label: 'Khách hàng', required: true },
+    { key: 'branchId', label: 'Chi nhánh', required: true },
     { key: 'type', label: 'Loại hẹn', type: 'select', options: ['CONSULTATION', 'SURGERY', 'FOLLOWUP', 'TREATMENT'] },
     { key: 'startTime', label: 'Bắt đầu', type: 'datetime', required: true },
     { key: 'endTime', label: 'Kết thúc', type: 'datetime', required: true },
@@ -181,17 +199,17 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'status', label: 'Trạng thái', type: 'select', options: ['SCHEDULED', 'WAITING', 'IN_PROGRESS', 'COMPLETED', 'NO_SHOW'] },
   ],
   'stock-batches': [
-    { key: 'productId', label: 'ID sản phẩm', required: true },
-    { key: 'branchId', label: 'ID chi nhánh', required: true },
-    { key: 'supplierId', label: 'ID NCC' },
+    { key: 'productId', label: 'Sản phẩm', required: true },
+    { key: 'branchId', label: 'Chi nhánh', required: true },
+    { key: 'supplierId', label: 'Nhà cung cấp' },
     { key: 'batchNumber', label: 'Số lô', required: true },
     { key: 'expiryDate', label: 'Hạn dùng', type: 'date' },
     { key: 'remainingQuantity', label: 'Tồn còn lại', type: 'number', required: true },
     { key: 'unit', label: 'Đơn vị' },
   ],
   treatments: [
-    { key: 'customerId', label: 'ID khách hàng', required: true },
-    { key: 'branchId', label: 'ID chi nhánh', required: true },
+    { key: 'customerId', label: 'Khách hàng', required: true },
+    { key: 'branchId', label: 'Chi nhánh', required: true },
     { key: 'name', label: 'Tên liệu trình', required: true },
     { key: 'totalSessions', label: 'Số buổi', type: 'number' },
     { key: 'completedSessions', label: 'Đã hoàn thành', type: 'number' },
@@ -200,15 +218,15 @@ export const baseFields: Record<string, FieldSpec[]> = {
   ],
   invoices: [
     { key: 'code', label: 'Mã phiếu thu', required: true },
-    { key: 'customerId', label: 'ID khách hàng', required: true },
-    { key: 'branchId', label: 'ID chi nhánh', required: true },
+    { key: 'customerId', label: 'Khách hàng', required: true },
+    { key: 'branchId', label: 'Chi nhánh', required: true },
     { key: 'totalAmount', label: 'Tổng tiền', type: 'number', required: true },
     { key: 'paidAmount', label: 'Đã thu', type: 'number' },
     { key: 'method', label: 'Thanh toán', type: 'select', options: ['CASH', 'TRANSFER', 'CARD'] },
     { key: 'status', label: 'Trạng thái', type: 'select', options: ['UNPAID', 'PARTIAL', 'PAID'] },
   ],
   expenses: [
-    { key: 'branchId', label: 'ID chi nhánh', required: true },
+    { key: 'branchId', label: 'Chi nhánh', required: true },
     { key: 'category', label: 'Danh mục', required: true },
     { key: 'description', label: 'Diễn giải', required: true },
     { key: 'amount', label: 'Số tiền', type: 'number', required: true },
@@ -216,7 +234,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
   ],
   commissions: [
     { key: 'staffName', label: 'Nhân viên', required: true },
-    { key: 'invoiceId', label: 'ID hóa đơn', required: true },
+    { key: 'invoiceId', label: 'Hóa đơn', required: true },
     { key: 'roleType', label: 'Vai trò', required: true },
     { key: 'amount', label: 'Hoa hồng', type: 'number', required: true },
     { key: 'status', label: 'Trạng thái', type: 'select', options: ['PENDING', 'PAID'] },

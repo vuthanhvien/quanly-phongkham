@@ -6,6 +6,7 @@ import { Link, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { RecordFormContent } from '../components/RecordFormContent';
 import { baseFields, CustomField, entityLabels } from '../models';
+import { displayValue, loadRelationOptions, LookupMap } from '../relations';
 
 export function RecordListPage() {
   const { resource = 'customers' } = useParams();
@@ -14,6 +15,7 @@ export function RecordListPage() {
   const [configuredColumns, setConfiguredColumns] = useState<string[]>([]);
   const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([]);
   const [creating, setCreating] = useState(false);
+  const [lookups, setLookups] = useState<LookupMap>({});
   const query = useList({ resource, pagination: { currentPage: 1, pageSize: 50 }, filters: [{ field: 'search', operator: 'contains', value: search }] }) as any;
   const response = query.result || query.query?.data || query.data?.data;
   const rows = response?.data || [];
@@ -31,7 +33,10 @@ export function RecordListPage() {
       const table = views.data.data.find((view: { viewType: string }) => view.viewType === 'TABLE');
       setConfiguredColumns(table?.config?.columns || []);
       setTemplates(prints.data.data);
-    });
+      const custom = fields.data.data.filter((field: CustomField) => field.isActive).map((field: CustomField) => field.key);
+      const tableColumns = table?.config?.columns || [...(baseFields[resource] || []).map((field) => field.key), ...custom];
+      return loadRelationOptions(tableColumns);
+    }).then(setLookups);
   }, [resource]);
 
   const allFields = [...(baseFields[resource] || []), ...customFields.map((field) => ({ key: field.key, label: field.label }))];
@@ -42,7 +47,7 @@ export function RecordListPage() {
         title: field.label,
         dataIndex: field.key,
         key: field.key,
-        render: (_: unknown, row: Record<string, any>) => String(row[field.key] ?? row.customFields?.[field.key] ?? ''),
+        render: (_: unknown, row: Record<string, any>) => displayValue(field.key, row[field.key] ?? row.customFields?.[field.key], lookups),
       })),
       {
         title: 'Thao tác',
@@ -60,7 +65,7 @@ export function RecordListPage() {
         ),
       },
     ],
-    [displayFields, resource, templates],
+    [displayFields, resource, templates, lookups],
   );
 
   async function printRecord(templateId: string, recordId: string) {
