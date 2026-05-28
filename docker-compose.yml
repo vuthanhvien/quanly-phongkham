@@ -35,7 +35,7 @@ services:
   proxy:
     image: vienvu/quanly-phongkham-proxy:${TAG:-latest}
     ports:
-      - "${PORT:-80}:80"
+      - "${PORT:-8080}:80"
     depends_on:
       - backend
       - cms
