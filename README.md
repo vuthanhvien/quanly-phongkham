@@ -29,6 +29,20 @@ Password: Admin@123
 
 Thay `JWT_SECRET` và mật khẩu admin trong `.env` trước khi sử dụng ngoài môi trường phát triển.
 
+## Chạy Docker Dev Có Hot Reload
+
+Compose dev mount source code từ máy host vào container để khi sửa file thì NestJS và Vite tự reload ngay.
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+- CMS dev: <http://localhost:5173>
+- API dev: <http://localhost:3000/api>
+- PostgreSQL: `localhost:5433`
+
+Nếu lần đầu khởi động thấy watcher chưa bắt thay đổi trên Docker Desktop, compose dev đã bật polling sẵn cho cả backend và cms.
+
 ## Chức Năng MVP
 
 - CRUD các phân hệ: chi nhánh, khách hàng, hồ sơ bệnh án, lịch hẹn, nhà cung cấp, hàng hóa/vật tư, lô tồn kho, liệu trình, phiếu thu/hóa đơn, phiếu chi và hoa hồng.

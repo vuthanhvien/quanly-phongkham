@@ -1,7 +1,13 @@
 import {
+  AppstoreOutlined,
+  FileTextOutlined,
+  SettingOutlined,
+} from "@ant-design/icons"
+import {
   Button,
   Card,
   Checkbox,
+  Divider,
   Form,
   Input,
   InputNumber,
@@ -14,10 +20,11 @@ import {
   Typography,
   message,
 } from "antd"
+import Editor from "@monaco-editor/react"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
-import { CustomField, entityLabels } from "../models"
+import { CustomField, DynamicRole, entityLabels } from "../models"
 import {
   buildFieldLayoutConfigs,
   DEFAULT_ROLE_SCOPE,
@@ -39,6 +46,26 @@ interface Template {
   htmlTemplate: string
 }
 
+const CUSTOM_FIELD_TYPES = [
+  "text",
+  "number",
+  "date",
+  "boolean",
+  "select",
+  "textarea",
+  "relative",
+]
+
+const RELATIVE_RESOURCE_OPTIONS = Object.entries(entityLabels).map(
+  ([value, label]) => ({ value, label }),
+)
+
+const DEFAULT_TEMPLATE_HTML = `<section>
+  <h1>Phiếu điều trị</h1>
+  <p>Khách hàng: {{fullName}}</p>
+  <p>Mã hồ sơ: {{code}}</p>
+</section>`
+
 export function SettingsPage() {
   const [entityType, setEntityType] = useState("customers")
   const [selectedRole, setSelectedRole] = useState(getStoredUserRole())
@@ -49,19 +76,31 @@ export function SettingsPage() {
   const [formConfig, setFormConfig] = useState<FieldLayoutConfig[]>([])
   const [detailConfig, setDetailConfig] = useState<FieldLayoutConfig[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
+  const [dynamicRoles, setDynamicRoles] = useState<DynamicRole[]>([])
   const [fieldModal, setFieldModal] = useState(false)
   const [editingField, setEditingField] = useState<CustomField | null>(null)
   const [templateModal, setTemplateModal] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
   const [fieldForm] = Form.useForm()
   const [templateForm] = Form.useForm()
+  const currentFieldType = Form.useWatch("dataType", fieldForm)
+  const templateHtml = Form.useWatch("htmlTemplate", templateForm)
 
   const fieldCatalog = useMemo(
     () => getFieldCatalog(entityType, fields),
     [entityType, fields],
   )
+  const templateVariables = useMemo(
+    () => fieldCatalog.map((field) => `{{${field.key}}}`),
+    [fieldCatalog],
+  )
   const roleOptions = useMemo(
     () => getRoleOptions(views, [selectedRole]),
     [views, selectedRole],
+  )
+  const selectableRoles = useMemo(
+    () => getRoleOptions(views, [selectedRole, ...dynamicRoles.map((role) => role.key)]),
+    [dynamicRoles, selectedRole, views],
   )
   const viewStatus = useMemo(
     () =>
@@ -130,27 +169,32 @@ export function SettingsPage() {
   }, [fieldCatalog, selectedRole, views])
 
   async function load() {
-    const [fieldResponse, viewResponse, templateResponse] = await Promise.all([
+    const [fieldResponse, viewResponse, templateResponse, roleResponse] = await Promise.all([
       api.get("/settings/custom-fields", { params: { entityType } }),
       api.get("/settings/views", { params: { entityType } }),
       api.get("/settings/print-templates", { params: { entityType } }),
+      api.get("/settings/dynamic-roles"),
     ])
     setFields(fieldResponse.data.data)
     setViews(viewResponse.data.data)
     setTemplates(templateResponse.data.data)
+    setDynamicRoles(roleResponse.data.data)
   }
 
   async function saveField(values: Record<string, any>) {
     const payload = {
       ...values,
       entityType,
+      required: false,
       isActive: values.isActive ?? true,
-      options: values.options
+      options: values.dataType === "select" && values.options
         ? String(values.options)
             .split(",")
             .map((value) => value.trim())
             .filter(Boolean)
         : undefined,
+      relationResource:
+        values.dataType === "relative" ? values.relationResource : undefined,
     }
     if (editingField) {
       await api.patch(`/settings/custom-fields/${editingField.id}`, payload)
@@ -205,12 +249,37 @@ export function SettingsPage() {
     await load()
   }
 
-  async function addTemplate(values: Record<string, unknown>) {
-    await api.post("/settings/print-templates", { ...values, entityType })
+  async function saveTemplate(values: Record<string, unknown>) {
+    if (editingTemplate) {
+      await api.patch(`/settings/print-templates/${editingTemplate.id}`, {
+        ...values,
+        entityType,
+      })
+      message.success("Đã cập nhật mẫu in")
+    } else {
+      await api.post("/settings/print-templates", { ...values, entityType })
+      message.success("Đã lưu mẫu in")
+    }
     setTemplateModal(false)
+    setEditingTemplate(null)
     templateForm.resetFields()
-    message.success("Đã lưu mẫu in")
     await load()
+  }
+
+  function openCreateTemplate() {
+    setEditingTemplate(null)
+    templateForm.resetFields()
+    templateForm.setFieldsValue({
+      name: "",
+      htmlTemplate: DEFAULT_TEMPLATE_HTML,
+    })
+    setTemplateModal(true)
+  }
+
+  function openEditTemplate(template: Template) {
+    setEditingTemplate(template)
+    templateForm.setFieldsValue(template)
+    setTemplateModal(true)
   }
 
   function updateConfig(
@@ -255,167 +324,236 @@ export function SettingsPage() {
           }))}
         />
       </div>
-      <div className="settings-grid">
-        <Card
-          className="glass-card"
-          title="Custom fields"
-          extra={<Button onClick={openCreateField}>Thêm field</Button>}
-        >
-          <Table
-            size="small"
-            pagination={false}
-            rowKey="id"
-            dataSource={fields}
-            columns={[
-              { title: "Nhãn", dataIndex: "label" },
-              { title: "Key", dataIndex: "key" },
-              { title: "Kiểu", dataIndex: "dataType" },
-              {
-                title: "Bắt buộc",
-                dataIndex: "required",
-                render: (value) => (value ? "Có" : "Không"),
-              },
-              {
-                title: "Hoạt động",
-                dataIndex: "isActive",
-                render: (value) => (value ? "Bật" : "Tắt"),
-              },
-              {
-                title: "",
-                render: (_, row) => (
-                  <Space>
-                    <Button type="link" onClick={() => openEditField(row)}>
-                      Sửa
-                    </Button>
-                    <Button
-                      danger
-                      type="link"
-                      onClick={() => deleteField(row.id)}
-                    >
-                      Xóa
-                    </Button>
+      <Card className="glass-card settings-card">
+        <Tabs
+          className="settings-tabs"
+          items={[
+            {
+              key: "custom-fields",
+              label: (
+                <span className="simple-tab-label">
+                  <AppstoreOutlined />
+                  <span>Custom fields</span>
+                </span>
+              ),
+              children: (
+                <div className="settings-tab-panel">
+                  <div className="settings-tab-header">
+                    <Typography.Paragraph type="secondary">
+                      Tại đây chỉ định nghĩa field, kiểu dữ liệu và liên kết. Quy tắc bắt buộc hiển thị được cấu hình riêng trong phần form nhập liệu.
+                    </Typography.Paragraph>
+                    <Button onClick={openCreateField}>Thêm field</Button>
+                  </div>
+                  <Table
+                    size="small"
+                    pagination={false}
+                    rowKey="id"
+                    dataSource={fields}
+                    columns={[
+                      { title: "Nhãn", dataIndex: "label" },
+                      { title: "Key", dataIndex: "key" },
+                      { title: "Kiểu", dataIndex: "dataType" },
+                      {
+                        title: "Liên kết",
+                        render: (_, row) =>
+                          row.relationResource
+                            ? entityLabels[row.relationResource] || row.relationResource
+                            : "-",
+                      },
+                      {
+                        title: "Hoạt động",
+                        dataIndex: "isActive",
+                        render: (value) => (value ? "Bật" : "Tắt"),
+                      },
+                      {
+                        title: "",
+                        render: (_, row) => (
+                          <Space>
+                            <Button type="link" onClick={() => openEditField(row)}>
+                              Sửa
+                            </Button>
+                            <Button
+                              danger
+                              type="link"
+                              onClick={() => deleteField(row.id)}
+                            >
+                              Xóa
+                            </Button>
+                          </Space>
+                        ),
+                      },
+                    ]}
+                  />
+                </div>
+              ),
+            },
+            {
+              key: "view-config",
+              label: (
+                <span className="simple-tab-label">
+                  <SettingOutlined />
+                  <span>Hiển thị theo role / module</span>
+                </span>
+              ),
+              children: (
+                <div className="settings-tab-panel">
+                  <div className="settings-tab-header settings-tab-header-wrap">
+                    <Typography.Text>
+                      Module hiện tại là <strong>{entityLabels[entityType] || entityType}</strong>. Chọn role để cấu hình dữ liệu nào được hiển thị ở bảng, form và màn chi tiết. Nếu module này chưa có cấu hình riêng, hệ thống sẽ kế thừa từ role mặc định <strong>{DEFAULT_ROLE_SCOPE}</strong>.
+                    </Typography.Text>
+                    <Space wrap>
+                      <Select
+                        style={{ width: 180 }}
+                        value={selectedRole}
+                        onChange={(value) => setSelectedRole(normalizeRole(value))}
+                        options={selectableRoles.map((role) => ({
+                          value: role,
+                          label:
+                            dynamicRoles.find((item) => item.key === role)?.name
+                              ? `${dynamicRoles.find((item) => item.key === role)?.name} (${role})`
+                              : role,
+                        }))}
+                      />
+                      <Input
+                        placeholder="Thêm role mới"
+                        value={newRole}
+                        onChange={(event) => setNewRole(event.target.value)}
+                        onPressEnter={addRoleScope}
+                        style={{ width: 160 }}
+                      />
+                      <Button onClick={addRoleScope}>Tạo role</Button>
+                    </Space>
+                  </div>
+                  <Space wrap>
+                    {VIEW_TYPES.map((viewType) => (
+                      <Tag
+                        color={viewStatus[viewType] ? "green" : "gold"}
+                        key={viewType}
+                      >
+                        {viewType}: {viewStatus[viewType] ? "riêng theo role" : "đang kế thừa ALL"}
+                      </Tag>
+                    ))}
                   </Space>
-                ),
-              },
-            ]}
-          />
-        </Card>
-        <Card
-          className="glass-card"
-          title="Hiển thị table / form / detail theo role"
-          extra={
-            <Space wrap>
-              <Select
-                style={{ width: 180 }}
-                value={selectedRole}
-                onChange={(value) => setSelectedRole(normalizeRole(value))}
-                options={roleOptions.map((role) => ({
-                  value: role,
-                  label: role,
-                }))}
-              />
-              <Input
-                placeholder="Thêm role mới"
-                value={newRole}
-                onChange={(event) => setNewRole(event.target.value)}
-                onPressEnter={addRoleScope}
-                style={{ width: 160 }}
-              />
-              <Button onClick={addRoleScope}>Tạo role</Button>
-            </Space>
-          }
-        >
-          <Space direction="vertical" size={12} style={{ width: "100%" }}>
-            <Typography.Text>
-              Cấu hình đang áp dụng cho role <strong>{selectedRole}</strong>.
-              Nếu một view chưa có cấu hình riêng, hệ thống sẽ kế thừa từ role
-              mặc định <strong>{DEFAULT_ROLE_SCOPE}</strong>.
-            </Typography.Text>
-            <Space wrap>
-              {VIEW_TYPES.map((viewType) => (
-                <Tag
-                  color={viewStatus[viewType] ? "green" : "gold"}
-                  key={viewType}
-                >
-                  {viewType}:{" "}
-                  {viewStatus[viewType]
-                    ? "riêng theo role"
-                    : "đang kế thừa ALL"}
-                </Tag>
-              ))}
-            </Space>
-            <Tabs
-              items={[
-                {
-                  key: "TABLE",
-                  label: "Bảng",
-                  children: (
-                    <ViewConfigTable
-                      dataSource={tableConfig}
-                      viewType="TABLE"
-                      onChange={updateConfig}
-                    />
-                  ),
-                },
-                {
-                  key: "FORM-QUICK",
-                  label: "Tạo nhanh",
-                  children: (
-                    <ViewConfigTable
-                      dataSource={formConfig}
-                      viewType="FORM"
-                      onChange={updateConfig}
-                    />
-                  ),
-                },
-                {
-                  key: "FORM-DETAIL",
-                  label: "Tạo chi tiết",
-                  children: (
-                    <ViewConfigTable
-                      dataSource={formConfig}
-                      viewType="FORM"
-                      onChange={updateConfig}
-                    />
-                  ),
-                },
-                {
-                  key: "DETAIL",
-                  label: "Thông tin chi tiết",
-                  children: (
-                    <ViewConfigTable
-                      dataSource={detailConfig}
-                      viewType="DETAIL"
-                      onChange={updateConfig}
-                    />
-                  ),
-                },
-              ]}
-            />
-            <Button className="primary-glow" type="primary" onClick={saveView}>
-              Lưu cấu hình role
-            </Button>
-          </Space>
-        </Card>
-        <Card
-          className="glass-card"
-          title="Mẫu in"
-          extra={
-            <Button onClick={() => setTemplateModal(true)}>Thêm mẫu</Button>
-          }
-        >
-          <Table
-            size="small"
-            pagination={false}
-            rowKey="id"
-            dataSource={templates}
-            columns={[
-              { title: "Tên mẫu", dataIndex: "name" },
-              { title: "Biến sử dụng", render: () => "{{field_key}}" },
-            ]}
-          />
-        </Card>
-      </div>
+                  <Tabs
+                    className="settings-inner-tabs"
+                    items={[
+                      {
+                        key: "TABLE",
+                        label: "Bảng",
+                        children: (
+                          <ViewConfigTable
+                            dataSource={tableConfig}
+                            viewType="TABLE"
+                            onChange={updateConfig}
+                          />
+                        ),
+                      },
+                      {
+                        key: "FORM",
+                        label: "Form nhập liệu",
+                        children: (
+                          <ViewConfigTable
+                            dataSource={formConfig}
+                            viewType="FORM"
+                            onChange={updateConfig}
+                          />
+                        ),
+                      },
+                      {
+                        key: "DETAIL",
+                        label: "Thông tin chi tiết",
+                        children: (
+                          <ViewConfigTable
+                            dataSource={detailConfig}
+                            viewType="DETAIL"
+                            onChange={updateConfig}
+                          />
+                        ),
+                      },
+                    ]}
+                  />
+                  <Button
+                    className="primary-glow"
+                    type="primary"
+                    onClick={saveView}
+                  >
+                    Lưu cấu hình hiển thị cho module
+                  </Button>
+                </div>
+              ),
+            },
+            {
+              key: "print-templates",
+              label: (
+                <span className="simple-tab-label">
+                  <FileTextOutlined />
+                  <span>Mẫu in</span>
+                </span>
+              ),
+              children: (
+                <div className="settings-tab-panel">
+                  <div className="settings-tab-header">
+                    <Typography.Paragraph type="secondary">
+                      Dùng biến theo cú pháp Handlebars như {"{{fullName}}"} hoặc {"{{custom_key}}"}.
+                    </Typography.Paragraph>
+                    <Button onClick={openCreateTemplate}>Thêm mẫu</Button>
+                  </div>
+                  <div className="template-variable-cloud">
+                    {templateVariables.map((variable) => (
+                      <Tag className="soft-tag" key={variable}>
+                        {variable}
+                      </Tag>
+                    ))}
+                  </div>
+                  <Divider />
+                  <div className="template-layout">
+                    <div>
+                      <Table
+                        size="small"
+                        pagination={false}
+                        rowKey="id"
+                        dataSource={templates}
+                        columns={[
+                          { title: "Tên mẫu", dataIndex: "name" },
+                          {
+                            title: "Xem nhanh",
+                            render: (_, row) => (
+                              <Typography.Paragraph
+                                ellipsis={{ rows: 2 }}
+                                style={{ marginBottom: 0, maxWidth: 360 }}
+                              >
+                                {row.htmlTemplate}
+                              </Typography.Paragraph>
+                            ),
+                          },
+                          {
+                            title: "",
+                            render: (_, row) => (
+                              <Button type="link" onClick={() => openEditTemplate(row)}>
+                                Sửa
+                              </Button>
+                            ),
+                          },
+                        ]}
+                      />
+                    </div>
+                    <Card className="template-preview-card" title="Preview nhanh">
+                      <div
+                        className="template-preview-surface"
+                        dangerouslySetInnerHTML={{
+                          __html:
+                            templates[0]?.htmlTemplate ||
+                            "<p>Chưa có mẫu in cho model này.</p>",
+                        }}
+                      />
+                    </Card>
+                  </div>
+                </div>
+              ),
+            },
+          ]}
+        />
+      </Card>
       <Modal
         title={editingField ? "Cập nhật custom field" : "Thêm custom field"}
         open={fieldModal}
@@ -442,19 +580,28 @@ export function SettingsPage() {
           </Form.Item>
           <Form.Item name="dataType" label="Kiểu" initialValue="text">
             <Select
-              options={["text", "number", "date", "boolean", "select"].map(
-                (value) => ({ value, label: value }),
-              )}
+              options={CUSTOM_FIELD_TYPES.map((value) => ({
+                value,
+                label: value,
+              }))}
             />
           </Form.Item>
-          <Form.Item name="options" label="Lựa chọn (ngăn cách dấu phẩy)">
-            <Input />
-          </Form.Item>
+          {currentFieldType === "select" && (
+            <Form.Item name="options" label="Lựa chọn (ngăn cách dấu phẩy)">
+              <Input />
+            </Form.Item>
+          )}
+          {currentFieldType === "relative" && (
+            <Form.Item
+              name="relationResource"
+              label="Bảng liên kết"
+              rules={[{ required: true, message: "Chọn bảng liên kết" }]}
+            >
+              <Select options={RELATIVE_RESOURCE_OPTIONS} />
+            </Form.Item>
+          )}
           <Form.Item name="sortOrder" label="Thứ tự" initialValue={0}>
             <InputNumber />
-          </Form.Item>
-          <Form.Item name="required" valuePropName="checked">
-            <Checkbox>Bắt buộc nhập</Checkbox>
           </Form.Item>
           <Form.Item name="isActive" valuePropName="checked" initialValue>
             <Checkbox>Cho phép sử dụng</Checkbox>
@@ -465,27 +612,67 @@ export function SettingsPage() {
         </Form>
       </Modal>
       <Modal
-        title="Thêm mẫu in HTML"
+        title={editingTemplate ? "Cập nhật mẫu in HTML" : "Thêm mẫu in HTML"}
         open={templateModal}
         footer={null}
-        onCancel={() => setTemplateModal(false)}
+        onCancel={() => {
+          setTemplateModal(false)
+          setEditingTemplate(null)
+        }}
+        width={1080}
       >
-        <Form form={templateForm} layout="vertical" onFinish={addTemplate}>
-          <Form.Item name="name" label="Tên mẫu" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="htmlTemplate"
-            label="HTML, dùng {{key}} để lấy dữ liệu"
-            rules={[{ required: true }]}
-          >
-            <Input.TextArea
-              rows={9}
-              placeholder={"<h1>Phiếu</h1><p>Khách: {{fullName}}</p>"}
-            />
-          </Form.Item>
+        <Form form={templateForm} layout="vertical" onFinish={saveTemplate}>
+          <div className="template-editor-layout">
+            <div>
+              <Form.Item
+                name="name"
+                label="Tên mẫu"
+                rules={[{ required: true }]}
+              >
+                <Input />
+              </Form.Item>
+              <Form.Item
+                name="htmlTemplate"
+                label="HTML template"
+                rules={[{ required: true }]}
+              >
+                <Editor
+                  height="420px"
+                  defaultLanguage="html"
+                  options={{
+                    fontSize: 14,
+                    minimap: { enabled: false },
+                    padding: { top: 14 },
+                    scrollBeyondLastLine: false,
+                    wordWrap: "on",
+                  }}
+                />
+              </Form.Item>
+            </div>
+            <div>
+              <Card className="template-preview-card" title="Preview trực tiếp">
+                <div
+                  className="template-preview-surface"
+                  dangerouslySetInnerHTML={{
+                    __html:
+                      templateHtml ||
+                      "<p>Nhập HTML mẫu in để xem preview tại đây.</p>",
+                  }}
+                />
+              </Card>
+              <Card className="template-preview-card" title="Biến có thể dùng">
+                <div className="template-variable-cloud">
+                  {templateVariables.map((variable) => (
+                    <Tag className="soft-tag" key={variable}>
+                      {variable}
+                    </Tag>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          </div>
           <Button className="primary-glow" htmlType="submit" type="primary">
-            Lưu mẫu in
+            {editingTemplate ? "Cập nhật mẫu" : "Lưu mẫu in"}
           </Button>
         </Form>
       </Modal>

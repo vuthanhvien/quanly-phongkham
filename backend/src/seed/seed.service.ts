@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
 import { Repository } from 'typeorm';
-import { Branch, BranchPermission, CustomFieldDefinition, Department, PrintTemplate, Staff, User, ViewSetting } from '../entities/entities';
+import { Branch, BranchPermission, CustomFieldDefinition, Department, DynamicRoleDefinition, PrintTemplate, Staff, User, ViewSetting } from '../entities/entities';
 
 @Injectable()
 export class SeedService implements OnApplicationBootstrap {
@@ -13,6 +13,7 @@ export class SeedService implements OnApplicationBootstrap {
     @InjectRepository(Department) private readonly departments: Repository<Department>,
     @InjectRepository(Staff) private readonly staff: Repository<Staff>,
     @InjectRepository(BranchPermission) private readonly branchPermissions: Repository<BranchPermission>,
+    @InjectRepository(DynamicRoleDefinition) private readonly roles: Repository<DynamicRoleDefinition>,
     @InjectRepository(CustomFieldDefinition) private readonly fields: Repository<CustomFieldDefinition>,
     @InjectRepository(ViewSetting) private readonly views: Repository<ViewSetting>,
     @InjectRepository(PrintTemplate) private readonly templates: Repository<PrintTemplate>,
@@ -63,12 +64,24 @@ export class SeedService implements OnApplicationBootstrap {
       await this.users.save(admin);
     }
     if (!(await this.branchPermissions.findOne({ where: { staffId: adminStaff.id, branchId: branch.id } }))) {
+      let adminRole = await this.roles.findOne({ where: { key: 'ADMIN_OWNER' } });
+      if (!adminRole) {
+        adminRole = await this.roles.save(
+          this.roles.create({
+            key: 'ADMIN_OWNER',
+            name: 'Admin Owner',
+            roleMain: 'ADMIN',
+            isActive: true,
+          }),
+        );
+      }
       await this.branchPermissions.save(
         this.branchPermissions.create({
+          userId: admin.id,
           staffId: adminStaff.id,
           branchId: branch.id,
-          roleName: 'Quan tri chi nhanh',
-          permissions: ['*'],
+          roleName: 'ADMIN_OWNER',
+          roleKeys: [adminRole.key],
           isActive: true,
         }),
       );

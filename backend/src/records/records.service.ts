@@ -152,7 +152,8 @@ export class RecordsService {
     return { data: { phone: customer.phone } };
   }
 
-  async audits(page = 1, pageSize = 30) {
+  async audits(page = 1, pageSize = 30, user?: AuthUser) {
+    this.assertScreenAccess(user, 'audit-logs');
     const [data, total] = await this.auditLogs.findAndCount({
       order: { createdAt: 'DESC' },
       skip: (page - 1) * pageSize,
@@ -194,6 +195,9 @@ export class RecordsService {
     delete value.id;
     delete value.createdAt;
     delete value.updatedAt;
+    if (typeof value.role === 'string' && !['ADMIN', 'STAFF', 'DOCTOR'].includes(value.role)) {
+      throw new BadRequestException('Vai tro khong hop le');
+    }
     if (typeof value.password === 'string' && value.password) {
       value.passwordHash = await hash(value.password, 10);
     }
@@ -216,6 +220,7 @@ export class RecordsService {
         field.dataType === 'number' ? !Number.isNaN(Number(value)) :
         field.dataType === 'boolean' ? typeof value === 'boolean' :
         field.dataType === 'select' ? !field.options || field.options.includes(String(value)) :
+        field.dataType === 'relative' ? typeof value === 'string' && value.length > 0 :
         true;
       if (!valid) throw new BadRequestException(`Gia tri khong hop le cho ${field.label}`);
     }
@@ -236,24 +241,19 @@ export class RecordsService {
   }
 
   private assertPermission(user: AuthUser | undefined, resource: string, action: string, branchId?: string) {
-    if (!user || user.role === 'ADMIN') return;
-    const permission = `${resource}:${action}`;
-    const permissions = user.branchPermissions || [];
-    const matched = permissions.some((item) => {
-      const branchMatched = !branchId || item.branchId === branchId;
-      return branchMatched && (item.permissions.includes('*') || item.permissions.includes(permission));
-    });
+    void resource;
+    void action;
+    if (!user || this.isAdmin(user)) return;
+    const branches = this.allowedBranches(user) || [];
+    const matched = !branchId ? branches.length > 0 : branches.includes(branchId);
     if (!matched) {
       throw new ForbiddenException('Ban khong co quyen thuc hien thao tac nay tai chi nhanh hien tai');
     }
   }
 
-  private allowedBranches(user: AuthUser | undefined, resource: string, action: string) {
-    if (!user || user.role === 'ADMIN') return undefined;
-    const permission = `${resource}:${action}`;
-    return (user.branchPermissions || [])
-      .filter((item) => item.permissions.includes('*') || item.permissions.includes(permission))
-      .map((item) => item.branchId);
+  private allowedBranches(user: AuthUser | undefined) {
+    if (!user || this.isAdmin(user)) return undefined;
+    return Array.from(new Set((user.branchPermissions || []).map((item) => item.branchId).filter(Boolean)));
   }
 
   private applyBranchScope(
@@ -262,7 +262,7 @@ export class RecordsService {
     user?: AuthUser,
   ) {
     const branchField = this.branchField(resource);
-    const branches = this.allowedBranches(user, resource, 'view');
+    const branches = this.allowedBranches(user);
     if (!branchField || !branches || branches.length === 0) return where;
     const scoped = { [branchField]: In(branches) } as FindOptionsWhere<ConfigurableEntity>;
     if (Array.isArray(where)) return where.length ? where.map((item) => ({ ...item, ...scoped })) : scoped;
@@ -290,6 +290,21 @@ export class RecordsService {
       treatments: 'branchId',
     };
     return map[resource];
+  }
+
+  private isAdmin(user: AuthUser | undefined) {
+    return !user || (user.roleMain || user.role) === 'ADMIN';
+  }
+
+  private assertResourceAccess(user: AuthUser | undefined, resource: string) {
+    void user;
+    void resource;
+  }
+
+  private assertScreenAccess(user: AuthUser | undefined, screen: string) {
+    void screen;
+    if (!user || this.isAdmin(user)) return;
+    throw new ForbiddenException('Chi ADMIN moi duoc truy cap man hinh he thong');
   }
 
   private async audit(

@@ -11,12 +11,7 @@ import {
 } from "antd"
 import { useEffect, useState } from "react"
 import { api } from "../api"
-import {
-  CustomField,
-  entityLabels,
-  FieldSpec,
-  relationFields,
-} from "../models"
+import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
 import { loadRelationOptions, LookupMap } from "../relations"
 import {
   getFieldCatalog,
@@ -68,7 +63,7 @@ export function RecordFormContent({
           getStoredUserRole(),
         )
         setFields(nextFields)
-        return loadRelationOptions(nextFields.map((field) => field.key))
+        return loadRelationOptions(nextFields)
       })
       .then(setLookups)
   }, [resource])
@@ -82,7 +77,9 @@ export function RecordFormContent({
   }, [recordQuery.result, recordQuery.query?.data, form])
 
   function submit(values: Record<string, unknown>) {
-    const baseKeys = new Set(getFieldCatalog(resource, []).map((field) => field.key))
+    const baseKeys = new Set(
+      getFieldCatalog(resource, []).map((field) => field.key),
+    )
     const payload: Record<string, unknown> = { customFields: {} }
     Object.entries(values).forEach(([key, value]) => {
       if (baseKeys.has(key)) payload[key] = value
@@ -153,9 +150,13 @@ export function RecordFormContent({
 function FieldInput({
   field,
   lookups,
+  value,
+  onChange,
 }: {
   field: FieldSpec
   lookups: LookupMap
+  value?: unknown
+  onChange?: (value: unknown) => void
 }) {
   if (field.type === "number")
     return (
@@ -163,17 +164,21 @@ function FieldInput({
         disabled={field.disabled}
         placeholder={field.placeholder}
         style={{ width: "100%" }}
+        value={value as number | undefined}
+        onChange={onChange}
       />
     )
   if (field.type === "select")
     return (
       <Select
         disabled={field.disabled}
-        options={(field.options || []).map((value) => ({
-          label: value,
-          value,
+        options={(field.options || []).map((opt) => ({
+          label: opt,
+          value: opt,
         }))}
         placeholder={field.placeholder}
+        value={value}
+        onChange={onChange}
       />
     )
   if (field.type === "multi-select")
@@ -181,14 +186,16 @@ function FieldInput({
       <Select
         disabled={field.disabled}
         mode="multiple"
-        options={(field.options || []).map((value) => ({
-          label: value,
-          value,
+        options={(field.options || []).map((opt) => ({
+          label: opt,
+          value: opt,
         }))}
         placeholder={field.placeholder}
+        value={value}
+        onChange={onChange}
       />
     )
-  const relation = relationFields[field.key]
+  const relation = field.relation || relationFields[field.key]
   if (relation) {
     return (
       <Select
@@ -197,23 +204,50 @@ function FieldInput({
         showSearch
         optionFilterProp="label"
         options={Object.entries(lookups[relation.resource] || {}).map(
-          ([value, label]) => ({ value, label }),
+          ([v, label]) => ({ value: v, label }),
         )}
         placeholder={field.placeholder || `Chọn ${field.label.toLowerCase()}`}
+        value={value}
+        onChange={onChange}
       />
     )
   }
   if (field.type === "textarea")
-    return <Input.TextArea disabled={field.disabled} placeholder={field.placeholder} rows={3} />
+    return (
+      <Input.TextArea
+        disabled={field.disabled}
+        placeholder={field.placeholder}
+        rows={3}
+        value={value as string | undefined}
+        onChange={(e) => onChange?.(e.target.value)}
+      />
+    )
   if (field.type === "date")
-    return <Input disabled={field.disabled} placeholder={field.placeholder} type="date" />
+    return (
+      <Input
+        disabled={field.disabled}
+        placeholder={field.placeholder}
+        type="date"
+        value={value as string | undefined}
+        onChange={(e) => onChange?.(e.target.value)}
+      />
+    )
   if (field.type === "datetime")
     return (
       <Input
         disabled={field.disabled}
         placeholder={field.placeholder}
         type="datetime-local"
+        value={value as string | undefined}
+        onChange={(e) => onChange?.(e.target.value)}
       />
     )
-  return <Input disabled={field.disabled} placeholder={field.placeholder} />
+  return (
+    <Input
+      disabled={field.disabled}
+      placeholder={field.placeholder}
+      value={value as string | undefined}
+      onChange={(e) => onChange?.(e.target.value)}
+    />
+  )
 }

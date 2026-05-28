@@ -8,11 +8,14 @@ export interface AuthUser {
   email: string;
   fullName: string;
   role: string;
+  activeRole?: string;
+  roleMain?: string;
   branchId?: string;
   staffId?: string;
   branchPermissions?: Array<{
     branchId: string;
-    roleName: string;
-    permissions: string[];
+    roleName?: string;
+    roleNames?: string[];
+    roleKeys?: string[];
   }>;
 }

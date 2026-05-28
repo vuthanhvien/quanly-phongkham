@@ -451,6 +451,94 @@ body::before {
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
 }
 
+.settings-card .ant-card-body {
+  padding-top: 18px;
+}
+
+.settings-tabs > .ant-tabs-nav {
+  margin-bottom: 20px !important;
+}
+
+.settings-tabs > .ant-tabs-nav::before,
+.settings-inner-tabs > .ant-tabs-nav::before {
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.settings-tabs .ant-tabs-tab,
+.settings-inner-tabs .ant-tabs-tab {
+  color: #cdbdc7;
+  font-weight: 700;
+}
+
+.settings-tabs .ant-tabs-tab-active .ant-tabs-tab-btn,
+.settings-inner-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #fff7fb !important;
+}
+
+.settings-tabs .ant-tabs-ink-bar,
+.settings-inner-tabs .ant-tabs-ink-bar {
+  background: linear-gradient(90deg, #f5a7c6, #d7a45b) !important;
+}
+
+.simple-tab-label {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.settings-tab-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-tab-header {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.settings-tab-header .ant-typography {
+  margin-bottom: 0;
+}
+
+.settings-tab-header-wrap {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.template-layout,
+.template-editor-layout {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr);
+}
+
+.template-preview-card {
+  margin-bottom: 16px;
+}
+
+.template-preview-surface {
+  background: #fff;
+  border-radius: 18px;
+  color: #111;
+  min-height: 240px;
+  overflow: auto;
+  padding: 18px;
+}
+
+.template-variable-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.template-editor-layout .monaco-editor,
+.template-editor-layout .monaco-editor-background,
+.template-editor-layout .margin {
+  border-radius: 18px;
+}
+
 .soft-tag {
   background: rgba(232, 137, 174, 0.14) !important;
   border: 1px solid rgba(232, 137, 174, 0.34) !important;
@@ -573,5 +661,15 @@ textarea.ant-input {
 
   .app-content {
     padding: 20px;
+  }
+
+  .template-layout,
+  .template-editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-tab-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

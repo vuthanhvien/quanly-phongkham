@@ -30,7 +30,8 @@ function readStoredUser() {
 }
 
 export function getStoredUserRole() {
-  return normalizeRole(readStoredUser()?.role)
+  const user = readStoredUser()
+  return normalizeRole(user?.activeRole || user?.role)
 }
 
 export function normalizeRole(role?: string) {
@@ -59,6 +60,9 @@ export function getFieldCatalog(resource: string, customFields: CustomField[]) {
           type: field.dataType as FieldSpec['type'],
           required: field.required,
           options: field.options,
+          relation: field.dataType === 'relative' && field.relationResource
+            ? { resource: field.relationResource, labelFields: ['code', 'name', 'fullName', 'title'] }
+            : undefined,
         }),
       ),
   ]

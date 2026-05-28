@@ -68,6 +68,30 @@ export class User {
   createdAt: Date;
 }
 
+@Entity('dynamic_role_definitions')
+export class DynamicRoleDefinition {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ unique: true })
+  key: string;
+
+  @Column()
+  name: string;
+
+  @Column({ default: 'STAFF' })
+  roleMain: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
 @Entity('departments')
 export class Department extends ConfigurableEntity {
   @Column({ unique: true })
@@ -127,17 +151,20 @@ export class Staff extends ConfigurableEntity {
 
 @Entity('branch_permissions')
 export class BranchPermission extends ConfigurableEntity {
+  @Column({ nullable: true })
+  userId?: string;
+
   @Column()
   staffId: string;
 
   @Column()
   branchId: string;
 
-  @Column()
+  @Column({ nullable: true })
   roleName: string;
 
   @Column({ type: 'jsonb', default: [] })
-  permissions: string[];
+  roleKeys: string[];
 
   @Column({ default: true })
   isActive: boolean;
@@ -445,6 +472,9 @@ export class CustomFieldDefinition {
   @Column({ type: 'jsonb', nullable: true })
   options?: string[];
 
+  @Column({ nullable: true })
+  relationResource?: string;
+
   @Column({ default: true })
   isActive: boolean;
 
@@ -530,6 +560,7 @@ export class AuditLog {
 export const ENTITIES = [
   Branch,
   User,
+  DynamicRoleDefinition,
   Department,
   Staff,
   BranchPermission,

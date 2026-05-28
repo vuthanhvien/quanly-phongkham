@@ -2,6 +2,7 @@ import {
   AuditOutlined,
   BankOutlined,
   CalendarOutlined,
+  DeploymentUnitOutlined,
   DashboardOutlined,
   DatabaseOutlined,
   DollarOutlined,
@@ -20,12 +21,15 @@ import { useLogout } from "@refinedev/core"
 import { Button, Layout, Menu, Space, Tag, Typography } from "antd"
 import type { MenuProps } from "antd"
 import { Link, useLocation } from "react-router-dom"
+import { hasResourceAccess, hasScreenAccess } from "../access"
 import { entityLabels } from "../models"
 
 const { Header, Content, Sider } = Layout
 
 const menuIcons: Record<string, React.ReactNode> = {
   branches: <BankOutlined />,
+  roles: <SettingOutlined />,
+  "branch-role-assignments": <DeploymentUnitOutlined />,
   departments: <SolutionOutlined />,
   staff: <TeamOutlined />,
   "branch-permissions": <AuditOutlined />,
@@ -76,7 +80,6 @@ const menuGroups = [
       "departments",
       "staff",
       "user-accounts",
-      "branch-permissions",
     ],
   },
 ]
@@ -91,43 +94,72 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const { mutate: logout } = useLogout()
   const currentResource = location.pathname.split("/")[1]
+  const visibleGroups = menuGroups
+    .map((group) => ({
+      ...group,
+      resources: group.resources.filter((resource) => hasResourceAccess(resource)),
+    }))
+    .filter((group) => group.resources.length > 0)
   const items: MenuProps["items"] = [
     {
       key: "/",
       icon: <DashboardOutlined />,
       label: <Link to="/">Tổng quan</Link>,
     },
-    ...menuGroups.map((group) => ({
+    ...visibleGroups.map((group) => ({
       key: group.key,
       icon: group.icon,
       label: group.label,
-      children: group.resources.map((key) => ({
-        key: `/${key}`,
-        icon: menuIcons[key] || <SolutionOutlined />,
-        label: <Link to={`/${key}`}>{entityLabels[key]}</Link>,
-      })),
+      children: [
+        ...group.resources.map((key) => ({
+          key: `/${key}`,
+          icon: menuIcons[key] || <SolutionOutlined />,
+          label: <Link to={`/${key}`}>{entityLabels[key]}</Link>,
+        })),
+        ...(group.key === "admin" && hasScreenAccess("settings")
+          ? [
+              {
+                key: "/roles",
+                icon: menuIcons.roles,
+                label: <Link to="/roles">Vai trò</Link>,
+              },
+              {
+                key: "/branch-role-assignments",
+                icon: menuIcons["branch-role-assignments"],
+                label: <Link to="/branch-role-assignments">Role theo chi nhánh</Link>,
+              },
+            ]
+          : []),
+      ],
     })),
     {
       key: "system-tools",
       icon: <GoldOutlined />,
       label: "Công cụ hệ thống",
       children: [
-        {
-          key: "/settings",
-          icon: <SettingOutlined />,
-          label: <Link to="/settings">Cấu hình động</Link>,
-        },
-        {
-          key: "/audit-logs",
-          icon: <AuditOutlined />,
-          label: <Link to="/audit-logs">Audit log</Link>,
-        },
-      ],
+        hasScreenAccess("settings")
+          ? {
+              key: "/settings",
+              icon: <SettingOutlined />,
+              label: <Link to="/settings">Cấu hình động</Link>,
+            }
+          : null,
+        hasScreenAccess("audit-logs")
+          ? {
+              key: "/audit-logs",
+              icon: <AuditOutlined />,
+              label: <Link to="/audit-logs">Audit log</Link>,
+            }
+          : null,
+      ].filter(Boolean),
     },
-  ]
+  ].filter((item) => item && (item.key !== "system-tools" || ((item.children as []) || []).length > 0))
   const selected = location.pathname === "/" ? "/" : `/${currentResource}`
   const defaultOpenKeys = [
-    resourceToGroup[currentResource],
+    resourceToGroup[currentResource] ||
+    (location.pathname === "/roles" || location.pathname === "/branch-role-assignments"
+      ? "admin"
+      : undefined),
     location.pathname.startsWith("/settings") ||
     location.pathname.startsWith("/audit-logs")
       ? "system-tools"

@@ -1,12 +1,13 @@
 export interface FieldSpec {
   key: string;
   label: string;
-  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea';
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative';
   required?: boolean;
   options?: string[];
   disabled?: boolean;
   description?: string;
   placeholder?: string;
+  relation?: RelationSpec;
 }
 
 export interface RelationSpec {
@@ -22,8 +23,25 @@ export interface CustomField {
   dataType: string;
   required: boolean;
   options?: string[];
+  relationResource?: string;
   isActive: boolean;
   sortOrder?: number;
+}
+
+export interface DynamicRole {
+  id: string;
+  key: string;
+  name: string;
+  roleMain: string;
+  isActive: boolean;
+}
+
+export interface BranchRoleAssignment {
+  id: string;
+  userId: string;
+  branchId: string;
+  roleKeys: string[];
+  isActive: boolean;
 }
 
 export const systemRoleOptions = ['ADMIN', 'STAFF', 'DOCTOR'];
@@ -42,7 +60,7 @@ export const entityLabels: Record<string, string> = {
   commissions: 'Hoa hồng',
   departments: 'Phòng ban',
   staff: 'Nhân viên',
-  'branch-permissions': 'Phân quyền chi nhánh',
+  'branch-permissions': 'Gán role chi nhánh',
   'user-accounts': 'Tài khoản đăng nhập',
 };
 
@@ -58,54 +76,6 @@ export const relationFields: Record<string, RelationSpec> = {
   staffId: { resource: 'staff', labelFields: ['code', 'fullName'] },
   userId: { resource: 'user-accounts', labelFields: ['email', 'fullName'] },
 };
-
-export const permissionOptions = [
-  '*',
-  'customers:view',
-  'customers:create',
-  'customers:update',
-  'customers:delete',
-  'customers:reveal-phone',
-  'appointments:view',
-  'appointments:create',
-  'appointments:update',
-  'appointments:delete',
-  'medical-episodes:view',
-  'medical-episodes:create',
-  'medical-episodes:update',
-  'medical-episodes:delete',
-  'treatments:view',
-  'treatments:create',
-  'treatments:update',
-  'treatments:delete',
-  'products:view',
-  'products:create',
-  'products:update',
-  'stock-batches:view',
-  'stock-batches:create',
-  'stock-batches:update',
-  'invoices:view',
-  'invoices:create',
-  'invoices:update',
-  'expenses:view',
-  'expenses:create',
-  'expenses:update',
-  'commissions:view',
-  'commissions:create',
-  'commissions:update',
-  'departments:view',
-  'departments:create',
-  'departments:update',
-  'staff:view',
-  'staff:create',
-  'staff:update',
-  'branch-permissions:view',
-  'branch-permissions:create',
-  'branch-permissions:update',
-  'user-accounts:view',
-  'user-accounts:create',
-  'user-accounts:update',
-];
 
 export const baseFields: Record<string, FieldSpec[]> = {
   branches: [
@@ -135,10 +105,9 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'note', label: 'Ghi chú', type: 'textarea' },
   ],
   'branch-permissions': [
-    { key: 'staffId', label: 'Nhân viên', required: true },
+    { key: 'userId', label: 'Tài khoản', required: true },
     { key: 'branchId', label: 'Chi nhánh', required: true },
-    { key: 'roleName', label: 'Vai trò tại chi nhánh', required: true },
-    { key: 'permissions', label: 'Quyền chức năng', type: 'multi-select', options: permissionOptions, required: true },
+    { key: 'roleKeys', label: 'Các role tại chi nhánh', type: 'multi-select', required: true },
   ],
   'user-accounts': [
     { key: 'email', label: 'Email đăng nhập', required: true },

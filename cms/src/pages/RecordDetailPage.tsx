@@ -68,7 +68,7 @@ export function RecordDetailPage() {
       setRelated(relatedResponse)
       setFields(detailFields)
       loadRelationOptions([
-        ...detailFields.map((field) => field.key),
+        ...detailFields,
         "branchId",
         "defaultBranchId",
         "customerId",
@@ -136,7 +136,7 @@ export function RecordDetailPage() {
                   }
                 >
                   {displayValue(
-                    field.key,
+                    field,
                     record?.[field.key] ?? record?.customFields?.[field.key],
                     lookups,
                   )}
@@ -282,7 +282,7 @@ async function loadRelated(
         title: "Quyền theo chi nhánh",
         resource: "branch-permissions",
         field: "staffId",
-        columns: ["branchId", "roleName", "permissions"],
+        columns: ["branchId", "roleName", "roleKeys"],
       },
       {
         title: "Tài khoản đăng nhập",

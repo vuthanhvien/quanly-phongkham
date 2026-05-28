@@ -66,7 +66,7 @@ export function RecordListPage() {
         )
         setDisplayFields(tableFields)
         setTemplates(prints.data.data)
-        return loadRelationOptions(tableFields.map((field) => field.key))
+        return loadRelationOptions(tableFields)
       })
       .then(setLookups)
   }, [resource])
@@ -79,7 +79,7 @@ export function RecordListPage() {
         key: field.key,
         render: (_: unknown, row: Record<string, any>) =>
           displayValue(
-            field.key,
+            field,
             row[field.key] ?? row.customFields?.[field.key],
             lookups,
           ),

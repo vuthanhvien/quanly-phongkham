@@ -55,7 +55,8 @@ export class RecordsController {
   audits(
     @Query('page', new ParseIntPipe({ optional: true })) page = 1,
     @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize = 30,
+    @Request() request?: { user: AuthUser },
   ) {
-    return this.records.audits(page, pageSize);
+    return this.records.audits(page, pageSize, request?.user);
   }
 }

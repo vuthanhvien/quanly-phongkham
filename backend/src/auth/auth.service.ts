@@ -2,8 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { compare } from 'bcryptjs';
-import { Repository } from 'typeorm';
-import { BranchPermission, Staff, User } from '../entities/entities';
+import { In, Repository } from 'typeorm';
+import { BranchPermission, DynamicRoleDefinition, Staff, User } from '../entities/entities';
 
 @Injectable()
 export class AuthService {
@@ -11,6 +11,7 @@ export class AuthService {
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Staff) private readonly staff: Repository<Staff>,
     @InjectRepository(BranchPermission) private readonly branchPermissions: Repository<BranchPermission>,
+    @InjectRepository(DynamicRoleDefinition) private readonly dynamicRoles: Repository<DynamicRoleDefinition>,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -20,20 +21,30 @@ export class AuthService {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
     const staff = user.staffId ? await this.staff.findOne({ where: { id: user.staffId } }) : await this.staff.findOne({ where: { userId: user.id } });
-    const branchPermissions = staff
-      ? await this.branchPermissions.find({ where: { staffId: staff.id, isActive: true } })
+    const branchPermissions = await this.branchPermissions.find({ where: { userId: user.id, isActive: true } });
+    const assignedRoleKeys = Array.from(new Set(branchPermissions.flatMap((item) => item.roleKeys || []).filter(Boolean)));
+    const roleDefinitions = assignedRoleKeys.length
+      ? await this.dynamicRoles.find({ where: { key: In(assignedRoleKeys), isActive: true } })
       : [];
+    const roleMap = new Map(roleDefinitions.map((role) => [role.key, role]));
+    const activeRole =
+      branchPermissions.find((item) => item.branchId === user.branchId)?.roleKeys?.[0] ||
+      branchPermissions[0]?.roleKeys?.[0] ||
+      user.role;
     const profile = {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
       role: user.role,
+      activeRole,
+      roleMain: user.role,
       branchId: user.branchId,
       staffId: staff?.id || user.staffId,
       branchPermissions: branchPermissions.map((item) => ({
         branchId: item.branchId,
         roleName: item.roleName,
-        permissions: item.permissions,
+        roleNames: (item.roleKeys || []).map((key) => roleMap.get(key)?.name || key),
+        roleKeys: item.roleKeys || [],
       })),
     };
     return {
