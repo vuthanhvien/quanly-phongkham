@@ -1,10 +1,10 @@
-import { Card } from 'antd';
-import { useNavigate, useParams } from 'react-router-dom';
-import { RecordFormContent } from '../components/RecordFormContent';
+import { Card } from "antd"
+import { useNavigate, useParams } from "react-router-dom"
+import { RecordFormContent } from "../components/RecordFormContent"
 
 export function RecordFormPage() {
-  const { resource = 'customers', id } = useParams();
-  const navigate = useNavigate();
+  const { resource = "customers", id } = useParams()
+  const navigate = useNavigate()
 
   return (
     <Card className="form-card">
@@ -15,5 +15,5 @@ export function RecordFormPage() {
         onSuccess={() => navigate(`/${resource}`)}
       />
     </Card>
-  );
+  )
 }
