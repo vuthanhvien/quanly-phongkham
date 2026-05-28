@@ -213,13 +213,16 @@ export function SettingsPage() {
     await load()
   }
 
-  function updateConfig(viewType: ViewType, key: string, patch: Partial<FieldLayoutConfig>) {
-    const setter =
-      viewType === "TABLE"
-        ? setTableConfig
-        : viewType === "FORM"
-          ? setFormConfig
-          : setDetailConfig
+  function updateConfig(
+    viewType: ViewType,
+    key: string,
+    patch: Partial<FieldLayoutConfig>,
+  ) {
+    let setter = setDetailConfig
+    if (viewType === "FORM") setter = setFormConfig
+    if (viewType === "TABLE") setter = setTableConfig
+    if (viewType === "DETAIL") setter = setDetailConfig
+
     setter((current) =>
       current.map((field) =>
         field.key === key ? { ...field, ...patch } : field,
@@ -256,9 +259,7 @@ export function SettingsPage() {
         <Card
           className="glass-card"
           title="Custom fields"
-          extra={
-            <Button onClick={openCreateField}>Thêm field</Button>
-          }
+          extra={<Button onClick={openCreateField}>Thêm field</Button>}
         >
           <Table
             size="small"
@@ -308,7 +309,10 @@ export function SettingsPage() {
                 style={{ width: 180 }}
                 value={selectedRole}
                 onChange={(value) => setSelectedRole(normalizeRole(value))}
-                options={roleOptions.map((role) => ({ value: role, label: role }))}
+                options={roleOptions.map((role) => ({
+                  value: role,
+                  label: role,
+                }))}
               />
               <Input
                 placeholder="Thêm role mới"
@@ -324,12 +328,19 @@ export function SettingsPage() {
           <Space direction="vertical" size={12} style={{ width: "100%" }}>
             <Typography.Text>
               Cấu hình đang áp dụng cho role <strong>{selectedRole}</strong>.
-              Nếu một view chưa có cấu hình riêng, hệ thống sẽ kế thừa từ role mặc định <strong>{DEFAULT_ROLE_SCOPE}</strong>.
+              Nếu một view chưa có cấu hình riêng, hệ thống sẽ kế thừa từ role
+              mặc định <strong>{DEFAULT_ROLE_SCOPE}</strong>.
             </Typography.Text>
             <Space wrap>
               {VIEW_TYPES.map((viewType) => (
-                <Tag color={viewStatus[viewType] ? "green" : "gold"} key={viewType}>
-                  {viewType}: {viewStatus[viewType] ? "riêng theo role" : "đang kế thừa ALL"}
+                <Tag
+                  color={viewStatus[viewType] ? "green" : "gold"}
+                  key={viewType}
+                >
+                  {viewType}:{" "}
+                  {viewStatus[viewType]
+                    ? "riêng theo role"
+                    : "đang kế thừa ALL"}
                 </Tag>
               ))}
             </Space>
@@ -337,7 +348,7 @@ export function SettingsPage() {
               items={[
                 {
                   key: "TABLE",
-                  label: "Table",
+                  label: "Bảng",
                   children: (
                     <ViewConfigTable
                       dataSource={tableConfig}
@@ -347,8 +358,19 @@ export function SettingsPage() {
                   ),
                 },
                 {
-                  key: "FORM",
-                  label: "Form",
+                  key: "FORM-QUICK",
+                  label: "Tạo nhanh",
+                  children: (
+                    <ViewConfigTable
+                      dataSource={formConfig}
+                      viewType="FORM"
+                      onChange={updateConfig}
+                    />
+                  ),
+                },
+                {
+                  key: "FORM-DETAIL",
+                  label: "Tạo chi tiết",
                   children: (
                     <ViewConfigTable
                       dataSource={formConfig}
@@ -359,7 +381,7 @@ export function SettingsPage() {
                 },
                 {
                   key: "DETAIL",
-                  label: "Detail",
+                  label: "Thông tin chi tiết",
                   children: (
                     <ViewConfigTable
                       dataSource={detailConfig}
