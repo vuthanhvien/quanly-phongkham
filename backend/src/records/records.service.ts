@@ -9,20 +9,26 @@ import {
   BranchRoleAssignment,
   Branch,
   Commission,
+  Consultation,
   ConfigurableEntity,
   CustomFieldDefinition,
   CustomFieldValue,
+  CustomerImage,
   Customer,
   Department,
   Expense,
   Invoice,
+  Lead,
+  LeadActivity,
   MedicalEpisode,
   Product,
+  ServiceOrder,
   Staff,
   StockBatch,
   Supplier,
   Treatment,
   User,
+  WorkSchedule,
 } from '../entities/entities';
 
 type ResourceRepository = Repository<any>;
@@ -36,11 +42,17 @@ export class RecordsService {
     @InjectRepository(BranchRoleAssignment) private readonly branchPermissions: Repository<BranchRoleAssignment>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
+    @InjectRepository(Lead) private readonly leads: Repository<Lead>,
+    @InjectRepository(LeadActivity) private readonly leadActivities: Repository<LeadActivity>,
     @InjectRepository(Supplier) private readonly suppliers: Repository<Supplier>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
     @InjectRepository(MedicalEpisode) private readonly episodes: Repository<MedicalEpisode>,
     @InjectRepository(Appointment) private readonly appointments: Repository<Appointment>,
+    @InjectRepository(WorkSchedule) private readonly workSchedules: Repository<WorkSchedule>,
     @InjectRepository(StockBatch) private readonly stockBatches: Repository<StockBatch>,
+    @InjectRepository(Consultation) private readonly consultations: Repository<Consultation>,
+    @InjectRepository(ServiceOrder) private readonly serviceOrders: Repository<ServiceOrder>,
+    @InjectRepository(CustomerImage) private readonly customerImages: Repository<CustomerImage>,
     @InjectRepository(Invoice) private readonly invoices: Repository<Invoice>,
     @InjectRepository(Expense) private readonly expenses: Repository<Expense>,
     @InjectRepository(Treatment) private readonly treatments: Repository<Treatment>,
@@ -59,11 +71,17 @@ export class RecordsService {
       'branch-permissions': this.branchPermissions,
       'user-accounts': this.users,
       customers: this.customers,
+      leads: this.leads,
+      'lead-activities': this.leadActivities,
       suppliers: this.suppliers,
       products: this.products,
       'medical-episodes': this.episodes,
       appointments: this.appointments,
+      'work-schedules': this.workSchedules,
       'stock-batches': this.stockBatches,
+      consultations: this.consultations,
+      'service-orders': this.serviceOrders,
+      'customer-images': this.customerImages,
       invoices: this.invoices,
       expenses: this.expenses,
       treatments: this.treatments,
@@ -81,11 +99,17 @@ export class RecordsService {
     if (search) {
       const searchable: Record<string, string[]> = {
         customers: ['code', 'fullName'],
+        leads: ['code', 'fullName', 'phone', 'email'],
+        'lead-activities': ['activityType', 'content', 'status'],
         suppliers: ['code', 'name'],
         products: ['code', 'name'],
         branches: ['name', 'slug'],
         departments: ['code', 'name'],
         staff: ['code', 'fullName', 'email', 'phone'],
+        consultations: ['summary', 'diagnosis', 'status'],
+        'service-orders': ['code', 'serviceName', 'status'],
+        'customer-images': ['title', 'mediaType', 'diagnosisNote'],
+        'work-schedules': ['shiftLabel', 'room', 'status'],
         'branch-role-assignments': ['roleName'],
         'branch-permissions': ['roleName'],
         'user-accounts': ['email', 'fullName', 'role'],
@@ -126,6 +150,7 @@ export class RecordsService {
     await this.validateCustomFields(resource, payload, true);
     const normalized = await this.normalizeInput(resource, payload, true);
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
+    if (resource === 'service-orders') this.computeServiceOrderTotals(normalized);
     const repository = this.repository(resource);
     const record = await repository.save(repository.create(normalized));
     await this.replaceCustomFieldValues(resource, record.id, (payload.customFields || {}) as Record<string, unknown>);
@@ -148,6 +173,7 @@ export class RecordsService {
     }, false);
     this.assertPermission(user, resource, 'update', this.branchIdOf(resource, normalized) || this.branchIdOf(resource, previous));
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized, id);
+    if (resource === 'service-orders') this.computeServiceOrderTotals(normalized);
     const repository = this.repository(resource);
     const record = await repository.save(repository.merge(previous, normalized));
     await this.replaceCustomFieldValues(resource, id, mergedCustomFields);
@@ -170,6 +196,39 @@ export class RecordsService {
     this.assertPermission(user, 'customers', 'reveal-phone', customer.branchId);
     await this.audit(user, 'REVEAL_PHONE', 'customers', id);
     return { data: { phone: customer.phone } };
+  }
+
+  async convertLeadToCustomer(id: string, user: AuthUser) {
+    const lead = await this.findStored('leads', id) as Lead;
+    this.assertPermission(user, 'leads', 'update', lead.branchId);
+
+    if (lead.convertedCustomerId) {
+      const existingCustomer = await this.findRaw('customers', lead.convertedCustomerId);
+      return { data: existingCustomer };
+    }
+
+    const customer = await this.customers.save(
+      this.customers.create({
+        code: await this.generateCustomerCodeFromLead(lead),
+        fullName: lead.fullName,
+        phone: lead.phone,
+        email: lead.email,
+        branchId: lead.branchId,
+        assignedStaff: lead.assignedStaffId,
+        status: 'CONSULTING',
+        note: lead.note,
+      }),
+    );
+
+    await this.copyCustomFieldValues('leads', lead.id, 'customers', customer.id);
+
+    lead.status = 'CONVERTED';
+    lead.convertedCustomerId = customer.id;
+    lead.convertedAt = new Date();
+    await this.leads.save(lead);
+
+    await this.audit(user, 'CONVERT_TO_CUSTOMER', 'leads', lead.id, { customerId: customer.id });
+    return { data: await this.findRaw('customers', customer.id) };
   }
 
   async audits(page = 1, pageSize = 30, user?: AuthUser) {
@@ -206,6 +265,11 @@ export class RecordsService {
       }
       const spent = Number(value.totalSpent || 0);
       value.tier = spent >= 200_000_000 ? 'DIAMOND' : spent >= 50_000_000 ? 'GOLD' : spent >= 10_000_000 ? 'SILVER' : 'MEMBER';
+    }
+    if (resource === 'service-orders') {
+      const quantity = Number(value.quantity || 0);
+      const unitPrice = Number(value.unitPrice || 0);
+      value.totalAmount = quantity * unitPrice;
     }
     return value;
   }
@@ -283,6 +347,12 @@ export class RecordsService {
     return valueText;
   }
 
+  private computeServiceOrderTotals(payload: Record<string, unknown>) {
+    const quantity = Number(payload.quantity || 0);
+    const unitPrice = Number(payload.unitPrice || 0);
+    payload.totalAmount = quantity * unitPrice;
+  }
+
   private async replaceCustomFieldValues(resource: string, recordId: string, values: Record<string, unknown>) {
     await this.customFieldValues.delete({ entityType: resource, recordId });
 
@@ -298,6 +368,40 @@ export class RecordsService {
     if (rows.length > 0) {
       await this.customFieldValues.save(rows);
     }
+  }
+
+  private async copyCustomFieldValues(
+    sourceEntityType: string,
+    sourceRecordId: string,
+    targetEntityType: string,
+    targetRecordId: string,
+  ) {
+    const sourceRows = await this.customFieldValues.find({
+      where: { entityType: sourceEntityType, recordId: sourceRecordId },
+    });
+    if (sourceRows.length === 0) return;
+
+    await this.customFieldValues.save(
+      sourceRows.map((row) =>
+        this.customFieldValues.create({
+          entityType: targetEntityType,
+          recordId: targetRecordId,
+          fieldKey: row.fieldKey,
+          valueText: row.valueText,
+        }),
+      ),
+    );
+  }
+
+  private async generateCustomerCodeFromLead(lead: Lead) {
+    const prefix = lead.code ? `KH-${lead.code}` : `KH-${Date.now()}`;
+    let candidate = prefix;
+    let suffix = 1;
+    while (await this.customers.findOne({ where: { code: candidate } })) {
+      candidate = `${prefix}-${suffix}`;
+      suffix += 1;
+    }
+    return candidate;
   }
 
   private async ensureAppointmentAvailable(payload: Record<string, unknown>, ignoredId?: string) {
@@ -357,9 +461,15 @@ export class RecordsService {
       'branch-permissions': 'branchId',
       'user-accounts': 'branchId',
       customers: 'branchId',
+      leads: 'branchId',
+      'lead-activities': 'branchId',
       'medical-episodes': 'branchId',
       appointments: 'branchId',
+      'work-schedules': 'branchId',
       'stock-batches': 'branchId',
+      consultations: 'branchId',
+      'service-orders': 'branchId',
+      'customer-images': 'branchId',
       invoices: 'branchId',
       expenses: 'branchId',
       treatments: 'branchId',

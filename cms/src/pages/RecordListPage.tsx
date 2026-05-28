@@ -12,7 +12,7 @@ import {
 } from "antd"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { api } from "../api"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { CustomField, entityLabels } from "../models"
@@ -27,6 +27,7 @@ import {
 
 export function RecordListPage() {
   const { resource = "customers" } = useParams()
+  const navigate = useNavigate()
   const [search, setSearch] = useState("")
   const [displayFields, setDisplayFields] = useState<FieldLayoutConfig[]>([])
   const [templates, setTemplates] = useState<
@@ -96,6 +97,11 @@ export function RecordListPage() {
                 Xem SĐT
               </Button>
             )}
+            {resource === "leads" && !row.convertedCustomerId && (
+              <Button type="link" onClick={() => convertLead(row.id)}>
+                Chuyển thành KH
+              </Button>
+            )}
             {templates[0] && (
               <Button
                 type="link"
@@ -150,6 +156,13 @@ export function RecordListPage() {
       `/records/customers/${recordId}/reveal-phone`,
     )
     message.info(`Số điện thoại: ${response.data.data.phone}`)
+  }
+
+  async function convertLead(recordId: string) {
+    const response = await api.post(`/records/leads/${recordId}/convert-to-customer`)
+    message.success("Đã chuyển lead thành khách hàng")
+    refresh()
+    navigate(`/customers/${response.data.data.id}`)
   }
 
   return (

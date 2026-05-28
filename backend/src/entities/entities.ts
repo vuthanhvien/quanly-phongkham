@@ -212,6 +212,66 @@ export class Customer extends ConfigurableEntity {
   note?: string;
 }
 
+@Entity('leads')
+export class Lead extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  fullName: string;
+
+  @Column()
+  phone: string;
+
+  @Column({ nullable: true })
+  email?: string;
+
+  @Column({ nullable: true })
+  source?: string;
+
+  @Column({ default: 'NEW' })
+  status: string;
+
+  @Column({ nullable: true })
+  assignedStaffId?: string;
+
+  @Column()
+  branchId: string;
+
+  @Column({ nullable: true })
+  convertedCustomerId?: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  convertedAt?: Date;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('lead_activities')
+export class LeadActivity extends ConfigurableEntity {
+  @Column()
+  leadId: string;
+
+  @Column()
+  branchId: string;
+
+  @Column({ default: 'CALL' })
+  activityType: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  scheduledAt?: Date;
+
+  @Column({ nullable: true })
+  ownerStaffId?: string;
+
+  @Column({ default: 'OPEN' })
+  status: string;
+
+  @Column({ type: 'text' })
+  content: string;
+}
+
 @Entity('suppliers')
 export class Supplier extends ConfigurableEntity {
   @Column({ unique: true })
@@ -339,6 +399,126 @@ export class Appointment extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+}
+
+@Entity('work_schedules')
+export class WorkSchedule extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column()
+  branchId: string;
+
+  @Column({ type: 'date' })
+  workDate: string;
+
+  @Column({ default: 'CA SANG' })
+  shiftLabel: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  startTime?: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  endTime?: Date;
+
+  @Column({ nullable: true })
+  room?: string;
+
+  @Column({ default: 'PLANNED' })
+  status: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('consultations')
+export class Consultation extends ConfigurableEntity {
+  @Column()
+  customerId: string;
+
+  @Column()
+  branchId: string;
+
+  @Column({ type: 'timestamptz' })
+  consultedAt: Date;
+
+  @Column({ nullable: true })
+  consultantStaffId?: string;
+
+  @Column({ nullable: true })
+  doctorStaffId?: string;
+
+  @Column({ default: 'OPEN' })
+  status: string;
+
+  @Column({ type: 'text', nullable: true })
+  summary?: string;
+
+  @Column({ type: 'text', nullable: true })
+  diagnosis?: string;
+
+  @Column({ type: 'text', nullable: true })
+  nextAction?: string;
+}
+
+@Entity('service_orders')
+export class ServiceOrder extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  customerId: string;
+
+  @Column()
+  branchId: string;
+
+  @Column({ type: 'date' })
+  orderDate: string;
+
+  @Column()
+  serviceName: string;
+
+  @Column({ default: 1 })
+  quantity: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  unitPrice: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  totalAmount: number;
+
+  @Column({ nullable: true })
+  performerStaffId?: string;
+
+  @Column({ default: 'DRAFT' })
+  status: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('customer_images')
+export class CustomerImage extends ConfigurableEntity {
+  @Column()
+  customerId: string;
+
+  @Column()
+  branchId: string;
+
+  @Column({ default: 'BEFORE' })
+  mediaType: string;
+
+  @Column({ nullable: true })
+  title?: string;
+
+  @Column()
+  imageUrl: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  capturedAt?: Date;
+
+  @Column({ type: 'text', nullable: true })
+  diagnosisNote?: string;
 }
 
 @Entity('stock_batches')
@@ -590,11 +770,17 @@ export const ENTITIES = [
   Staff,
   BranchRoleAssignment,
   Customer,
+  Lead,
+  LeadActivity,
   Supplier,
   Product,
   MedicalEpisode,
   Appointment,
+  WorkSchedule,
   StockBatch,
+  Consultation,
+  ServiceOrder,
+  CustomerImage,
   Invoice,
   Expense,
   Treatment,

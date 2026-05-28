@@ -4,6 +4,7 @@ import {
   Col,
   Descriptions,
   Empty,
+  message,
   Row,
   Space,
   Table,
@@ -11,7 +12,7 @@ import {
   Typography,
 } from "antd"
 import { useEffect, useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { api } from "../api"
 import { CustomField, entityLabels } from "../models"
 import { displayValue, loadRelationOptions, LookupMap } from "../relations"
@@ -32,6 +33,7 @@ interface RelatedBlock {
 
 export function RecordDetailPage() {
   const { resource = "customers", id = "" } = useParams()
+  const navigate = useNavigate()
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [related, setRelated] = useState<RelatedBlock[]>([])
   const [fields, setFields] = useState<FieldLayoutConfig[]>([])
@@ -72,9 +74,16 @@ export function RecordDetailPage() {
         "branchId",
         "defaultBranchId",
         "customerId",
+        "leadId",
         "staffId",
+        "assignedStaffId",
+        "ownerStaffId",
+        "consultantStaffId",
+        "doctorStaffId",
+        "performerStaffId",
         "userId",
         "invoiceId",
+        "convertedCustomerId",
       ]).then((lookupResponse) => {
         if (!mounted) return
         setLookups(lookupResponse)
@@ -103,6 +112,17 @@ export function RecordDetailPage() {
           <Link to={`/${resource}`}>
             <Button>Quay lại</Button>
           </Link>
+          {resource === "leads" && !record?.convertedCustomerId && (
+            <Button
+              onClick={async () => {
+                const response = await convertLead(id)
+                message.success("Đã chuyển lead thành khách hàng")
+                navigate(`/customers/${response.data.data.id}`)
+              }}
+            >
+              Chuyển thành khách hàng
+            </Button>
+          )}
           <Link to={`/${resource}/${id}/edit`}>
             <Button className="primary-glow" type="primary">
               Sửa hồ sơ
@@ -247,6 +267,17 @@ async function loadRelated(
   resource: string,
   id: string,
 ): Promise<RelatedBlock[]> {
+  if (resource === "leads") {
+    const specs = [
+      {
+        title: "Nhật ký chăm lead",
+        resource: "lead-activities",
+        field: "leadId",
+        columns: ["activityType", "scheduledAt", "ownerStaffId", "status"],
+      },
+    ]
+    return loadBlocks(specs, id)
+  }
   if (resource === "customers") {
     const specs = [
       {
@@ -266,6 +297,24 @@ async function loadRelated(
         resource: "treatments",
         field: "customerId",
         columns: ["name", "totalSessions", "completedSessions", "status"],
+      },
+      {
+        title: "Thăm khám",
+        resource: "consultations",
+        field: "customerId",
+        columns: ["consultedAt", "consultantStaffId", "doctorStaffId", "status"],
+      },
+      {
+        title: "Đơn hàng / dịch vụ sử dụng",
+        resource: "service-orders",
+        field: "customerId",
+        columns: ["code", "serviceName", "quantity", "totalAmount", "status"],
+      },
+      {
+        title: "Hình ảnh - chẩn đoán",
+        resource: "customer-images",
+        field: "customerId",
+        columns: ["mediaType", "title", "capturedAt", "diagnosisNote"],
       },
       {
         title: "Phiếu thu / hóa đơn",
@@ -326,6 +375,10 @@ async function loadBlocks(
       (row: Record<string, unknown>) => String(row[spec.field]) === id,
     ),
   }))
+}
+
+async function convertLead(id: string) {
+  return api.post(`/records/leads/${id}/convert-to-customer`)
 }
 
 function detailTitle(resource: string, record: Record<string, any> | null) {

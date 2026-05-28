@@ -22,6 +22,11 @@ export class RecordsController {
     return this.records.revealPhone(id, request.user);
   }
 
+  @Post('records/leads/:id/convert-to-customer')
+  convertLeadToCustomer(@Param('id') id: string, @Request() request: { user: AuthUser }) {
+    return this.records.convertLeadToCustomer(id, request.user);
+  }
+
   @Get('records/:resource/:id')
   find(@Param('resource') resource: string, @Param('id') id: string, @Request() request: { user: AuthUser }) {
     return this.records.find(resource, id, request.user);
