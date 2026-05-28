@@ -202,7 +202,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Typography.Text className="eyebrow">
               CMS vận hành viện thẩm mỹ
             </Typography.Text>
-            <Typography.Title level={3}>Không gian quản trị</Typography.Title>
+            {/* <Typography.Title level={3}>Không gian quản trị</Typography.Title> */}
           </div>
           <Space>
             <Tag className="soft-tag">Live</Tag>

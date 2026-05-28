@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -10,8 +11,7 @@ export abstract class ConfigurableEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'jsonb', default: {} })
-  customFields: Record<string, unknown>;
+  customFields: Record<string, unknown> = {};
 
   @CreateDateColumn()
   createdAt: Date;
@@ -530,6 +530,31 @@ export class PrintTemplate {
   updatedAt: Date;
 }
 
+@Entity('custom_field_values')
+@Index(['entityType', 'recordId', 'fieldKey'], { unique: true })
+export class CustomFieldValue {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  entityType: string;
+
+  @Column()
+  recordId: string;
+
+  @Column()
+  fieldKey: string;
+
+  @Column({ type: 'text' })
+  valueText: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
 @Entity('audit_logs')
 export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
@@ -575,6 +600,7 @@ export const ENTITIES = [
   Treatment,
   Commission,
   CustomFieldDefinition,
+  CustomFieldValue,
   ViewSetting,
   PrintTemplate,
   AuditLog,

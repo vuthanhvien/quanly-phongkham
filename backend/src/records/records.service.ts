@@ -11,6 +11,7 @@ import {
   Commission,
   ConfigurableEntity,
   CustomFieldDefinition,
+  CustomFieldValue,
   Customer,
   Department,
   Expense,
@@ -45,6 +46,7 @@ export class RecordsService {
     @InjectRepository(Treatment) private readonly treatments: Repository<Treatment>,
     @InjectRepository(Commission) private readonly commissions: Repository<Commission>,
     @InjectRepository(CustomFieldDefinition) private readonly fieldDefinitions: Repository<CustomFieldDefinition>,
+    @InjectRepository(CustomFieldValue) private readonly customFieldValues: Repository<CustomFieldValue>,
     @InjectRepository(AuditLog) private readonly auditLogs: Repository<AuditLog>,
   ) {}
 
@@ -97,10 +99,17 @@ export class RecordsService {
       take: pageSize,
       order: { createdAt: 'DESC' },
     });
-    return { data: rows.map((row) => this.protect(resource, row)), total };
+    const hydrated = await this.hydrateCustomFields(resource, rows);
+    return { data: hydrated.map((row) => this.protect(resource, row)), total };
   }
 
   async findRaw(resource: string, id: string) {
+    const record = await this.findStored(resource, id);
+    const [hydrated] = await this.hydrateCustomFields(resource, [record]);
+    return hydrated;
+  }
+
+  private async findStored(resource: string, id: string) {
     const record = await this.repository(resource).findOne({ where: { id } });
     if (!record) throw new NotFoundException('Khong tim thay du lieu');
     return record;
@@ -119,29 +128,38 @@ export class RecordsService {
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
     const repository = this.repository(resource);
     const record = await repository.save(repository.create(normalized));
+    await this.replaceCustomFieldValues(resource, record.id, (payload.customFields || {}) as Record<string, unknown>);
     await this.audit(user, 'CREATE', resource, record.id, normalized);
-    return { data: this.protect(resource, record) };
+    const hydrated = await this.findRaw(resource, record.id);
+    return { data: this.protect(resource, hydrated) };
   }
 
   async update(resource: string, id: string, payload: Record<string, unknown>, user: AuthUser) {
-    const previous = await this.findRaw(resource, id);
+    const previous = await this.findStored(resource, id);
+    const previousCustomFields = await this.loadCustomFieldsMap(resource, [id]);
+    const mergedCustomFields = {
+      ...(previousCustomFields.get(id) || {}),
+      ...((payload.customFields || {}) as Record<string, unknown>),
+    };
     await this.validateCustomFields(resource, payload, false);
     const normalized = await this.normalizeInput(resource, {
       ...previous,
       ...payload,
-      customFields: { ...(previous.customFields || {}), ...((payload.customFields || {}) as Record<string, unknown>) },
     }, false);
     this.assertPermission(user, resource, 'update', this.branchIdOf(resource, normalized) || this.branchIdOf(resource, previous));
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized, id);
     const repository = this.repository(resource);
     const record = await repository.save(repository.merge(previous, normalized));
+    await this.replaceCustomFieldValues(resource, id, mergedCustomFields);
     await this.audit(user, 'UPDATE', resource, id, { before: previous, changes: normalized });
-    return { data: this.protect(resource, record) };
+    const hydrated = await this.findRaw(resource, record.id);
+    return { data: this.protect(resource, hydrated) };
   }
 
   async remove(resource: string, id: string, user: AuthUser) {
-    const record = await this.findRaw(resource, id);
+    const record = await this.findStored(resource, id);
     this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
+    await this.customFieldValues.delete({ entityType: resource, recordId: id });
     await this.repository(resource).remove(record);
     await this.audit(user, 'DELETE', resource, id);
     return { data: { id } };
@@ -181,6 +199,7 @@ export class RecordsService {
     delete value.id;
     delete value.createdAt;
     delete value.updatedAt;
+    delete value.customFields;
     if (resource === 'customers') {
       if (typeof value.phone === 'string' && value.phone.includes('*')) {
         delete value.phone;
@@ -197,6 +216,7 @@ export class RecordsService {
     delete value.id;
     delete value.createdAt;
     delete value.updatedAt;
+    delete value.customFields;
     if (typeof value.role === 'string' && !['ADMIN', 'STAFF', 'DOCTOR'].includes(value.role)) {
       throw new BadRequestException('Vai tro khong hop le');
     }
@@ -225,6 +245,58 @@ export class RecordsService {
         field.dataType === 'relative' ? typeof value === 'string' && value.length > 0 :
         true;
       if (!valid) throw new BadRequestException(`Gia tri khong hop le cho ${field.label}`);
+    }
+  }
+
+  private async hydrateCustomFields<T extends ConfigurableEntity>(resource: string, records: T[]) {
+    if (records.length === 0) return records;
+    const recordIds = records.map((record) => record.id).filter(Boolean);
+    const storedValues = await this.loadCustomFieldsMap(resource, recordIds);
+    return records.map((record) => ({
+      ...record,
+      customFields: storedValues.get(record.id) || {},
+    }));
+  }
+
+  private async loadCustomFieldsMap(resource: string, recordIds: string[]) {
+    const normalizedIds = Array.from(new Set(recordIds.filter(Boolean)));
+    const valuesByRecord = new Map<string, Record<string, unknown>>();
+    if (normalizedIds.length === 0) return valuesByRecord;
+
+    const [definitions, storedValues] = await Promise.all([
+      this.fieldDefinitions.find({ where: { entityType: resource } }),
+      this.customFieldValues.find({ where: { entityType: resource, recordId: In(normalizedIds) } }),
+    ]);
+    const definitionsByKey = new Map(definitions.map((field) => [field.key, field]));
+
+    for (const row of storedValues) {
+      const current = valuesByRecord.get(row.recordId) || {};
+      current[row.fieldKey] = this.parseCustomFieldValue(row.valueText, definitionsByKey.get(row.fieldKey)?.dataType);
+      valuesByRecord.set(row.recordId, current);
+    }
+
+    return valuesByRecord;
+  }
+  private parseCustomFieldValue(valueText: string, dataType?: string) {
+    if (dataType === 'number') return Number(valueText);
+    if (dataType === 'boolean') return valueText === 'true';
+    return valueText;
+  }
+
+  private async replaceCustomFieldValues(resource: string, recordId: string, values: Record<string, unknown>) {
+    await this.customFieldValues.delete({ entityType: resource, recordId });
+
+    const rows = Object.entries(values)
+      .filter(([, value]) => value !== undefined && value !== null && value !== '')
+      .map(([fieldKey, value]) => this.customFieldValues.create({
+        entityType: resource,
+        recordId,
+        fieldKey,
+        valueText: String(value),
+      }));
+
+    if (rows.length > 0) {
+      await this.customFieldValues.save(rows);
     }
   }
 
