@@ -9,5 +9,10 @@ export interface AuthUser {
   fullName: string;
   role: string;
   branchId?: string;
+  staffId?: string;
+  branchPermissions?: Array<{
+    branchId: string;
+    roleName: string;
+    permissions: string[];
+  }>;
 }
-

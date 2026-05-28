@@ -1,19 +1,22 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, ILike, LessThan, MoreThan, Repository } from 'typeorm';
+import { FindOptionsWhere, ILike, In, LessThan, MoreThan, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
 import {
   Appointment,
   AuditLog,
+  BranchPermission,
   Branch,
   Commission,
   ConfigurableEntity,
   CustomFieldDefinition,
   Customer,
+  Department,
   Expense,
   Invoice,
   MedicalEpisode,
   Product,
+  Staff,
   StockBatch,
   Supplier,
   Treatment,
@@ -25,6 +28,9 @@ type ResourceRepository = Repository<ConfigurableEntity>;
 export class RecordsService {
   constructor(
     @InjectRepository(Branch) private readonly branches: Repository<Branch>,
+    @InjectRepository(Department) private readonly departments: Repository<Department>,
+    @InjectRepository(Staff) private readonly staff: Repository<Staff>,
+    @InjectRepository(BranchPermission) private readonly branchPermissions: Repository<BranchPermission>,
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
     @InjectRepository(Supplier) private readonly suppliers: Repository<Supplier>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
@@ -42,6 +48,9 @@ export class RecordsService {
   private repository(resource: string): ResourceRepository {
     const map: Record<string, ResourceRepository> = {
       branches: this.branches,
+      departments: this.departments,
+      staff: this.staff,
+      'branch-permissions': this.branchPermissions,
       customers: this.customers,
       suppliers: this.suppliers,
       products: this.products,
@@ -58,7 +67,8 @@ export class RecordsService {
     return repository;
   }
 
-  async list(resource: string, page = 1, pageSize = 20, search?: string) {
+  async list(resource: string, page = 1, pageSize = 20, search?: string, user?: AuthUser) {
+    this.assertPermission(user, resource, 'view');
     const repository = this.repository(resource);
     let where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[] = {};
     if (search) {
@@ -67,9 +77,13 @@ export class RecordsService {
         suppliers: ['code', 'name'],
         products: ['code', 'name'],
         branches: ['name', 'slug'],
+        departments: ['code', 'name'],
+        staff: ['code', 'fullName', 'email', 'phone'],
+        'branch-permissions': ['roleName'],
       };
       where = (searchable[resource] || []).map((field) => ({ [field]: ILike(`%${search}%`) })) as FindOptionsWhere<ConfigurableEntity>[];
     }
+    where = this.applyBranchScope(resource, where, user);
     const [rows, total] = await repository.findAndCount({
       where,
       skip: (page - 1) * pageSize,
@@ -85,13 +99,16 @@ export class RecordsService {
     return record;
   }
 
-  async find(resource: string, id: string) {
-    return { data: this.protect(resource, await this.findRaw(resource, id)) };
+  async find(resource: string, id: string, user?: AuthUser) {
+    const record = await this.findRaw(resource, id);
+    this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
+    return { data: this.protect(resource, record) };
   }
 
   async create(resource: string, payload: Record<string, unknown>, user: AuthUser) {
     await this.validateCustomFields(resource, payload, true);
     const normalized = this.normalize(resource, payload);
+    this.assertPermission(user, resource, 'create', this.branchIdOf(resource, normalized));
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
     const repository = this.repository(resource);
     const record = await repository.save(repository.create(normalized));
@@ -107,6 +124,7 @@ export class RecordsService {
       ...payload,
       customFields: { ...(previous.customFields || {}), ...((payload.customFields || {}) as Record<string, unknown>) },
     });
+    this.assertPermission(user, resource, 'update', this.branchIdOf(resource, normalized) || this.branchIdOf(resource, previous));
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized, id);
     const repository = this.repository(resource);
     const record = await repository.save(repository.merge(previous, normalized));
@@ -116,6 +134,7 @@ export class RecordsService {
 
   async remove(resource: string, id: string, user: AuthUser) {
     const record = await this.findRaw(resource, id);
+    this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
     await this.repository(resource).remove(record);
     await this.audit(user, 'DELETE', resource, id);
     return { data: { id } };
@@ -123,6 +142,7 @@ export class RecordsService {
 
   async revealPhone(id: string, user: AuthUser) {
     const customer = (await this.findRaw('customers', id)) as Customer;
+    this.assertPermission(user, 'customers', 'reveal-phone', customer.branchId);
     await this.audit(user, 'REVEAL_PHONE', 'customers', id);
     return { data: { phone: customer.phone } };
   }
@@ -188,6 +208,62 @@ export class RecordsService {
       (item) => item.id !== ignoredId && (item.doctorName === payload.doctorName || item.room === payload.room),
     );
     if (conflict) throw new BadRequestException('Bac si hoac phong da co lich trong khung gio nay');
+  }
+
+  private assertPermission(user: AuthUser | undefined, resource: string, action: string, branchId?: string) {
+    if (!user || user.role === 'ADMIN') return;
+    const permission = `${resource}:${action}`;
+    const permissions = user.branchPermissions || [];
+    const matched = permissions.some((item) => {
+      const branchMatched = !branchId || item.branchId === branchId;
+      return branchMatched && (item.permissions.includes('*') || item.permissions.includes(permission));
+    });
+    if (!matched) {
+      throw new ForbiddenException('Ban khong co quyen thuc hien thao tac nay tai chi nhanh hien tai');
+    }
+  }
+
+  private allowedBranches(user: AuthUser | undefined, resource: string, action: string) {
+    if (!user || user.role === 'ADMIN') return undefined;
+    const permission = `${resource}:${action}`;
+    return (user.branchPermissions || [])
+      .filter((item) => item.permissions.includes('*') || item.permissions.includes(permission))
+      .map((item) => item.branchId);
+  }
+
+  private applyBranchScope(
+    resource: string,
+    where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
+    user?: AuthUser,
+  ) {
+    const branchField = this.branchField(resource);
+    const branches = this.allowedBranches(user, resource, 'view');
+    if (!branchField || !branches || branches.length === 0) return where;
+    const scoped = { [branchField]: In(branches) } as FindOptionsWhere<ConfigurableEntity>;
+    if (Array.isArray(where)) return where.length ? where.map((item) => ({ ...item, ...scoped })) : scoped;
+    return { ...where, ...scoped };
+  }
+
+  private branchIdOf(resource: string, record: Record<string, unknown>) {
+    const field = this.branchField(resource);
+    return field ? String(record[field] || '') || undefined : undefined;
+  }
+
+  private branchField(resource: string) {
+    const map: Record<string, string> = {
+      branches: 'id',
+      departments: 'branchId',
+      staff: 'defaultBranchId',
+      'branch-permissions': 'branchId',
+      customers: 'branchId',
+      'medical-episodes': 'branchId',
+      appointments: 'branchId',
+      'stock-batches': 'branchId',
+      invoices: 'branchId',
+      expenses: 'branchId',
+      treatments: 'branchId',
+    };
+    return map[resource];
   }
 
   private async audit(

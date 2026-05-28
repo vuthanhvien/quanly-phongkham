@@ -3,14 +3,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Appointment,
   AuditLog,
+  BranchPermission,
   Branch,
   Commission,
   CustomFieldDefinition,
   Customer,
+  Department,
   Expense,
   Invoice,
   MedicalEpisode,
   Product,
+  Staff,
   StockBatch,
   Supplier,
   Treatment,
@@ -22,6 +25,9 @@ import { RecordsService } from './records.service';
   imports: [
     TypeOrmModule.forFeature([
       Branch,
+      Department,
+      Staff,
+      BranchPermission,
       Customer,
       Supplier,
       Product,
@@ -41,4 +47,3 @@ import { RecordsService } from './records.service';
   exports: [RecordsService],
 })
 export class RecordsModule {}
-

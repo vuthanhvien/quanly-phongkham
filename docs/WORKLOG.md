@@ -10,6 +10,8 @@
 - [x] Tạo setting bố cục table/form và setting mẫu in HTML theo model.
 - [x] Tạo CMS Refine đọc cấu hình động để render danh sách và form.
 - [x] Làm lại giao diện CMS theo dark beauty theme: nền đen, sắc hồng nhẹ, font Plus Jakarta Sans, sidebar/header/card hiện đại hơn.
+- [x] Thêm icon menu theo từng phân hệ và nâng dashboard nhiều màu với KPI, revenue card, pipeline tiến độ và lịch ưu tiên.
+- [x] Gom menu sidebar theo nhóm role/nghiệp vụ: Lễ tân & CRM, Chuyên môn điều trị, Kho & mua hàng, Tài chính & lương, Quản trị hệ thống và Công cụ hệ thống.
 - [x] Thêm mask điện thoại, endpoint reveal có audit, phân hạng khách theo chi tiêu và kiểm tra trùng lịch.
 - [x] Thêm Dockerfile/Compose và tài liệu khởi chạy.
 

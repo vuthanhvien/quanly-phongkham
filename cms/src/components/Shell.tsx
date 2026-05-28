@@ -1,23 +1,109 @@
+import {
+  AuditOutlined,
+  BankOutlined,
+  CalendarOutlined,
+  DashboardOutlined,
+  DatabaseOutlined,
+  DollarOutlined,
+  ExperimentOutlined,
+  FileDoneOutlined,
+  GiftOutlined,
+  GoldOutlined,
+  MedicineBoxOutlined,
+  ProductOutlined,
+  SettingOutlined,
+  ShopOutlined,
+  SolutionOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
 import { useLogout } from '@refinedev/core';
 import { Button, Layout, Menu, Space, Tag, Typography } from 'antd';
+import type { MenuProps } from 'antd';
 import { Link, useLocation } from 'react-router-dom';
 import { entityLabels } from '../models';
 
 const { Header, Content, Sider } = Layout;
 
+const menuIcons: Record<string, React.ReactNode> = {
+  branches: <BankOutlined />,
+  customers: <TeamOutlined />,
+  'medical-episodes': <MedicineBoxOutlined />,
+  appointments: <CalendarOutlined />,
+  suppliers: <ShopOutlined />,
+  products: <ProductOutlined />,
+  'stock-batches': <DatabaseOutlined />,
+  treatments: <ExperimentOutlined />,
+  invoices: <FileDoneOutlined />,
+  expenses: <DollarOutlined />,
+  commissions: <GiftOutlined />,
+};
+
+const menuGroups = [
+  {
+    key: 'front-office',
+    label: 'Lễ tân & CRM',
+    icon: <TeamOutlined />,
+    resources: ['customers', 'appointments'],
+  },
+  {
+    key: 'clinical',
+    label: 'Chuyên môn điều trị',
+    icon: <MedicineBoxOutlined />,
+    resources: ['medical-episodes', 'treatments'],
+  },
+  {
+    key: 'inventory',
+    label: 'Kho & mua hàng',
+    icon: <DatabaseOutlined />,
+    resources: ['suppliers', 'products', 'stock-batches'],
+  },
+  {
+    key: 'finance',
+    label: 'Tài chính & lương',
+    icon: <DollarOutlined />,
+    resources: ['invoices', 'expenses', 'commissions'],
+  },
+  {
+    key: 'admin',
+    label: 'Quản trị hệ thống',
+    icon: <SettingOutlined />,
+    resources: ['branches'],
+  },
+];
+
+const resourceToGroup = Object.fromEntries(menuGroups.flatMap((group) => group.resources.map((resource) => [resource, group.key])));
+
 export function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { mutate: logout } = useLogout();
-  const items = [
-    { key: '/', label: <Link to="/">Tổng quan</Link> },
-    ...Object.entries(entityLabels).map(([key, label]) => ({
-      key: `/${key}`,
-      label: <Link to={`/${key}`}>{label}</Link>,
+  const currentResource = location.pathname.split('/')[1];
+  const items: MenuProps['items'] = [
+    { key: '/', icon: <DashboardOutlined />, label: <Link to="/">Tổng quan</Link> },
+    ...menuGroups.map((group) => ({
+      key: group.key,
+      icon: group.icon,
+      label: group.label,
+      children: group.resources.map((key) => ({
+        key: `/${key}`,
+        icon: menuIcons[key] || <SolutionOutlined />,
+        label: <Link to={`/${key}`}>{entityLabels[key]}</Link>,
+      })),
     })),
-    { key: '/settings', label: <Link to="/settings">Cấu hình động</Link> },
-    { key: '/audit-logs', label: <Link to="/audit-logs">Audit log</Link> },
+    {
+      key: 'system-tools',
+      icon: <GoldOutlined />,
+      label: 'Công cụ hệ thống',
+      children: [
+        { key: '/settings', icon: <SettingOutlined />, label: <Link to="/settings">Cấu hình động</Link> },
+        { key: '/audit-logs', icon: <AuditOutlined />, label: <Link to="/audit-logs">Audit log</Link> },
+      ],
+    },
   ];
-  const selected = items.find((item) => item.key !== '/' && location.pathname.startsWith(item.key))?.key || '/';
+  const selected = location.pathname === '/' ? '/' : `/${currentResource}`;
+  const defaultOpenKeys = [
+    resourceToGroup[currentResource],
+    location.pathname.startsWith('/settings') || location.pathname.startsWith('/audit-logs') ? 'system-tools' : undefined,
+  ].filter(Boolean) as string[];
   return (
     <Layout className="app-shell">
       <Sider className="app-sider" width={282} theme="dark">
@@ -28,7 +114,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Typography.Title level={4}>Thiện Chánh</Typography.Title>
           </div>
         </div>
-        <Menu className="side-menu" items={items} selectedKeys={[selected]} mode="inline" theme="dark" />
+        <Menu className="side-menu" defaultOpenKeys={defaultOpenKeys} items={items} selectedKeys={[selected]} mode="inline" theme="dark" />
       </Sider>
       <Layout>
         <Header className="app-header">

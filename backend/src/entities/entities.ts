@@ -58,11 +58,89 @@ export class User {
   @Column({ nullable: true })
   branchId?: string;
 
+  @Column({ nullable: true })
+  staffId?: string;
+
   @Column({ default: true })
   isActive: boolean;
 
   @CreateDateColumn()
   createdAt: Date;
+}
+
+@Entity('departments')
+export class Department extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  name: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ nullable: true })
+  managerStaffId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+}
+
+@Entity('staff')
+export class Staff extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  fullName: string;
+
+  @Column({ nullable: true })
+  phone?: string;
+
+  @Column({ nullable: true })
+  email?: string;
+
+  @Column({ nullable: true })
+  position?: string;
+
+  @Column({ nullable: true })
+  departmentId?: string;
+
+  @Column({ nullable: true })
+  defaultBranchId?: string;
+
+  @Column({ nullable: true })
+  userId?: string;
+
+  @Column({ default: 'ACTIVE' })
+  status: string;
+
+  @Column({ type: 'date', nullable: true })
+  joinedAt?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('branch_permissions')
+export class BranchPermission extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column()
+  branchId: string;
+
+  @Column()
+  roleName: string;
+
+  @Column({ type: 'jsonb', default: [] })
+  permissions: string[];
+
+  @Column({ default: true })
+  isActive: boolean;
 }
 
 @Entity('customers')
@@ -449,6 +527,9 @@ export class AuditLog {
 export const ENTITIES = [
   Branch,
   User,
+  Department,
+  Staff,
+  BranchPermission,
   Customer,
   Supplier,
   Product,
@@ -464,4 +545,3 @@ export const ENTITIES = [
   PrintTemplate,
   AuditLog,
 ];
-

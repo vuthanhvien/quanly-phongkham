@@ -12,8 +12,9 @@ export class RecordsController {
     @Query('page', new ParseIntPipe({ optional: true })) page = 1,
     @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize = 20,
     @Query('search') search?: string,
+    @Request() request?: { user: AuthUser },
   ) {
-    return this.records.list(resource, page, pageSize, search);
+    return this.records.list(resource, page, pageSize, search, request?.user);
   }
 
   @Post('records/customers/:id/reveal-phone')
@@ -22,8 +23,8 @@ export class RecordsController {
   }
 
   @Get('records/:resource/:id')
-  find(@Param('resource') resource: string, @Param('id') id: string) {
-    return this.records.find(resource, id);
+  find(@Param('resource') resource: string, @Param('id') id: string, @Request() request: { user: AuthUser }) {
+    return this.records.find(resource, id, request.user);
   }
 
   @Post('records/:resource')
@@ -58,4 +59,3 @@ export class RecordsController {
     return this.records.audits(page, pageSize);
   }
 }
-
