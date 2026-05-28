@@ -213,7 +213,11 @@ export function SettingsPage() {
     await load()
   }
 
-  function updateConfig(viewType: ViewType, key: string, patch: Partial<FieldLayoutConfig>) {
+  function updateConfig(
+    viewType: ViewType,
+    key: string,
+    patch: Partial<FieldLayoutConfig>,
+  ) {
     const setter =
       viewType === "TABLE"
         ? setTableConfig
@@ -256,9 +260,7 @@ export function SettingsPage() {
         <Card
           className="glass-card"
           title="Custom fields"
-          extra={
-            <Button onClick={openCreateField}>Thêm field</Button>
-          }
+          extra={<Button onClick={openCreateField}>Thêm field</Button>}
         >
           <Table
             size="small"
@@ -299,101 +301,7 @@ export function SettingsPage() {
             ]}
           />
         </Card>
-        <Card
-          className="glass-card"
-          title="Hiển thị table / form / detail theo role"
-          extra={
-            <Space wrap>
-              <Select
-                style={{ width: 180 }}
-                value={selectedRole}
-                onChange={(value) => setSelectedRole(normalizeRole(value))}
-                options={roleOptions.map((role) => ({ value: role, label: role }))}
-              />
-              <Input
-                placeholder="Thêm role mới"
-                value={newRole}
-                onChange={(event) => setNewRole(event.target.value)}
-                onPressEnter={addRoleScope}
-                style={{ width: 160 }}
-              />
-              <Button onClick={addRoleScope}>Tạo role</Button>
-            </Space>
-          }
-        >
-          <Space direction="vertical" size={12} style={{ width: "100%" }}>
-            <Typography.Text>
-              Cấu hình đang áp dụng cho role <strong>{selectedRole}</strong>.
-              Nếu một view chưa có cấu hình riêng, hệ thống sẽ kế thừa từ role mặc định <strong>{DEFAULT_ROLE_SCOPE}</strong>.
-            </Typography.Text>
-            <Space wrap>
-              {VIEW_TYPES.map((viewType) => (
-                <Tag color={viewStatus[viewType] ? "green" : "gold"} key={viewType}>
-                  {viewType}: {viewStatus[viewType] ? "riêng theo role" : "đang kế thừa ALL"}
-                </Tag>
-              ))}
-            </Space>
-            <Tabs
-              items={[
-                {
-                  key: "TABLE",
-                  label: "Table",
-                  children: (
-                    <ViewConfigTable
-                      dataSource={tableConfig}
-                      viewType="TABLE"
-                      onChange={updateConfig}
-                    />
-                  ),
-                },
-                {
-                  key: "FORM",
-                  label: "Form",
-                  children: (
-                    <ViewConfigTable
-                      dataSource={formConfig}
-                      viewType="FORM"
-                      onChange={updateConfig}
-                    />
-                  ),
-                },
-                {
-                  key: "DETAIL",
-                  label: "Detail",
-                  children: (
-                    <ViewConfigTable
-                      dataSource={detailConfig}
-                      viewType="DETAIL"
-                      onChange={updateConfig}
-                    />
-                  ),
-                },
-              ]}
-            />
-            <Button className="primary-glow" type="primary" onClick={saveView}>
-              Lưu cấu hình role
-            </Button>
-          </Space>
-        </Card>
-        <Card
-          className="glass-card"
-          title="Mẫu in"
-          extra={
-            <Button onClick={() => setTemplateModal(true)}>Thêm mẫu</Button>
-          }
-        >
-          <Table
-            size="small"
-            pagination={false}
-            rowKey="id"
-            dataSource={templates}
-            columns={[
-              { title: "Tên mẫu", dataIndex: "name" },
-              { title: "Biến sử dụng", render: () => "{{field_key}}" },
-            ]}
-          />
-        </Card>
-      </div>
+       
       <Modal
         title={editingField ? "Cập nhật custom field" : "Thêm custom field"}
         open={fieldModal}

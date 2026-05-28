@@ -130,7 +130,10 @@ export function RecordFormContent({
             }
             name={field.key}
             rules={[
-              { required: field.required, message: `Nhập ${field.label}` },
+              {
+                required: Boolean(field.required && !field.disabled),
+                message: `Nhập ${field.label}`,
+              },
             ]}
           >
             <FieldInput field={field} lookups={lookups} />
