@@ -50,6 +50,8 @@ export interface FieldLayoutConfig extends FieldSpec {
   disabled?: boolean
   description?: string
   placeholder?: string
+  defaultValue?: unknown
+  width?: '25' | '33' | '50' | '66' | '100'
 }
 
 function readStoredUser() {
@@ -210,10 +212,11 @@ export function buildFieldLayoutConfigs(
         typeof entry.label === 'string' && entry.label.trim()
           ? entry.label
           : base.label,
-      required:
-        typeof entry.required === 'boolean'
-          ? entry.required
-          : base.required,
+      required: base.required,
+      options:
+        Array.isArray(entry.options)
+          ? entry.options.map(String)
+          : base.options,
       disabled:
         typeof entry.disabled === 'boolean'
           ? entry.disabled
@@ -226,6 +229,14 @@ export function buildFieldLayoutConfigs(
         typeof entry.placeholder === 'string' && entry.placeholder.trim()
           ? entry.placeholder
           : undefined,
+      defaultValue:
+        entry.defaultValue !== undefined
+          ? entry.defaultValue
+          : base.defaultValue,
+      width:
+        ['25', '33', '50', '66', '100'].includes(String(entry.width))
+          ? String(entry.width) as FieldLayoutConfig['width']
+          : base.width,
       visible:
         typeof entry.visible === 'boolean' ? entry.visible : true,
     })
@@ -269,10 +280,14 @@ export function serializeViewConfig(
     }
 
     if (field.label?.trim()) next.label = field.label.trim()
-    if (typeof field.required === 'boolean') next.required = field.required
     if (typeof field.disabled === 'boolean') next.disabled = field.disabled
+    if (Array.isArray(field.options) && field.options.length > 0) next.options = field.options
     if (field.description?.trim()) next.description = field.description.trim()
     if (field.placeholder?.trim()) next.placeholder = field.placeholder.trim()
+    if (field.defaultValue !== undefined && field.defaultValue !== '') {
+      next.defaultValue = field.defaultValue
+    }
+    if (field.width) next.width = field.width
 
     return next
   })

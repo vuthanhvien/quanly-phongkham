@@ -388,7 +388,7 @@ body::before {
 }
 
 .record-form {
-  max-width: 760px;
+  max-width: 100%;
 }
 
 .quick-drawer .ant-drawer-content {
@@ -410,19 +410,47 @@ body::before {
   margin-bottom: 18px;
 }
 
-.detail-card .ant-descriptions-view {
-  border-color: rgba(255, 255, 255, 0.08) !important;
+.detail-grid {
+  margin-top: 12px;
 }
 
-.detail-card .ant-descriptions-item-label {
-  background: rgba(255, 255, 255, 0.045) !important;
-  color: #eab4ca !important;
+.detail-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.detail-item-label {
+  background: rgba(255, 255, 255, 0.045);
+  color: #eab4ca;
   font-weight: 800;
-  width: 220px;
+  padding: 14px 16px;
 }
 
-.detail-card .ant-descriptions-item-content {
-  background: rgba(255, 255, 255, 0.025) !important;
+.detail-item-content {
+  background: rgba(255, 255, 255, 0.025);
+  min-height: 58px;
+  padding: 16px;
+}
+
+.drag-handle {
+  align-items: center;
+  color: #d8bdca;
+  cursor: grab;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.drag-order {
+  color: #8f7f88;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.drag-row-active > td {
+  background: rgba(232, 137, 174, 0.1) !important;
 }
 
 .profile-summary {

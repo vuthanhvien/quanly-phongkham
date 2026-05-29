@@ -4,6 +4,8 @@ import {
   Form,
   Input,
   InputNumber,
+  Col,
+  Row,
   Select,
   Space,
   Typography,
@@ -73,8 +75,20 @@ export function RecordFormContent({
       recordQuery.result?.data ||
       recordQuery.query?.data?.data ||
       recordQuery.data?.data?.data
-    if (data) form.setFieldsValue({ ...data, ...(data.customFields || {}) })
-  }, [recordQuery.result, recordQuery.query?.data, form])
+    if (data) {
+      form.setFieldsValue({ ...data, ...(data.customFields || {}) })
+      return
+    }
+    if (!editing && fields.length > 0) {
+      form.setFieldsValue(
+        Object.fromEntries(
+          fields
+            .filter((field) => field.defaultValue !== undefined)
+            .map((field) => [field.key, field.defaultValue]),
+        ),
+      )
+    }
+  }, [editing, fields, form, recordQuery.result, recordQuery.query?.data, recordQuery.data?.data?.data])
 
   function submit(values: Record<string, unknown>) {
     const baseKeys = new Set(
@@ -110,32 +124,35 @@ export function RecordFormContent({
         layout="vertical"
         onFinish={submit}
       >
-        {fields.map((field) => (
-          <Form.Item
-            key={field.key}
-            label={
-              field.description ? (
-                <Space direction="vertical" size={0}>
-                  <span>{field.label}</span>
-                  <Typography.Text type="secondary">
-                    {field.description}
-                  </Typography.Text>
-                </Space>
-              ) : (
-                field.label
-              )
-            }
-            name={field.key}
-            rules={[
-              {
-                required: Boolean(field.required && !field.disabled),
-                message: `Nhập ${field.label}`,
-              },
-            ]}
-          >
-            <FieldInput field={field} lookups={lookups} />
-          </Form.Item>
-        ))}
+        <Row gutter={[16, 0]}>
+          {fields.map((field) => (
+            <Col key={field.key} span={widthToSpan(field.width)} xs={24}>
+              <Form.Item
+                label={
+                  field.description ? (
+                    <Space direction="vertical" size={0}>
+                      <span>{field.label}</span>
+                      <Typography.Text type="secondary">
+                        {field.description}
+                      </Typography.Text>
+                    </Space>
+                  ) : (
+                    field.label
+                  )
+                }
+                name={field.key}
+                rules={[
+                  {
+                    required: Boolean(field.required && !field.disabled),
+                    message: `Nhập ${field.label}`,
+                  },
+                ]}
+              >
+                <FieldInput field={field} lookups={lookups} />
+              </Form.Item>
+            </Col>
+          ))}
+        </Row>
         <Space>
           <Button className="primary-glow" htmlType="submit" type="primary">
             Lưu
@@ -145,6 +162,22 @@ export function RecordFormContent({
       </Form>
     </>
   )
+}
+
+function widthToSpan(width?: FieldSpec["width"]) {
+  switch (width) {
+    case "25":
+      return 6
+    case "33":
+      return 8
+    case "50":
+      return 12
+    case "66":
+      return 16
+    case "100":
+    default:
+      return 24
+  }
 }
 
 function FieldInput({

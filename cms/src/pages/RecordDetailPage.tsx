@@ -2,7 +2,6 @@ import {
   Button,
   Card,
   Col,
-  Descriptions,
   Empty,
   Tooltip,
   message,
@@ -144,31 +143,33 @@ export function RecordDetailPage() {
         >
           <Card className="glass-card detail-card" loading={loading}>
             <Typography.Title level={4}>Thông tin chính</Typography.Title>
-            <Descriptions column={1} bordered>
+            <Row gutter={[16, 16]} className="detail-grid">
               {fields.map((field) => (
-                <Descriptions.Item
-                  key={field.key}
-                  label={
-                    field.description ? (
-                      <Space direction="vertical" size={0}>
-                        <span>{field.label}</span>
-                        <Typography.Text type="secondary">
-                          {field.description}
-                        </Typography.Text>
-                      </Space>
-                    ) : (
-                      field.label
-                    )
-                  }
-                >
-                  {displayValue(
-                    field,
-                    record?.[field.key] ?? record?.customFields?.[field.key],
-                    lookups,
-                  )}
-                </Descriptions.Item>
+                <Col key={field.key} span={detailWidthToSpan(field.width)} xs={24}>
+                  <div className="detail-item">
+                    <div className="detail-item-label">
+                      {field.description ? (
+                        <Space direction="vertical" size={0}>
+                          <span>{field.label}</span>
+                          <Typography.Text type="secondary">
+                            {field.description}
+                          </Typography.Text>
+                        </Space>
+                      ) : (
+                        field.label
+                      )}
+                    </div>
+                    <div className="detail-item-content">
+                      {displayValue(
+                        field,
+                        record?.[field.key] ?? record?.customFields?.[field.key],
+                        lookups,
+                      )}
+                    </div>
+                  </div>
+                </Col>
               ))}
-            </Descriptions>
+            </Row>
           </Card>
         </Col>
         {(resource === "customers" || resource === "staff") && (
@@ -267,6 +268,22 @@ export function RecordDetailPage() {
       ))}
     </>
   )
+}
+
+function detailWidthToSpan(width?: FieldLayoutConfig["width"]) {
+  switch (width) {
+    case "25":
+      return 6
+    case "33":
+      return 8
+    case "50":
+      return 12
+    case "66":
+      return 16
+    case "100":
+    default:
+      return 24
+  }
 }
 
 async function loadRelated(

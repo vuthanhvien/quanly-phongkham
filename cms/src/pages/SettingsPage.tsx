@@ -1,4 +1,5 @@
 import {
+  HolderOutlined,
   FileTextOutlined,
   SettingOutlined,
 } from "@ant-design/icons"
@@ -235,6 +236,29 @@ export function SettingsPage() {
     )
   }
 
+  function reorderConfig(
+    viewType: ViewType,
+    fromKey: string,
+    toKey: string,
+  ) {
+    let setter = setDetailConfig
+    if (viewType === "FORM") setter = setFormConfig
+    if (viewType === "TABLE") setter = setTableConfig
+    if (viewType === "DETAIL") setter = setDetailConfig
+
+    setter((current) => {
+      const fromIndex = current.findIndex((field) => field.key === fromKey)
+      const toIndex = current.findIndex((field) => field.key === toKey)
+
+      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return current
+
+      const next = [...current]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+  }
+
   return (
     <>
       <div className="page-header">
@@ -341,6 +365,7 @@ export function SettingsPage() {
                             dataSource={formConfig}
                             viewType="FORM"
                             onChange={updateConfig}
+                            onReorder={reorderConfig}
                           />
                         ),
                       },
@@ -352,6 +377,7 @@ export function SettingsPage() {
                             dataSource={detailConfig}
                             viewType="DETAIL"
                             onChange={updateConfig}
+                            onReorder={reorderConfig}
                           />
                         ),
                       },
@@ -512,6 +538,7 @@ function ViewConfigTable({
   dataSource,
   viewType,
   onChange,
+  onReorder,
 }: {
   dataSource: FieldLayoutConfig[]
   viewType: ViewType
@@ -520,8 +547,22 @@ function ViewConfigTable({
     key: string,
     patch: Partial<FieldLayoutConfig>,
   ) => void
+  onReorder?: (viewType: ViewType, fromKey: string, toKey: string) => void
 }) {
+  const [draggingKey, setDraggingKey] = useState<string | null>(null)
   const columns: ColumnsType<FieldLayoutConfig> = [
+    {
+      title: "",
+      key: "sort",
+      width: 56,
+      render: (_, row) =>
+        viewType === "FORM" || viewType === "DETAIL" ? (
+          <span className="drag-handle" title="Kéo để đổi thứ tự">
+            <HolderOutlined />
+            <span className="drag-order">#{dataSource.findIndex((item) => item.key === row.key) + 1}</span>
+          </span>
+        ) : null,
+    },
     {
       title: "Hiển thị",
       dataIndex: "visible",
@@ -570,19 +611,6 @@ function ViewConfigTable({
   if (viewType !== "TABLE") {
     columns.push(
       {
-        title: "Bắt buộc",
-        dataIndex: "required",
-        width: 110,
-        render: (value, row) => (
-          <Checkbox
-            checked={Boolean(value)}
-            onChange={(event) =>
-              onChange(viewType, row.key, { required: event.target.checked })
-            }
-          />
-        ),
-      },
-      {
         title: "Mô tả / hướng dẫn",
         key: "description",
         render: (_, row) => (
@@ -596,11 +624,78 @@ function ViewConfigTable({
           />
         ),
       },
+      {
+        title: "Width",
+        key: "width",
+        width: 150,
+        render: (_, row) => (
+          <Select
+            value={row.width || "100"}
+            onChange={(value) =>
+              onChange(viewType, row.key, {
+                width: value as FieldLayoutConfig["width"],
+              })
+            }
+            options={[
+              { value: "25", label: "1/4" },
+              { value: "33", label: "1/3" },
+              { value: "50", label: "1/2" },
+              { value: "66", label: "2/3" },
+              { value: "100", label: "Full" },
+            ]}
+          />
+        ),
+      },
     )
   }
 
   if (viewType === "FORM") {
     columns.push(
+      {
+        title: "Options",
+        key: "options",
+        render: (_, row) => {
+          if (row.type !== "select" && row.type !== "multi-select") {
+            return <Typography.Text type="secondary">-</Typography.Text>
+          }
+          return (
+            <Input.TextArea
+              autoSize={{ minRows: 1, maxRows: 3 }}
+              value={(row.options || []).join(", ")}
+              onChange={(event) =>
+                onChange(viewType, row.key, {
+                  options: event.target.value
+                    .split(",")
+                    .map((value) => value.trim())
+                    .filter(Boolean),
+                })
+              }
+              placeholder="Nhập options, ngăn cách bằng dấu phẩy"
+            />
+          )
+        },
+      },
+      {
+        title: "Default data",
+        key: "defaultValue",
+        render: (_, row) => (
+          <Input
+            value={
+              Array.isArray(row.defaultValue)
+                ? row.defaultValue.join(", ")
+                : row.defaultValue === undefined || row.defaultValue === null
+                  ? ""
+                  : String(row.defaultValue)
+            }
+            onChange={(event) =>
+              onChange(viewType, row.key, {
+                defaultValue: parseDefaultValue(row.type, event.target.value),
+              })
+            }
+            placeholder="Giá trị mặc định"
+          />
+        ),
+      },
       {
         title: "Placeholder",
         key: "placeholder",
@@ -633,6 +728,41 @@ function ViewConfigTable({
   return (
     <Table
       columns={columns}
+      components={{
+        body: {
+          row: (props: React.HTMLAttributes<HTMLTableRowElement>) => {
+            const rowKey = String((props as React.HTMLAttributes<HTMLTableRowElement> & { "data-row-key"?: string })["data-row-key"] || "")
+            const draggable = viewType === "FORM" || viewType === "DETAIL"
+            return (
+              <tr
+                {...props}
+                className={`${props.className || ""} ${draggingKey === rowKey ? "drag-row-active" : ""}`.trim()}
+                draggable={draggable}
+                onDragStart={(event) => {
+                  if (!draggable || !rowKey) return
+                  setDraggingKey(rowKey)
+                  event.dataTransfer.effectAllowed = "move"
+                  event.dataTransfer.setData("text/plain", rowKey)
+                }}
+                onDragOver={(event) => {
+                  if (!draggable || !rowKey) return
+                  event.preventDefault()
+                  event.dataTransfer.dropEffect = "move"
+                }}
+                onDrop={(event) => {
+                  if (!draggable || !rowKey || !onReorder) return
+                  event.preventDefault()
+                  const fromKey = event.dataTransfer.getData("text/plain")
+                  if (!fromKey || fromKey === rowKey) return
+                  onReorder(viewType, fromKey, rowKey)
+                  setDraggingKey(null)
+                }}
+                onDragEnd={() => setDraggingKey(null)}
+              />
+            )
+          },
+        },
+      }}
       dataSource={dataSource}
       pagination={false}
       rowKey="key"
@@ -640,4 +770,16 @@ function ViewConfigTable({
       size="small"
     />
   )
+}
+
+function parseDefaultValue(type: FieldLayoutConfig["type"], value: string) {
+  if (!value.trim()) return undefined
+  if (type === "number") return Number(value)
+  if (type === "multi-select") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  return value
 }

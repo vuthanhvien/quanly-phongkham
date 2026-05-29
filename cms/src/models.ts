@@ -4,6 +4,8 @@ export interface FieldSpec {
   type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative';
   required?: boolean;
   options?: string[];
+  defaultValue?: unknown;
+  width?: '25' | '33' | '50' | '66' | '100';
   disabled?: boolean;
   description?: string;
   placeholder?: string;
