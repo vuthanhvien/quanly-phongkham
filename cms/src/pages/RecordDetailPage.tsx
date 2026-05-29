@@ -28,6 +28,7 @@ import { api } from "../api"
 import { hasActionAccess } from "../access"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
+import { ServiceOrderForm } from "../components/ServiceOrderForm"
 import { CustomField, entityLabels } from "../models"
 import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
 import {
@@ -373,6 +374,24 @@ export function RecordDetailPage() {
         </Card>
       ))}
 
+      {resource === "service-orders" && Array.isArray(record?.items) && record.items.length > 0 && (
+        <Card className="glass-card detail-card" title="Sản phẩm trong đơn hàng">
+          <Table
+            columns={[
+              { title: "Sản phẩm", dataIndex: "itemName", key: "itemName" },
+              { title: "Số lượng", dataIndex: "quantity", key: "quantity", width: 120 },
+              { title: "Đơn giá", dataIndex: "unitPrice", key: "unitPrice", width: 140 },
+              { title: "Thành tiền", dataIndex: "lineTotal", key: "lineTotal", width: 160 },
+            ]}
+            dataSource={record.items}
+            pagination={false}
+            rowKey="id"
+            scroll={{ x: "max-content" }}
+            size="small"
+          />
+        </Card>
+      )}
+
       <Drawer
         destroyOnClose
         maskClosable={false}
@@ -418,20 +437,32 @@ export function RecordDetailPage() {
         open={Boolean(quickCreateBlock)}
         placement="right"
         title={quickCreateBlock ? `Thêm nhanh ${entityLabels[quickCreateBlock.resource] || quickCreateBlock.resource}` : "Thêm nhanh"}
-        width={620}
+        width={quickCreateBlock?.resource === "service-orders" ? 980 : 620}
         onClose={() => setQuickCreateBlock(null)}
       >
         {quickCreateBlock && (
-          <RecordFormContent
-            compact
-            initialValues={{ [quickCreateBlock.relationField]: id }}
-            resource={quickCreateBlock.resource}
-            onCancel={() => setQuickCreateBlock(null)}
-            onSuccess={() => {
-              setQuickCreateBlock(null)
-              void reloadRelatedBlocks()
-            }}
-          />
+          quickCreateBlock.resource === "service-orders" ? (
+            <ServiceOrderForm
+              compact
+              initialValues={{ [quickCreateBlock.relationField]: id }}
+              onCancel={() => setQuickCreateBlock(null)}
+              onSuccess={() => {
+                setQuickCreateBlock(null)
+                void reloadRelatedBlocks()
+              }}
+            />
+          ) : (
+            <RecordFormContent
+              compact
+              initialValues={{ [quickCreateBlock.relationField]: id }}
+              resource={quickCreateBlock.resource}
+              onCancel={() => setQuickCreateBlock(null)}
+              onSuccess={() => {
+                setQuickCreateBlock(null)
+                void reloadRelatedBlocks()
+              }}
+            />
+          )
         )}
       </Drawer>
     </>

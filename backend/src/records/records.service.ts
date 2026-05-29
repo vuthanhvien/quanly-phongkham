@@ -27,6 +27,7 @@ import {
   MedicalEpisode,
   Product,
   ServiceOrder,
+  ServiceOrderItem,
   Staff,
   StockBatch,
   Supplier,
@@ -75,6 +76,7 @@ export class RecordsService {
     @InjectRepository(LeadActivity) private readonly leadActivities: Repository<LeadActivity>,
     @InjectRepository(Supplier) private readonly suppliers: Repository<Supplier>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
+    @InjectRepository(ServiceOrderItem) private readonly serviceOrderItems: Repository<ServiceOrderItem>,
     @InjectRepository(MedicalEpisode) private readonly episodes: Repository<MedicalEpisode>,
     @InjectRepository(Appointment) private readonly appointments: Repository<Appointment>,
     @InjectRepository(WorkSchedule) private readonly workSchedules: Repository<WorkSchedule>,
@@ -166,6 +168,9 @@ export class RecordsService {
   async findRaw(resource: string, id: string) {
     const record = await this.findStored(resource, id);
     const [hydrated] = await this.hydrateCustomFields(resource, [record]);
+    if (resource === 'service-orders') {
+      return this.attachServiceOrderItems(hydrated as ServiceOrder);
+    }
     return hydrated;
   }
 
@@ -187,11 +192,15 @@ export class RecordsService {
     }
     await this.assertPermission(user, resource, 'create', this.branchIdOf(resource, payload));
     await this.validateCustomFields(resource, payload, true);
+    const serviceOrderItems = resource === 'service-orders'
+      ? await this.normalizeServiceOrderItems(payload.items)
+      : [];
     const normalized = await this.normalizeInput(resource, payload, true);
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
-    if (resource === 'service-orders') this.computeServiceOrderTotals(normalized);
+    if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
     const record = await repository.save(repository.create(normalized));
+    if (resource === 'service-orders') await this.replaceServiceOrderItems(record.id, serviceOrderItems);
     await this.replaceCustomFieldValues(resource, record.id, (payload.customFields || {}) as Record<string, unknown>);
     await this.audit(user, 'CREATE', resource, record.id, normalized);
     const hydrated = await this.findRaw(resource, record.id);
@@ -206,15 +215,19 @@ export class RecordsService {
       ...((payload.customFields || {}) as Record<string, unknown>),
     };
     await this.validateCustomFields(resource, payload, false);
+    const serviceOrderItems = resource === 'service-orders'
+      ? await this.normalizeServiceOrderItems(payload.items)
+      : [];
     const normalized = await this.normalizeInput(resource, {
       ...previous,
       ...payload,
     }, false);
     await this.assertPermission(user, resource, 'update', this.branchIdOf(resource, normalized) || this.branchIdOf(resource, previous));
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized, id);
-    if (resource === 'service-orders') this.computeServiceOrderTotals(normalized);
+    if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
     const record = await repository.save(repository.merge(previous, normalized));
+    if (resource === 'service-orders') await this.replaceServiceOrderItems(id, serviceOrderItems);
     await this.replaceCustomFieldValues(resource, id, mergedCustomFields);
     await this.audit(user, 'UPDATE', resource, id, { before: previous, changes: normalized });
     const hydrated = await this.findRaw(resource, record.id);
@@ -226,6 +239,9 @@ export class RecordsService {
     await this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
     if (resource === 'files') {
       await fs.unlink((record as ManagedFile).storagePath).catch(() => undefined);
+    }
+    if (resource === 'service-orders') {
+      await this.serviceOrderItems.delete({ orderId: id });
     }
     await this.customFieldValues.delete({ entityType: resource, recordId: id });
     await this.repository(resource).remove(record);
@@ -365,17 +381,13 @@ export class RecordsService {
     delete value.createdAt;
     delete value.updatedAt;
     delete value.customFields;
+    delete value.items;
     if (resource === 'customers') {
       if (typeof value.phone === 'string' && value.phone.includes('*')) {
         delete value.phone;
       }
       const spent = Number(value.totalSpent || 0);
       value.tier = spent >= 200_000_000 ? 'DIAMOND' : spent >= 50_000_000 ? 'GOLD' : spent >= 10_000_000 ? 'SILVER' : 'MEMBER';
-    }
-    if (resource === 'service-orders') {
-      const quantity = Number(value.quantity || 0);
-      const unitPrice = Number(value.unitPrice || 0);
-      value.totalAmount = quantity * unitPrice;
     }
     return value;
   }
@@ -464,10 +476,71 @@ export class RecordsService {
     return valueText;
   }
 
-  private computeServiceOrderTotals(payload: Record<string, unknown>) {
-    const quantity = Number(payload.quantity || 0);
-    const unitPrice = Number(payload.unitPrice || 0);
-    payload.totalAmount = quantity * unitPrice;
+  private computeServiceOrderTotals(payload: Record<string, unknown>, items: ServiceOrderItem[]) {
+    const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    const totalAmount = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
+    payload.quantity = totalQuantity;
+    payload.totalAmount = totalAmount;
+    payload.unitPrice = items.length === 1 ? Number(items[0].unitPrice || 0) : 0;
+    payload.serviceName = this.summarizeServiceOrderItems(items);
+  }
+
+  private summarizeServiceOrderItems(items: ServiceOrderItem[]) {
+    if (items.length === 0) return 'Chua co san pham';
+    if (items.length === 1) return items[0].itemName;
+    if (items.length === 2) return `${items[0].itemName}, ${items[1].itemName}`;
+    return `${items[0].itemName}, ${items[1].itemName} +${items.length - 2}`;
+  }
+
+  private async normalizeServiceOrderItems(value: unknown) {
+    if (!Array.isArray(value) || value.length === 0) {
+      throw new BadRequestException('Don hang phai co it nhat 1 san pham');
+    }
+    const productIds = Array.from(new Set(value.map((item) => String((item as Record<string, unknown>)?.productId || '')).filter(Boolean)));
+    const products = await this.products.find({ where: { id: In(productIds) } });
+    const productsById = new Map(products.map((item) => [item.id, item]));
+
+    return value.map((rawItem) => {
+      const item = rawItem as Record<string, unknown>;
+      const productId = String(item.productId || '');
+      const product = productsById.get(productId);
+      if (!product) throw new BadRequestException('San pham trong don hang khong hop le');
+      const quantity = Number(item.quantity || 0);
+      const unitPrice = Number(item.unitPrice ?? product.sellingPrice ?? 0);
+      if (quantity <= 0) {
+        throw new BadRequestException(`So luong khong hop le cho san pham ${product.name}`);
+      }
+      return this.serviceOrderItems.create({
+        productId: product.id,
+        itemName: String(item.itemName || product.name),
+        quantity,
+        unitPrice,
+        lineTotal: quantity * unitPrice,
+      });
+    });
+  }
+
+  private async replaceServiceOrderItems(orderId: string, items: ServiceOrderItem[]) {
+    await this.serviceOrderItems.delete({ orderId });
+    if (items.length === 0) return;
+    await this.serviceOrderItems.save(
+      items.map((item) => this.serviceOrderItems.create({
+        orderId,
+        productId: item.productId,
+        itemName: item.itemName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        lineTotal: item.lineTotal,
+      })),
+    );
+  }
+
+  private async attachServiceOrderItems(record: ServiceOrder) {
+    const items = await this.serviceOrderItems.find({ where: { orderId: record.id }, order: { createdAt: 'ASC' } });
+    return {
+      ...record,
+      items,
+    };
   }
 
   private async replaceCustomFieldValues(resource: string, recordId: string, values: Record<string, unknown>) {

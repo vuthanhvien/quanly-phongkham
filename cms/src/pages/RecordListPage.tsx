@@ -28,6 +28,7 @@ import { hasActionAccess } from "../access"
 import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
+import { ServiceOrderForm } from "../components/ServiceOrderForm"
 import { CustomField, entityLabels } from "../models"
 import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
 import {
@@ -246,11 +247,20 @@ export function RecordListPage() {
         open={creating}
         placement="right"
         title={`Thêm nhanh ${entityLabels[resource] || resource}`}
-        width={560}
+        width={resource === "service-orders" ? 980 : 560}
         onClose={() => setCreating(false)}
       >
         {resource === "files" ? (
           <FileUploadPanel
+            onCancel={() => setCreating(false)}
+            onSuccess={() => {
+              setCreating(false)
+              refresh()
+            }}
+          />
+        ) : resource === "service-orders" ? (
+          <ServiceOrderForm
+            compact
             onCancel={() => setCreating(false)}
             onSuccess={() => {
               setCreating(false)

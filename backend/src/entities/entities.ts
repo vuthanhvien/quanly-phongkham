@@ -497,6 +497,36 @@ export class ServiceOrder extends ConfigurableEntity {
   note?: string;
 }
 
+@Entity('service_order_items')
+export class ServiceOrderItem {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  orderId: string;
+
+  @Column()
+  productId: string;
+
+  @Column()
+  itemName: string;
+
+  @Column({ default: 1 })
+  quantity: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  unitPrice: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  lineTotal: number;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
 @Entity('customer_images')
 export class CustomerImage extends ConfigurableEntity {
   @Column()
@@ -834,6 +864,7 @@ export const ENTITIES = [
   StockBatch,
   Consultation,
   ServiceOrder,
+  ServiceOrderItem,
   CustomerImage,
   FileFolder,
   ManagedFile,
