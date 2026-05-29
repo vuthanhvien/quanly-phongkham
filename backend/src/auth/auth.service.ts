@@ -17,6 +17,19 @@ function normalizeRole(role?: string) {
   return role?.trim().toUpperCase() || DEFAULT_ROLE_SCOPE;
 }
 
+function buildRoleChain(role?: string, mainRole?: string) {
+  const normalizedRole = normalizeRole(role);
+  if (normalizedRole === DEFAULT_ROLE_SCOPE) return [DEFAULT_ROLE_SCOPE];
+  const normalizedMainRole = normalizeRole(mainRole);
+  return Array.from(
+    new Set([
+      normalizedRole,
+      ...(normalizedMainRole !== normalizedRole ? [normalizedMainRole] : []),
+      DEFAULT_ROLE_SCOPE,
+    ]),
+  );
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -44,8 +57,8 @@ export class AuthService {
       branchPermissions.find((item) => item.branchId === user.branchId)?.roleKeys?.[0] ||
       branchPermissions[0]?.roleKeys?.[0] ||
       user.role;
-    const disabledModules = await this.resolveDisabledModules(activeRole);
-    const actionPermissions = await this.resolveActionPermissions(activeRole);
+    const disabledModules = await this.resolveDisabledModules(activeRole, user.role);
+    const actionPermissions = await this.resolveActionPermissions(activeRole, user.role);
     const profile = {
       id: user.id,
       email: user.email,
@@ -70,59 +83,48 @@ export class AuthService {
     };
   }
 
-  private async resolveActionPermissions(role?: string) {
-    const normalizedRole = normalizeRole(role);
+  private async resolveActionPermissions(role?: string, mainRole?: string) {
+    const roleChain = buildRoleChain(role, mainRole);
     const views = await this.viewSettings.find();
     const entityTypes = Array.from(new Set(views.map((view) => view.entityType).filter(Boolean)));
 
     return Object.fromEntries(
-      entityTypes.map((entityType) => [entityType, this.resolveAllowedActionsForEntity(views, entityType, normalizedRole)]),
+      entityTypes.map((entityType) => [entityType, this.resolveAllowedActionsForEntity(views, entityType, roleChain)]),
     );
   }
 
-  private async resolveDisabledModules(role?: string) {
-    const normalizedRole = normalizeRole(role);
+  private async resolveDisabledModules(role?: string, mainRole?: string) {
+    const roleChain = buildRoleChain(role, mainRole);
     const views = await this.viewSettings.find();
     const entityTypes = Array.from(new Set(views.map((view) => view.entityType).filter(Boolean)));
 
     return entityTypes.filter((entityType) => {
       const entityViews = views.filter((view) => view.entityType === entityType);
-      const exactViews = entityViews.filter((view) => normalizeRole(view.role) === normalizedRole);
-      const exactModuleEnabled = exactViews
-        .map((view) => view.config?.moduleEnabled)
-        .find((value) => typeof value === 'boolean');
+      for (const inheritedRole of roleChain) {
+        const inheritedViews = entityViews.filter((view) => normalizeRole(view.role) === inheritedRole);
+        const moduleEnabled = inheritedViews
+          .map((view) => view.config?.moduleEnabled)
+          .find((value) => typeof value === 'boolean');
 
-      if (typeof exactModuleEnabled === 'boolean') return !exactModuleEnabled;
-      if (exactViews.length > 0) return false;
+        if (typeof moduleEnabled === 'boolean') return !moduleEnabled;
+        if (inheritedViews.length > 0) return false;
+      }
 
-      const defaultViews = entityViews.filter((view) => normalizeRole(view.role) === DEFAULT_ROLE_SCOPE);
-      const defaultModuleEnabled = defaultViews
-        .map((view) => view.config?.moduleEnabled)
-        .find((value) => typeof value === 'boolean');
-
-      if (typeof defaultModuleEnabled === 'boolean') return !defaultModuleEnabled;
       return false;
     });
   }
 
-  private resolveAllowedActionsForEntity(views: ViewSetting[], entityType: string, normalizedRole: string) {
+  private resolveAllowedActionsForEntity(views: ViewSetting[], entityType: string, roleChain: string[]) {
     const entityViews = views.filter((view) => view.entityType === entityType);
-    const exactViews = entityViews.filter((view) => normalizeRole(view.role) === normalizedRole);
-    const exactActions = exactViews
-      .map((view) => view.config?.allowedActions)
-      .find((value) => Array.isArray(value));
+    for (const inheritedRole of roleChain) {
+      const inheritedViews = entityViews.filter((view) => normalizeRole(view.role) === inheritedRole);
+      const actions = inheritedViews
+        .map((view) => view.config?.allowedActions)
+        .find((value) => Array.isArray(value));
 
-    if (Array.isArray(exactActions)) {
-      return exactActions.map(String);
-    }
-
-    const defaultViews = entityViews.filter((view) => normalizeRole(view.role) === DEFAULT_ROLE_SCOPE);
-    const defaultActions = defaultViews
-      .map((view) => view.config?.allowedActions)
-      .find((value) => Array.isArray(value));
-
-    if (Array.isArray(defaultActions)) {
-      return defaultActions.map(String);
+      if (Array.isArray(actions)) {
+        return actions.map(String);
+      }
     }
 
     return RESOURCE_ACTIONS[entityType] || DEFAULT_RESOURCE_ACTIONS;

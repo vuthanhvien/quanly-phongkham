@@ -42,6 +42,15 @@ export class SettingsController {
     return { data: await this.settings.saveView(entityType, viewType, payload.config, payload.role, request?.user) };
   }
 
+  @Delete('views/:entityType')
+  async deleteViews(
+    @Param('entityType') entityType: string,
+    @Query('role') role?: string,
+    @Request() request?: { user: AuthUser },
+  ) {
+    return { data: await this.settings.deleteViews(entityType, role, request?.user) };
+  }
+
   @Get('print-templates')
   async templates(@Query('entityType') entityType?: string, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.listTemplates(entityType, request?.user) };

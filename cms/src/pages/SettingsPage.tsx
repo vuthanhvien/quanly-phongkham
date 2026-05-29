@@ -29,11 +29,13 @@ import {
   DEFAULT_ROLE_SCOPE,
   FieldLayoutConfig,
   getFieldCatalog,
+  getRoleInheritanceChain,
   getRoleOptions,
   getStoredUserRole,
   hasExactRoleSetting,
   normalizeRole,
   resolveAllowedActions,
+  resolveViewSetting,
   resolveModuleEnabled,
   serializeViewConfig,
   ViewSettingRecord,
@@ -82,6 +84,14 @@ export function SettingsPage() {
     () => getRoleOptions(views, [selectedRole, ...dynamicRoles.map((role) => role.key)]),
     [dynamicRoles, selectedRole, views],
   )
+  const inheritanceChain = useMemo(
+    () => getRoleInheritanceChain(selectedRole, dynamicRoles),
+    [dynamicRoles, selectedRole],
+  )
+  const hasRoleConfig = useMemo(
+    () => views.some((view) => normalizeRole(view.role) === selectedRole),
+    [selectedRole, views],
+  )
   const viewStatus = useMemo(
     () =>
       Object.fromEntries(
@@ -96,63 +106,46 @@ export function SettingsPage() {
     () => getResourceActionOptions(entityType),
     [entityType],
   )
+  const viewSources = useMemo(
+    () =>
+      Object.fromEntries(
+        VIEW_TYPES.map((viewType) => [
+          viewType,
+          normalizeRole(resolveViewSetting(views, viewType, selectedRole, dynamicRoles)?.role),
+        ]),
+      ) as Record<ViewType, string>,
+    [dynamicRoles, selectedRole, views],
+  )
 
   useEffect(() => {
     void load()
   }, [entityType])
 
   useEffect(() => {
-    setModuleEnabled(resolveModuleEnabled(views, selectedRole))
-    setAllowedActions(resolveAllowedActions(views, entityType, selectedRole))
+    setModuleEnabled(resolveModuleEnabled(views, selectedRole, dynamicRoles))
+    setAllowedActions(resolveAllowedActions(views, entityType, selectedRole, dynamicRoles))
     setTableConfig(
       buildFieldLayoutConfigs(
         fieldCatalog,
-        views.find(
-          (view) =>
-            view.viewType === "TABLE" &&
-            normalizeRole(view.role) === selectedRole,
-        ) ||
-          views.find(
-            (view) =>
-              view.viewType === "TABLE" &&
-              normalizeRole(view.role) === DEFAULT_ROLE_SCOPE,
-          ),
+        resolveViewSetting(views, "TABLE", selectedRole, dynamicRoles),
         "TABLE",
       ),
     )
     setFormConfig(
       buildFieldLayoutConfigs(
         fieldCatalog,
-        views.find(
-          (view) =>
-            view.viewType === "FORM" &&
-            normalizeRole(view.role) === selectedRole,
-        ) ||
-          views.find(
-            (view) =>
-              view.viewType === "FORM" &&
-              normalizeRole(view.role) === DEFAULT_ROLE_SCOPE,
-          ),
+        resolveViewSetting(views, "FORM", selectedRole, dynamicRoles),
         "FORM",
       ),
     )
     setDetailConfig(
       buildFieldLayoutConfigs(
         fieldCatalog,
-        views.find(
-          (view) =>
-            view.viewType === "DETAIL" &&
-            normalizeRole(view.role) === selectedRole,
-        ) ||
-          views.find(
-            (view) =>
-              view.viewType === "DETAIL" &&
-              normalizeRole(view.role) === DEFAULT_ROLE_SCOPE,
-          ),
+        resolveViewSetting(views, "DETAIL", selectedRole, dynamicRoles),
         "DETAIL",
       ),
     )
-  }, [entityType, fieldCatalog, selectedRole, views])
+  }, [dynamicRoles, entityType, fieldCatalog, selectedRole, views])
 
   async function load() {
     const [fieldResponse, viewResponse, templateResponse, roleResponse] = await Promise.all([
@@ -183,6 +176,14 @@ export function SettingsPage() {
       }),
     ])
     message.success("Đã lưu cấu hình module theo role")
+    await load()
+  }
+
+  async function resetInheritedView() {
+    await api.delete(`/settings/views/${entityType}`, {
+      params: { role: selectedRole },
+    })
+    message.success("Đã xóa config hiện tại. Role này sẽ kế thừa lại theo chuỗi mới")
     await load()
   }
 
@@ -308,7 +309,7 @@ export function SettingsPage() {
                 <div className="settings-tab-panel">
                   <div className="settings-tab-header settings-tab-header-wrap">
                     <Typography.Text>
-                      Module hiện tại là <strong>{entityLabels[entityType] || entityType}</strong>. Chọn role để cấu hình dữ liệu nào được hiển thị ở bảng, form và màn chi tiết. Nếu module này chưa có cấu hình riêng, hệ thống sẽ kế thừa từ role mặc định <strong>{DEFAULT_ROLE_SCOPE}</strong>.
+                      Module hiện tại là <strong>{entityLabels[entityType] || entityType}</strong>. Chuỗi kế thừa đang áp dụng là <strong>{inheritanceChain.join(" -> ")}</strong>. 3 role chính kế thừa từ <strong>{DEFAULT_ROLE_SCOPE}</strong>, còn role dynamic sẽ kế thừa thêm một lớp từ main role của nó.
                     </Typography.Text>
                     <Checkbox
                       checked={moduleEnabled}
@@ -329,7 +330,7 @@ export function SettingsPage() {
                         color={viewStatus[viewType] ? "green" : "gold"}
                         key={viewType}
                       >
-                        {viewType}: {viewStatus[viewType] ? "riêng theo role" : "đang kế thừa ALL"}
+                        {viewType}: {viewStatus[viewType] ? "riêng theo role" : `đang kế thừa ${viewSources[viewType]}`}
                       </Tag>
                     ))}
                   </Space>
@@ -384,13 +385,22 @@ export function SettingsPage() {
                       },
                     ]}
                   />
-                  <Button
-                    className="primary-glow"
-                    type="primary"
-                    onClick={saveView}
-                  >
-                    Lưu cấu hình hiển thị cho module
-                  </Button>
+                  <Space wrap>
+                    <Button
+                      className="primary-glow"
+                      type="primary"
+                      onClick={saveView}
+                    >
+                      Lưu cấu hình hiển thị cho module
+                    </Button>
+                    <Button
+                      danger
+                      disabled={!hasRoleConfig}
+                      onClick={() => void resetInheritedView()}
+                    >
+                      Xóa config hiện tại để kế thừa lại
+                    </Button>
+                  </Space>
                 </div>
               ),
             },

@@ -1,4 +1,4 @@
-import { baseFields, CustomField, FieldSpec, getResourceActionOptions, systemRoleOptions } from './models'
+import { baseFields, CustomField, DynamicRole, FieldSpec, getResourceActionOptions, systemRoleOptions } from './models'
 
 export const DEFAULT_ROLE_SCOPE = 'ALL'
 export const DEFAULT_ROLE_GROUPS = [DEFAULT_ROLE_SCOPE, ...systemRoleOptions]
@@ -14,27 +14,58 @@ export interface ViewSettingRecord {
   config?: Record<string, unknown>
 }
 
+export function getRoleInheritanceChain(role?: string, dynamicRoles: DynamicRole[] = []) {
+  const normalizedRole = normalizeRole(role)
+  if (normalizedRole === DEFAULT_ROLE_SCOPE) return [DEFAULT_ROLE_SCOPE]
+
+  const user = readStoredUser()
+  const matchedRole = dynamicRoles.find((item) => normalizeRole(item.key) === normalizedRole)
+  const mainRole = normalizeRole(
+    matchedRole?.roleMain ||
+      (normalizeRole(user?.activeRole || user?.role) === normalizedRole
+        ? user?.roleMain || user?.role
+        : undefined),
+  )
+
+  return Array.from(
+    new Set([
+      normalizedRole,
+      ...(mainRole !== normalizedRole ? [mainRole] : []),
+      DEFAULT_ROLE_SCOPE,
+    ]),
+  )
+}
+
+function resolveViewFromChain(
+  views: ViewSettingRecord[],
+  predicate: (view: ViewSettingRecord) => boolean,
+  role?: string,
+  dynamicRoles: DynamicRole[] = [],
+) {
+  const chain = getRoleInheritanceChain(role, dynamicRoles)
+  for (const inheritedRole of chain) {
+    const matched = views.find(
+      (view) => predicate(view) && normalizeRole(view.role) === inheritedRole,
+    )
+    if (matched) return matched
+  }
+  return undefined
+}
+
 export function resolveAllowedActions(
   views: ViewSettingRecord[],
   resource: string,
   role?: string,
+  dynamicRoles: DynamicRole[] = [],
 ) {
-  const normalizedRole = normalizeRole(role)
-  const exactViews = views.filter((view) => normalizeRole(view.role) === normalizedRole)
-  const exactAllowedActions = exactViews
-    .map((view) => view.config?.allowedActions)
-    .find((value) => Array.isArray(value))
-
-  if (Array.isArray(exactAllowedActions)) return exactAllowedActions.map(String)
-
-  const defaultViews = views.filter(
-    (view) => normalizeRole(view.role) === DEFAULT_ROLE_SCOPE,
+  const matched = resolveViewFromChain(
+    views,
+    (view) => Array.isArray(view.config?.allowedActions),
+    role,
+    dynamicRoles,
   )
-  const defaultAllowedActions = defaultViews
-    .map((view) => view.config?.allowedActions)
-    .find((value) => Array.isArray(value))
-
-  if (Array.isArray(defaultAllowedActions)) return defaultAllowedActions.map(String)
+  const allowedActions = matched?.config?.allowedActions
+  if (Array.isArray(allowedActions)) return allowedActions.map(String)
   return getResourceActionOptions(resource).map((item) => item.key)
 }
 
@@ -116,18 +147,13 @@ export function resolveViewSetting(
   views: ViewSettingRecord[],
   viewType: ViewType,
   role?: string,
+  dynamicRoles: DynamicRole[] = [],
 ) {
-  const normalizedRole = normalizeRole(role)
-  return (
-    views.find(
-      (view) =>
-        view.viewType === viewType && normalizeRole(view.role) === normalizedRole,
-    ) ||
-    views.find(
-      (view) =>
-        view.viewType === viewType &&
-        normalizeRole(view.role) === DEFAULT_ROLE_SCOPE,
-    )
+  return resolveViewFromChain(
+    views,
+    (view) => view.viewType === viewType,
+    role,
+    dynamicRoles,
   )
 }
 
@@ -146,26 +172,20 @@ export function hasExactRoleSetting(
 export function resolveModuleEnabled(
   views: ViewSettingRecord[],
   role?: string,
+  dynamicRoles: DynamicRole[] = [],
 ) {
-  const normalizedRole = normalizeRole(role)
-  const exactViews = views.filter(
-    (view) => normalizeRole(view.role) === normalizedRole,
-  )
-  const exactModuleEnabled = exactViews
-    .map((view) => getModuleEnabledValue(view))
-    .find((value) => typeof value === 'boolean')
+  const chain = getRoleInheritanceChain(role, dynamicRoles)
+  for (const inheritedRole of chain) {
+    const inheritedViews = views.filter(
+      (view) => normalizeRole(view.role) === inheritedRole,
+    )
+    const moduleEnabled = inheritedViews
+      .map((view) => getModuleEnabledValue(view))
+      .find((value) => typeof value === 'boolean')
 
-  if (typeof exactModuleEnabled === 'boolean') return exactModuleEnabled
-  if (exactViews.length > 0) return true
-
-  const defaultViews = views.filter(
-    (view) => normalizeRole(view.role) === DEFAULT_ROLE_SCOPE,
-  )
-  const defaultModuleEnabled = defaultViews
-    .map((view) => getModuleEnabledValue(view))
-    .find((value) => typeof value === 'boolean')
-
-  if (typeof defaultModuleEnabled === 'boolean') return defaultModuleEnabled
+    if (typeof moduleEnabled === 'boolean') return moduleEnabled
+    if (inheritedViews.length > 0) return true
+  }
   return true
 }
 

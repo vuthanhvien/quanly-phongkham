@@ -39,6 +39,23 @@ const RESOURCE_ACTIONS: Record<string, string[]> = {
   leads: [...DEFAULT_RESOURCE_ACTIONS, 'convert-to-customer'],
 };
 
+function normalizeRole(role?: string) {
+  return role?.trim().toUpperCase() || 'ALL';
+}
+
+function buildRoleChain(role?: string, mainRole?: string) {
+  const normalizedRole = normalizeRole(role);
+  if (normalizedRole === 'ALL') return ['ALL'];
+  const normalizedMainRole = normalizeRole(mainRole);
+  return Array.from(
+    new Set([
+      normalizedRole,
+      ...(normalizedMainRole !== normalizedRole ? [normalizedMainRole] : []),
+      'ALL',
+    ]),
+  );
+}
+
 type ResourceRepository = Repository<any>;
 
 @Injectable()
@@ -430,7 +447,7 @@ export class RecordsService {
   private async assertPermission(user: AuthUser | undefined, resource: string, action: string, branchId?: string) {
     this.assertResourceAccess(user, resource);
     if (!user || this.isAdmin(user)) return;
-    const allowedActions = await this.resolveAllowedActions(resource, user.activeRole || user.role);
+    const allowedActions = await this.resolveAllowedActions(resource, user.activeRole || user.role, user.roleMain || user.role);
     if (!allowedActions.includes(action)) {
       throw new ForbiddenException('Role hien tai khong duoc su dung thao tac nay');
     }
@@ -441,20 +458,16 @@ export class RecordsService {
     }
   }
 
-  private async resolveAllowedActions(resource: string, role?: string) {
-    const normalizedRole = (role || 'ALL').trim().toUpperCase();
+  private async resolveAllowedActions(resource: string, role?: string, mainRole?: string) {
+    const roleChain = buildRoleChain(role, mainRole);
     const views = await this.viewSettings.find({ where: { entityType: resource } });
-    const exactViews = views.filter((view) => (view.role || 'ALL').trim().toUpperCase() === normalizedRole);
-    const exactActions = exactViews
-      .map((view) => view.config?.allowedActions)
-      .find((value) => Array.isArray(value));
-    if (Array.isArray(exactActions)) return exactActions.map(String);
-
-    const defaultViews = views.filter((view) => (view.role || 'ALL').trim().toUpperCase() === 'ALL');
-    const defaultActions = defaultViews
-      .map((view) => view.config?.allowedActions)
-      .find((value) => Array.isArray(value));
-    if (Array.isArray(defaultActions)) return defaultActions.map(String);
+    for (const inheritedRole of roleChain) {
+      const inheritedViews = views.filter((view) => normalizeRole(view.role) === inheritedRole);
+      const actions = inheritedViews
+        .map((view) => view.config?.allowedActions)
+        .find((value) => Array.isArray(value));
+      if (Array.isArray(actions)) return actions.map(String);
+    }
 
     return RESOURCE_ACTIONS[resource] || DEFAULT_RESOURCE_ACTIONS;
   }

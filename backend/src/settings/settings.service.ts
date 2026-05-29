@@ -81,6 +81,17 @@ export class SettingsService {
     return this.views.save(setting);
   }
 
+  async deleteViews(entityType: string, role?: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const normalizedRole = normalizeRole(role);
+    const settings = await this.views.find({ where: { entityType, role: normalizedRole } });
+    if (!settings.length) {
+      return { entityType, role: normalizedRole, deleted: 0 };
+    }
+    await this.views.remove(settings);
+    return { entityType, role: normalizedRole, deleted: settings.length };
+  }
+
   listTemplates(entityType?: string, user?: AuthUser) {
     this.assertResourceReadable(user, entityType);
     return this.templates.find({ where: entityType ? { entityType } : {}, order: { name: 'ASC' } });
