@@ -27,8 +27,9 @@ import { api } from "../api"
 import { hasActionAccess } from "../access"
 import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordFormContent } from "../components/RecordFormContent"
+import { RecordValueView } from "../components/RecordValueView"
 import { CustomField, entityLabels } from "../models"
-import { displayValue, loadRelationOptions, LookupMap } from "../relations"
+import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
 import {
   FieldLayoutConfig,
   getFieldCatalog,
@@ -47,6 +48,7 @@ export function RecordListPage() {
   >([])
   const [creating, setCreating] = useState(false)
   const [lookups, setLookups] = useState<LookupMap>({})
+  const [fileLookups, setFileLookups] = useState<FileLookupMap>({})
   const query = useList({
     resource,
     pagination: { currentPage: 1, pageSize: 50 },
@@ -79,9 +81,12 @@ export function RecordListPage() {
         )
         setDisplayFields(tableFields)
         setTemplates(prints.data.data)
-        return loadRelationOptions(tableFields)
+        return Promise.all([loadRelationOptions(tableFields), loadFileLookupMap()])
       })
-      .then(setLookups)
+      .then(([nextLookups, nextFileLookups]) => {
+        setLookups(nextLookups)
+        setFileLookups(nextFileLookups)
+      })
   }, [resource])
 
   const columns: ColumnsType<Record<string, any>> = useMemo(
@@ -92,11 +97,13 @@ export function RecordListPage() {
         key: field.key,
         width: field.tableWidth,
         render: (_: unknown, row: Record<string, any>) =>
-          displayValue(
-            field,
-            row[field.key] ?? row.customFields?.[field.key],
-            lookups,
-          ),
+          <RecordValueView
+            compact
+            field={field}
+            fileLookups={fileLookups}
+            lookups={lookups}
+            value={row[field.key] ?? row.customFields?.[field.key]}
+          />,
       })),
       {
         title: "Thao tác",
@@ -161,7 +168,7 @@ export function RecordListPage() {
         ),
       },
     ],
-    [displayFields, resource, templates, lookups],
+    [displayFields, resource, templates, lookups, fileLookups],
   )
 
   async function printRecord(templateId: string, recordId: string) {

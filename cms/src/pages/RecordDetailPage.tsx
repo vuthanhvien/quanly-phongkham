@@ -27,8 +27,9 @@ import {
 import { api } from "../api"
 import { hasActionAccess } from "../access"
 import { RecordFormContent } from "../components/RecordFormContent"
+import { RecordValueView } from "../components/RecordValueView"
 import { CustomField, entityLabels } from "../models"
-import { displayValue, loadRelationOptions, LookupMap } from "../relations"
+import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
 import {
   FieldLayoutConfig,
   getFieldCatalog,
@@ -59,6 +60,7 @@ export function RecordDetailPage() {
   const [related, setRelated] = useState<RelatedBlock[]>([])
   const [fields, setFields] = useState<FieldLayoutConfig[]>([])
   const [lookups, setLookups] = useState<LookupMap>({})
+  const [fileLookups, setFileLookups] = useState<FileLookupMap>({})
   const [loading, setLoading] = useState(true)
   const [relatedDetail, setRelatedDetail] = useState<RelatedRecordDrawerState | null>(null)
   const [relatedDetailLoading, setRelatedDetailLoading] = useState(false)
@@ -95,25 +97,29 @@ export function RecordDetailPage() {
       setRecord(nextRecord)
       setRelated(relatedResponse)
       setFields(detailFields)
-      loadRelationOptions([
-        ...detailFields,
-        ...relatedResponse.flatMap((block) => [...block.tableFields, ...block.detailFields]),
-        "branchId",
-        "defaultBranchId",
-        "customerId",
-        "leadId",
-        "staffId",
-        "assignedStaffId",
-        "ownerStaffId",
-        "consultantStaffId",
-        "doctorStaffId",
-        "performerStaffId",
-        "userId",
-        "invoiceId",
-        "convertedCustomerId",
-      ]).then((lookupResponse) => {
+      Promise.all([
+        loadRelationOptions([
+          ...detailFields,
+          ...relatedResponse.flatMap((block) => [...block.tableFields, ...block.detailFields]),
+          "branchId",
+          "defaultBranchId",
+          "customerId",
+          "leadId",
+          "staffId",
+          "assignedStaffId",
+          "ownerStaffId",
+          "consultantStaffId",
+          "doctorStaffId",
+          "performerStaffId",
+          "userId",
+          "invoiceId",
+          "convertedCustomerId",
+        ]),
+        loadFileLookupMap(),
+      ]).then(([lookupResponse, nextFileLookups]) => {
         if (!mounted) return
         setLookups(lookupResponse)
+        setFileLookups(nextFileLookups)
         setLoading(false)
       })
     })
@@ -186,11 +192,7 @@ export function RecordDetailPage() {
                       )}
                     </div>
                     <div className="detail-item-content">
-                      {displayValue(
-                        field,
-                        record?.[field.key] ?? record?.customFields?.[field.key],
-                        lookups,
-                      )}
+                      <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={record?.[field.key] ?? record?.customFields?.[field.key]} />
                     </div>
                   </div>
                 </Col>
@@ -248,11 +250,7 @@ export function RecordDetailPage() {
                         Chi nhánh mặc định
                       </Typography.Text>
                       <Typography.Text>
-                        {displayValue(
-                          "defaultBranchId",
-                          record?.defaultBranchId,
-                          lookups,
-                        )}
+                        <RecordValueView field="defaultBranchId" fileLookups={fileLookups} lookups={lookups} value={record?.defaultBranchId} />
                       </Typography.Text>
                     </div>
                   </>
@@ -284,11 +282,7 @@ export function RecordDetailPage() {
                 key: field.key,
                 width: field.tableWidth,
                 render: (_: unknown, row: Record<string, any>) =>
-                  displayValue(
-                    field,
-                    row[field.key] ?? row.customFields?.[field.key],
-                    lookups,
-                  ),
+                  <RecordValueView compact field={field} fileLookups={fileLookups} lookups={lookups} value={row[field.key] ?? row.customFields?.[field.key]} />,
               })),
               {
                 title: "",
@@ -408,11 +402,7 @@ export function RecordDetailPage() {
                       )}
                     </div>
                     <div className="detail-item-content">
-                      {displayValue(
-                        field,
-                        relatedDetail.record?.[field.key] ?? relatedDetail.record?.customFields?.[field.key],
-                        lookups,
-                      )}
+                      <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={relatedDetail.record?.[field.key] ?? relatedDetail.record?.customFields?.[field.key]} />
                     </div>
                   </div>
                 </Col>

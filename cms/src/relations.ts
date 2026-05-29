@@ -3,6 +3,16 @@ import { FieldSpec, relationFields, RelationSpec } from './models';
 import { buildFolderPathMap, normalizeFileFolderRows } from './utils/fileFolders';
 
 export type LookupMap = Record<string, Record<string, string>>;
+export interface FileLookupItem {
+  id: string;
+  title: string;
+  originalName?: string;
+  publicUrl: string;
+  mimeType?: string;
+  extension?: string;
+}
+
+export type FileLookupMap = Record<string, FileLookupItem>;
 
 function resolveRelationSpec(field: string | FieldSpec) {
   if (typeof field === 'string') return relationFields[field];
@@ -47,6 +57,22 @@ export async function loadRelationOptions(fields: Array<string | FieldSpec>) {
     }),
   );
   return Object.fromEntries(entries) as LookupMap;
+}
+
+export async function loadFileLookupMap(pageSize = 500) {
+  const response = await api.get('/records/files', { params: { pageSize } }).catch(() => ({ data: { data: [] } }));
+  const entries = (response.data.data || []).map((row: Record<string, unknown>) => [
+    String(row.id),
+    {
+      id: String(row.id),
+      title: String(row.title || row.originalName || row.id),
+      originalName: row.originalName ? String(row.originalName) : undefined,
+      publicUrl: String(row.publicUrl || ''),
+      mimeType: row.mimeType ? String(row.mimeType) : undefined,
+      extension: row.extension ? String(row.extension) : undefined,
+    } satisfies FileLookupItem,
+  ] as const);
+  return Object.fromEntries(entries) as FileLookupMap;
 }
 
 export function displayValue(field: string | FieldSpec, value: unknown, lookups: LookupMap) {

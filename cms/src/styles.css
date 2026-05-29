@@ -950,6 +950,80 @@ textarea.ant-input {
   display: inline-flex;
 }
 
+.record-media-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.record-media-stack.compact {
+  gap: 6px;
+}
+
+.record-media-card {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  color: #fff7fb;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 8px;
+  text-decoration: none;
+}
+
+.record-media-card img,
+.record-file-fallback {
+  border-radius: 12px;
+  flex: 0 0 52px;
+  height: 52px;
+  width: 52px;
+}
+
+.record-media-stack.compact .record-media-card img,
+.record-media-stack.compact .record-file-fallback {
+  flex-basis: 40px;
+  height: 40px;
+  width: 40px;
+}
+
+.record-media-card img {
+  object-fit: cover;
+}
+
+.record-file-fallback {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f6c4d7;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.record-media-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.record-media-copy strong,
+.record-media-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-media-copy strong {
+  color: #fff7fb;
+}
+
+.record-media-copy span {
+  color: #bdaeb8;
+  font-size: 12px;
+}
+
 @media (max-width: 900px) {
   .app-sider {
     display: none;
