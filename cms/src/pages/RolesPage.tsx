@@ -111,6 +111,7 @@ export function RolesPage() {
         title={editingRole ? "Cập nhật role" : "Thêm role"}
         open={roleModal}
         footer={null}
+        maskClosable={false}
         onCancel={() => {
           setRoleModal(false)
           setEditingRole(null)

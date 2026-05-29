@@ -144,6 +144,7 @@ export function BranchRoleAssignmentsPage() {
         title={editingAssignment ? "Cập nhật role theo chi nhánh" : "Thêm role theo chi nhánh"}
         open={assignmentModal}
         footer={null}
+        maskClosable={false}
         onCancel={() => {
           setAssignmentModal(false)
           setEditingAssignment(null)

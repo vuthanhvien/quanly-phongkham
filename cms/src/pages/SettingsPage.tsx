@@ -470,6 +470,7 @@ export function SettingsPage() {
         title={editingTemplate ? "Cập nhật mẫu in HTML" : "Thêm mẫu in HTML"}
         open={templateModal}
         footer={null}
+        maskClosable={false}
         onCancel={() => {
           setTemplateModal(false)
           setEditingTemplate(null)

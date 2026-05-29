@@ -231,6 +231,7 @@ export function RecordListPage() {
       <Drawer
         className="quick-drawer"
         destroyOnClose
+        maskClosable={false}
         open={creating}
         placement="right"
         title={`Thêm nhanh ${entityLabels[resource] || resource}`}

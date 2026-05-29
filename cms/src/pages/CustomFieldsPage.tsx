@@ -1,7 +1,9 @@
-import { AppstoreOutlined, DownloadOutlined, ImportOutlined, UploadOutlined } from "@ant-design/icons"
+import { AppstoreOutlined, DeleteOutlined, DownloadOutlined, ImportOutlined, PlusOutlined, UploadOutlined } from "@ant-design/icons"
 import { Button, Card, Checkbox, Form, Input, InputNumber, Modal, Select, Space, Table, Typography, Upload, message } from "antd"
 import type { UploadProps } from "antd"
+import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
+import * as XLSX from "xlsx"
 import { api } from "../api"
 import { CustomField, entityLabels } from "../models"
 
@@ -26,7 +28,7 @@ export function CustomFieldsPage() {
   const [editingField, setEditingField] = useState<CustomField | null>(null)
   const [batchModal, setBatchModal] = useState(false)
   const [batchMode, setBatchMode] = useState<"create" | "upsert">("create")
-  const [batchPayload, setBatchPayload] = useState("")
+  const [batchRows, setBatchRows] = useState<BatchFieldRow[]>([])
   const [importModal, setImportModal] = useState(false)
   const [importPayload, setImportPayload] = useState<ParsedFieldInput[]>([])
   const [fieldForm] = Form.useForm()
@@ -81,12 +83,19 @@ export function CustomFieldsPage() {
 
   function openBatch(mode: "create" | "upsert") {
     setBatchMode(mode)
-    setBatchPayload(buildBatchTemplate(entityType, mode))
+    setBatchRows(
+      mode === "create"
+        ? [createEmptyBatchRow(0)]
+        : fields.map((field, index) => toBatchRow(field, index)),
+    )
     setBatchModal(true)
   }
 
   async function submitBatch() {
-    const parsed = parseBatchPayload(batchPayload)
+    const parsed = batchRows
+      .map((row) => normalizeBatchRow(row))
+      .filter((row) => row.label && row.key)
+
     if (parsed.length === 0) {
       message.warning("Chưa có dữ liệu để xử lý")
       return
@@ -120,7 +129,7 @@ export function CustomFieldsPage() {
         : `Đã import/cập nhật ${parsed.length} field`,
     )
     setBatchModal(false)
-    setBatchPayload("")
+    setBatchRows([])
     await load()
   }
 
@@ -129,25 +138,21 @@ export function CustomFieldsPage() {
       label: field.label,
       key: field.key,
       dataType: field.dataType,
-      options: field.options || [],
-      relationResource: field.relationResource,
+      options: (field.options || []).join(", "),
+      relationResource: field.relationResource || "",
       sortOrder: field.sortOrder || 0,
-      isActive: field.isActive,
+      isActive: field.isActive ? "true" : "false",
     }))
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `${entityType}-custom-fields.json`
-    link.click()
-    URL.revokeObjectURL(url)
+    const workbook = XLSX.utils.book_new()
+    const worksheet = XLSX.utils.json_to_sheet(payload)
+    XLSX.utils.book_append_sheet(workbook, worksheet, "CustomFields")
+    XLSX.writeFile(workbook, `${entityType}-custom-fields.xlsx`)
   }
 
   const uploadProps: UploadProps = {
-    accept: ".json,.csv,.tsv,.txt",
+    accept: ".xlsx,.xls",
     beforeUpload: async (file) => {
-      const text = await file.text()
-      const parsed = parseBatchPayload(text)
+      const parsed = await parseExcelFile(file)
       setImportPayload(parsed)
       setImportModal(true)
       return false
@@ -160,8 +165,6 @@ export function CustomFieldsPage() {
       message.warning("File import chưa có dữ liệu hợp lệ")
       return
     }
-    setBatchMode(mode)
-    setBatchPayload(JSON.stringify(importPayload, null, 2))
     setImportModal(false)
     await submitBatchPayload(importPayload, mode)
   }
@@ -281,6 +284,7 @@ export function CustomFieldsPage() {
         title={editingField ? "Cập nhật custom field" : "Thêm custom field"}
         open={fieldModal}
         footer={null}
+        maskClosable={false}
         onCancel={() => {
           setFieldModal(false)
           setEditingField(null)
@@ -329,24 +333,38 @@ export function CustomFieldsPage() {
       <Modal
         title={batchMode === "create" ? "Add multi custom fields" : "Update multi custom fields"}
         open={batchModal}
+        maskClosable={false}
         onCancel={() => setBatchModal(false)}
         onOk={() => void submitBatch()}
         okText={batchMode === "create" ? "Thêm hàng loạt" : "Cập nhật hàng loạt"}
-        width={920}
+        width={1440}
       >
         <Typography.Paragraph type="secondary">
-          Dán JSON array hoặc CSV/TSV với các cột: `label`, `key`, `dataType`, `options`, `relationResource`, `sortOrder`, `isActive`.
+          Chỉnh nhiều field trực tiếp theo dạng bảng. `Add multi` dùng để thêm mới hàng loạt, `Update multi` mở toàn bộ field hiện có để sửa đồng loạt.
         </Typography.Paragraph>
-        <Input.TextArea
-          autoSize={{ minRows: 16, maxRows: 24 }}
-          value={batchPayload}
-          onChange={(event) => setBatchPayload(event.target.value)}
+        <Space style={{ marginBottom: 16 }}>
+          <Button icon={<PlusOutlined />} onClick={() => setBatchRows((current) => [...current, createEmptyBatchRow(current.length)])}>
+            Thêm dòng
+          </Button>
+          <Button onClick={() => setBatchRows(batchMode === "create" ? [createEmptyBatchRow(0)] : fields.map((field, index) => toBatchRow(field, index)))}>
+            Reset dữ liệu
+          </Button>
+        </Space>
+        <Table
+          columns={buildBatchColumns(setBatchRows)}
+          dataSource={batchRows}
+          pagination={false}
+          rowKey="__rowKey"
+          scroll={{ x: 1320, y: 520 }}
+          size="small"
         />
       </Modal>
       <Modal
         title="Import custom fields"
         open={importModal}
+        maskClosable={false}
         onCancel={() => setImportModal(false)}
+        width={1120}
         footer={[
           <Button key="cancel" onClick={() => setImportModal(false)}>
             Hủy
@@ -360,17 +378,20 @@ export function CustomFieldsPage() {
         ]}
       >
         <Typography.Paragraph type="secondary">
-          Đã đọc được {importPayload.length} field từ file. Chọn cách import phù hợp.
+          Đã đọc được {importPayload.length} field từ file Excel. Chọn cách import phù hợp.
         </Typography.Paragraph>
         <Table
           size="small"
           rowKey="key"
           pagination={false}
-          dataSource={importPayload.slice(0, 8)}
+          scroll={{ x: 980, y: 360 }}
+          dataSource={importPayload}
           columns={[
             { title: "Label", dataIndex: "label" },
             { title: "Key", dataIndex: "key" },
             { title: "Type", dataIndex: "dataType" },
+            { title: "Options", dataIndex: "options", render: (value) => Array.isArray(value) ? value.join(", ") : value || "-" },
+            { title: "Relation", dataIndex: "relationResource", render: (value) => value || "-" },
           ]}
         />
       </Modal>
@@ -388,23 +409,53 @@ interface ParsedFieldInput {
   isActive?: boolean | string
 }
 
-function buildBatchTemplate(entityType: string, mode: "create" | "upsert") {
-  return JSON.stringify(
-    [
-      {
-        label: mode === "create" ? "Nguồn marketing" : "Nguồn khách",
-        key: mode === "create" ? "nguon_marketing" : "nguon_khach",
-        dataType: "select",
-        options: ["Facebook", "TikTok", "Referral"],
-        relationResource: null,
-        sortOrder: 10,
-        isActive: true,
-        entityType,
-      },
-    ],
-    null,
-    2,
-  )
+interface BatchFieldRow {
+  __rowKey: string
+  label: string
+  key: string
+  dataType: string
+  options: string
+  relationResource?: string
+  sortOrder: number
+  isActive: boolean
+}
+
+function createEmptyBatchRow(index: number): BatchFieldRow {
+  return {
+    __rowKey: `new-${index}-${Date.now()}`,
+    label: "",
+    key: "",
+    dataType: "text",
+    options: "",
+    relationResource: undefined,
+    sortOrder: index,
+    isActive: true,
+  }
+}
+
+function toBatchRow(field: CustomField, index: number): BatchFieldRow {
+  return {
+    __rowKey: field.id,
+    label: field.label,
+    key: field.key,
+    dataType: field.dataType,
+    options: (field.options || []).join(", "),
+    relationResource: field.relationResource,
+    sortOrder: field.sortOrder || index,
+    isActive: field.isActive,
+  }
+}
+
+function normalizeBatchRow(row: BatchFieldRow): ParsedFieldInput {
+  return {
+    label: row.label.trim(),
+    key: sanitizeFieldKey(row.key),
+    dataType: row.dataType,
+    options: row.options,
+    relationResource: row.dataType === "relative" ? row.relationResource : undefined,
+    sortOrder: row.sortOrder,
+    isActive: row.isActive,
+  }
 }
 
 function sanitizeFieldKey(key: string) {
@@ -463,6 +514,14 @@ function parseBatchPayload(text: string): ParsedFieldInput[] {
   })
 }
 
+async function parseExcelFile(file: File) {
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: "array" })
+  const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: "" })
+  return rows.map(normalizeParsedField)
+}
+
 function normalizeParsedField(item: Record<string, unknown>): ParsedFieldInput {
   return {
     label: String(item.label || ""),
@@ -478,4 +537,122 @@ function normalizeParsedField(item: Record<string, unknown>): ParsedFieldInput {
     sortOrder: item.sortOrder ? Number(item.sortOrder) : 0,
     isActive: item.isActive === false || String(item.isActive).toLowerCase() === "false" ? false : true,
   }
+}
+
+function buildBatchColumns(
+  setBatchRows: React.Dispatch<React.SetStateAction<BatchFieldRow[]>>,
+): ColumnsType<BatchFieldRow> {
+  return [
+    {
+      title: "Nhãn",
+      dataIndex: "label",
+      width: 220,
+      render: (_, row) => (
+        <Input
+          value={row.label}
+          onChange={(event) =>
+            setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, label: event.target.value } : item))
+          }
+        />
+      ),
+    },
+    {
+      title: "Key",
+      dataIndex: "key",
+      width: 220,
+      render: (_, row) => (
+        <Input
+          value={row.key}
+          onChange={(event) =>
+            setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, key: event.target.value } : item))
+          }
+        />
+      ),
+    },
+    {
+      title: "Kiểu",
+      dataIndex: "dataType",
+      width: 150,
+      render: (_, row) => (
+        <Select
+          value={row.dataType}
+          options={CUSTOM_FIELD_TYPES.map((value) => ({ value, label: value }))}
+          onChange={(value) =>
+            setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, dataType: value, relationResource: value === "relative" ? item.relationResource : undefined, options: value === "select" ? item.options : "" } : item))
+          }
+        />
+      ),
+    },
+    {
+      title: "Options",
+      dataIndex: "options",
+      width: 260,
+      render: (_, row) => (
+        row.dataType === "select" ? (
+          <Input
+            value={row.options}
+            placeholder="A, B, C"
+            onChange={(event) =>
+              setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, options: event.target.value } : item))
+            }
+          />
+        ) : <Typography.Text type="secondary">-</Typography.Text>
+      ),
+    },
+    {
+      title: "Liên kết",
+      dataIndex: "relationResource",
+      width: 220,
+      render: (_, row) => (
+        row.dataType === "relative" ? (
+          <Select
+            value={row.relationResource}
+            options={RELATIVE_RESOURCE_OPTIONS}
+            onChange={(value) =>
+              setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, relationResource: value } : item))
+            }
+          />
+        ) : <Typography.Text type="secondary">-</Typography.Text>
+      ),
+    },
+    {
+      title: "Thứ tự",
+      dataIndex: "sortOrder",
+      width: 120,
+      render: (_, row) => (
+        <InputNumber
+          value={row.sortOrder}
+          onChange={(value) =>
+            setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, sortOrder: Number(value || 0) } : item))
+          }
+        />
+      ),
+    },
+    {
+      title: "Hoạt động",
+      dataIndex: "isActive",
+      width: 120,
+      render: (_, row) => (
+        <Checkbox
+          checked={row.isActive}
+          onChange={(event) =>
+            setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, isActive: event.target.checked } : item))
+          }
+        />
+      ),
+    },
+    {
+      title: "",
+      key: "actions",
+      width: 88,
+      render: (_, row) => (
+        <Button
+          danger
+          icon={<DeleteOutlined />}
+          type="text"
+          onClick={() => setBatchRows((current) => current.filter((item) => item.__rowKey !== row.__rowKey))}
+        />
+      ),
+    },
+  ]
 }
