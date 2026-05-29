@@ -26,6 +26,7 @@ interface RecordFormContentProps {
   resource: string
   id?: string
   compact?: boolean
+  initialValues?: Record<string, unknown>
   onCancel?: () => void
   onSuccess?: () => void
 }
@@ -34,6 +35,7 @@ export function RecordFormContent({
   resource,
   id,
   compact,
+  initialValues,
   onCancel,
   onSuccess,
 }: RecordFormContentProps) {
@@ -81,21 +83,25 @@ export function RecordFormContent({
     }
     if (!editing && fields.length > 0) {
       form.setFieldsValue(
-        Object.fromEntries(
-          fields
-            .filter((field) => field.defaultValue !== undefined)
-            .map((field) => [field.key, field.defaultValue]),
-        ),
+        {
+          ...Object.fromEntries(
+            fields
+              .filter((field) => field.defaultValue !== undefined)
+              .map((field) => [field.key, field.defaultValue]),
+          ),
+          ...(initialValues || {}),
+        },
       )
     }
-  }, [editing, fields, form, recordQuery.result, recordQuery.query?.data, recordQuery.data?.data?.data])
+  }, [editing, fields, form, initialValues, recordQuery.result, recordQuery.query?.data, recordQuery.data?.data?.data])
 
   function submit(values: Record<string, unknown>) {
+    const mergedValues = { ...(initialValues || {}), ...values }
     const baseKeys = new Set(
       getFieldCatalog(resource, []).map((field) => field.key),
     )
     const payload: Record<string, unknown> = { customFields: {} }
-    Object.entries(values).forEach(([key, value]) => {
+    Object.entries(mergedValues).forEach(([key, value]) => {
       if (baseKeys.has(key)) payload[key] = value
       else (payload.customFields as Record<string, unknown>)[key] = value
     })

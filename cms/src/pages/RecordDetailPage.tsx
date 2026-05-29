@@ -2,6 +2,7 @@ import {
   Button,
   Card,
   Col,
+  Drawer,
   Empty,
   Tooltip,
   message,
@@ -15,6 +16,7 @@ import { useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { api } from "../api"
 import { hasActionAccess } from "../access"
+import { RecordFormContent } from "../components/RecordFormContent"
 import { CustomField, entityLabels } from "../models"
 import { displayValue, loadRelationOptions, LookupMap } from "../relations"
 import {
@@ -28,8 +30,15 @@ import {
 interface RelatedBlock {
   title: string
   resource: string
+  relationField: string
   rows: Record<string, unknown>[]
-  columns: string[]
+  tableFields: FieldLayoutConfig[]
+  detailFields: FieldLayoutConfig[]
+}
+
+interface RelatedRecordDrawerState {
+  block: RelatedBlock
+  record: Record<string, any> | null
 }
 
 export function RecordDetailPage() {
@@ -40,13 +49,17 @@ export function RecordDetailPage() {
   const [fields, setFields] = useState<FieldLayoutConfig[]>([])
   const [lookups, setLookups] = useState<LookupMap>({})
   const [loading, setLoading] = useState(true)
+  const [relatedDetail, setRelatedDetail] = useState<RelatedRecordDrawerState | null>(null)
+  const [relatedDetailLoading, setRelatedDetailLoading] = useState(false)
+  const [quickCreateBlock, setQuickCreateBlock] = useState<RelatedBlock | null>(null)
 
   useEffect(() => {
     let mounted = true
     setLoading(true)
+    const activeRole = getStoredUserRole()
     Promise.all([
       api.get(`/records/${resource}/${id}`),
-      loadRelated(resource, id),
+      loadRelated(resource, id, activeRole),
       api.get("/settings/custom-fields", { params: { entityType: resource } }),
       api.get("/settings/views", { params: { entityType: resource } }),
     ]).then(([recordResponse, relatedResponse, fieldResponse, viewResponse]) => {
@@ -72,6 +85,7 @@ export function RecordDetailPage() {
       setFields(detailFields)
       loadRelationOptions([
         ...detailFields,
+        ...relatedResponse.flatMap((block) => [...block.tableFields, ...block.detailFields]),
         "branchId",
         "defaultBranchId",
         "customerId",
@@ -242,20 +256,47 @@ export function RecordDetailPage() {
           className="glass-card detail-card"
           key={block.title}
           title={block.title}
+          extra={
+            hasActionAccess(block.resource, "create") ? (
+              <Button size="small" type="primary" onClick={() => setQuickCreateBlock(block)}>
+                Thêm nhanh
+              </Button>
+            ) : null
+          }
         >
           <Table
             columns={[
-              ...block.columns.map((key) => ({
-                title: key,
-                dataIndex: key,
-                key,
-                render: (value: unknown) => displayValue(key, value, lookups),
+              ...block.tableFields.map((field) => ({
+                title: field.label,
+                dataIndex: field.key,
+                key: field.key,
+                width: field.tableWidth,
+                render: (_: unknown, row: Record<string, any>) =>
+                  displayValue(
+                    field,
+                    row[field.key] ?? row.customFields?.[field.key],
+                    lookups,
+                  ),
               })),
               {
                 title: "",
                 key: "action",
+                width: 140,
                 render: (_: unknown, row: any) => (
-                  <Link to={`/${block.resource}/${row.id}`}>Xem</Link>
+                  <Space>
+                    {hasActionAccess(block.resource, "view") && (
+                      <Button
+                        size="small"
+                        type="link"
+                        onClick={() => void openRelatedDetail(block, row.id)}
+                      >
+                        Xem nhanh
+                      </Button>
+                    )}
+                    {hasActionAccess(block.resource, "view") && (
+                      <Link to={`/${block.resource}/${row.id}`}>Chi tiết</Link>
+                    )}
+                  </Space>
                 ),
               },
             ]}
@@ -267,8 +308,108 @@ export function RecordDetailPage() {
           />
         </Card>
       ))}
+
+      <Drawer
+        destroyOnClose
+        maskClosable={false}
+        open={Boolean(relatedDetail || relatedDetailLoading)}
+        placement="right"
+        title={relatedDetail ? `${relatedDetail.block.title} - chi tiết` : "Đang tải chi tiết"}
+        width={720}
+        onClose={() => {
+          setRelatedDetail(null)
+          setRelatedDetailLoading(false)
+        }}
+      >
+        {relatedDetail && (
+          <div className="detail-grid">
+            <Row gutter={[16, 16]}>
+              {relatedDetail.block.detailFields.map((field) => (
+                <Col key={field.key} span={detailWidthToSpan(field.width)} xs={24}>
+                  <div className="detail-item">
+                    <div className="detail-item-label">
+                      {field.description ? (
+                        <Space direction="vertical" size={0}>
+                          <span>{field.label}</span>
+                          <Typography.Text type="secondary">{field.description}</Typography.Text>
+                        </Space>
+                      ) : (
+                        field.label
+                      )}
+                    </div>
+                    <div className="detail-item-content">
+                      {displayValue(
+                        field,
+                        relatedDetail.record?.[field.key] ?? relatedDetail.record?.customFields?.[field.key],
+                        lookups,
+                      )}
+                    </div>
+                  </div>
+                </Col>
+              ))}
+            </Row>
+          </div>
+        )}
+      </Drawer>
+
+      <Drawer
+        destroyOnClose
+        maskClosable={false}
+        open={Boolean(quickCreateBlock)}
+        placement="right"
+        title={quickCreateBlock ? `Thêm nhanh ${entityLabels[quickCreateBlock.resource] || quickCreateBlock.resource}` : "Thêm nhanh"}
+        width={620}
+        onClose={() => setQuickCreateBlock(null)}
+      >
+        {quickCreateBlock && (
+          <RecordFormContent
+            compact
+            initialValues={{ [quickCreateBlock.relationField]: id }}
+            resource={quickCreateBlock.resource}
+            onCancel={() => setQuickCreateBlock(null)}
+            onSuccess={() => {
+              setQuickCreateBlock(null)
+              void reloadRelatedBlocks()
+            }}
+          />
+        )}
+      </Drawer>
     </>
   )
+
+  async function openRelatedDetail(block: RelatedBlock, recordId: string) {
+    setRelatedDetailLoading(true)
+    try {
+      const response = await api.get(`/records/${block.resource}/${recordId}`)
+      setRelatedDetail({ block, record: response.data.data })
+    } finally {
+      setRelatedDetailLoading(false)
+    }
+  }
+
+  async function reloadRelatedBlocks() {
+    const activeRole = getStoredUserRole()
+    const nextRelated = await loadRelated(resource, id, activeRole)
+    setRelated(nextRelated)
+    const nextLookups = await loadRelationOptions([
+      ...fields,
+      ...nextRelated.flatMap((block) => [...block.tableFields, ...block.detailFields]),
+      "branchId",
+      "defaultBranchId",
+      "customerId",
+      "leadId",
+      "staffId",
+      "assignedStaffId",
+      "ownerStaffId",
+      "consultantStaffId",
+      "doctorStaffId",
+      "performerStaffId",
+      "userId",
+      "invoiceId",
+      "convertedCustomerId",
+    ])
+    setLookups(nextLookups)
+  }
 }
 
 function detailWidthToSpan(width?: FieldLayoutConfig["width"]) {
@@ -290,6 +431,7 @@ function detailWidthToSpan(width?: FieldLayoutConfig["width"]) {
 async function loadRelated(
   resource: string,
   id: string,
+  role: string,
 ): Promise<RelatedBlock[]> {
   if (resource === "leads") {
     const specs = [
@@ -300,7 +442,7 @@ async function loadRelated(
         columns: ["activityType", "scheduledAt", "ownerStaffId", "status"],
       },
     ]
-    return loadBlocks(specs, id)
+    return loadBlocks(specs, id, role)
   }
   if (resource === "customers") {
     const specs = [
@@ -347,7 +489,7 @@ async function loadRelated(
         columns: ["code", "totalAmount", "paidAmount", "status"],
       },
     ]
-    return loadBlocks(specs, id)
+    return loadBlocks(specs, id, role)
   }
   if (resource === "staff") {
     const specs = [
@@ -370,7 +512,7 @@ async function loadRelated(
         columns: ["invoiceId", "roleType", "amount", "status"],
       },
     ]
-    return loadBlocks(specs, id)
+    return loadBlocks(specs, id, role)
   }
   return []
 }
@@ -383,21 +525,51 @@ async function loadBlocks(
     columns: string[]
   }>,
   id: string,
+  role: string,
 ) {
   const responses = await Promise.all(
-    specs.map((spec) =>
-      api
-        .get(`/records/${spec.resource}`, { params: { pageSize: 100 } })
-        .catch(() => ({ data: { data: [] } })),
-    ),
+    specs.map(async (spec) => {
+      const [recordResponse, fieldResponse, viewResponse] = await Promise.all([
+        api
+          .get(`/records/${spec.resource}`, { params: { pageSize: 100 } })
+          .catch(() => ({ data: { data: [] } })),
+        api
+          .get("/settings/custom-fields", { params: { entityType: spec.resource } })
+          .catch(() => ({ data: { data: [] } })),
+        api
+          .get("/settings/views", { params: { entityType: spec.resource } })
+          .catch(() => ({ data: { data: [] } })),
+      ])
+
+      const rows = recordResponse.data.data.filter(
+        (row: Record<string, unknown>) => String(row[spec.field]) === id,
+      )
+      const customFields = fieldResponse.data.data.filter(
+        (field: CustomField) => field.isActive,
+      )
+      const catalog = getFieldCatalog(spec.resource, customFields)
+      rows.forEach((row: Record<string, any>) => {
+        Object.keys(row.customFields || {}).forEach((key) => {
+          if (catalog.some((field) => field.key === key)) return
+          catalog.push({ key, label: key })
+        })
+      })
+      const views = viewResponse.data.data as ViewSettingRecord[]
+
+      return {
+        rows,
+        tableFields: getVisibleFieldConfigs(catalog, views, "TABLE", role),
+        detailFields: getVisibleFieldConfigs(catalog, views, "DETAIL", role),
+      }
+    }),
   )
   return specs.map((spec, index) => ({
     title: specs[index].title,
     resource: spec.resource,
-    columns: spec.columns,
-    rows: responses[index].data.data.filter(
-      (row: Record<string, unknown>) => String(row[spec.field]) === id,
-    ),
+    relationField: spec.field,
+    rows: responses[index].rows,
+    tableFields: responses[index].tableFields,
+    detailFields: responses[index].detailFields,
   }))
 }
 
