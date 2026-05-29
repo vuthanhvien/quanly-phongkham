@@ -25,6 +25,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { api } from "../api"
 import { hasActionAccess } from "../access"
+import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { CustomField, entityLabels } from "../models"
 import { displayValue, loadRelationOptions, LookupMap } from "../relations"
@@ -216,7 +217,7 @@ export function RecordListPage() {
                 type="primary"
                 onClick={() => setCreating(true)}
               >
-                Thêm nhanh
+                {resource === "files" ? "Upload file" : "Thêm nhanh"}
               </Button>
             </Tooltip>
           )}
@@ -241,15 +242,25 @@ export function RecordListPage() {
         width={560}
         onClose={() => setCreating(false)}
       >
-        <RecordFormContent
-          compact
-          resource={resource}
-          onCancel={() => setCreating(false)}
-          onSuccess={() => {
-            setCreating(false)
-            refresh()
-          }}
-        />
+        {resource === "files" ? (
+          <FileUploadPanel
+            onCancel={() => setCreating(false)}
+            onSuccess={() => {
+              setCreating(false)
+              refresh()
+            }}
+          />
+        ) : (
+          <RecordFormContent
+            compact
+            resource={resource}
+            onCancel={() => setCreating(false)}
+            onSuccess={() => {
+              setCreating(false)
+              refresh()
+            }}
+          />
+        )}
       </Drawer>
     </>
   )

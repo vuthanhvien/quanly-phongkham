@@ -1,7 +1,7 @@
 export interface FieldSpec {
   key: string;
   label: string;
-  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative';
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative' | 'file';
   required?: boolean;
   options?: string[];
   defaultValue?: unknown;
@@ -73,6 +73,8 @@ export function getResourceActionOptions(resource: string) {
 
 export const entityLabels: Record<string, string> = {
   branches: 'Chi nhánh',
+  'file-folders': 'Folder tài liệu',
+  files: 'Thư viện file',
   customers: 'Khách hàng',
   leads: 'Lead',
   'lead-activities': 'Hoạt động lead',
@@ -97,6 +99,8 @@ export const entityLabels: Record<string, string> = {
 };
 
 export const relationFields: Record<string, RelationSpec> = {
+  folderId: { resource: 'file-folders', labelFields: ['name'] },
+  parentId: { resource: 'file-folders', labelFields: ['name'] },
   branchId: { resource: 'branches', labelFields: ['slug', 'name'] },
   defaultBranchId: { resource: 'branches', labelFields: ['slug', 'name'] },
   customerId: { resource: 'customers', labelFields: ['code', 'fullName'] },
@@ -122,6 +126,22 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'name', label: 'Tên chi nhánh', required: true },
     { key: 'address', label: 'Địa chỉ' },
     { key: 'phone', label: 'Điện thoại' },
+  ],
+  'file-folders': [
+    { key: 'name', label: 'Tên folder', required: true },
+    { key: 'parentId', label: 'Folder cha' },
+    { key: 'description', label: 'Mô tả', type: 'textarea' },
+    { key: 'isActive', label: 'Hoạt động' },
+  ],
+  files: [
+    { key: 'folderId', label: 'Folder', required: true },
+    { key: 'title', label: 'Tên hiển thị', required: true },
+    { key: 'originalName', label: 'Tên file gốc', disabled: true },
+    { key: 'mimeType', label: 'Loại file', disabled: true },
+    { key: 'extension', label: 'Phần mở rộng', disabled: true },
+    { key: 'sizeBytes', label: 'Dung lượng', type: 'number', disabled: true },
+    { key: 'publicUrl', label: 'Đường dẫn file', disabled: true },
+    { key: 'note', label: 'Ghi chú', type: 'textarea' },
   ],
   departments: [
     { key: 'code', label: 'Mã phòng ban', required: true },

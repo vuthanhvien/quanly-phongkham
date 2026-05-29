@@ -521,6 +521,60 @@ export class CustomerImage extends ConfigurableEntity {
   diagnosisNote?: string;
 }
 
+@Entity('file_folders')
+export class FileFolder extends ConfigurableEntity {
+  @Column()
+  name: string;
+
+  @Column({ nullable: true })
+  parentId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+}
+
+@Entity('files')
+export class ManagedFile extends ConfigurableEntity {
+  @Column()
+  folderId: string;
+
+  @Column()
+  title: string;
+
+  @Column()
+  originalName: string;
+
+  @Column()
+  storedName: string;
+
+  @Column({ nullable: true })
+  extension?: string;
+
+  @Column({ nullable: true })
+  mimeType?: string;
+
+  @Column({ type: 'bigint', default: 0 })
+  sizeBytes: number;
+
+  @Column()
+  storagePath: string;
+
+  @Column()
+  publicUrl: string;
+
+  @Column({ nullable: true })
+  uploadedBy?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+}
+
 @Entity('stock_batches')
 export class StockBatch extends ConfigurableEntity {
   @Column()
@@ -781,6 +835,8 @@ export const ENTITIES = [
   Consultation,
   ServiceOrder,
   CustomerImage,
+  FileFolder,
+  ManagedFile,
   Invoice,
   Expense,
   Treatment,

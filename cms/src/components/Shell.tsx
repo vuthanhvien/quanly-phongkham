@@ -9,6 +9,7 @@ import {
   DollarOutlined,
   ExperimentOutlined,
   FileDoneOutlined,
+  FolderOpenOutlined,
   GiftOutlined,
   GoldOutlined,
   InteractionOutlined,
@@ -59,6 +60,8 @@ const menuIcons: Record<string, React.ReactNode> = {
   invoices: <FileDoneOutlined />,
   expenses: <DollarOutlined />,
   commissions: <GiftOutlined />,
+  'file-folders': <FolderOpenOutlined />,
+  files: <FileDoneOutlined />,
 }
 
 const menuGroups = [
@@ -79,6 +82,12 @@ const menuGroups = [
     label: "Kho & mua hàng",
     icon: <DatabaseOutlined />,
     resources: ["suppliers", "products", "stock-batches"],
+  },
+  {
+    key: "documents",
+    label: "Tài liệu & file",
+    icon: <FolderOpenOutlined />,
+    resources: ["file-folders", "files"],
   },
   {
     key: "finance",

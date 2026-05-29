@@ -39,6 +39,9 @@ export class SettingsService {
     if (payload.dataType === 'relative' && !payload.relationResource) {
       throw new BadRequestException('Field relative can relationResource');
     }
+    if (payload.dataType === 'file') {
+      payload.relationResource = 'files';
+    }
     const exists = await this.fields.findOne({ where: { entityType: payload.entityType, key } });
     if (exists) throw new BadRequestException('Key da ton tai tren model nay');
     return this.fields.save(this.fields.create({ ...payload, key, required: false }));
@@ -52,7 +55,10 @@ export class SettingsService {
     if (next.dataType === 'relative' && !next.relationResource) {
       throw new BadRequestException('Field relative can relationResource');
     }
-    if (next.dataType !== 'relative') {
+    if (next.dataType === 'file') {
+      next.relationResource = 'files';
+    }
+    if (!['relative', 'file'].includes(next.dataType)) {
       next.relationResource = null as unknown as string;
     }
     return this.fields.save(next);

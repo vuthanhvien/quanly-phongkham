@@ -125,9 +125,12 @@ export function getFieldCatalog(resource: string, customFields: CustomField[]) {
           type: field.dataType as FieldSpec['type'],
           required: field.required,
           options: field.options,
-          relation: field.dataType === 'relative' && field.relationResource
-            ? { resource: field.relationResource, labelFields: ['code', 'name', 'fullName', 'title'] }
-            : undefined,
+          relation:
+            field.dataType === 'file'
+              ? { resource: 'files', labelFields: ['title', 'originalName'] }
+              : field.dataType === 'relative' && field.relationResource
+                ? { resource: field.relationResource, labelFields: ['code', 'name', 'fullName', 'title'] }
+                : undefined,
         }),
       ),
   ]

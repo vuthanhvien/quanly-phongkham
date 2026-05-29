@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Request } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Request, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { AuthUser } from '../common/auth';
 import { RecordsService } from './records.service';
 
@@ -25,6 +26,16 @@ export class RecordsController {
   @Post('records/leads/:id/convert-to-customer')
   convertLeadToCustomer(@Param('id') id: string, @Request() request: { user: AuthUser }) {
     return this.records.convertLeadToCustomer(id, request.user);
+  }
+
+  @Post('records/files/upload')
+  @UseInterceptors(FilesInterceptor('files', 50))
+  uploadFiles(
+    @UploadedFiles() files: any[],
+    @Body() payload: { folderId?: string; title?: string; note?: string },
+    @Request() request: { user: AuthUser },
+  ) {
+    return this.records.uploadFiles(files, payload, request.user);
   }
 
   @Get('records/:resource/:id')

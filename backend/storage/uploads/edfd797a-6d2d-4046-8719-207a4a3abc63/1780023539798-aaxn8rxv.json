@@ -1,0 +1,46 @@
+[
+  {
+    "label": "Số thẻ test",
+    "key": "so_the_1779900583136",
+    "dataType": "text",
+    "options": [],
+    "relationResource": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "label": "Test",
+    "key": "Test",
+    "dataType": "text",
+    "options": [],
+    "relationResource": null,
+    "sortOrder": 0,
+    "isActive": false
+  },
+  {
+    "label": "Test2",
+    "key": "Test2Test2Test2",
+    "dataType": "boolean",
+    "options": [
+      "213",
+      "21",
+      "32",
+      "13",
+      "21",
+      "321",
+      "32132132"
+    ],
+    "relationResource": null,
+    "sortOrder": 0,
+    "isActive": true
+  },
+  {
+    "label": "Nguon khach",
+    "key": "nguon_khach",
+    "dataType": "text",
+    "options": [],
+    "relationResource": null,
+    "sortOrder": 1,
+    "isActive": true
+  }
+]

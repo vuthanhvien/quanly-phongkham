@@ -22,6 +22,7 @@ import {
 import Editor from "@monaco-editor/react"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { CustomField, DynamicRole, entityLabels, getResourceActionOptions } from "../models"
 import {
@@ -56,8 +57,9 @@ const DEFAULT_TEMPLATE_HTML = `<section>
 </section>`
 
 export function SettingsPage() {
-  const [entityType, setEntityType] = useState("customers")
-  const [selectedRole, setSelectedRole] = useState(getStoredUserRole())
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [entityType, setEntityType] = useState(() => searchParams.get("module") || "customers")
+  const [selectedRole, setSelectedRole] = useState(() => normalizeRole(searchParams.get("role") || getStoredUserRole()))
   const [moduleEnabled, setModuleEnabled] = useState(true)
   const [fields, setFields] = useState<CustomField[]>([])
   const [views, setViews] = useState<ViewSettingRecord[]>([])
@@ -116,6 +118,25 @@ export function SettingsPage() {
       ) as Record<ViewType, string>,
     [dynamicRoles, selectedRole, views],
   )
+
+  useEffect(() => {
+    const moduleFromUrl = searchParams.get("module") || "customers"
+    const roleFromUrl = normalizeRole(searchParams.get("role") || getStoredUserRole())
+
+    setEntityType((current) => current === moduleFromUrl ? current : moduleFromUrl)
+    setSelectedRole((current) => current === roleFromUrl ? current : roleFromUrl)
+  }, [searchParams])
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set("module", entityType)
+    nextParams.set("role", selectedRole)
+    const nextQuery = nextParams.toString()
+    const currentQuery = searchParams.toString()
+    if (nextQuery !== currentQuery) {
+      setSearchParams(nextParams, { replace: true })
+    }
+  }, [entityType, searchParams, selectedRole, setSearchParams])
 
   useEffect(() => {
     void load()
@@ -309,7 +330,7 @@ export function SettingsPage() {
                 <div className="settings-tab-panel">
                   <div className="settings-tab-header settings-tab-header-wrap">
                     <Typography.Text>
-                      Module hiện tại là <strong>{entityLabels[entityType] || entityType}</strong>. Chuỗi kế thừa đang áp dụng là <strong>{inheritanceChain.join(" -> ")}</strong>. 3 role chính kế thừa từ <strong>{DEFAULT_ROLE_SCOPE}</strong>, còn role dynamic sẽ kế thừa thêm một lớp từ main role của nó.
+                      Module hiện tại là <strong>{entityLabels[entityType] || entityType}</strong>. <strong>{DEFAULT_ROLE_SCOPE}</strong> là config gốc. Chuỗi áp dụng cho role đang chọn là <strong>{[...inheritanceChain].reverse().join(" -> ")}</strong>, nghĩa là hệ thống đọc từ role hiện tại lên main role rồi mới về <strong>{DEFAULT_ROLE_SCOPE}</strong> nếu chưa có config riêng.
                     </Typography.Text>
                     <Checkbox
                       checked={moduleEnabled}

@@ -15,6 +15,7 @@ const CUSTOM_FIELD_TYPES = [
   "select",
   "textarea",
   "relative",
+  "file",
 ]
 
 const RELATIVE_RESOURCE_OPTIONS = Object.entries(entityLabels).map(
@@ -476,7 +477,11 @@ function normalizeFieldPayload(values: Record<string, unknown>, entityType: stri
         ? normalizeOptions(values.options)
         : undefined,
     relationResource:
-      values.dataType === "relative" ? values.relationResource : undefined,
+      values.dataType === "file"
+        ? "files"
+        : values.dataType === "relative"
+          ? values.relationResource
+          : undefined,
   }
 }
 

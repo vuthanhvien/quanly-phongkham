@@ -1,6 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
+import { promises as fs } from 'fs';
+import { extname, join } from 'path';
 import { FindOptionsWhere, ILike, In, LessThan, MoreThan, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
 import {
@@ -17,6 +19,8 @@ import {
   Customer,
   Department,
   Expense,
+  FileFolder,
+  ManagedFile,
   Invoice,
   Lead,
   LeadActivity,
@@ -78,6 +82,8 @@ export class RecordsService {
     @InjectRepository(Consultation) private readonly consultations: Repository<Consultation>,
     @InjectRepository(ServiceOrder) private readonly serviceOrders: Repository<ServiceOrder>,
     @InjectRepository(CustomerImage) private readonly customerImages: Repository<CustomerImage>,
+    @InjectRepository(FileFolder) private readonly fileFolders: Repository<FileFolder>,
+    @InjectRepository(ManagedFile) private readonly files: Repository<ManagedFile>,
     @InjectRepository(Invoice) private readonly invoices: Repository<Invoice>,
     @InjectRepository(Expense) private readonly expenses: Repository<Expense>,
     @InjectRepository(Treatment) private readonly treatments: Repository<Treatment>,
@@ -108,6 +114,8 @@ export class RecordsService {
       consultations: this.consultations,
       'service-orders': this.serviceOrders,
       'customer-images': this.customerImages,
+      'file-folders': this.fileFolders,
+      files: this.files,
       invoices: this.invoices,
       expenses: this.expenses,
       treatments: this.treatments,
@@ -135,6 +143,8 @@ export class RecordsService {
         consultations: ['summary', 'diagnosis', 'status'],
         'service-orders': ['code', 'serviceName', 'status'],
         'customer-images': ['title', 'mediaType', 'diagnosisNote'],
+        'file-folders': ['name', 'description'],
+        files: ['title', 'originalName', 'mimeType', 'extension'],
         'work-schedules': ['shiftLabel', 'room', 'status'],
         'branch-role-assignments': ['roleName'],
         'branch-permissions': ['roleName'],
@@ -172,6 +182,9 @@ export class RecordsService {
   }
 
   async create(resource: string, payload: Record<string, unknown>, user: AuthUser) {
+    if (resource === 'files') {
+      throw new BadRequestException('Hay dung endpoint upload file de tao tep moi');
+    }
     await this.assertPermission(user, resource, 'create', this.branchIdOf(resource, payload));
     await this.validateCustomFields(resource, payload, true);
     const normalized = await this.normalizeInput(resource, payload, true);
@@ -211,6 +224,9 @@ export class RecordsService {
   async remove(resource: string, id: string, user: AuthUser) {
     const record = await this.findStored(resource, id);
     await this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
+    if (resource === 'files') {
+      await fs.unlink((record as ManagedFile).storagePath).catch(() => undefined);
+    }
     await this.customFieldValues.delete({ entityType: resource, recordId: id });
     await this.repository(resource).remove(record);
     await this.audit(user, 'DELETE', resource, id);
@@ -255,6 +271,70 @@ export class RecordsService {
 
     await this.audit(user, 'CONVERT_TO_CUSTOMER', 'leads', lead.id, { customerId: customer.id });
     return { data: await this.findRaw('customers', customer.id) };
+  }
+
+  async uploadFiles(files: any[], payload: { folderId?: string; title?: string; note?: string }, user: AuthUser) {
+    await this.assertPermission(user, 'files', 'create');
+    if (!payload.folderId) {
+      throw new BadRequestException('Phai chon folder truoc khi upload file');
+    }
+    if (!Array.isArray(files) || files.length === 0) {
+      throw new BadRequestException('Chua co file hop le de upload');
+    }
+
+    const folder = await this.fileFolders.findOne({ where: { id: payload.folderId } });
+    if (!folder) {
+      throw new NotFoundException('Khong tim thay folder upload');
+    }
+
+    const uploaded = await Promise.all(
+      files.map((file, index) => this.storeUploadedFile(file, folder, payload, user, index === 0 && files.length === 1)),
+    );
+
+    return { data: uploaded };
+  }
+
+  private async storeUploadedFile(
+    file: any,
+    folder: FileFolder,
+    payload: { title?: string; note?: string },
+    user: AuthUser,
+    useCustomTitle: boolean,
+  ) {
+    if (!file?.buffer || !file.originalname) {
+      throw new BadRequestException('Chua co file hop le de upload');
+    }
+
+    const fileExt = extname(String(file.originalname || '')).replace(/^\./, '');
+    const storedName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${fileExt ? `.${fileExt}` : ''}`;
+    const folderPath = join(process.cwd(), 'storage', 'uploads', folder.id);
+    const storagePath = join(folderPath, storedName);
+
+    await fs.mkdir(folderPath, { recursive: true });
+    await fs.writeFile(storagePath, file.buffer);
+
+    const record = await this.files.save(
+      this.files.create({
+        folderId: folder.id,
+        title: String(useCustomTitle && payload.title ? payload.title : file.originalname),
+        originalName: String(file.originalname),
+        storedName,
+        extension: fileExt || undefined,
+        mimeType: file.mimetype || undefined,
+        sizeBytes: Number(file.size || 0),
+        storagePath,
+        publicUrl: `/uploads/${folder.id}/${storedName}`,
+        uploadedBy: user.id,
+        note: payload.note,
+        isActive: true,
+      }),
+    );
+
+    await this.audit(user, 'UPLOAD', 'files', record.id, {
+      folderId: folder.id,
+      originalName: file.originalname,
+    });
+    return record;
   }
 
   async audits(page = 1, pageSize = 30, user?: AuthUser) {
@@ -324,14 +404,18 @@ export class RecordsService {
     const values = (payload.customFields || {}) as Record<string, unknown>;
     for (const field of fields) {
       const value = values[field.key];
-      if (creating && field.required && (value === undefined || value === '')) {
+      if (creating && field.required && this.isEmptyCustomFieldValue(value)) {
         throw new BadRequestException(`Truong tuy bien bat buoc: ${field.label}`);
       }
-      if (value === undefined || value === '') continue;
+      if (this.isEmptyCustomFieldValue(value)) continue;
+      const valueItems = Array.isArray(value) ? value : [value];
       const valid =
         field.dataType === 'number' ? !Number.isNaN(Number(value)) :
         field.dataType === 'boolean' ? typeof value === 'boolean' :
         field.dataType === 'select' ? !field.options || field.options.includes(String(value)) :
+        field.dataType === 'file' ? Boolean(
+          (await this.files.count({ where: { id: In(valueItems.map((item) => String(item))), isActive: true } })) === valueItems.length,
+        ) :
         field.dataType === 'relative' ? typeof value === 'string' && value.length > 0 :
         true;
       if (!valid) throw new BadRequestException(`Gia tri khong hop le cho ${field.label}`);
@@ -361,7 +445,14 @@ export class RecordsService {
 
     for (const row of storedValues) {
       const current = valuesByRecord.get(row.recordId) || {};
-      current[row.fieldKey] = this.parseCustomFieldValue(row.valueText, definitionsByKey.get(row.fieldKey)?.dataType);
+      const parsed = this.parseCustomFieldValue(row.valueText, definitionsByKey.get(row.fieldKey)?.dataType);
+      if (current[row.fieldKey] === undefined) {
+        current[row.fieldKey] = parsed;
+      } else if (Array.isArray(current[row.fieldKey])) {
+        (current[row.fieldKey] as unknown[]).push(parsed);
+      } else {
+        current[row.fieldKey] = [current[row.fieldKey], parsed];
+      }
       valuesByRecord.set(row.recordId, current);
     }
 
@@ -383,17 +474,27 @@ export class RecordsService {
     await this.customFieldValues.delete({ entityType: resource, recordId });
 
     const rows = Object.entries(values)
-      .filter(([, value]) => value !== undefined && value !== null && value !== '')
-      .map(([fieldKey, value]) => this.customFieldValues.create({
-        entityType: resource,
-        recordId,
-        fieldKey,
-        valueText: String(value),
-      }));
+      .flatMap(([fieldKey, value]) => {
+        if (this.isEmptyCustomFieldValue(value)) return [];
+        const valueItems = Array.isArray(value) ? value : [value];
+        return valueItems
+          .filter((item) => !this.isEmptyCustomFieldValue(item))
+          .map((item) => this.customFieldValues.create({
+            entityType: resource,
+            recordId,
+            fieldKey,
+            valueText: String(item),
+          }));
+      });
 
     if (rows.length > 0) {
       await this.customFieldValues.save(rows);
     }
+  }
+
+  private isEmptyCustomFieldValue(value: unknown) {
+    if (Array.isArray(value)) return value.length === 0;
+    return value === undefined || value === null || value === '';
   }
 
   private async copyCustomFieldValues(
@@ -446,11 +547,12 @@ export class RecordsService {
 
   private async assertPermission(user: AuthUser | undefined, resource: string, action: string, branchId?: string) {
     this.assertResourceAccess(user, resource);
-    if (!user || this.isAdmin(user)) return;
+    if (!user) return;
     const allowedActions = await this.resolveAllowedActions(resource, user.activeRole || user.role, user.roleMain || user.role);
     if (!allowedActions.includes(action)) {
       throw new ForbiddenException('Role hien tai khong duoc su dung thao tac nay');
     }
+    if (this.isAdmin(user)) return;
     const branches = this.allowedBranches(user) || [];
     const matched = !branchId ? branches.length > 0 : branches.includes(branchId);
     if (!matched) {
@@ -525,7 +627,7 @@ export class RecordsService {
   }
 
   private assertResourceAccess(user: AuthUser | undefined, resource: string) {
-    if (!user || this.isAdmin(user)) return;
+    if (!user) return;
     if ((user.disabledModules || []).includes(resource)) {
       throw new ForbiddenException('Role hien tai khong duoc su dung module nay');
     }
