@@ -262,6 +262,7 @@ export function RecordDetailPage() {
             dataSource={block.rows}
             pagination={false}
             rowKey="id"
+            scroll={{ x: "max-content" }}
             size="small"
           />
         </Card>

@@ -89,6 +89,7 @@ export function RecordListPage() {
         title: field.label,
         dataIndex: field.key,
         key: field.key,
+        width: field.tableWidth,
         render: (_: unknown, row: Record<string, any>) =>
           displayValue(
             field,
@@ -99,6 +100,7 @@ export function RecordListPage() {
       {
         title: "Thao tác",
         key: "action",
+        width: 220,
         render: (_: unknown, row: Record<string, any>) => (
           <Space>
             {hasActionAccess(resource, "view") && (
@@ -226,6 +228,7 @@ export function RecordListPage() {
           dataSource={rows}
           loading={loading}
           rowKey="id"
+          scroll={{ x: "max-content" }}
         />
       </Card>
       <Drawer

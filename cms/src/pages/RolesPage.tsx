@@ -83,6 +83,7 @@ export function RolesPage() {
           pagination={false}
           rowKey="id"
           dataSource={roles}
+          scroll={{ x: "max-content" }}
           columns={[
             { title: "Key", dataIndex: "key" },
             { title: "Tên role", dataIndex: "name" },

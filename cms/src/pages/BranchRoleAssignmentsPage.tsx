@@ -104,6 +104,7 @@ export function BranchRoleAssignmentsPage() {
           pagination={false}
           rowKey="id"
           dataSource={assignments}
+          scroll={{ x: "max-content" }}
           columns={[
             {
               title: "User",

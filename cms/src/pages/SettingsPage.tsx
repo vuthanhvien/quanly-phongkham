@@ -425,6 +425,7 @@ export function SettingsPage() {
                         pagination={false}
                         rowKey="id"
                         dataSource={templates}
+                        scroll={{ x: "max-content" }}
                         columns={[
                           { title: "Tên mẫu", dataIndex: "name" },
                           {
@@ -651,6 +652,27 @@ function ViewConfigTable({
     )
   }
 
+  if (viewType === "TABLE") {
+    columns.push({
+      title: "Width cột (px)",
+      key: "tableWidth",
+      width: 160,
+      render: (_, row) => (
+        <Input
+          inputMode="numeric"
+          value={row.tableWidth === undefined ? "" : String(row.tableWidth)}
+          onChange={(event) => {
+            const nextValue = event.target.value.replace(/[^\d]/g, "")
+            onChange(viewType, row.key, {
+              tableWidth: nextValue ? Number(nextValue) : undefined,
+            })
+          }}
+          placeholder="Ví dụ 180"
+        />
+      ),
+    })
+  }
+
   if (viewType === "FORM") {
     columns.push(
       {
@@ -768,7 +790,7 @@ function ViewConfigTable({
       dataSource={dataSource}
       pagination={false}
       rowKey="key"
-      scroll={{ x: 1120 }}
+      scroll={{ x: "max-content" }}
       size="small"
     />
   )

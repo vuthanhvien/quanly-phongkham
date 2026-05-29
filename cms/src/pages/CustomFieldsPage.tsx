@@ -248,6 +248,7 @@ export function CustomFieldsPage() {
           pagination={false}
           rowKey="id"
           dataSource={fields}
+          scroll={{ x: "max-content" }}
           columns={[
             { title: "Nhãn", dataIndex: "label" },
             { title: "Key", dataIndex: "key" },
@@ -355,7 +356,7 @@ export function CustomFieldsPage() {
           dataSource={batchRows}
           pagination={false}
           rowKey="__rowKey"
-          scroll={{ x: 1320, y: 520 }}
+          scroll={{ x: "max-content", y: 520 }}
           size="small"
         />
       </Modal>
@@ -384,7 +385,7 @@ export function CustomFieldsPage() {
           size="small"
           rowKey="key"
           pagination={false}
-          scroll={{ x: 980, y: 360 }}
+          scroll={{ x: "max-content", y: 360 }}
           dataSource={importPayload}
           columns={[
             { title: "Label", dataIndex: "label" },

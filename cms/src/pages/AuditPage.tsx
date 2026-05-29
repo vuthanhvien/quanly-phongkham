@@ -19,6 +19,7 @@ export function AuditPage() {
         <Table
           rowKey="id"
           dataSource={rows}
+          scroll={{ x: "max-content" }}
           columns={[
             { title: "Thời gian", dataIndex: "createdAt" },
             { title: "Người dùng", dataIndex: "userName" },

@@ -52,6 +52,7 @@ export interface FieldLayoutConfig extends FieldSpec {
   placeholder?: string
   defaultValue?: unknown
   width?: '25' | '33' | '50' | '66' | '100'
+  tableWidth?: number
 }
 
 function readStoredUser() {
@@ -237,6 +238,10 @@ export function buildFieldLayoutConfigs(
         ['25', '33', '50', '66', '100'].includes(String(entry.width))
           ? String(entry.width) as FieldLayoutConfig['width']
           : base.width,
+      tableWidth:
+        typeof entry.tableWidth === 'number' && Number.isFinite(entry.tableWidth) && entry.tableWidth > 0
+          ? entry.tableWidth
+          : base.tableWidth,
       visible:
         typeof entry.visible === 'boolean' ? entry.visible : true,
     })
@@ -288,6 +293,9 @@ export function serializeViewConfig(
       next.defaultValue = field.defaultValue
     }
     if (field.width) next.width = field.width
+    if (typeof field.tableWidth === 'number' && Number.isFinite(field.tableWidth) && field.tableWidth > 0) {
+      next.tableWidth = field.tableWidth
+    }
 
     return next
   })

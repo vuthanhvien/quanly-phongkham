@@ -6,6 +6,7 @@ export interface FieldSpec {
   options?: string[];
   defaultValue?: unknown;
   width?: '25' | '33' | '50' | '66' | '100';
+  tableWidth?: number;
   disabled?: boolean;
   description?: string;
   placeholder?: string;
