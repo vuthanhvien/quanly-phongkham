@@ -354,6 +354,7 @@ export function SettingsPage() {
                             dataSource={tableConfig}
                             viewType="TABLE"
                             onChange={updateConfig}
+                            onReorder={reorderConfig}
                           />
                         ),
                       },
@@ -556,7 +557,7 @@ function ViewConfigTable({
       key: "sort",
       width: 56,
       render: (_, row) =>
-        viewType === "FORM" || viewType === "DETAIL" ? (
+        onReorder ? (
           <span className="drag-handle" title="Kéo để đổi thứ tự">
             <HolderOutlined />
             <span className="drag-order">#{dataSource.findIndex((item) => item.key === row.key) + 1}</span>
@@ -732,7 +733,7 @@ function ViewConfigTable({
         body: {
           row: (props: React.HTMLAttributes<HTMLTableRowElement>) => {
             const rowKey = String((props as React.HTMLAttributes<HTMLTableRowElement> & { "data-row-key"?: string })["data-row-key"] || "")
-            const draggable = viewType === "FORM" || viewType === "DETAIL"
+            const draggable = Boolean(onReorder)
             return (
               <tr
                 {...props}
