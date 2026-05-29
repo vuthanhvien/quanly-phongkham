@@ -6,6 +6,12 @@ import { In, Repository } from 'typeorm';
 import { BranchRoleAssignment, DynamicRoleDefinition, Staff, User, ViewSetting } from '../entities/entities';
 
 const DEFAULT_ROLE_SCOPE = 'ALL';
+const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print'];
+
+const RESOURCE_ACTIONS: Record<string, string[]> = {
+  customers: [...DEFAULT_RESOURCE_ACTIONS, 'reveal-phone'],
+  leads: [...DEFAULT_RESOURCE_ACTIONS, 'convert-to-customer'],
+};
 
 function normalizeRole(role?: string) {
   return role?.trim().toUpperCase() || DEFAULT_ROLE_SCOPE;
@@ -39,6 +45,7 @@ export class AuthService {
       branchPermissions[0]?.roleKeys?.[0] ||
       user.role;
     const disabledModules = await this.resolveDisabledModules(activeRole);
+    const actionPermissions = await this.resolveActionPermissions(activeRole);
     const profile = {
       id: user.id,
       email: user.email,
@@ -49,6 +56,7 @@ export class AuthService {
       branchId: user.branchId,
       staffId: staff?.id || user.staffId,
       disabledModules,
+      actionPermissions,
       branchPermissions: branchPermissions.map((item) => ({
         branchId: item.branchId,
         roleName: item.roleName,
@@ -60,6 +68,16 @@ export class AuthService {
       accessToken: this.jwtService.sign(profile),
       user: profile,
     };
+  }
+
+  private async resolveActionPermissions(role?: string) {
+    const normalizedRole = normalizeRole(role);
+    const views = await this.viewSettings.find();
+    const entityTypes = Array.from(new Set(views.map((view) => view.entityType).filter(Boolean)));
+
+    return Object.fromEntries(
+      entityTypes.map((entityType) => [entityType, this.resolveAllowedActionsForEntity(views, entityType, normalizedRole)]),
+    );
   }
 
   private async resolveDisabledModules(role?: string) {
@@ -85,5 +103,28 @@ export class AuthService {
       if (typeof defaultModuleEnabled === 'boolean') return !defaultModuleEnabled;
       return false;
     });
+  }
+
+  private resolveAllowedActionsForEntity(views: ViewSetting[], entityType: string, normalizedRole: string) {
+    const entityViews = views.filter((view) => view.entityType === entityType);
+    const exactViews = entityViews.filter((view) => normalizeRole(view.role) === normalizedRole);
+    const exactActions = exactViews
+      .map((view) => view.config?.allowedActions)
+      .find((value) => Array.isArray(value));
+
+    if (Array.isArray(exactActions)) {
+      return exactActions.map(String);
+    }
+
+    const defaultViews = entityViews.filter((view) => normalizeRole(view.role) === DEFAULT_ROLE_SCOPE);
+    const defaultActions = defaultViews
+      .map((view) => view.config?.allowedActions)
+      .find((value) => Array.isArray(value));
+
+    if (Array.isArray(defaultActions)) {
+      return defaultActions.map(String);
+    }
+
+    return RESOURCE_ACTIONS[entityType] || DEFAULT_RESOURCE_ACTIONS;
   }
 }

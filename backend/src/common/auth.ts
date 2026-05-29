@@ -13,6 +13,7 @@ export interface AuthUser {
   branchId?: string;
   staffId?: string;
   disabledModules?: string[];
+  actionPermissions?: Record<string, string[]>;
   branchPermissions?: Array<{
     branchId: string;
     roleName?: string;

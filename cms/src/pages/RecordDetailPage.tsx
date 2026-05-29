@@ -4,6 +4,7 @@ import {
   Col,
   Descriptions,
   Empty,
+  Tooltip,
   message,
   Row,
   Space,
@@ -14,6 +15,7 @@ import {
 import { useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { api } from "../api"
+import { hasActionAccess } from "../access"
 import { CustomField, entityLabels } from "../models"
 import { displayValue, loadRelationOptions, LookupMap } from "../relations"
 import {
@@ -112,22 +114,26 @@ export function RecordDetailPage() {
           <Link to={`/${resource}`}>
             <Button>Quay lại</Button>
           </Link>
-          {resource === "leads" && !record?.convertedCustomerId && (
-            <Button
-              onClick={async () => {
-                const response = await convertLead(id)
-                message.success("Đã chuyển lead thành khách hàng")
-                navigate(`/customers/${response.data.data.id}`)
-              }}
-            >
-              Chuyển thành khách hàng
-            </Button>
+          {resource === "leads" && !record?.convertedCustomerId && hasActionAccess(resource, "convert-to-customer") && (
+            <Tooltip title="Chuyển lead thành khách hàng">
+              <Button
+                onClick={async () => {
+                  const response = await convertLead(id)
+                  message.success("Đã chuyển lead thành khách hàng")
+                  navigate(`/customers/${response.data.data.id}`)
+                }}
+              >
+                Chuyển thành khách hàng
+              </Button>
+            </Tooltip>
           )}
-          <Link to={`/${resource}/${id}/edit`}>
-            <Button className="primary-glow" type="primary">
-              Sửa hồ sơ
-            </Button>
-          </Link>
+          {hasActionAccess(resource, "update") && (
+            <Link to={`/${resource}/${id}/edit`}>
+              <Button className="primary-glow" type="primary">
+                Sửa hồ sơ
+              </Button>
+            </Link>
+          )}
         </Space>
       </div>
 

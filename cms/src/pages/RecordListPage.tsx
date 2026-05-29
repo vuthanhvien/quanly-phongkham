@@ -1,5 +1,14 @@
 import { useDelete, useList } from "@refinedev/core"
 import {
+  DeleteOutlined,
+  EditOutlined,
+  EyeOutlined,
+  PhoneOutlined,
+  PrinterOutlined,
+  SwapOutlined,
+  PlusOutlined,
+} from "@ant-design/icons"
+import {
   Button,
   Card,
   Drawer,
@@ -7,6 +16,7 @@ import {
   Popconfirm,
   Space,
   Table,
+  Tooltip,
   Typography,
   message,
 } from "antd"
@@ -14,6 +24,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { api } from "../api"
+import { hasActionAccess } from "../access"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { CustomField, entityLabels } from "../models"
 import { displayValue, loadRelationOptions, LookupMap } from "../relations"
@@ -90,44 +101,59 @@ export function RecordListPage() {
         key: "action",
         render: (_: unknown, row: Record<string, any>) => (
           <Space>
-            <Link to={`/${resource}/${row.id}`}>Chi tiết</Link>
-            <Link to={`/${resource}/${row.id}/edit`}>Sửa</Link>
-            {resource === "customers" && (
-              <Button type="link" onClick={() => revealPhone(row.id)}>
-                Xem SĐT
-              </Button>
+            {hasActionAccess(resource, "view") && (
+              <Tooltip title="Xem chi tiết">
+                <Link to={`/${resource}/${row.id}`}>
+                  <Button icon={<EyeOutlined />} type="text" />
+                </Link>
+              </Tooltip>
             )}
-            {resource === "leads" && !row.convertedCustomerId && (
-              <Button type="link" onClick={() => convertLead(row.id)}>
-                Chuyển thành KH
-              </Button>
+            {hasActionAccess(resource, "update") && (
+              <Tooltip title="Chỉnh sửa">
+                <Link to={`/${resource}/${row.id}/edit`}>
+                  <Button icon={<EditOutlined />} type="text" />
+                </Link>
+              </Tooltip>
             )}
-            {templates[0] && (
-              <Button
-                type="link"
-                onClick={() => printRecord(templates[0].id, row.id)}
-              >
-                In
-              </Button>
+            {resource === "customers" && hasActionAccess(resource, "reveal-phone") && (
+              <Tooltip title="Xem số điện thoại">
+                <Button icon={<PhoneOutlined />} type="text" onClick={() => revealPhone(row.id)} />
+              </Tooltip>
             )}
-            <Popconfirm
-              title="Xóa bản ghi này?"
-              onConfirm={() =>
-                deleteRecord(
-                  { resource, id: row.id },
-                  {
-                    onSuccess: () => {
-                      message.success("Đã xóa")
-                      refresh()
+            {resource === "leads" && !row.convertedCustomerId && hasActionAccess(resource, "convert-to-customer") && (
+              <Tooltip title="Chuyển thành khách hàng">
+                <Button icon={<SwapOutlined />} type="text" onClick={() => convertLead(row.id)} />
+              </Tooltip>
+            )}
+            {templates[0] && hasActionAccess(resource, "print") && (
+              <Tooltip title="In biểu mẫu">
+                <Button
+                  icon={<PrinterOutlined />}
+                  type="text"
+                  onClick={() => printRecord(templates[0].id, row.id)}
+                />
+              </Tooltip>
+            )}
+            {hasActionAccess(resource, "delete") && (
+              <Popconfirm
+                title="Xóa bản ghi này?"
+                onConfirm={() =>
+                  deleteRecord(
+                    { resource, id: row.id },
+                    {
+                      onSuccess: () => {
+                        message.success("Đã xóa")
+                        refresh()
+                      },
                     },
-                  },
-                )
-              }
-            >
-              <Button danger type="link">
-                Xóa
-              </Button>
-            </Popconfirm>
+                  )
+                }
+              >
+                <Tooltip title="Xóa bản ghi">
+                  <Button danger icon={<DeleteOutlined />} type="text" />
+                </Tooltip>
+              </Popconfirm>
+            )}
           </Space>
         ),
       },
@@ -180,13 +206,18 @@ export function RecordListPage() {
             placeholder="Tìm kiếm"
             onSearch={setSearch}
           />
-          <Button
-            className="primary-glow"
-            type="primary"
-            onClick={() => setCreating(true)}
-          >
-            Thêm nhanh
-          </Button>
+          {hasActionAccess(resource, "create") && (
+            <Tooltip title="Tạo bản ghi mới">
+              <Button
+                className="primary-glow"
+                icon={<PlusOutlined />}
+                type="primary"
+                onClick={() => setCreating(true)}
+              >
+                Thêm nhanh
+              </Button>
+            </Tooltip>
+          )}
         </Space>
       </div>
       <Card className="table-card">

@@ -22,7 +22,7 @@ import Editor from "@monaco-editor/react"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
-import { CustomField, DynamicRole, entityLabels } from "../models"
+import { CustomField, DynamicRole, entityLabels, getResourceActionOptions } from "../models"
 import {
   buildFieldLayoutConfigs,
   DEFAULT_ROLE_SCOPE,
@@ -32,6 +32,7 @@ import {
   getStoredUserRole,
   hasExactRoleSetting,
   normalizeRole,
+  resolveAllowedActions,
   resolveModuleEnabled,
   serializeViewConfig,
   ViewSettingRecord,
@@ -62,6 +63,7 @@ export function SettingsPage() {
   const [detailConfig, setDetailConfig] = useState<FieldLayoutConfig[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [dynamicRoles, setDynamicRoles] = useState<DynamicRole[]>([])
+  const [allowedActions, setAllowedActions] = useState<string[]>([])
   const [templateModal, setTemplateModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
   const [templateForm] = Form.useForm()
@@ -89,6 +91,10 @@ export function SettingsPage() {
       ) as Record<ViewType, boolean>,
     [views, selectedRole],
   )
+  const actionOptions = useMemo(
+    () => getResourceActionOptions(entityType),
+    [entityType],
+  )
 
   useEffect(() => {
     void load()
@@ -96,6 +102,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     setModuleEnabled(resolveModuleEnabled(views, selectedRole))
+    setAllowedActions(resolveAllowedActions(views, entityType, selectedRole))
     setTableConfig(
       buildFieldLayoutConfigs(
         fieldCatalog,
@@ -144,7 +151,7 @@ export function SettingsPage() {
         "DETAIL",
       ),
     )
-  }, [fieldCatalog, selectedRole, views])
+  }, [entityType, fieldCatalog, selectedRole, views])
 
   async function load() {
     const [fieldResponse, viewResponse, templateResponse, roleResponse] = await Promise.all([
@@ -163,15 +170,15 @@ export function SettingsPage() {
     await Promise.all([
       api.put(`/settings/views/${entityType}/TABLE`, {
         role: selectedRole,
-        config: serializeViewConfig("TABLE", tableConfig, moduleEnabled),
+        config: serializeViewConfig("TABLE", tableConfig, moduleEnabled, allowedActions),
       }),
       api.put(`/settings/views/${entityType}/FORM`, {
         role: selectedRole,
-        config: serializeViewConfig("FORM", formConfig, moduleEnabled),
+        config: serializeViewConfig("FORM", formConfig, moduleEnabled, allowedActions),
       }),
       api.put(`/settings/views/${entityType}/DETAIL`, {
         role: selectedRole,
-        config: serializeViewConfig("DETAIL", detailConfig, moduleEnabled),
+        config: serializeViewConfig("DETAIL", detailConfig, moduleEnabled, allowedActions),
       }),
     ])
     message.success("Đã lưu cấu hình module theo role")
@@ -290,6 +297,9 @@ export function SettingsPage() {
                     <Tag color={moduleEnabled ? "green" : "red"}>
                       Module: {moduleEnabled ? "Được dùng" : "Bị khóa"}
                     </Tag>
+                    <Tag color="blue">
+                      Actions: {allowedActions.length ? allowedActions.join(", ") : "Không có"}
+                    </Tag>
                     {VIEW_TYPES.map((viewType) => (
                       <Tag
                         color={viewStatus[viewType] ? "green" : "gold"}
@@ -299,6 +309,16 @@ export function SettingsPage() {
                       </Tag>
                     ))}
                   </Space>
+                  <Card size="small" title="Action theo role" style={{ marginTop: 16 }}>
+                    <Checkbox.Group
+                      options={actionOptions.map((item) => ({
+                        label: item.label,
+                        value: item.key,
+                      }))}
+                      value={allowedActions}
+                      onChange={(values) => setAllowedActions(values.map(String))}
+                    />
+                  </Card>
                   <Tabs
                     className="settings-inner-tabs"
                     items={[

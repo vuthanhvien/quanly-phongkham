@@ -28,8 +28,16 @@ import {
   Supplier,
   Treatment,
   User,
+  ViewSetting,
   WorkSchedule,
 } from '../entities/entities';
+
+const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print'];
+
+const RESOURCE_ACTIONS: Record<string, string[]> = {
+  customers: [...DEFAULT_RESOURCE_ACTIONS, 'reveal-phone'],
+  leads: [...DEFAULT_RESOURCE_ACTIONS, 'convert-to-customer'],
+};
 
 type ResourceRepository = Repository<any>;
 
@@ -59,6 +67,7 @@ export class RecordsService {
     @InjectRepository(Commission) private readonly commissions: Repository<Commission>,
     @InjectRepository(CustomFieldDefinition) private readonly fieldDefinitions: Repository<CustomFieldDefinition>,
     @InjectRepository(CustomFieldValue) private readonly customFieldValues: Repository<CustomFieldValue>,
+    @InjectRepository(ViewSetting) private readonly viewSettings: Repository<ViewSetting>,
     @InjectRepository(AuditLog) private readonly auditLogs: Repository<AuditLog>,
   ) {}
 
@@ -93,7 +102,7 @@ export class RecordsService {
   }
 
   async list(resource: string, page = 1, pageSize = 20, search?: string, user?: AuthUser) {
-    this.assertPermission(user, resource, 'view');
+    await this.assertPermission(user, resource, 'view');
     const repository = this.repository(resource);
     let where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[] = {};
     if (search) {
@@ -141,12 +150,12 @@ export class RecordsService {
 
   async find(resource: string, id: string, user?: AuthUser) {
     const record = await this.findRaw(resource, id);
-    this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
+    await this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
     return { data: this.protect(resource, record) };
   }
 
   async create(resource: string, payload: Record<string, unknown>, user: AuthUser) {
-    this.assertPermission(user, resource, 'create', this.branchIdOf(resource, payload));
+    await this.assertPermission(user, resource, 'create', this.branchIdOf(resource, payload));
     await this.validateCustomFields(resource, payload, true);
     const normalized = await this.normalizeInput(resource, payload, true);
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
@@ -171,7 +180,7 @@ export class RecordsService {
       ...previous,
       ...payload,
     }, false);
-    this.assertPermission(user, resource, 'update', this.branchIdOf(resource, normalized) || this.branchIdOf(resource, previous));
+    await this.assertPermission(user, resource, 'update', this.branchIdOf(resource, normalized) || this.branchIdOf(resource, previous));
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized, id);
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized);
     const repository = this.repository(resource);
@@ -184,7 +193,7 @@ export class RecordsService {
 
   async remove(resource: string, id: string, user: AuthUser) {
     const record = await this.findStored(resource, id);
-    this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
+    await this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
     await this.customFieldValues.delete({ entityType: resource, recordId: id });
     await this.repository(resource).remove(record);
     await this.audit(user, 'DELETE', resource, id);
@@ -193,14 +202,14 @@ export class RecordsService {
 
   async revealPhone(id: string, user: AuthUser) {
     const customer = (await this.findRaw('customers', id)) as Customer;
-    this.assertPermission(user, 'customers', 'reveal-phone', customer.branchId);
+    await this.assertPermission(user, 'customers', 'reveal-phone', customer.branchId);
     await this.audit(user, 'REVEAL_PHONE', 'customers', id);
     return { data: { phone: customer.phone } };
   }
 
   async convertLeadToCustomer(id: string, user: AuthUser) {
     const lead = await this.findStored('leads', id) as Lead;
-    this.assertPermission(user, 'leads', 'update', lead.branchId);
+    await this.assertPermission(user, 'leads', 'convert-to-customer', lead.branchId);
 
     if (lead.convertedCustomerId) {
       const existingCustomer = await this.findRaw('customers', lead.convertedCustomerId);
@@ -418,15 +427,36 @@ export class RecordsService {
     if (conflict) throw new BadRequestException('Bac si hoac phong da co lich trong khung gio nay');
   }
 
-  private assertPermission(user: AuthUser | undefined, resource: string, action: string, branchId?: string) {
-    void resource;
-    void action;
+  private async assertPermission(user: AuthUser | undefined, resource: string, action: string, branchId?: string) {
+    this.assertResourceAccess(user, resource);
     if (!user || this.isAdmin(user)) return;
+    const allowedActions = await this.resolveAllowedActions(resource, user.activeRole || user.role);
+    if (!allowedActions.includes(action)) {
+      throw new ForbiddenException('Role hien tai khong duoc su dung thao tac nay');
+    }
     const branches = this.allowedBranches(user) || [];
     const matched = !branchId ? branches.length > 0 : branches.includes(branchId);
     if (!matched) {
       throw new ForbiddenException('Ban khong co quyen thuc hien thao tac nay tai chi nhanh hien tai');
     }
+  }
+
+  private async resolveAllowedActions(resource: string, role?: string) {
+    const normalizedRole = (role || 'ALL').trim().toUpperCase();
+    const views = await this.viewSettings.find({ where: { entityType: resource } });
+    const exactViews = views.filter((view) => (view.role || 'ALL').trim().toUpperCase() === normalizedRole);
+    const exactActions = exactViews
+      .map((view) => view.config?.allowedActions)
+      .find((value) => Array.isArray(value));
+    if (Array.isArray(exactActions)) return exactActions.map(String);
+
+    const defaultViews = views.filter((view) => (view.role || 'ALL').trim().toUpperCase() === 'ALL');
+    const defaultActions = defaultViews
+      .map((view) => view.config?.allowedActions)
+      .find((value) => Array.isArray(value));
+    if (Array.isArray(defaultActions)) return defaultActions.map(String);
+
+    return RESOURCE_ACTIONS[resource] || DEFAULT_RESOURCE_ACTIONS;
   }
 
   private allowedBranches(user: AuthUser | undefined) {

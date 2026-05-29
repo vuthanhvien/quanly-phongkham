@@ -1,4 +1,4 @@
-import { baseFields, CustomField, FieldSpec, systemRoleOptions } from './models'
+import { baseFields, CustomField, FieldSpec, getResourceActionOptions, systemRoleOptions } from './models'
 
 export const DEFAULT_ROLE_SCOPE = 'ALL'
 export const DEFAULT_ROLE_GROUPS = [DEFAULT_ROLE_SCOPE, ...systemRoleOptions]
@@ -12,6 +12,30 @@ export interface ViewSettingRecord {
   viewType: string
   role?: string
   config?: Record<string, unknown>
+}
+
+export function resolveAllowedActions(
+  views: ViewSettingRecord[],
+  resource: string,
+  role?: string,
+) {
+  const normalizedRole = normalizeRole(role)
+  const exactViews = views.filter((view) => normalizeRole(view.role) === normalizedRole)
+  const exactAllowedActions = exactViews
+    .map((view) => view.config?.allowedActions)
+    .find((value) => Array.isArray(value))
+
+  if (Array.isArray(exactAllowedActions)) return exactAllowedActions.map(String)
+
+  const defaultViews = views.filter(
+    (view) => normalizeRole(view.role) === DEFAULT_ROLE_SCOPE,
+  )
+  const defaultAllowedActions = defaultViews
+    .map((view) => view.config?.allowedActions)
+    .find((value) => Array.isArray(value))
+
+  if (Array.isArray(defaultAllowedActions)) return defaultAllowedActions.map(String)
+  return getResourceActionOptions(resource).map((item) => item.key)
 }
 
 function getModuleEnabledValue(view: ViewSettingRecord | undefined) {
@@ -236,6 +260,7 @@ export function serializeViewConfig(
   viewType: ViewType,
   configs: FieldLayoutConfig[],
   moduleEnabled = true,
+  allowedActions?: string[],
 ) {
   const items = configs.map((field) => {
     const next: Record<string, unknown> = {
@@ -253,6 +278,6 @@ export function serializeViewConfig(
   })
 
   return viewType === 'TABLE'
-    ? { columns: items, moduleEnabled }
-    : { fields: items, moduleEnabled }
+    ? { columns: items, moduleEnabled, allowedActions }
+    : { fields: items, moduleEnabled, allowedActions }
 }

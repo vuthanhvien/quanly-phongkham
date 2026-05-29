@@ -25,6 +25,7 @@ import {
   Supplier,
   Treatment,
   User,
+  ViewSetting,
   WorkSchedule,
 } from '../entities/entities';
 import { RecordsController } from './records.controller';
@@ -57,6 +58,7 @@ import { RecordsService } from './records.service';
       Commission,
       CustomFieldDefinition,
       CustomFieldValue,
+      ViewSetting,
       AuditLog,
     ]),
   ],

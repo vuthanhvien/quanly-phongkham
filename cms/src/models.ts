@@ -44,7 +44,29 @@ export interface BranchRoleAssignment {
   isActive: boolean;
 }
 
+export interface ResourceActionOption {
+  key: string;
+  label: string;
+}
+
 export const systemRoleOptions = ['ADMIN', 'STAFF', 'DOCTOR'];
+
+const DEFAULT_RESOURCE_ACTIONS: ResourceActionOption[] = [
+  { key: 'view', label: 'Xem chi tiết' },
+  { key: 'create', label: 'Tạo mới' },
+  { key: 'update', label: 'Cập nhật' },
+  { key: 'delete', label: 'Xóa' },
+  { key: 'print', label: 'In biểu mẫu' },
+];
+
+export const resourceActionOptions: Record<string, ResourceActionOption[]> = {
+  customers: [...DEFAULT_RESOURCE_ACTIONS, { key: 'reveal-phone', label: 'Xem số điện thoại' }],
+  leads: [...DEFAULT_RESOURCE_ACTIONS, { key: 'convert-to-customer', label: 'Chuyển thành khách hàng' }],
+};
+
+export function getResourceActionOptions(resource: string) {
+  return resourceActionOptions[resource] || DEFAULT_RESOURCE_ACTIONS;
+}
 
 export const entityLabels: Record<string, string> = {
   branches: 'Chi nhánh',
