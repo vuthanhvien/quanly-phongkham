@@ -14,6 +14,8 @@ import {
   InteractionOutlined,
   LineChartOutlined,
   MedicineBoxOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   PictureOutlined,
   ProductOutlined,
   SettingOutlined,
@@ -24,11 +26,13 @@ import {
 import { useLogout } from "@refinedev/core"
 import { Button, Layout, Menu, Space, Tag, Typography } from "antd"
 import type { MenuProps } from "antd"
+import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { hasResourceAccess, hasScreenAccess } from "../access"
 import { entityLabels } from "../models"
 
 const { Header, Content, Sider } = Layout
+const SIDER_COLLAPSE_KEY = "clinic-sider-collapsed"
 
 const menuIcons: Record<string, React.ReactNode> = {
   "custom-fields": <AppstoreOutlined />,
@@ -104,6 +108,13 @@ const resourceToGroup = Object.fromEntries(
 export function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const { mutate: logout } = useLogout()
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDER_COLLAPSE_KEY) === "1"
+    } catch {
+      return false
+    }
+  })
   const currentResource = location.pathname.split("/")[1]
   const visibleGroups = menuGroups
     .map((group) => ({
@@ -184,12 +195,36 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ? "system-tools"
       : undefined,
   ].filter(Boolean) as string[]
+
+  function toggleCollapsed() {
+    setCollapsed((current) => {
+      const next = !current
+      try {
+        localStorage.setItem(SIDER_COLLAPSE_KEY, next ? "1" : "0")
+      } catch {
+        // ignore storage errors
+      }
+      return next
+    })
+  }
+
   return (
     <Layout className="app-shell">
-      <Sider className="app-sider" width={282} theme="dark">
+      <Sider
+        breakpoint="lg"
+        className="app-sider"
+        collapsed={collapsed}
+        collapsedWidth={88}
+        theme="dark"
+        trigger={null}
+        width={282}
+        onBreakpoint={(broken) => {
+          if (broken) setCollapsed(true)
+        }}
+      >
         <div className="brand-card">
           <div className="brand-mark">TC</div>
-          <div>
+          <div className="brand-copy">
             <Typography.Text className="brand-kicker">
               Aesthetic Clinic
             </Typography.Text>
@@ -207,12 +242,19 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </Sider>
       <Layout>
         <Header className="app-header">
-          <div>
-            <Typography.Text className="eyebrow">
-              CMS vận hành viện thẩm mỹ
-            </Typography.Text>
-            {/* <Typography.Title level={3}>Không gian quản trị</Typography.Title> */}
-          </div>
+          <Space size={12}>
+            <Button
+              aria-label={collapsed ? "Mở menu" : "Thu gọn menu"}
+              className="sider-toggle"
+              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              onClick={toggleCollapsed}
+            />
+            <div>
+              <Typography.Text className="eyebrow">
+                CMS vận hành viện thẩm mỹ
+              </Typography.Text>
+            </div>
+          </Space>
           <Space>
             <Tag className="soft-tag">Live</Tag>
             <Button onClick={() => logout()}>Đăng xuất</Button>

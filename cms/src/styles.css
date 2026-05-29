@@ -35,17 +35,22 @@ body::before {
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 24px 0 80px rgba(0, 0, 0, 0.3);
   overflow-y: auto;
-  padding: 22px 16px;
+  padding: 16px 12px;
 }
 
 .brand-card {
   align-items: center;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(232, 137, 174, 0.1));
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 26px;
+  border-radius: 22px;
   display: flex;
-  gap: 14px;
-  padding: 16px;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px;
+}
+
+.brand-copy {
+  min-width: 0;
 }
 
 .brand-card h3,
@@ -68,41 +73,41 @@ body::before {
 .brand-mark {
   align-items: center;
   background: linear-gradient(135deg, #f5a7c6, #b8688a 52%, #d7a45b);
-  border-radius: 20px;
-  box-shadow: 0 18px 40px rgba(232, 137, 174, 0.3);
+  border-radius: 16px;
+  box-shadow: 0 14px 30px rgba(232, 137, 174, 0.26);
   color: #180c12;
   display: flex;
   font-weight: 900;
-  height: 54px;
+  height: 44px;
   justify-content: center;
   letter-spacing: -0.05em;
-  width: 54px;
+  width: 44px;
 }
 
 .side-menu {
   background: transparent !important;
   border-inline-end: 0 !important;
-  margin-top: 22px;
+  margin-top: 14px;
 }
 
 .side-menu .ant-menu-item {
-  border-radius: 16px;
+  border-radius: 14px;
   color: #cdbdc7;
   font-weight: 700;
-  height: 44px;
-  line-height: 44px;
-  margin: 5px 0;
+  height: 40px;
+  line-height: 40px;
+  margin: 3px 0;
 }
 
 .side-menu .ant-menu-submenu-title {
-  border-radius: 16px;
+  border-radius: 14px;
   color: #f1dbe4 !important;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
-  height: 42px !important;
+  height: 38px !important;
   letter-spacing: 0.02em;
-  line-height: 42px !important;
-  margin: 10px 0 4px !important;
+  line-height: 38px !important;
+  margin: 8px 0 2px !important;
   text-transform: uppercase;
 }
 
@@ -113,17 +118,17 @@ body::before {
 .side-menu .ant-menu-sub {
   background: rgba(255, 255, 255, 0.025) !important;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 18px;
-  margin: 0 0 8px !important;
-  padding: 5px !important;
+  border-radius: 16px;
+  margin: 0 0 6px !important;
+  padding: 4px !important;
 }
 
 .side-menu .ant-menu-sub .ant-menu-item {
-  font-size: 13px;
-  height: 38px;
-  line-height: 38px;
+  font-size: 12px;
+  height: 34px;
+  line-height: 34px;
   margin: 2px 0;
-  padding-left: 18px !important;
+  padding-left: 16px !important;
 }
 
 .side-menu .ant-menu-item-icon {
@@ -148,12 +153,21 @@ body::before {
   background: rgba(8, 7, 11, 0.72) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
-  height: 86px;
+  height: 68px;
   justify-content: space-between;
-  padding: 0 32px;
+  padding: 0 18px;
   position: sticky;
   top: 0;
   z-index: 5;
+}
+
+.sider-toggle {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  display: inline-flex;
+  justify-content: center;
+  width: 38px;
 }
 
 .app-header h3 {
@@ -162,15 +176,15 @@ body::before {
 }
 
 .app-content {
-  padding: 30px;
+  padding: 18px;
 }
 
 .page-header {
   align-items: center;
   display: flex;
-  gap: 18px;
+  gap: 12px;
   justify-content: space-between;
-  margin-bottom: 22px;
+  margin-bottom: 14px;
 }
 
 .page-header h2 {
@@ -191,13 +205,13 @@ body::before {
 }
 
 .hero-panel {
-  border-radius: 32px;
+  border-radius: 24px;
   display: flex;
-  gap: 24px;
+  gap: 18px;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   overflow: hidden;
-  padding: 30px;
+  padding: 22px;
   position: relative;
 }
 
@@ -227,7 +241,7 @@ body::before {
   align-items: flex-end;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   min-width: 280px;
   position: relative;
   z-index: 1;
@@ -239,23 +253,23 @@ body::before {
     linear-gradient(135deg, rgba(232, 137, 174, 0.18), rgba(215, 164, 91, 0.16)),
     rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 28px;
+  border-radius: 22px;
   display: flex;
-  gap: 14px;
-  padding: 18px;
+  gap: 12px;
+  padding: 14px;
   width: 100%;
 }
 
 .hero-revenue > span {
   align-items: center;
   background: rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
+  border-radius: 14px;
   color: #ffd3e3;
   display: flex;
   font-size: 24px;
-  height: 52px;
+  height: 44px;
   justify-content: center;
-  width: 52px;
+  width: 44px;
 }
 
 .hero-revenue h3 {
@@ -278,7 +292,7 @@ body::before {
 }
 
 .metric-card {
-  min-height: 172px;
+  min-height: 148px;
   position: relative;
 }
 
@@ -298,17 +312,17 @@ body::before {
   align-items: center;
   display: flex;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .metric-icon {
   align-items: center;
-  border-radius: 18px;
+  border-radius: 14px;
   display: flex;
-  font-size: 24px;
-  height: 52px;
+  font-size: 20px;
+  height: 44px;
   justify-content: center;
-  width: 52px;
+  width: 44px;
 }
 
 .metric-rose {
@@ -352,7 +366,7 @@ body::before {
 }
 
 .spacious-card {
-  margin-top: 20px;
+  margin-top: 14px;
 }
 
 .dashboard-grid {
@@ -361,12 +375,12 @@ body::before {
 
 .pipeline-list {
   display: grid;
-  gap: 18px;
+  gap: 12px;
 }
 
 .pipeline-row {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .pipeline-row > div {
@@ -387,8 +401,22 @@ body::before {
   max-width: 920px;
 }
 
+.form-card .ant-card-body,
+.glass-card .ant-card-body,
+.metric-card .ant-card-body {
+  padding: 14px !important;
+}
+
 .record-form {
   max-width: 100%;
+}
+
+.record-form .ant-form-item {
+  margin-bottom: 12px;
+}
+
+.record-form .ant-row {
+  row-gap: 0 !important;
 }
 
 .quick-drawer .ant-drawer-content {
@@ -407,17 +435,17 @@ body::before {
 }
 
 .detail-card {
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .detail-grid {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .detail-item {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
+  border-radius: 14px;
   height: 100%;
   overflow: hidden;
 }
@@ -426,13 +454,13 @@ body::before {
   background: rgba(255, 255, 255, 0.045);
   color: #eab4ca;
   font-weight: 800;
-  padding: 14px 16px;
+  padding: 10px 12px;
 }
 
 .detail-item-content {
   background: rgba(255, 255, 255, 0.025);
-  min-height: 58px;
-  padding: 16px;
+  min-height: 48px;
+  padding: 12px;
 }
 
 .drag-handle {
@@ -455,16 +483,16 @@ body::before {
 
 .profile-summary {
   display: grid;
-  gap: 18px;
+  gap: 12px;
 }
 
 .profile-summary > div {
   background: rgba(255, 255, 255, 0.045);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
+  border-radius: 14px;
   display: grid;
   gap: 8px;
-  padding: 16px;
+  padding: 12px;
 }
 
 .profile-summary h3,
@@ -475,16 +503,16 @@ body::before {
 
 .settings-grid {
   display: grid;
-  gap: 20px;
+  gap: 14px;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
 }
 
 .settings-card .ant-card-body {
-  padding-top: 18px;
+  padding-top: 14px;
 }
 
 .settings-tabs > .ant-tabs-nav {
-  margin-bottom: 20px !important;
+  margin-bottom: 14px !important;
 }
 
 .settings-tabs > .ant-tabs-nav::before,
@@ -516,13 +544,13 @@ body::before {
 
 .settings-tab-panel {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .settings-tab-header {
   align-items: center;
   display: flex;
-  gap: 16px;
+  gap: 12px;
   justify-content: space-between;
 }
 
@@ -538,21 +566,21 @@ body::before {
 .template-layout,
 .template-editor-layout {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr);
 }
 
 .template-preview-card {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .template-preview-surface {
   background: #fff;
-  border-radius: 18px;
+  border-radius: 14px;
   color: #111;
   min-height: 240px;
   overflow: auto;
-  padding: 18px;
+  padding: 14px;
 }
 
 .template-variable-cloud {
@@ -573,7 +601,7 @@ body::before {
   border-radius: 999px;
   color: #f6c4d7 !important;
   font-weight: 800;
-  padding: 4px 12px;
+  padding: 3px 10px;
 }
 
 .primary-glow {
@@ -688,7 +716,7 @@ textarea.ant-input {
   }
 
   .app-content {
-    padding: 20px;
+    padding: 14px;
   }
 
   .template-layout,
@@ -700,4 +728,26 @@ textarea.ant-input {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+.app-sider.ant-layout-sider-collapsed {
+  padding-inline: 8px;
+}
+
+.app-sider.ant-layout-sider-collapsed .brand-card {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.app-sider.ant-layout-sider-collapsed .brand-copy {
+  display: none;
+}
+
+.app-sider.ant-layout-sider-collapsed .side-menu {
+  margin-top: 10px;
+}
+
+.app-sider.ant-layout-sider-collapsed .side-menu .ant-menu-item,
+.app-sider.ant-layout-sider-collapsed .side-menu .ant-menu-submenu-title {
+  padding-inline: calc(50% - 17px) !important;
 }

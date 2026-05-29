@@ -52,16 +52,24 @@ export function App() {
           colorInfo: '#d7a45b',
           colorBgBase: '#08070b',
           colorTextBase: '#fff7fb',
-          borderRadius: 18,
+          borderRadius: 14,
           fontFamily: '"Plus Jakarta Sans", Inter, Arial, sans-serif',
         },
         components: {
-          Button: { controlHeight: 42, borderRadius: 999, fontWeight: 700 },
-          Card: { borderRadiusLG: 24, paddingLG: 24 },
-          Input: { controlHeight: 42 },
-          InputNumber: { controlHeight: 42 },
-          Select: { controlHeight: 42 },
-          Table: { borderColor: 'rgba(255, 255, 255, 0.08)', headerBg: '#17101b', headerColor: '#f7d9e6' },
+          Button: { controlHeight: 38, borderRadius: 999, fontWeight: 700 },
+          Card: { borderRadiusLG: 20, paddingLG: 18 },
+          Input: { controlHeight: 38 },
+          InputNumber: { controlHeight: 38 },
+          Select: { controlHeight: 38 },
+          Table: {
+            borderColor: 'rgba(255, 255, 255, 0.08)',
+            cellPaddingBlock: 10,
+            cellPaddingInline: 12,
+            cellPaddingBlockSM: 8,
+            cellPaddingInlineSM: 10,
+            headerBg: '#17101b',
+            headerColor: '#f7d9e6'
+          },
         },
       }}
     >

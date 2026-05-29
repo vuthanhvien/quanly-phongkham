@@ -1,9 +1,11 @@
+import { useDelete } from "@refinedev/core"
 import {
   Button,
   Card,
   Col,
   Drawer,
   Empty,
+  Popconfirm,
   Tooltip,
   message,
   Row,
@@ -14,6 +16,14 @@ import {
 } from "antd"
 import { useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
+import {
+  DeleteOutlined,
+  EditOutlined,
+  EyeOutlined,
+  PhoneOutlined,
+  PrinterOutlined,
+  SwapOutlined,
+} from "@ant-design/icons"
 import { api } from "../api"
 import { hasActionAccess } from "../access"
 import { RecordFormContent } from "../components/RecordFormContent"
@@ -34,6 +44,7 @@ interface RelatedBlock {
   rows: Record<string, unknown>[]
   tableFields: FieldLayoutConfig[]
   detailFields: FieldLayoutConfig[]
+  printTemplateId?: string
 }
 
 interface RelatedRecordDrawerState {
@@ -52,6 +63,7 @@ export function RecordDetailPage() {
   const [relatedDetail, setRelatedDetail] = useState<RelatedRecordDrawerState | null>(null)
   const [relatedDetailLoading, setRelatedDetailLoading] = useState(false)
   const [quickCreateBlock, setQuickCreateBlock] = useState<RelatedBlock | null>(null)
+  const { mutate: deleteRecord } = useDelete()
 
   useEffect(() => {
     let mounted = true
@@ -281,20 +293,78 @@ export function RecordDetailPage() {
               {
                 title: "",
                 key: "action",
-                width: 140,
+                width: 260,
                 render: (_: unknown, row: any) => (
                   <Space>
                     {hasActionAccess(block.resource, "view") && (
-                      <Button
-                        size="small"
-                        type="link"
-                        onClick={() => void openRelatedDetail(block, row.id)}
-                      >
-                        Xem nhanh
-                      </Button>
+                      <Tooltip title="Xem nhanh">
+                        <Button
+                          icon={<EyeOutlined />}
+                          size="small"
+                          type="text"
+                          onClick={() => void openRelatedDetail(block, row.id)}
+                        />
+                      </Tooltip>
                     )}
-                    {hasActionAccess(block.resource, "view") && (
-                      <Link to={`/${block.resource}/${row.id}`}>Chi tiết</Link>
+                    {hasActionAccess(block.resource, "update") && (
+                      <Tooltip title="Chỉnh sửa">
+                        <Link to={`/${block.resource}/${row.id}/edit`}>
+                          <Button icon={<EditOutlined />} size="small" type="text" />
+                        </Link>
+                      </Tooltip>
+                    )}
+                    {block.resource === "customers" && hasActionAccess(block.resource, "reveal-phone") && (
+                      <Tooltip title="Xem số điện thoại">
+                        <Button
+                          icon={<PhoneOutlined />}
+                          size="small"
+                          type="text"
+                          onClick={() => void revealPhone(row.id)}
+                        />
+                      </Tooltip>
+                    )}
+                    {block.resource === "leads" && !row.convertedCustomerId && hasActionAccess(block.resource, "convert-to-customer") && (
+                      <Tooltip title="Chuyển thành khách hàng">
+                        <Button
+                          icon={<SwapOutlined />}
+                          size="small"
+                          type="text"
+                          onClick={() => void convertRelatedLead(row.id)}
+                        />
+                      </Tooltip>
+                    )}
+                    {block.printTemplateId && hasActionAccess(block.resource, "print") && (
+                      <Tooltip title="In biểu mẫu">
+                        <Button
+                          icon={<PrinterOutlined />}
+                          size="small"
+                          type="text"
+                          onClick={() => void printRecord(block.printTemplateId!, row.id)}
+                        />
+                      </Tooltip>
+                    )}
+                    {hasActionAccess(block.resource, "delete") && (
+                      <Popconfirm
+                        title="Xóa bản ghi này?"
+                        onConfirm={() =>
+                          deleteRecord(
+                            { resource: block.resource, id: row.id },
+                            {
+                              onSuccess: () => {
+                                message.success("Đã xóa")
+                                if (relatedDetail?.record?.id === row.id) {
+                                  setRelatedDetail(null)
+                                }
+                                void reloadRelatedBlocks()
+                              },
+                            },
+                          )
+                        }
+                      >
+                        <Tooltip title="Xóa bản ghi">
+                          <Button danger icon={<DeleteOutlined />} size="small" type="text" />
+                        </Tooltip>
+                      </Popconfirm>
                     )}
                   </Space>
                 ),
@@ -409,6 +479,18 @@ export function RecordDetailPage() {
       "convertedCustomerId",
     ])
     setLookups(nextLookups)
+  }
+
+  async function revealPhone(recordId: string) {
+    const response = await api.post(`/records/customers/${recordId}/reveal-phone`)
+    message.info(`Số điện thoại: ${response.data.data.phone}`)
+  }
+
+  async function convertRelatedLead(recordId: string) {
+    const response = await convertLead(recordId)
+    message.success("Đã chuyển lead thành khách hàng")
+    await reloadRelatedBlocks()
+    navigate(`/customers/${response.data.data.id}`)
   }
 }
 
@@ -529,7 +611,7 @@ async function loadBlocks(
 ) {
   const responses = await Promise.all(
     specs.map(async (spec) => {
-      const [recordResponse, fieldResponse, viewResponse] = await Promise.all([
+      const [recordResponse, fieldResponse, viewResponse, printResponse] = await Promise.all([
         api
           .get(`/records/${spec.resource}`, { params: { pageSize: 100 } })
           .catch(() => ({ data: { data: [] } })),
@@ -538,6 +620,9 @@ async function loadBlocks(
           .catch(() => ({ data: { data: [] } })),
         api
           .get("/settings/views", { params: { entityType: spec.resource } })
+          .catch(() => ({ data: { data: [] } })),
+        api
+          .get("/settings/print-templates", { params: { entityType: spec.resource } })
           .catch(() => ({ data: { data: [] } })),
       ])
 
@@ -560,6 +645,7 @@ async function loadBlocks(
         rows,
         tableFields: getVisibleFieldConfigs(catalog, views, "TABLE", role),
         detailFields: getVisibleFieldConfigs(catalog, views, "DETAIL", role),
+        printTemplateId: printResponse.data.data?.[0]?.id,
       }
     }),
   )
@@ -570,11 +656,27 @@ async function loadBlocks(
     rows: responses[index].rows,
     tableFields: responses[index].tableFields,
     detailFields: responses[index].detailFields,
+    printTemplateId: responses[index].printTemplateId,
   }))
 }
 
 async function convertLead(id: string) {
   return api.post(`/records/leads/${id}/convert-to-customer`)
+}
+
+async function printRecord(templateId: string, recordId: string) {
+  const html = (
+    await api.get(`/settings/print-templates/${templateId}/render/${recordId}`, {
+      responseType: "text",
+    })
+  ).data
+  const windowRef = window.open("", "_blank")
+  if (windowRef) {
+    windowRef.document.write(
+      `<div class="print-sheet">${html}</div><script>window.print()</script>`,
+    )
+    windowRef.document.close()
+  }
 }
 
 function detailTitle(resource: string, record: Record<string, any> | null) {
