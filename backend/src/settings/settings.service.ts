@@ -1,13 +1,32 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'crypto';
 import Handlebars from 'handlebars';
 import { IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
-import { BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, PrintTemplate, User, ViewSetting } from '../entities/entities';
+import { BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, LandingFormSubmission, LandingPage, PrintTemplate, User, ViewSetting } from '../entities/entities';
 import { RecordsService } from '../records/records.service';
 
 const DEFAULT_ROLE_SCOPE = 'ALL';
 const SYSTEM_ROLES = ['ADMIN', 'STAFF', 'DOCTOR'];
+const LANDING_BLOCK_TYPES = ['title', 'text', 'image', 'video', 'form'];
+
+function slugify(input?: string) {
+  return String(input || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+function normalizeLandingPath(path?: string, fallbackSlug?: string) {
+  const raw = String(path || fallbackSlug || '').trim();
+  if (!raw) return '/';
+  const normalized = raw.startsWith('/') ? raw : `/${raw}`;
+  if (normalized === '/') return '/';
+  return normalized.replace(/\/+$/g, '');
+}
 
 function normalizeRole(role?: string) {
   return role?.trim().toUpperCase() || DEFAULT_ROLE_SCOPE;
@@ -19,6 +38,8 @@ export class SettingsService {
     @InjectRepository(CustomFieldDefinition) private readonly fields: Repository<CustomFieldDefinition>,
     @InjectRepository(ViewSetting) private readonly views: Repository<ViewSetting>,
     @InjectRepository(PrintTemplate) private readonly templates: Repository<PrintTemplate>,
+    @InjectRepository(LandingPage) private readonly landingPages: Repository<LandingPage>,
+    @InjectRepository(LandingFormSubmission) private readonly landingFormSubmissions: Repository<LandingFormSubmission>,
     @InjectRepository(DynamicRoleDefinition) private readonly roles: Repository<DynamicRoleDefinition>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(BranchRoleAssignment) private readonly branchRoles: Repository<BranchRoleAssignment>,
@@ -101,6 +122,85 @@ export class SettingsService {
   listTemplates(entityType?: string, user?: AuthUser) {
     this.assertResourceReadable(user, entityType);
     return this.templates.find({ where: entityType ? { entityType } : {}, order: { name: 'ASC' } });
+  }
+
+  listLandingPages(user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    return this.landingPages.find({ order: { updatedAt: 'DESC', createdAt: 'DESC' } });
+  }
+
+  async createLandingPage(payload: Partial<LandingPage>, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const normalized = this.normalizeLandingPagePayload(payload, true);
+    await this.assertLandingPageUnique(normalized.slug, normalized.path);
+    return this.landingPages.save(this.landingPages.create(normalized));
+  }
+
+  async updateLandingPage(id: string, payload: Partial<LandingPage>, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const page = await this.landingPages.findOne({ where: { id } });
+    if (!page) throw new NotFoundException('Khong tim thay landing page');
+    const normalized = this.normalizeLandingPagePayload({ ...page, ...payload }, false);
+    await this.assertLandingPageUnique(normalized.slug, normalized.path, id);
+    return this.landingPages.save(this.landingPages.merge(page, normalized));
+  }
+
+  async deleteLandingPage(id: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const page = await this.landingPages.findOne({ where: { id } });
+    if (!page) throw new NotFoundException('Khong tim thay landing page');
+    await this.landingPages.remove(page);
+    return { id };
+  }
+
+  async findPublishedLandingPageByPath(path?: string) {
+    const normalizedPath = normalizeLandingPath(path);
+    const page = await this.landingPages.findOne({ where: { path: normalizedPath, isPublished: true } });
+    if (!page) {
+      throw new NotFoundException('Khong tim thay landing page');
+    }
+    return page;
+  }
+
+  async submitLandingForm(slug: string, blockId: string, payload: Record<string, unknown>) {
+    const page = await this.landingPages.findOne({ where: { slug: slugify(slug), isPublished: true } });
+    if (!page) {
+      throw new NotFoundException('Khong tim thay landing page');
+    }
+
+    const block = Array.isArray(page.blocks)
+      ? page.blocks.find((item) => String(item?.id || '') === blockId && String(item?.type || '') === 'form')
+      : undefined;
+
+    if (!block) {
+      throw new NotFoundException('Khong tim thay form block');
+    }
+
+    const fields = Array.isArray(block.fields) ? block.fields : [];
+    const values = payload && typeof payload === 'object' && payload.values && typeof payload.values === 'object'
+      ? payload.values as Record<string, unknown>
+      : payload;
+
+    for (const field of fields) {
+      const key = String(field?.name || '').trim();
+      if (!key) continue;
+      if (field?.required && (values[key] === undefined || values[key] === null || String(values[key]).trim() === '')) {
+        throw new BadRequestException(`Truong ${field.label || key} la bat buoc`);
+      }
+    }
+
+    const submission = await this.landingFormSubmissions.save(
+      this.landingFormSubmissions.create({
+        pageId: page.id,
+        pageSlug: page.slug,
+        pagePath: page.path,
+        blockId,
+        formName: String(block.title || block.label || '' || undefined),
+        payload: values,
+      }),
+    );
+
+    return { id: submission.id, submittedAt: submission.createdAt };
   }
 
   listRoles(user?: AuthUser) {
@@ -244,6 +344,113 @@ export class SettingsService {
   private assertRoleReadable(user?: AuthUser) {
     if (!user || this.isAdmin(user)) return;
     throw new BadRequestException('Chi ADMIN moi duoc xem danh sach role');
+  }
+
+  private normalizeLandingPagePayload(payload: Partial<LandingPage>, isCreate: boolean) {
+    const title = String(payload.title || '').trim();
+    if (!title) {
+      throw new BadRequestException('title la bat buoc');
+    }
+
+    const slug = slugify(payload.slug || title);
+    if (!slug) {
+      throw new BadRequestException('slug khong hop le');
+    }
+
+    const path = normalizeLandingPath(payload.path, slug);
+    const blocks = this.normalizeLandingBlocks(payload.blocks);
+    const description = payload.description ? String(payload.description).trim() : undefined;
+    const seoTitle = payload.seoTitle ? String(payload.seoTitle).trim() : undefined;
+    const seoDescription = payload.seoDescription ? String(payload.seoDescription).trim() : undefined;
+
+    return {
+      slug,
+      path,
+      title,
+      description,
+      seoTitle,
+      seoDescription,
+      blocks,
+      isPublished: isCreate ? Boolean(payload.isPublished) : Boolean(payload.isPublished),
+    };
+  }
+
+  private normalizeLandingBlocks(blocks?: Record<string, unknown>[]) {
+    if (!blocks) return [];
+    if (!Array.isArray(blocks)) {
+      throw new BadRequestException('blocks phai la mang');
+    }
+
+    return blocks.map((block, index) => {
+      const type = String(block?.type || '').trim().toLowerCase();
+      if (!LANDING_BLOCK_TYPES.includes(type)) {
+        throw new BadRequestException(`Block type khong hop le: ${type || 'unknown'}`);
+      }
+
+      const spanValue = Number(block?.span ?? 12);
+      const rowValue = Number(block?.row ?? 1);
+      const orderValue = Number(block?.order ?? index + 1);
+      const normalized: Record<string, unknown> = {
+        id: String(block?.id || randomUUID()),
+        type,
+        row: Number.isFinite(rowValue) && rowValue > 0 ? Math.floor(rowValue) : 1,
+        span: Number.isFinite(spanValue) ? Math.max(1, Math.min(12, Math.floor(spanValue))) : 12,
+        order: Number.isFinite(orderValue) ? Math.floor(orderValue) : index + 1,
+      };
+
+      if (type === 'title') {
+        normalized.title = String(block?.title || '');
+        normalized.level = Math.max(1, Math.min(6, Number(block?.level ?? 2) || 2));
+        normalized.align = ['left', 'center', 'right'].includes(String(block?.align || '')) ? block?.align : 'left';
+      }
+
+      if (type === 'text') {
+        normalized.text = String(block?.text || '');
+        normalized.align = ['left', 'center', 'right'].includes(String(block?.align || '')) ? block?.align : 'left';
+      }
+
+      if (type === 'image') {
+        normalized.url = String(block?.url || '');
+        normalized.alt = String(block?.alt || '');
+        normalized.caption = String(block?.caption || '');
+      }
+
+      if (type === 'video') {
+        normalized.url = String(block?.url || '');
+        normalized.title = String(block?.title || '');
+      }
+
+      if (type === 'form') {
+        normalized.title = String(block?.title || '');
+        normalized.description = String(block?.description || '');
+        normalized.submitLabel = String(block?.submitLabel || 'Gửi thông tin');
+        normalized.successMessage = String(block?.successMessage || 'Đã gửi thành công');
+        const fields = Array.isArray(block?.fields) ? block.fields : [];
+        normalized.fields = fields.map((field, fieldIndex) => ({
+          id: String(field?.id || randomUUID()),
+          name: slugify(String(field?.name || field?.label || `field_${fieldIndex + 1}`)).replace(/-/g, '_'),
+          label: String(field?.label || `Trường ${fieldIndex + 1}`),
+          type: ['text', 'textarea', 'email', 'tel', 'number'].includes(String(field?.type || '')) ? field.type : 'text',
+          placeholder: String(field?.placeholder || ''),
+          required: Boolean(field?.required),
+          span: Math.max(1, Math.min(12, Number(field?.span ?? 12) || 12)),
+        }));
+      }
+
+      return normalized;
+    });
+  }
+
+  private async assertLandingPageUnique(slug: string, path: string, excludeId?: string) {
+    const sameSlug = await this.landingPages.findOne({ where: { slug } });
+    if (sameSlug && sameSlug.id !== excludeId) {
+      throw new BadRequestException('slug da ton tai');
+    }
+
+    const samePath = await this.landingPages.findOne({ where: { path } });
+    if (samePath && samePath.id !== excludeId) {
+      throw new BadRequestException('path da ton tai');
+    }
   }
 
   private async resolveRoleKeys(roleKeys: string[]) {

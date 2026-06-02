@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, Request } from '@nestjs/common';
-import { AuthUser } from '../common/auth';
-import { BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, PrintTemplate } from '../entities/entities';
+import { AuthUser, Public } from '../common/auth';
+import { BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, LandingPage, PrintTemplate } from '../entities/entities';
 import { SettingsService } from './settings.service';
 
 @Controller('settings')
@@ -96,6 +96,26 @@ export class SettingsController {
     return { data: await this.settings.deleteBranchRoleAssignment(id, request?.user) };
   }
 
+  @Get('landing-pages')
+  async landingPages(@Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.listLandingPages(request?.user) };
+  }
+
+  @Post('landing-pages')
+  async createLandingPage(@Body() payload: Partial<LandingPage>, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.createLandingPage(payload, request?.user) };
+  }
+
+  @Patch('landing-pages/:id')
+  async updateLandingPage(@Param('id') id: string, @Body() payload: Partial<LandingPage>, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.updateLandingPage(id, payload, request?.user) };
+  }
+
+  @Delete('landing-pages/:id')
+  async removeLandingPage(@Param('id') id: string, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.deleteLandingPage(id, request?.user) };
+  }
+
   @Post('print-templates')
   async createTemplate(@Body() payload: Partial<PrintTemplate>, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.saveTemplate(payload, request?.user) };
@@ -110,5 +130,26 @@ export class SettingsController {
   @Header('Content-Type', 'text/html; charset=utf-8')
   render(@Param('id') id: string, @Param('recordId') recordId: string) {
     return this.settings.renderTemplate(id, recordId);
+  }
+}
+
+@Controller('public/landing-pages')
+export class PublicLandingPagesController {
+  constructor(private readonly settings: SettingsService) {}
+
+  @Public()
+  @Get('resolve')
+  async resolve(@Query('path') path?: string) {
+    return { data: await this.settings.findPublishedLandingPageByPath(path) };
+  }
+
+  @Public()
+  @Post(':slug/forms/:blockId/submissions')
+  async submitForm(
+    @Param('slug') slug: string,
+    @Param('blockId') blockId: string,
+    @Body() payload: Record<string, unknown>,
+  ) {
+    return { data: await this.settings.submitLandingForm(slug, blockId, payload) };
   }
 }

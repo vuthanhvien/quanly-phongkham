@@ -86,6 +86,77 @@ export interface FieldLayoutConfig extends FieldSpec {
   tableWidth?: number
 }
 
+function resolveDefaultFieldWidth(field: FieldSpec): FieldLayoutConfig['width'] {
+  if (field.width) return field.width
+
+  const normalizedKey = field.key.toLowerCase()
+
+  if (
+    field.type === 'textarea' ||
+    ['address', 'note', 'description', 'content', 'summary', 'diagnosis', 'chiefcomplaint', 'allergywarning', 'nextaction', 'publicurl'].includes(normalizedKey)
+  ) {
+    return '100'
+  }
+
+  if (field.type === 'number') return '33'
+
+  if (
+    field.type === 'date' ||
+    field.type === 'datetime' ||
+    field.type === 'select' ||
+    field.type === 'multi-select' ||
+    field.type === 'relative' ||
+    field.type === 'file'
+  ) {
+    return '50'
+  }
+
+  if (
+    ['code', 'slug', 'phone', 'email', 'status', 'type', 'method', 'gender'].includes(normalizedKey)
+  ) {
+    return '50'
+  }
+
+  return '50'
+}
+
+function resolveDefaultTableWidth(field: FieldSpec) {
+  if (typeof field.tableWidth === 'number' && Number.isFinite(field.tableWidth) && field.tableWidth > 0) {
+    return field.tableWidth
+  }
+
+  const normalizedKey = field.key.toLowerCase()
+
+  if (
+    field.type === 'textarea' ||
+    ['address', 'note', 'description', 'content', 'summary', 'diagnosis', 'chiefcomplaint', 'allergywarning', 'nextaction', 'publicurl'].includes(normalizedKey)
+  ) {
+    return 320
+  }
+
+  if (field.type === 'number') return 140
+  if (field.type === 'date') return 160
+  if (field.type === 'datetime') return 190
+  if (field.type === 'select' || field.type === 'multi-select') return 170
+  if (field.type === 'relative' || field.type === 'file') return 220
+
+  if (['code', 'slug', 'status', 'type', 'method', 'gender'].includes(normalizedKey)) {
+    return 150
+  }
+
+  if (['phone', 'email'].includes(normalizedKey)) return 180
+
+  return 200
+}
+
+export function applyDefaultFieldLayout<T extends FieldSpec>(field: T): T {
+  return {
+    ...field,
+    width: field.width || resolveDefaultFieldWidth(field),
+    tableWidth: resolveDefaultTableWidth(field),
+  }
+}
+
 function readStoredUser() {
   try {
     return JSON.parse(localStorage.getItem('clinic-user') || 'null')
@@ -133,7 +204,7 @@ export function getFieldCatalog(resource: string, customFields: CustomField[]) {
                 : undefined,
         }),
       ),
-  ]
+  ].map((field) => applyDefaultFieldLayout(field))
 }
 
 function getConfigEntries(view: ViewSettingRecord | undefined, viewType: ViewType) {
@@ -143,7 +214,9 @@ function getConfigEntries(view: ViewSettingRecord | undefined, viewType: ViewTyp
 }
 
 function fallbackField(key: string, catalog: FieldSpec[]) {
-  return catalog.find((field) => field.key === key) || { key, label: key }
+  return applyDefaultFieldLayout(
+    catalog.find((field) => field.key === key) || { key, label: key },
+  )
 }
 
 export function resolveViewSetting(
@@ -202,7 +275,7 @@ export function buildFieldLayoutConfigs(
   if (!entries.length) {
     return catalog.map(
       (field): FieldLayoutConfig => ({
-        ...field,
+        ...applyDefaultFieldLayout(field),
         visible: true,
         disabled: field.disabled ?? false,
       }),

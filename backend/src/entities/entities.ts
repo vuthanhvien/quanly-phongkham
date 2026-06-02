@@ -794,6 +794,69 @@ export class PrintTemplate {
   updatedAt: Date;
 }
 
+@Entity('landing_pages')
+export class LandingPage {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ unique: true })
+  slug: string;
+
+  @Column({ unique: true })
+  path: string;
+
+  @Column()
+  title: string;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ nullable: true })
+  seoTitle?: string;
+
+  @Column({ type: 'text', nullable: true })
+  seoDescription?: string;
+
+  @Column({ type: 'jsonb', default: [] })
+  blocks: Record<string, unknown>[];
+
+  @Column({ default: false })
+  isPublished: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
+@Entity('landing_form_submissions')
+export class LandingFormSubmission {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  pageId: string;
+
+  @Column()
+  pageSlug: string;
+
+  @Column()
+  pagePath: string;
+
+  @Column()
+  blockId: string;
+
+  @Column({ nullable: true })
+  formName?: string;
+
+  @Column({ type: 'jsonb', default: {} })
+  payload: Record<string, unknown>;
+
+  @CreateDateColumn()
+  createdAt: Date;
+}
+
 @Entity('custom_field_values')
 @Index(['entityType', 'recordId', 'fieldKey'], { unique: true })
 export class CustomFieldValue {
@@ -876,5 +939,7 @@ export const ENTITIES = [
   CustomFieldValue,
   ViewSetting,
   PrintTemplate,
+  LandingPage,
+  LandingFormSubmission,
   AuditLog,
 ];
