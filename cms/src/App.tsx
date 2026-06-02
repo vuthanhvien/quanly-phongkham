@@ -11,6 +11,7 @@ import { BranchRoleAssignmentsPage } from './pages/BranchRoleAssignmentsPage';
 import { CustomFieldsPage } from './pages/CustomFieldsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { LandingPagesPage } from './pages/LandingPagesPage';
 import { RecordDetailPage } from './pages/RecordDetailPage';
 import { RecordFormPage } from './pages/RecordFormPage';
 import { RecordListPage } from './pages/RecordListPage';
@@ -81,6 +82,7 @@ export function App() {
             <Route element={<ScreenGuard screen="settings" />}>
               <Route path="/custom-fields" element={<CustomFieldsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/landing-pages" element={<LandingPagesPage />} />
               <Route path="/roles" element={<RolesPage />} />
               <Route path="/branch-role-assignments" element={<BranchRoleAssignmentsPage />} />
             </Route>

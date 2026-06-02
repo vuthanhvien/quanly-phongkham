@@ -47,6 +47,7 @@ services:
       dockerfile: Dockerfile.dev
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+      VITE_LANDING_URL: ${VITE_LANDING_URL:-http://localhost:3001}
       CHOKIDAR_USEPOLLING: "true"
     command:
       - sh
@@ -60,7 +61,28 @@ services:
       - ./cms:/app
       - cms_node_modules:/app/node_modules
 
+  landing:
+    build:
+      context: ./landing
+      dockerfile: Dockerfile.dev
+    environment:
+      LANDING_API_URL: ${LANDING_API_URL:-http://backend:3000/api}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api}
+      CHOKIDAR_USEPOLLING: "true"
+    command:
+      - sh
+      - -lc
+      - npm install && npm run dev
+    depends_on:
+      - backend
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./landing:/app
+      - landing_node_modules:/app/node_modules
+
 volumes:
   postgres_data:
   backend_node_modules:
   cms_node_modules:
+  landing_node_modules:

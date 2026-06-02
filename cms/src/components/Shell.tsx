@@ -12,6 +12,7 @@ import {
   FolderOpenOutlined,
   GiftOutlined,
   GoldOutlined,
+  GlobalOutlined,
   InteractionOutlined,
   LineChartOutlined,
   MedicineBoxOutlined,
@@ -40,6 +41,7 @@ const menuIcons: Record<string, React.ReactNode> = {
   branches: <BankOutlined />,
   roles: <SettingOutlined />,
   "branch-role-assignments": <DeploymentUnitOutlined />,
+  "landing-pages": <GlobalOutlined />,
   departments: <SolutionOutlined />,
   staff: <TeamOutlined />,
   "branch-permissions": <AuditOutlined />,
@@ -170,6 +172,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
       children: [
         hasScreenAccess("settings")
           ? {
+              key: "/landing-pages",
+              icon: menuIcons["landing-pages"],
+              label: <Link to="/landing-pages">Landing pages</Link>,
+            }
+          : null,
+        hasScreenAccess("settings")
+          ? {
               key: "/custom-fields",
               icon: menuIcons["custom-fields"],
               label: <Link to="/custom-fields">Custom fields</Link>,
@@ -199,6 +208,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ? "admin"
       : undefined),
     location.pathname.startsWith("/settings") ||
+    location.pathname.startsWith("/landing-pages") ||
     location.pathname.startsWith("/custom-fields") ||
     location.pathname.startsWith("/audit-logs")
       ? "system-tools"

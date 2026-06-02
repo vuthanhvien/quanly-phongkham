@@ -11,6 +11,7 @@ TAG="${TAG:-latest}"
 BACKEND_IMAGE="${IMAGE_PREFIX}-backend:${TAG}"
 CMS_IMAGE="${IMAGE_PREFIX}-cms:${TAG}"
 PROXY_IMAGE="${IMAGE_PREFIX}-proxy:${TAG}"
+LANDING_IMAGE="${IMAGE_PREFIX}-landing:${TAG}"
 
 # ============================================================
 echo "=> Docker user : $DOCKER_USER"
@@ -22,7 +23,7 @@ docker login
 
 # Build backend
 echo ""
-echo "[1/5] Building backend..."
+echo "[1/6] Building backend..."
 docker build \
   --platform linux/amd64 \
   -t "$BACKEND_IMAGE" \
@@ -30,7 +31,7 @@ docker build \
 
 # Build CMS
 echo ""
-echo "[2/5] Building cms..."
+echo "[2/6] Building cms..."
 docker build \
   --platform linux/amd64 \
   --build-arg VITE_API_URL=/api \
@@ -39,7 +40,15 @@ docker build \
 
 # Build proxy
 echo ""
-echo "[3/5] Building proxy..."
+echo "[3/6] Building landing..."
+docker build \
+  --platform linux/amd64 \
+  -t "$LANDING_IMAGE" \
+  ./landing
+
+# Build proxy
+echo ""
+echo "[4/6] Building proxy..."
 docker build \
   --platform linux/amd64 \
   -t "$PROXY_IMAGE" \
@@ -47,13 +56,14 @@ docker build \
 
 # Push
 echo ""
-echo "[4/5] Pushing images..."
+echo "[5/6] Pushing images..."
 docker push "$BACKEND_IMAGE"
 docker push "$CMS_IMAGE"
+docker push "$LANDING_IMAGE"
 docker push "$PROXY_IMAGE"
 
 echo ""
-echo "[5/5] Done!"
+echo "[6/6] Done!"
 echo ""
 echo "Trên server chỉ cần file docker-compose.yml, rồi chạy:"
 echo "  docker compose pull && docker compose up -d"

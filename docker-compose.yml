@@ -32,6 +32,16 @@ services:
     depends_on:
       - backend
 
+  landing:
+    image: vienvu/quanly-phongkham-landing:${TAG:-latest}
+    environment:
+      LANDING_API_URL: ${LANDING_API_URL:-http://backend:3000/api}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api}
+    depends_on:
+      - backend
+    ports:
+      - "${LANDING_PORT:-3001}:3000"
+
   proxy:
     image: vienvu/quanly-phongkham-proxy:${TAG:-latest}
     ports:

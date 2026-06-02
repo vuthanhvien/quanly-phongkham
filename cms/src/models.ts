@@ -39,6 +39,51 @@ export interface DynamicRole {
   isActive: boolean;
 }
 
+export type LandingBlockType = 'title' | 'text' | 'image' | 'video' | 'form';
+
+export interface LandingFormField {
+  id: string;
+  name: string;
+  label: string;
+  type: 'text' | 'textarea' | 'email' | 'tel' | 'number';
+  placeholder?: string;
+  required: boolean;
+  span: number;
+}
+
+export interface LandingBlock {
+  id: string;
+  type: LandingBlockType;
+  row: number;
+  span: number;
+  order: number;
+  title?: string;
+  level?: number;
+  align?: 'left' | 'center' | 'right';
+  text?: string;
+  url?: string;
+  alt?: string;
+  caption?: string;
+  description?: string;
+  submitLabel?: string;
+  successMessage?: string;
+  fields?: LandingFormField[];
+}
+
+export interface LandingPage {
+  id: string;
+  slug: string;
+  path: string;
+  title: string;
+  description?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  blocks: LandingBlock[];
+  isPublished: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BranchRoleAssignment {
   id: string;
   userId: string;
