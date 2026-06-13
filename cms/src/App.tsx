@@ -108,11 +108,19 @@ export function App() {
             fontFamily: appUiSettings.fontFamily,
           },
           components: {
-            Button: { controlHeight, borderRadius: 999, fontWeight: 700 },
-            Card: { borderRadiusLG: appUiSettings.borderRadius + 6, paddingLG: cardPadding },
+            Button: { controlHeight, borderRadius: appUiSettings.borderRadius, fontWeight: 700 },
+            Card: {
+              borderRadius: appUiSettings.borderRadius,
+              borderRadiusLG: appUiSettings.borderRadius,
+              paddingLG: cardPadding,
+            },
             Input: { controlHeight },
             InputNumber: { controlHeight },
             Select: { controlHeight },
+            Menu: {
+              itemBorderRadius: appUiSettings.borderRadius,
+              subMenuItemBorderRadius: Math.max(0, appUiSettings.borderRadius - 2),
+            },
             Table: {
               borderColor: appUiSettings.theme === 'light' ? 'rgba(34, 22, 15, 0.08)' : 'rgba(255, 255, 255, 0.08)',
               cellPaddingBlock: tablePadding.block,

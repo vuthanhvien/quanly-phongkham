@@ -108,7 +108,7 @@ body::before {
 }
 
 .side-menu .ant-menu-item {
-  border-radius: 14px;
+  border-radius: var(--app-radius);
   color: #cdbdc7;
   font-weight: 700;
   height: 40px;
@@ -118,7 +118,7 @@ body::before {
 }
 
 .side-menu .ant-menu-submenu-title {
-  border-radius: 14px;
+  border-radius: var(--app-radius);
   color: #f1dbe4 !important;
   font-size: 12px;
   font-weight: 800;
@@ -137,7 +137,7 @@ body::before {
 .side-menu .ant-menu-sub {
   background: rgba(255, 255, 255, 0.025) !important;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 16px;
+  border-radius: calc(var(--app-radius) + 2px);
   margin: 0 2px 6px !important;
   padding: 4px !important;
 }
@@ -192,6 +192,7 @@ body::before {
   align-items: center;
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
+  border-radius: var(--app-radius) !important;
   display: inline-flex;
   justify-content: center;
   width: 38px;
@@ -232,7 +233,7 @@ body::before {
 }
 
 .hero-panel {
-  border-radius: 24px;
+  border-radius: var(--app-radius);
   display: flex;
   gap: 18px;
   justify-content: space-between;
@@ -625,7 +626,7 @@ body::before {
 .soft-tag {
   background: rgba(232, 137, 174, 0.14) !important;
   border: 1px solid rgba(232, 137, 174, 0.34) !important;
-  border-radius: 999px;
+  border-radius: var(--app-radius);
   color: #f6c4d7 !important;
   font-weight: 800;
   padding: 3px 10px;
