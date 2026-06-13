@@ -1,9 +1,11 @@
 import { Authenticated, Refine } from '@refinedev/core';
 import routerProvider, { CatchAllNavigate } from '@refinedev/react-router';
 import { ConfigProvider, theme } from 'antd';
+import { useCallback, useEffect, useState } from 'react';
 import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
 import { hasResourceAccess, hasScreenAccess } from './access';
-import { authProvider, dataProvider } from './api';
+import { AppUiContext, cardPaddingBySize, controlHeightBySize, defaultAppUiSettings, syncDocumentBranding, tablePaddingBySize, useAppUi, type AppUiSettings } from './app-ui';
+import { authProvider, dataProvider, api } from './api';
 import { Shell } from './components/Shell';
 import { entityLabels } from './models';
 import { AuditPage } from './pages/AuditPage';
@@ -17,6 +19,7 @@ import { RecordFormPage } from './pages/RecordFormPage';
 import { RecordListPage } from './pages/RecordListPage';
 import { RolesPage } from './pages/RolesPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { UiSettingsPage } from './pages/UiSettingsPage';
 
 const resources = Object.entries(entityLabels).map(([name, label]) => ({
   name,
@@ -27,6 +30,12 @@ const resources = Object.entries(entityLabels).map(([name, label]) => ({
 }));
 
 function ProtectedLayout() {
+  const { refresh } = useAppUi();
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
   return (
     <Authenticated key="authenticated" fallback={<CatchAllNavigate to="/login" />}>
       <Shell><Outlet /></Shell>
@@ -44,60 +53,104 @@ function ResourceGuard() {
 }
 
 export function App() {
+  const [appUiSettings, setAppUiSettings] = useState<AppUiSettings>(defaultAppUiSettings);
+  const [uiLoading, setUiLoading] = useState(true);
+
+  useEffect(() => {
+    void loadAppUiSettings();
+  }, []);
+
+  useEffect(() => {
+    syncDocumentBranding(appUiSettings);
+  }, [appUiSettings]);
+
+  const loadAppUiSettings = useCallback(async () => {
+    setUiLoading(true);
+    try {
+      const response = await api.get('/settings/app-ui');
+      setAppUiSettings({ ...defaultAppUiSettings, ...response.data.data });
+    } catch {
+      setAppUiSettings(defaultAppUiSettings);
+    } finally {
+      setUiLoading(false);
+    }
+  }, []);
+
+  const saveAppUiSettings = useCallback(async (payload: Partial<AppUiSettings>) => {
+    const response = await api.patch('/settings/app-ui', payload);
+    const next = { ...defaultAppUiSettings, ...response.data.data } as AppUiSettings;
+    setAppUiSettings(next);
+    return next;
+  }, []);
+
+  const controlHeight = controlHeightBySize(appUiSettings.size);
+  const cardPadding = cardPaddingBySize(appUiSettings.size);
+  const tablePadding = tablePaddingBySize(appUiSettings.size);
+
   return (
-    <ConfigProvider
-      theme={{
-        algorithm: theme.darkAlgorithm,
-        token: {
-          colorPrimary: '#e889ae',
-          colorInfo: '#d7a45b',
-          colorBgBase: '#08070b',
-          colorTextBase: '#fff7fb',
-          borderRadius: 14,
-          fontFamily: '"Plus Jakarta Sans", Inter, Arial, sans-serif',
-        },
-        components: {
-          Button: { controlHeight: 38, borderRadius: 999, fontWeight: 700 },
-          Card: { borderRadiusLG: 20, paddingLG: 18 },
-          Input: { controlHeight: 38 },
-          InputNumber: { controlHeight: 38 },
-          Select: { controlHeight: 38 },
-          Table: {
-            borderColor: 'rgba(255, 255, 255, 0.08)',
-            cellPaddingBlock: 10,
-            cellPaddingInline: 12,
-            cellPaddingBlockSM: 8,
-            cellPaddingInlineSM: 10,
-            headerBg: '#17101b',
-            headerColor: '#f7d9e6'
-          },
-        },
+    <AppUiContext.Provider
+      value={{
+        settings: appUiSettings,
+        loading: uiLoading,
+        refresh: loadAppUiSettings,
+        save: saveAppUiSettings,
       }}
     >
-      <Refine dataProvider={dataProvider} authProvider={authProvider} routerProvider={routerProvider} resources={resources}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route element={<ProtectedLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route element={<ScreenGuard screen="settings" />}>
-              <Route path="/custom-fields" element={<CustomFieldsPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/landing-pages" element={<LandingPagesPage />} />
-              <Route path="/roles" element={<RolesPage />} />
-              <Route path="/branch-role-assignments" element={<BranchRoleAssignmentsPage />} />
+      <ConfigProvider
+        theme={{
+          algorithm: appUiSettings.theme === 'light' ? theme.defaultAlgorithm : theme.darkAlgorithm,
+          token: {
+            colorPrimary: appUiSettings.primaryColor,
+            colorInfo: appUiSettings.primaryColor,
+            colorBgBase: appUiSettings.theme === 'light' ? '#f7f4ef' : '#08070b',
+            colorTextBase: appUiSettings.theme === 'light' ? '#22160f' : '#fff7fb',
+            borderRadius: appUiSettings.borderRadius,
+            fontFamily: appUiSettings.fontFamily,
+          },
+          components: {
+            Button: { controlHeight, borderRadius: 999, fontWeight: 700 },
+            Card: { borderRadiusLG: appUiSettings.borderRadius + 6, paddingLG: cardPadding },
+            Input: { controlHeight },
+            InputNumber: { controlHeight },
+            Select: { controlHeight },
+            Table: {
+              borderColor: appUiSettings.theme === 'light' ? 'rgba(34, 22, 15, 0.08)' : 'rgba(255, 255, 255, 0.08)',
+              cellPaddingBlock: tablePadding.block,
+              cellPaddingInline: tablePadding.inline,
+              cellPaddingBlockSM: Math.max(6, tablePadding.block - 2),
+              cellPaddingInlineSM: Math.max(8, tablePadding.inline - 2),
+              headerBg: appUiSettings.theme === 'light' ? '#f0e8dd' : '#17101b',
+              headerColor: appUiSettings.theme === 'light' ? '#4d2b1f' : '#f7d9e6'
+            },
+          },
+        }}
+      >
+        <Refine dataProvider={dataProvider} authProvider={authProvider} routerProvider={routerProvider} resources={resources}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route element={<ProtectedLayout />}>
+              <Route index element={<DashboardPage />} />
+              <Route element={<ScreenGuard screen="settings" />}>
+                <Route path="/custom-fields" element={<CustomFieldsPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/landing-pages" element={<LandingPagesPage />} />
+                <Route path="/roles" element={<RolesPage />} />
+                <Route path="/branch-role-assignments" element={<BranchRoleAssignmentsPage />} />
+                <Route path="/ui-settings" element={<UiSettingsPage />} />
+              </Route>
+              <Route element={<ScreenGuard screen="audit-logs" />}>
+                <Route path="/audit-logs" element={<AuditPage />} />
+              </Route>
+              <Route element={<ResourceGuard />}>
+                <Route path="/:resource" element={<RecordListPage />} />
+                <Route path="/:resource/:id/edit" element={<RecordFormPage />} />
+                <Route path="/:resource/:id" element={<RecordDetailPage />} />
+              </Route>
             </Route>
-            <Route element={<ScreenGuard screen="audit-logs" />}>
-              <Route path="/audit-logs" element={<AuditPage />} />
-            </Route>
-            <Route element={<ResourceGuard />}>
-              <Route path="/:resource" element={<RecordListPage />} />
-              <Route path="/:resource/:id/edit" element={<RecordFormPage />} />
-              <Route path="/:resource/:id" element={<RecordDetailPage />} />
-            </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Refine>
-    </ConfigProvider>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Refine>
+      </ConfigProvider>
+    </AppUiContext.Provider>
   );
 }

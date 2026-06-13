@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, Request } from '@nestjs/common';
 import { AuthUser, Public } from '../common/auth';
-import { BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, LandingPage, PrintTemplate } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, LandingPage, PrintTemplate } from '../entities/entities';
 import { SettingsService } from './settings.service';
 
 @Controller('settings')
@@ -99,6 +99,16 @@ export class SettingsController {
   @Get('landing-pages')
   async landingPages(@Request() request?: { user: AuthUser }) {
     return { data: await this.settings.listLandingPages(request?.user) };
+  }
+
+  @Get('app-ui')
+  async appUi(@Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.getAppUiSettings(request?.user) };
+  }
+
+  @Patch('app-ui')
+  async updateAppUi(@Body() payload: Partial<AppUiSetting>, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.updateAppUiSettings(payload, request?.user) };
   }
 
   @Post('landing-pages')

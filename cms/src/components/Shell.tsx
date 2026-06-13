@@ -31,6 +31,7 @@ import type { MenuProps } from "antd"
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { hasResourceAccess, hasScreenAccess } from "../access"
+import { useAppUi } from "../app-ui"
 import { entityLabels } from "../models"
 
 const { Header, Content, Sider } = Layout
@@ -119,6 +120,7 @@ const resourceToGroup = Object.fromEntries(
 export function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const { mutate: logout } = useLogout()
+  const { settings } = useAppUi()
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDER_COLLAPSE_KEY) === "1"
@@ -172,6 +174,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
       children: [
         hasScreenAccess("settings")
           ? {
+              key: "/ui-settings",
+              icon: <SettingOutlined />,
+              label: <Link to="/ui-settings">UI settings</Link>,
+            }
+          : null,
+        hasScreenAccess("settings")
+          ? {
               key: "/landing-pages",
               icon: menuIcons["landing-pages"],
               label: <Link to="/landing-pages">Landing pages</Link>,
@@ -208,6 +217,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ? "admin"
       : undefined),
     location.pathname.startsWith("/settings") ||
+    location.pathname.startsWith("/ui-settings") ||
     location.pathname.startsWith("/landing-pages") ||
     location.pathname.startsWith("/custom-fields") ||
     location.pathname.startsWith("/audit-logs")
@@ -242,12 +252,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
         }}
       >
         <div className="brand-card">
-          <div className="brand-mark">TC</div>
+          <div className="brand-mark">
+            {settings.appIconUrl ? <img alt={settings.appName} src={settings.appIconUrl} /> : settings.appName.slice(0, 2).toUpperCase()}
+          </div>
           <div className="brand-copy">
             <Typography.Text className="brand-kicker">
-              Aesthetic Clinic
+              {settings.appDescription || "Aesthetic Clinic"}
             </Typography.Text>
-            <Typography.Title level={4}>Thiện Chánh</Typography.Title>
+            <Typography.Title level={4}>{settings.appName}</Typography.Title>
           </div>
         </div>
         <Menu
@@ -270,7 +282,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             />
             <div>
               <Typography.Text className="eyebrow">
-                CMS vận hành viện thẩm mỹ
+                {settings.appDescription || "CMS vận hành viện thẩm mỹ"}
               </Typography.Text>
             </div>
           </Space>

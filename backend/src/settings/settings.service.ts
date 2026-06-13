@@ -4,12 +4,26 @@ import { randomUUID } from 'crypto';
 import Handlebars from 'handlebars';
 import { IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
-import { BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, LandingFormSubmission, LandingPage, PrintTemplate, User, ViewSetting } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, LandingFormSubmission, LandingPage, PrintTemplate, User, ViewSetting } from '../entities/entities';
 import { RecordsService } from '../records/records.service';
 
 const DEFAULT_ROLE_SCOPE = 'ALL';
 const SYSTEM_ROLES = ['ADMIN', 'STAFF', 'DOCTOR'];
 const LANDING_BLOCK_TYPES = ['title', 'text', 'image', 'video', 'form'];
+const UI_THEME_OPTIONS = ['dark', 'light'];
+const UI_SIZE_OPTIONS = ['small', 'medium', 'large'];
+const UI_FONT_FAMILIES = [
+  '"Plus Jakarta Sans", Inter, Arial, sans-serif',
+  '"Be Vietnam Pro", Inter, Arial, sans-serif',
+  '"Manrope", Inter, Arial, sans-serif',
+  '"Space Grotesk", Inter, Arial, sans-serif',
+  '"DM Sans", Inter, Arial, sans-serif',
+  '"Nunito Sans", Inter, Arial, sans-serif',
+  '"IBM Plex Sans", Inter, Arial, sans-serif',
+  '"Public Sans", Inter, Arial, sans-serif',
+  '"Work Sans", Inter, Arial, sans-serif',
+  '"Barlow", Inter, Arial, sans-serif',
+];
 
 function slugify(input?: string) {
   return String(input || '')
@@ -40,6 +54,7 @@ export class SettingsService {
     @InjectRepository(PrintTemplate) private readonly templates: Repository<PrintTemplate>,
     @InjectRepository(LandingPage) private readonly landingPages: Repository<LandingPage>,
     @InjectRepository(LandingFormSubmission) private readonly landingFormSubmissions: Repository<LandingFormSubmission>,
+    @InjectRepository(AppUiSetting) private readonly appUiSettings: Repository<AppUiSetting>,
     @InjectRepository(DynamicRoleDefinition) private readonly roles: Repository<DynamicRoleDefinition>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(BranchRoleAssignment) private readonly branchRoles: Repository<BranchRoleAssignment>,
@@ -127,6 +142,18 @@ export class SettingsService {
   listLandingPages(user?: AuthUser) {
     this.assertSettingsAccess(user);
     return this.landingPages.find({ order: { updatedAt: 'DESC', createdAt: 'DESC' } });
+  }
+
+  async getAppUiSettings(user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    return this.ensureAppUiSettings();
+  }
+
+  async updateAppUiSettings(payload: Partial<AppUiSetting>, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const current = await this.ensureAppUiSettings();
+    const next = this.appUiSettings.merge(current, this.normalizeAppUiPayload(payload, current));
+    return this.appUiSettings.save(next);
   }
 
   async createLandingPage(payload: Partial<LandingPage>, user?: AuthUser) {
@@ -481,5 +508,97 @@ export class SettingsService {
     if (!account) throw new NotFoundException('Khong tim thay user');
     return account.staffId || undefined;
   }
-}
 
+  private async ensureAppUiSettings() {
+    const existing = await this.appUiSettings.findOne({ where: { appKey: 'cms' } });
+    if (existing) {
+      const normalized = this.normalizeAppUiPayload(existing);
+      if (this.hasAppUiDiff(existing, normalized)) {
+        return this.appUiSettings.save(this.appUiSettings.merge(existing, normalized));
+      }
+      return existing;
+    }
+    return this.appUiSettings.save(this.appUiSettings.create(this.normalizeAppUiPayload({ appKey: 'cms' })));
+  }
+
+  private normalizeAppUiPayload(payload: Partial<AppUiSetting>, fallback?: Partial<AppUiSetting>) {
+    const appName = String(payload.appName ?? fallback?.appName ?? 'Thiện Chánh CMS').trim();
+    if (!appName) {
+      throw new BadRequestException('appName la bat buoc');
+    }
+
+    const appDescription = String(payload.appDescription ?? fallback?.appDescription ?? '').trim() || undefined;
+    const appIconUrl = String(payload.appIconUrl ?? fallback?.appIconUrl ?? '').trim() || undefined;
+    const primaryColor = this.normalizeHexColor(payload.primaryColor ?? fallback?.primaryColor ?? '#e889ae');
+    const theme = this.normalizeUiTheme(payload.theme ?? fallback?.theme ?? 'dark');
+    const borderRadius = this.normalizeBorderRadius(payload.borderRadius ?? fallback?.borderRadius ?? 14);
+    const size = this.normalizeUiSize(payload.size ?? fallback?.size ?? 'medium');
+    const fontFamily = this.normalizeFontFamily(payload.fontFamily ?? fallback?.fontFamily ?? UI_FONT_FAMILIES[0]);
+
+    return {
+      appKey: 'cms',
+      appName,
+      appDescription,
+      appIconUrl,
+      primaryColor,
+      theme,
+      borderRadius,
+      size,
+      fontFamily,
+    };
+  }
+
+  private normalizeHexColor(value: unknown) {
+    const normalized = String(value || '').trim();
+    if (!/^#([0-9a-fA-F]{6})$/.test(normalized)) {
+      throw new BadRequestException('primaryColor phai theo dinh dang #RRGGBB');
+    }
+    return normalized.toLowerCase();
+  }
+
+  private normalizeUiTheme(value: unknown) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!UI_THEME_OPTIONS.includes(normalized)) {
+      throw new BadRequestException('theme khong hop le');
+    }
+    return normalized;
+  }
+
+  private normalizeUiSize(value: unknown) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!UI_SIZE_OPTIONS.includes(normalized)) {
+      throw new BadRequestException('size khong hop le');
+    }
+    return normalized;
+  }
+
+  private normalizeFontFamily(value: unknown) {
+    const normalized = String(value || '').trim();
+    if (!UI_FONT_FAMILIES.includes(normalized)) {
+      throw new BadRequestException('fontFamily khong hop le');
+    }
+    return normalized;
+  }
+
+  private normalizeBorderRadius(value: unknown) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      throw new BadRequestException('borderRadius khong hop le');
+    }
+    return Math.max(0, Math.min(32, Math.round(numeric)));
+  }
+
+  private hasAppUiDiff(current: AppUiSetting, next: ReturnType<SettingsService['normalizeAppUiPayload']>) {
+    return (
+      current.appKey !== next.appKey ||
+      current.appName !== next.appName ||
+      current.appDescription !== next.appDescription ||
+      current.appIconUrl !== next.appIconUrl ||
+      current.primaryColor !== next.primaryColor ||
+      current.theme !== next.theme ||
+      current.borderRadius !== next.borderRadius ||
+      current.size !== next.size ||
+      current.fontFamily !== next.fontFamily
+    );
+  }
+}

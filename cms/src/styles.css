@@ -1,9 +1,21 @@
 @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 
 :root {
-  color: #fff7fb;
-  background: #08070b;
-  font-family: "Plus Jakarta Sans", Inter, Arial, sans-serif;
+  --app-primary: #e889ae;
+  --app-font-family: "Plus Jakarta Sans", Inter, Arial, sans-serif;
+  --app-radius: 14px;
+  --app-text: #fff7fb;
+  --app-text-soft: #eab4ca;
+  --app-line: rgba(255, 255, 255, 0.08);
+  --app-sider-bg: linear-gradient(180deg, rgba(22, 13, 26, 0.96), rgba(8, 7, 11, 0.98));
+  --app-page-bg: #08070b;
+  --app-page-overlay:
+    radial-gradient(circle at 12% 12%, rgba(232, 137, 174, 0.22), transparent 34%),
+    radial-gradient(circle at 82% 6%, rgba(215, 164, 91, 0.16), transparent 30%),
+    linear-gradient(135deg, #08070b 0%, #110914 46%, #170d16 100%);
+  color: var(--app-text);
+  background: var(--app-page-bg);
+  font-family: var(--app-font-family);
   font-synthesis: none;
   text-rendering: geometricPrecision;
 }
@@ -14,10 +26,7 @@ body {
 }
 
 body::before {
-  background:
-    radial-gradient(circle at 12% 12%, rgba(232, 137, 174, 0.22), transparent 34%),
-    radial-gradient(circle at 82% 6%, rgba(215, 164, 91, 0.16), transparent 30%),
-    linear-gradient(135deg, #08070b 0%, #110914 46%, #170d16 100%);
+  background: var(--app-page-overlay);
   content: "";
   inset: 0;
   pointer-events: none;
@@ -31,8 +40,8 @@ body::before {
 }
 
 .app-sider {
-  background: linear-gradient(180deg, rgba(22, 13, 26, 0.96), rgba(8, 7, 11, 0.98)) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--app-sider-bg) !important;
+  border-right: 1px solid var(--app-line);
   box-shadow: 24px 0 80px rgba(0, 0, 0, 0.3);
   overflow-y: auto;
   padding: 16px 12px;
@@ -40,9 +49,9 @@ body::before {
 
 .brand-card {
   align-items: center;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(232, 137, 174, 0.1));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 22px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 10%, white), color-mix(in srgb, var(--app-primary) 22%, transparent));
+  border: 1px solid var(--app-line);
+  border-radius: calc(var(--app-radius) + 8px);
   display: flex;
   gap: 12px;
   min-height: 72px;
@@ -55,14 +64,14 @@ body::before {
 
 .brand-card h3,
 .brand-card h4 {
-  color: #fff7fb !important;
+  color: var(--app-text) !important;
   line-height: 1.1 !important;
   margin: 0 !important;
 }
 
 .brand-kicker,
 .eyebrow {
-  color: #eab4ca !important;
+  color: var(--app-text-soft) !important;
   display: block;
   font-size: 11px;
   font-weight: 800;
@@ -72,8 +81,8 @@ body::before {
 
 .brand-mark {
   align-items: center;
-  background: linear-gradient(135deg, #f5a7c6, #b8688a 52%, #d7a45b);
-  border-radius: 16px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 54%, white), var(--app-primary) 52%, #d7a45b);
+  border-radius: calc(var(--app-radius) + 2px);
   box-shadow: 0 14px 30px rgba(232, 137, 174, 0.26);
   color: #180c12;
   display: flex;
@@ -82,6 +91,13 @@ body::before {
   justify-content: center;
   letter-spacing: -0.05em;
   width: 44px;
+}
+
+.brand-mark img {
+  border-radius: inherit;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
 }
 
 .side-menu {

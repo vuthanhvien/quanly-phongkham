@@ -830,6 +830,42 @@ export class LandingPage {
   updatedAt: Date;
 }
 
+@Entity('app_ui_settings')
+export class AppUiSetting {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ default: 'cms' })
+  appKey: string;
+
+  @Column({ default: 'Thiện Chánh CMS' })
+  appName: string;
+
+  @Column({ type: 'text', nullable: true })
+  appDescription?: string;
+
+  @Column({ type: 'text', nullable: true })
+  appIconUrl?: string;
+
+  @Column({ default: '#e889ae' })
+  primaryColor: string;
+
+  @Column({ default: 'dark' })
+  theme: string;
+
+  @Column({ default: 14 })
+  borderRadius: number;
+
+  @Column({ default: 'medium' })
+  size: string;
+
+  @Column({ default: '"Plus Jakarta Sans", Inter, Arial, sans-serif' })
+  fontFamily: string;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
 @Entity('landing_form_submissions')
 export class LandingFormSubmission {
   @PrimaryGeneratedColumn('uuid')
@@ -940,6 +976,7 @@ export const ENTITIES = [
   ViewSetting,
   PrintTemplate,
   LandingPage,
+  AppUiSetting,
   LandingFormSubmission,
   AuditLog,
 ];

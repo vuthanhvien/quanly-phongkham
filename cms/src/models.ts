@@ -92,6 +92,19 @@ export interface BranchRoleAssignment {
   isActive: boolean;
 }
 
+export interface AppUiSettings {
+  id?: string;
+  appKey?: string;
+  appName: string;
+  appDescription?: string;
+  appIconUrl?: string;
+  primaryColor: string;
+  theme: 'dark' | 'light';
+  borderRadius: number;
+  size: 'small' | 'medium' | 'large';
+  fontFamily: string;
+}
+
 export interface ResourceActionOption {
   key: string;
   label: string;
