@@ -2,6 +2,8 @@ import {
   CalendarOutlined,
   DollarOutlined,
   ExperimentOutlined,
+  FileDoneOutlined,
+  LineChartOutlined,
   MedicineBoxOutlined,
   RiseOutlined,
   SafetyCertificateOutlined,
@@ -24,47 +26,20 @@ import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
 import { loadRelationOptions, LookupMap } from "../relations"
 
-const metrics = [
-  {
-    title: "Khách đang chờ",
-    value: 18,
-    suffix: "khách",
-    icon: <TeamOutlined />,
-    tone: "rose",
-    trend: "+12% tuần này",
-  },
-  {
-    title: "Đang tư vấn",
-    value: 9,
-    suffix: "ca",
-    icon: <MedicineBoxOutlined />,
-    tone: "gold",
-    trend: "4 bác sĩ active",
-  },
-  {
-    title: "Đang điều trị",
-    value: 27,
-    suffix: "liệu trình",
-    icon: <ExperimentOutlined />,
-    tone: "violet",
-    trend: "82% đúng lịch",
-  },
-  {
-    title: "Hậu phẫu",
-    value: 14,
-    suffix: "case",
-    icon: <SafetyCertificateOutlined />,
-    tone: "cyan",
-    trend: "3 cần follow-up",
-  },
-]
+interface DashboardMetric {
+  title: string
+  value: number
+  suffix: string
+  icon: React.ReactNode
+  tone: string
+  trend: string
+}
 
-const pipeline = [
-  { label: "Tư vấn", value: 74, color: "#e889ae" },
-  { label: "Phẫu thuật", value: 48, color: "#d7a45b" },
-  { label: "Liệu trình", value: 86, color: "#9b7cff" },
-  { label: "Hậu phẫu", value: 62, color: "#62d8d2" },
-]
+interface DashboardPipeline {
+  label: string
+  value: number
+  color: string
+}
 
 interface DashboardEvent {
   id: string
@@ -76,20 +51,105 @@ interface DashboardEvent {
   meta: string
 }
 
+interface ListPayload<T> {
+  data: T[]
+  total: number
+}
+
+const DEFAULT_METRICS: DashboardMetric[] = [
+  {
+    title: "Khách hàng",
+    value: 0,
+    suffix: "khách",
+    icon: <TeamOutlined />,
+    tone: "rose",
+    trend: "0 hồ sơ",
+  },
+  {
+    title: "Leads",
+    value: 0,
+    suffix: "lead",
+    icon: <LineChartOutlined />,
+    tone: "gold",
+    trend: "0 đầu mối",
+  },
+  {
+    title: "Đang điều trị",
+    value: 0,
+    suffix: "liệu trình",
+    icon: <ExperimentOutlined />,
+    tone: "violet",
+    trend: "0 liệu trình",
+  },
+  {
+    title: "Hồ sơ điều trị",
+    value: 0,
+    suffix: "case",
+    icon: <SafetyCertificateOutlined />,
+    tone: "cyan",
+    trend: "0 hồ sơ",
+  },
+]
+
+const DEFAULT_PIPELINE: DashboardPipeline[] = [
+  { label: "Tư vấn", value: 0, color: "#e889ae" },
+  { label: "Đơn dịch vụ", value: 0, color: "#d7a45b" },
+  { label: "Lịch hẹn", value: 0, color: "#9b7cff" },
+  { label: "Hóa đơn", value: 0, color: "#62d8d2" },
+]
+
+function formatCompactCurrency(value: number) {
+  return new Intl.NumberFormat("vi-VN", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
+function parseAmount(value: unknown) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+async function fetchList<T>(resource: string, pageSize = 10000) {
+  const response = await api.get(`/records/${resource}`, { params: { pageSize } })
+  return response.data as ListPayload<T>
+}
+
 export function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState(dayjs())
   const [events, setEvents] = useState<DashboardEvent[]>([])
   const [lookups, setLookups] = useState<LookupMap>({})
+  const [metrics, setMetrics] = useState<DashboardMetric[]>(DEFAULT_METRICS)
+  const [pipeline, setPipeline] = useState<DashboardPipeline[]>(DEFAULT_PIPELINE)
+  const [revenue, setRevenue] = useState(0)
 
   useEffect(() => {
     Promise.all([
-      api.get("/records/appointments", { params: { pageSize: 200 } }),
-      api.get("/records/work-schedules", { params: { pageSize: 200 } }).catch(
-        () => ({ data: { data: [] } }),
+      fetchList<Record<string, any>>("appointments", 200),
+      fetchList<Record<string, any>>("work-schedules", 200).catch(
+        () => ({ data: [], total: 0 }),
       ),
+      fetchList<Record<string, any>>("customers"),
+      fetchList<Record<string, any>>("leads"),
+      fetchList<Record<string, any>>("treatments"),
+      fetchList<Record<string, any>>("medical-episodes"),
+      fetchList<Record<string, any>>("consultations"),
+      fetchList<Record<string, any>>("service-orders"),
+      fetchList<Record<string, any>>("invoices"),
       loadRelationOptions(["customerId", "staffId"]),
-    ]).then(([appointments, workSchedules, relationLookups]) => {
-      const appointmentEvents = appointments.data.data.map(
+    ]).then(([
+      appointments,
+      workSchedules,
+      customers,
+      leads,
+      treatments,
+      medicalEpisodes,
+      consultations,
+      serviceOrders,
+      invoices,
+      relationLookups,
+    ]) => {
+      const appointmentEvents = appointments.data.map(
         (item: Record<string, any>) => ({
           id: item.id,
           type: "appointment" as const,
@@ -100,7 +160,7 @@ export function DashboardPage() {
           meta: [item.status, item.doctorName, item.room].filter(Boolean).join(" | "),
         }),
       )
-      const scheduleEvents = workSchedules.data.data.map(
+      const scheduleEvents = workSchedules.data.map(
         (item: Record<string, any>) => ({
           id: item.id,
           type: "schedule" as const,
@@ -112,8 +172,64 @@ export function DashboardPage() {
         }),
       )
 
+      const paidRevenue = invoices.data.reduce(
+        (sum, item) => sum + parseAmount(item.paidAmount),
+        0,
+      )
+
+      const nextMetrics: DashboardMetric[] = [
+        {
+          title: "Khách hàng",
+          value: customers.total,
+          suffix: "khách",
+          icon: <TeamOutlined />,
+          tone: "rose",
+          trend: `${customers.total.toLocaleString("vi-VN")} hồ sơ`,
+        },
+        {
+          title: "Leads",
+          value: leads.total,
+          suffix: "lead",
+          icon: <LineChartOutlined />,
+          tone: "gold",
+          trend: `${leads.total.toLocaleString("vi-VN")} đầu mối`,
+        },
+        {
+          title: "Đang điều trị",
+          value: treatments.total,
+          suffix: "liệu trình",
+          icon: <ExperimentOutlined />,
+          tone: "violet",
+          trend: `${treatments.total.toLocaleString("vi-VN")} liệu trình`,
+        },
+        {
+          title: "Hồ sơ điều trị",
+          value: medicalEpisodes.total,
+          suffix: "case",
+          icon: <SafetyCertificateOutlined />,
+          tone: "cyan",
+          trend: `${medicalEpisodes.total.toLocaleString("vi-VN")} hồ sơ`,
+        },
+      ]
+
+      const pipelineTotals = [
+        { label: "Tư vấn", total: consultations.total, color: "#e889ae" },
+        { label: "Đơn dịch vụ", total: serviceOrders.total, color: "#d7a45b" },
+        { label: "Lịch hẹn", total: appointments.total, color: "#9b7cff" },
+        { label: "Hóa đơn", total: invoices.total, color: "#62d8d2" },
+      ]
+      const maxTotal = Math.max(...pipelineTotals.map((item) => item.total), 1)
+      const nextPipeline = pipelineTotals.map((item) => ({
+        label: `${item.label} (${item.total.toLocaleString("vi-VN")})`,
+        value: Math.round((item.total / maxTotal) * 100),
+        color: item.color,
+      }))
+
       setLookups(relationLookups)
       setEvents([...appointmentEvents, ...scheduleEvents])
+      setRevenue(paidRevenue)
+      setMetrics(nextMetrics)
+      setPipeline(nextPipeline)
     })
   }, [])
 
@@ -146,7 +262,7 @@ export function DashboardPage() {
             <DollarOutlined />
             <div>
               <Typography.Text>Doanh thu hôm nay</Typography.Text>
-              <Typography.Title level={3}>128.5M</Typography.Title>
+              <Typography.Title level={3}>{formatCompactCurrency(revenue)}</Typography.Title>
             </div>
           </div>
           <Space wrap>
@@ -186,7 +302,7 @@ export function DashboardPage() {
                   <div>
                     <Typography.Text strong>{item.label}</Typography.Text>
                     <Typography.Text type="secondary">
-                      {item.value}% kế hoạch
+                      {item.value}% theo quy mô dữ liệu
                     </Typography.Text>
                   </div>
                   <Progress

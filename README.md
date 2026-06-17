@@ -16,9 +16,10 @@ cp .env.example .env
 docker compose up --build
 ```
 
-- CMS: <http://localhost:5173>
-- API: <http://localhost:3000/api>
-- PostgreSQL: `localhost:5432`
+- Landing: <http://localhost:3001>
+- CMS: <http://localhost:8080>
+- API: nội bộ qua proxy
+- PostgreSQL: `localhost:5433`
 
 Tài khoản khởi tạo:
 
@@ -34,11 +35,31 @@ Thay `JWT_SECRET` và mật khẩu admin trong `.env` trước khi sử dụng n
 Compose dev mount source code từ máy host vào container để khi sửa file thì NestJS và Vite tự reload ngay.
 
 ```bash
+cp .env.example .env
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-- CMS dev: <http://localhost:5173>
-- API dev: <http://localhost:3000/api>
+- Start nền:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+- Xem log:
+
+```bash
+docker compose -f docker-compose.dev.yml logs -f
+```
+
+- Dừng dev:
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
+
+- CMS dev: <http://localhost:15173>
+- API dev: <http://localhost:13000/api>
+- Landing dev: <http://localhost:13001>
 - PostgreSQL: `localhost:5433`
 
 Nếu lần đầu khởi động thấy watcher chưa bắt thay đổi trên Docker Desktop, compose dev đã bật polling sẵn cho cả backend và cms.
@@ -89,4 +110,3 @@ Khởi động riêng PostgreSQL trước, sau đó:
 cd backend && npm install && DATABASE_URL=postgresql://clinic:clinic_password@localhost:5432/clinic npm run start:dev
 cd cms && npm install && npm run dev
 ```
-

@@ -43,6 +43,8 @@ export function RecordListPage() {
   const { resource = "customers" } = useParams()
   const navigate = useNavigate()
   const [search, setSearch] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
   const [displayFields, setDisplayFields] = useState<FieldLayoutConfig[]>([])
   const [templates, setTemplates] = useState<
     Array<{ id: string; name: string }>
@@ -52,14 +54,19 @@ export function RecordListPage() {
   const [fileLookups, setFileLookups] = useState<FileLookupMap>({})
   const query = useList({
     resource,
-    pagination: { currentPage: 1, pageSize: 50 },
+    pagination: { currentPage, pageSize },
     filters: [{ field: "search", operator: "contains", value: search }],
   }) as any
   const response = query.result || query.query?.data || query.data?.data
   const rows = response?.data || []
+  const total = response?.total || 0
   const loading = query.query?.isLoading || query.isLoading
   const { mutate: deleteRecord } = useDelete()
   const refresh = () => query.query?.refetch?.() || query.refetch?.()
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [resource])
 
   useEffect(() => {
     Promise.all([
@@ -215,7 +222,10 @@ export function RecordListPage() {
           <Input.Search
             allowClear
             placeholder="Tìm kiếm"
-            onSearch={setSearch}
+            onSearch={(value) => {
+              setCurrentPage(1)
+              setSearch(value)
+            }}
           />
           {hasActionAccess(resource, "create") && (
             <Tooltip title="Tạo bản ghi mới">
@@ -236,6 +246,18 @@ export function RecordListPage() {
           columns={columns}
           dataSource={rows}
           loading={loading}
+          pagination={{
+            current: currentPage,
+            pageSize,
+            total,
+            showSizeChanger: true,
+            pageSizeOptions: [20, 50, 100, 200],
+            showTotal: (value) => `${value.toLocaleString("vi-VN")} bản ghi`,
+            onChange: (page, nextPageSize) => {
+              setCurrentPage(page)
+              setPageSize(nextPageSize)
+            },
+          }}
           rowKey="id"
           scroll={{ x: "max-content" }}
         />
