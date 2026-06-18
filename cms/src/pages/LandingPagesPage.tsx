@@ -18,6 +18,7 @@ import {
   Input,
   InputNumber,
   List,
+  Modal,
   Popconfirm,
   Row,
   Select,
@@ -124,6 +125,163 @@ function emptyPage(): Omit<LandingPage, 'id' | 'createdAt' | 'updatedAt'> {
   }
 }
 
+type PageTemplate = {
+  key: string
+  label: string
+  description: string
+  page: Omit<LandingPage, 'id' | 'createdAt' | 'updatedAt'>
+}
+
+function makeId() {
+  return crypto.randomUUID()
+}
+
+const PAGE_TEMPLATES: PageTemplate[] = [
+  {
+    key: 'blank',
+    label: 'Trang trống',
+    description: 'Bắt đầu từ đầu, không có block nào.',
+    page: emptyPage(),
+  },
+  {
+    key: 'home',
+    label: 'Trang chủ (Home)',
+    description: 'Template trang chủ đầy đủ: hero, giới thiệu, dịch vụ nổi bật, và form liên hệ.',
+    page: {
+      slug: 'trang-chu',
+      path: '/',
+      title: 'Thiện Chánh Clinic – Thẩm mỹ chuyên nghiệp',
+      description: 'Thiện Chánh Clinic – Nơi hội tụ đội ngũ bác sĩ chuyên sâu, công nghệ hiện đại và không gian sang trọng.',
+      seoTitle: 'Thiện Chánh Clinic – Phòng khám thẩm mỹ uy tín',
+      seoDescription: 'Thiện Chánh Clinic cung cấp các dịch vụ thẩm mỹ cao cấp: nâng mũi, độn cằm, căng da mặt... Bác sĩ giàu kinh nghiệm, an toàn, tự nhiên.',
+      isPublished: false,
+      blocks: [
+        { id: makeId(), type: 'title', row: 1, span: 12, order: 1, title: 'Vẻ đẹp tự nhiên – Sự tự tin vượt trội', level: 1, align: 'center' },
+        { id: makeId(), type: 'text', row: 2, span: 12, order: 2, text: 'Thiện Chánh Clinic – Phòng khám thẩm mỹ uy tín hàng đầu tại TP.HCM. Đội ngũ bác sĩ 10+ năm kinh nghiệm, công nghệ châu Âu, không gian 5 sao. Chúng tôi đồng hành cùng bạn trên hành trình tìm lại vẻ đẹp tự nhiên nhất.', align: 'center' },
+        { id: makeId(), type: 'image', row: 3, span: 12, order: 3, url: '', alt: 'Thiện Chánh Clinic', caption: 'Cơ sở Thiện Chánh Clinic – Quận 1, TP.HCM' },
+        { id: makeId(), type: 'title', row: 4, span: 12, order: 4, title: 'Dịch vụ nổi bật', level: 2, align: 'center' },
+        { id: makeId(), type: 'text', row: 5, span: 4, order: 5, text: '👃 Nâng mũi cấu trúc\nSụn tự thân, dáng mũi tự nhiên – bền vững theo thời gian. Không lo co rút, không lo biến chứng.', align: 'left' },
+        { id: makeId(), type: 'text', row: 5, span: 4, order: 6, text: '✨ Căng da mặt\nCông nghệ HIFU và chỉ treo Collagen V-Line – trẻ hóa làn da không cần phẫu thuật, không thời gian hồi phục.', align: 'left' },
+        { id: makeId(), type: 'text', row: 5, span: 4, order: 7, text: '💎 Độn cằm V-Line\nTạo đường cằm thanh tú, khuôn mặt cân đối hài hòa. Phẫu thuật nhanh – nghỉ dưỡng 3 ngày.', align: 'left' },
+        { id: makeId(), type: 'title', row: 6, span: 12, order: 8, title: 'Vì sao hơn 10.000 khách hàng tin tưởng?', level: 2, align: 'center' },
+        { id: makeId(), type: 'text', row: 7, span: 3, order: 9, text: '🏥 10+ năm\nHoạt động trong ngành thẩm mỹ y tế', align: 'center' },
+        { id: makeId(), type: 'text', row: 7, span: 3, order: 10, text: '👨‍⚕️ 15 bác sĩ\nChuyên môn cao, được đào tạo tại Hàn Quốc & Mỹ', align: 'center' },
+        { id: makeId(), type: 'text', row: 7, span: 3, order: 11, text: '⭐ 4.9/5\nĐánh giá trung bình từ khách hàng thực tế', align: 'center' },
+        { id: makeId(), type: 'text', row: 7, span: 3, order: 12, text: '🛡️ Bảo hành\nCam kết theo dõi và hỗ trợ trọn đời sau dịch vụ', align: 'center' },
+        {
+          id: makeId(), type: 'form', row: 8, span: 12, order: 13,
+          title: 'Nhận tư vấn miễn phí ngay hôm nay',
+          description: 'Để lại thông tin, chuyên viên sẽ liên hệ tư vấn trong 30 phút (miễn phí, không ràng buộc).',
+          submitLabel: 'Nhận tư vấn miễn phí',
+          successMessage: 'Cảm ơn bạn! Chuyên viên sẽ gọi lại trong 30 phút.',
+          fields: [
+            { id: makeId(), name: 'full_name', label: 'Họ và tên', type: 'text', placeholder: 'Nguyễn Thị A', required: true, span: 6 },
+            { id: makeId(), name: 'phone', label: 'Số điện thoại', type: 'tel', placeholder: '0901 234 567', required: true, span: 6 },
+            { id: makeId(), name: 'service', label: 'Dịch vụ quan tâm', type: 'text', placeholder: 'Ví dụ: nâng mũi, căng da mặt...', required: false, span: 12 },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    key: 'khuyen-mai',
+    label: 'Khuyến mãi dịch vụ',
+    description: 'Template trang ưu đãi: tiêu đề, ảnh, mô tả và form đăng ký.',
+    page: {
+      slug: 'uu-dai-dich-vu',
+      path: '/uu-dai-dich-vu',
+      title: 'Ưu đãi dịch vụ tháng này',
+      description: 'Chương trình ưu đãi đặc biệt dành cho khách hàng mới và khách hàng thân thiết.',
+      seoTitle: 'Ưu đãi dịch vụ thẩm mỹ – Thiện Chánh Clinic',
+      seoDescription: 'Khám phá các ưu đãi hấp dẫn tại Thiện Chánh Clinic. Đặt lịch ngay hôm nay!',
+      isPublished: false,
+      blocks: [
+        { id: makeId(), type: 'title', row: 1, span: 12, order: 1, title: 'Ưu đãi đặc biệt tháng 6', level: 1, align: 'center' },
+        { id: makeId(), type: 'text', row: 2, span: 7, order: 2, text: 'Thiện Chánh Clinic mang đến chương trình ưu đãi lên đến 30% cho các dịch vụ thẩm mỹ cao cấp. Đội ngũ bác sĩ giàu kinh nghiệm, công nghệ hiện đại, không gian sang trọng – tất cả chỉ trong một nơi.', align: 'left' },
+        { id: makeId(), type: 'image', row: 2, span: 5, order: 3, url: '', alt: 'Ưu đãi dịch vụ thẩm mỹ', caption: 'Dịch vụ chuyên nghiệp tại Thiện Chánh Clinic' },
+        {
+          id: makeId(), type: 'form', row: 3, span: 12, order: 4,
+          title: 'Đăng ký nhận ưu đãi ngay',
+          description: 'Điền thông tin để nhận tư vấn miễn phí và ưu đãi độc quyền.',
+          submitLabel: 'Đăng ký ngay',
+          successMessage: 'Cảm ơn bạn! Chúng tôi sẽ liên hệ trong 24 giờ.',
+          fields: [
+            { id: makeId(), name: 'full_name', label: 'Họ và tên', type: 'text', placeholder: 'Nguyễn Văn A', required: true, span: 6 },
+            { id: makeId(), name: 'phone', label: 'Số điện thoại', type: 'tel', placeholder: '0901 234 567', required: true, span: 6 },
+            { id: makeId(), name: 'service', label: 'Dịch vụ quan tâm', type: 'text', placeholder: 'Ví dụ: nâng mũi, độn cằm...', required: false, span: 12 },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    key: 'dich-vu',
+    label: 'Giới thiệu dịch vụ',
+    description: 'Template giới thiệu một dịch vụ cụ thể: tiêu đề, video, lợi ích và form.',
+    page: {
+      slug: 'dich-vu-nang-mui',
+      path: '/dich-vu-nang-mui',
+      title: 'Dịch vụ nâng mũi cấu trúc',
+      description: 'Nâng mũi cấu trúc sụn tự thân – giải pháp tự nhiên, bền vững cho dáng mũi hoàn hảo.',
+      seoTitle: 'Nâng mũi cấu trúc – Thiện Chánh Clinic',
+      seoDescription: 'Nâng mũi sụn tự thân an toàn, tự nhiên tại Thiện Chánh Clinic. Kết quả bền vững, không lo biến chứng.',
+      isPublished: false,
+      blocks: [
+        { id: makeId(), type: 'title', row: 1, span: 12, order: 1, title: 'Nâng mũi cấu trúc sụn tự thân', level: 1, align: 'center' },
+        { id: makeId(), type: 'text', row: 2, span: 12, order: 2, text: 'Kỹ thuật nâng mũi cấu trúc sụn tự thân là giải pháp tối ưu cho dáng mũi tự nhiên, bền lâu. Bác sĩ sử dụng sụn tai hoặc sụn sườn của chính bệnh nhân để tạo hình mũi, không lo thải trừ hay biến chứng.', align: 'left' },
+        { id: makeId(), type: 'video', row: 3, span: 12, order: 3, url: '', title: 'Quy trình nâng mũi cấu trúc tại Thiện Chánh Clinic' },
+        { id: makeId(), type: 'title', row: 4, span: 12, order: 4, title: 'Tại sao chọn Thiện Chánh?', level: 2, align: 'left' },
+        { id: makeId(), type: 'text', row: 5, span: 4, order: 5, text: '✅ Bác sĩ 10+ năm kinh nghiệm\nChuyên sâu về phẫu thuật thẩm mỹ mũi, đã thực hiện hàng nghìn ca.', align: 'left' },
+        { id: makeId(), type: 'text', row: 5, span: 4, order: 6, text: '✅ Công nghệ 3D Imaging\nMô phỏng kết quả trước phẫu thuật, giúp bạn hình dung rõ dáng mũi sau.', align: 'left' },
+        { id: makeId(), type: 'text', row: 5, span: 4, order: 7, text: '✅ Bảo hành trọn đời\nCam kết theo dõi và hỗ trợ sau phẫu thuật không giới hạn thời gian.', align: 'left' },
+        {
+          id: makeId(), type: 'form', row: 6, span: 12, order: 8,
+          title: 'Tư vấn miễn phí ngay hôm nay',
+          description: 'Để lại thông tin, bác sĩ sẽ gọi lại tư vấn trực tiếp trong 30 phút.',
+          submitLabel: 'Nhận tư vấn miễn phí',
+          successMessage: 'Đã nhận thông tin! Bác sĩ sẽ liên hệ bạn sớm nhất.',
+          fields: [
+            { id: makeId(), name: 'full_name', label: 'Họ và tên', type: 'text', placeholder: 'Nguyễn Thị B', required: true, span: 6 },
+            { id: makeId(), name: 'phone', label: 'Điện thoại', type: 'tel', placeholder: '0901 234 567', required: true, span: 6 },
+            { id: makeId(), name: 'note', label: 'Ghi chú thêm', type: 'textarea', placeholder: 'Bạn muốn hỏi gì về dịch vụ...', required: false, span: 12 },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    key: 'dat-lich',
+    label: 'Đặt lịch khám',
+    description: 'Template đặt lịch khám: thông tin phòng khám và form đặt lịch.',
+    page: {
+      slug: 'dat-lich-kham',
+      path: '/dat-lich-kham',
+      title: 'Đặt lịch khám tại Thiện Chánh Clinic',
+      description: 'Đặt lịch khám và tư vấn thẩm mỹ trực tiếp với bác sĩ.',
+      seoTitle: 'Đặt lịch khám – Thiện Chánh Clinic',
+      seoDescription: 'Đặt lịch khám tư vấn thẩm mỹ miễn phí tại Thiện Chánh Clinic. Bác sĩ giàu kinh nghiệm, tận tâm.',
+      isPublished: false,
+      blocks: [
+        { id: makeId(), type: 'title', row: 1, span: 12, order: 1, title: 'Đặt lịch khám & tư vấn miễn phí', level: 1, align: 'center' },
+        { id: makeId(), type: 'text', row: 2, span: 6, order: 2, text: '📍 Địa chỉ: 123 Đường ABC, Quận 1, TP.HCM\n⏰ Giờ làm việc: Thứ 2 – Thứ 7, 8:00 – 20:00\n📞 Hotline: 1800 1234 (miễn phí)\n\nĐội ngũ bác sĩ và chuyên viên tư vấn luôn sẵn sàng hỗ trợ bạn tìm ra giải pháp phù hợp nhất.', align: 'left' },
+        {
+          id: makeId(), type: 'form', row: 2, span: 6, order: 3,
+          title: 'Chọn thời gian phù hợp',
+          description: 'Chúng tôi sẽ xác nhận lịch hẹn qua điện thoại trong vòng 1 giờ.',
+          submitLabel: 'Đặt lịch ngay',
+          successMessage: 'Đặt lịch thành công! Chúng tôi sẽ gọi xác nhận sớm.',
+          fields: [
+            { id: makeId(), name: 'full_name', label: 'Họ và tên', type: 'text', placeholder: 'Nguyễn Văn C', required: true, span: 12 },
+            { id: makeId(), name: 'phone', label: 'Số điện thoại', type: 'tel', placeholder: '0901 234 567', required: true, span: 12 },
+            { id: makeId(), name: 'service', label: 'Dịch vụ muốn khám', type: 'text', placeholder: 'Ví dụ: tư vấn nâng mũi', required: false, span: 12 },
+            { id: makeId(), name: 'preferred_time', label: 'Thời gian mong muốn', type: 'text', placeholder: 'Ví dụ: sáng thứ 3 tuần này', required: false, span: 12 },
+          ],
+        },
+      ],
+    },
+  },
+]
+
 function isYoutubeUrl(url: string) {
   return /youtube\.com|youtu\.be/.test(url)
 }
@@ -148,6 +306,7 @@ export function LandingPagesPage() {
   const [draft, setDraft] = useState<Omit<LandingPage, 'id' | 'createdAt' | 'updatedAt'>>(emptyPage())
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [templateModal, setTemplateModal] = useState(false)
 
   const selectedPage = useMemo(
     () => pages.find((item) => item.id === selectedId) || null,
@@ -209,8 +368,16 @@ export function LandingPagesPage() {
   }
 
   function startCreatePage() {
+    setTemplateModal(true)
+  }
+
+  function applyTemplate(template: PageTemplate) {
     setSelectedId(null)
-    setDraft(emptyPage())
+    setDraft({
+      ...template.page,
+      blocks: template.page.blocks.map((block) => ({ ...block, id: makeId() })),
+    })
+    setTemplateModal(false)
   }
 
   function syncSlugFromTitle(title: string) {
@@ -335,6 +502,39 @@ export function LandingPagesPage() {
     }
   }
 
+  async function saveAndOpen() {
+    const payload = {
+      ...draft,
+      slug: slugify(draft.slug || draft.title),
+      path: normalizePath(draft.path || draft.slug || draft.title),
+      blocks: draft.blocks.map((block, index) => ({ ...block, order: index + 1 })),
+    }
+    if (!payload.title.trim()) {
+      message.error('Cần nhập tên page')
+      return
+    }
+    setSaving(true)
+    try {
+      let savedPath = payload.path
+      if (selectedId) {
+        const response = await api.patch(`/settings/landing-pages/${selectedId}`, payload)
+        savedPath = response.data.data.path
+        message.success('Đã cập nhật')
+        await loadPages(response.data.data.id)
+      } else {
+        const response = await api.post('/settings/landing-pages', payload)
+        savedPath = response.data.data.path
+        message.success('Đã tạo landing page')
+        await loadPages(response.data.data.id)
+      }
+      const base = LANDING_URL.replace(/\/$/, '')
+      const path = savedPath === '/' ? '' : savedPath
+      window.open(`${base}${path || '/'}`, '_blank', 'noreferrer')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function deletePage() {
     if (!selectedId) return
     await api.delete(`/settings/landing-pages/${selectedId}`)
@@ -363,7 +563,8 @@ export function LandingPagesPage() {
         </div>
         <Space wrap>
           <Button icon={<PlusOutlined />} onClick={startCreatePage}>Page mới</Button>
-          <Button icon={<SaveOutlined />} loading={saving} type="primary" onClick={savePage}>Lưu page</Button>
+          <Button icon={<SaveOutlined />} loading={saving} onClick={savePage}>Lưu</Button>
+          <Button icon={<EyeOutlined />} loading={saving} type="primary" onClick={() => void saveAndOpen()}>Lưu & Mở</Button>
         </Space>
       </div>
 
@@ -731,6 +932,38 @@ export function LandingPagesPage() {
           </Space>
         </Col>
       </Row>
+
+      <Modal
+        footer={null}
+        onCancel={() => setTemplateModal(false)}
+        open={templateModal}
+        title="Chọn template cho page mới"
+        width={640}
+      >
+        <Space direction="vertical" size={12} style={{ width: '100%', marginTop: 8 }}>
+          {PAGE_TEMPLATES.map((template) => (
+            <Card
+              hoverable
+              key={template.key}
+              onClick={() => applyTemplate(template)}
+              size="small"
+              style={{ cursor: 'pointer' }}
+            >
+              <Flex justify="space-between" align="center">
+                <div>
+                  <Typography.Text strong>{template.label}</Typography.Text>
+                  <br />
+                  <Typography.Text type="secondary">{template.description}</Typography.Text>
+                </div>
+                <Space>
+                  <Tag>{template.page.blocks.length} block</Tag>
+                  <Button size="small" type="primary">Chọn</Button>
+                </Space>
+              </Flex>
+            </Card>
+          ))}
+        </Space>
+      </Modal>
     </Space>
   )
 }
