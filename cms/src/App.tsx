@@ -16,6 +16,7 @@ import { LoginPage } from './pages/LoginPage';
 import { LandingPagesPage } from './pages/LandingPagesPage';
 import { RecordDetailPage } from './pages/RecordDetailPage';
 import { RecordFormPage } from './pages/RecordFormPage';
+import { RecordImportPage } from './pages/RecordImportPage';
 import { RecordListPage } from './pages/RecordListPage';
 import { RolesPage } from './pages/RolesPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -151,6 +152,7 @@ export function App() {
               </Route>
               <Route element={<ResourceGuard />}>
                 <Route path="/:resource" element={<RecordListPage />} />
+                <Route path="/:resource/import" element={<RecordImportPage />} />
                 <Route path="/:resource/:id/edit" element={<RecordFormPage />} />
                 <Route path="/:resource/:id" element={<RecordDetailPage />} />
               </Route>

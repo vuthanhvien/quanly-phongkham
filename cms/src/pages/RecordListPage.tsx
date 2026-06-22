@@ -3,6 +3,7 @@ import {
   DeleteOutlined,
   EditOutlined,
   EyeOutlined,
+  ImportOutlined,
   PhoneOutlined,
   PrinterOutlined,
   SwapOutlined,
@@ -227,6 +228,16 @@ export function RecordListPage() {
               setSearch(value)
             }}
           />
+          {hasActionAccess(resource, "create") && !["files", "service-orders"].includes(resource) && (
+            <Tooltip title="Mở màn hình import">
+              <Button
+                icon={<ImportOutlined />}
+                onClick={() => navigate(`/${resource}/import`)}
+              >
+                Import
+              </Button>
+            </Tooltip>
+          )}
           {hasActionAccess(resource, "create") && (
             <Tooltip title="Tạo bản ghi mới">
               <Button

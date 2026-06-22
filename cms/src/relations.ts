@@ -41,7 +41,7 @@ export async function loadRelationOptions(fields: Array<string | FieldSpec>) {
   const uniqueResources = Array.from(new Set(relationSpecs.map((spec) => spec.resource)));
   const entries = await Promise.all(
     uniqueResources.map(async (resource) => {
-      const response = await api.get(`/records/${resource}`, { params: { pageSize: resource === 'file-folders' ? 500 : 100 } }).catch(() => ({ data: { data: [] } }));
+      const response = await api.get(`/records/${resource}`, { params: { pageSize: 500 } }).catch(() => ({ data: { data: [] } }));
       const spec = relationSpecs.find((item) => item.resource === resource)!;
       if (resource === 'file-folders') {
         const rows = normalizeFileFolderRows(response.data.data || []);

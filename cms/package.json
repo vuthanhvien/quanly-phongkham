@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",
+    "@faker-js/faker": "^9.9.0",
     "@monaco-editor/react": "^4.7.0",
     "@refinedev/core": "^5.0.5",
     "@refinedev/react-router": "^2.0.2",
