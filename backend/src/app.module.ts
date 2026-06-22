@@ -8,6 +8,7 @@ import { ENTITIES } from './entities/entities';
 import { RecordsModule } from './records/records.module';
 import { SeedModule } from './seed/seed.module';
 import { SettingsModule } from './settings/settings.module';
+import { ZaloModule } from './zalo/zalo.module';
 
 @Module({
   imports: [
@@ -25,8 +26,8 @@ import { SettingsModule } from './settings/settings.module';
     RecordsModule,
     SettingsModule,
     SeedModule,
+    ZaloModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })
 export class AppModule {}
-

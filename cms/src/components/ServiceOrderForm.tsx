@@ -3,6 +3,7 @@ import { Button, Card, Form, Input, InputNumber, Select, Space, Table, Typograph
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
+import { getApiErrorMessage } from "../utils/apiError"
 
 interface ServiceOrderFormProps {
   id?: string
@@ -35,11 +36,12 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
   const editing = Boolean(id)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+  const [lookupLoading, setLookupLoading] = useState(false)
   const [customerOptions, setCustomerOptions] = useState<OptionItem[]>([])
   const [branchOptions, setBranchOptions] = useState<OptionItem[]>([])
   const [staffOptions, setStaffOptions] = useState<OptionItem[]>([])
   const [productOptions, setProductOptions] = useState<ProductOption[]>([])
-  const items = Form.useWatch("items", form) as OrderLineValue[] | undefined
+  const items = Form.useWatch("items", { form, preserve: true }) as OrderLineValue[] | undefined
 
   useEffect(() => {
     void loadLookups()
@@ -47,10 +49,11 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
 
   useEffect(() => {
     if (!editing) {
+      const defaultItems = normalizeItems(initialValues?.items)
       form.setFieldsValue({
         status: "DRAFT",
         orderDate: new Date().toISOString().slice(0, 10),
-        items: [createEmptyItem()],
+        items: defaultItems.length > 0 ? defaultItems : [createEmptyItem()],
         ...(initialValues || {}),
       })
       return
@@ -59,66 +62,67 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
   }, [editing, form, id, initialValues])
 
   const totalAmount = useMemo(
-    () => (items || []).reduce((sum, item) => sum + Number(item?.quantity || 0) * Number(item?.unitPrice || 0), 0),
+    () => normalizeItems(items).reduce((sum, item) => sum + Number(item?.quantity || 0) * Number(item?.unitPrice || 0), 0),
     [items],
   )
 
   async function loadLookups() {
-    const [customersResponse, branchesResponse, staffResponse, productsResponse] = await Promise.all([
-      api.get("/records/customers", { params: { pageSize: 200 } }),
-      api.get("/records/branches", { params: { pageSize: 200 } }),
-      api.get("/records/staff", { params: { pageSize: 200 } }),
-      api.get("/records/products", { params: { pageSize: 200 } }),
-    ])
+    setLookupLoading(true)
+    try {
+      const [customersResponse, branchesResponse, staffResponse, productsResponse] = await Promise.all([
+        api.get("/records/customers", { params: { pageSize: 200 } }),
+        api.get("/records/branches", { params: { pageSize: 200 } }),
+        api.get("/records/staff", { params: { pageSize: 200 } }),
+        api.get("/records/service-orders/product-options"),
+      ])
 
-    setCustomerOptions(
-      (customersResponse.data.data || []).map((row: Record<string, unknown>) => ({
-        value: String(row.id),
-        label: `${row.code || ""} - ${row.fullName || row.id}`,
-      })),
-    )
-    setBranchOptions(
-      (branchesResponse.data.data || []).map((row: Record<string, unknown>) => ({
-        value: String(row.id),
-        label: `${row.slug || ""} - ${row.name || row.id}`,
-      })),
-    )
-    setStaffOptions(
-      (staffResponse.data.data || []).map((row: Record<string, unknown>) => ({
-        value: String(row.id),
-        label: `${row.code || ""} - ${row.fullName || row.id}`,
-      })),
-    )
-    setProductOptions(
-      (productsResponse.data.data || []).map((row: Record<string, unknown>) => ({
-        value: String(row.id),
-        label: `${row.code || ""} - ${row.name || row.id}`,
-        name: String(row.name || row.id),
-        sellingPrice: Number(row.sellingPrice || 0),
-      })),
-    )
+      setCustomerOptions(
+        (customersResponse.data.data || []).map((row: Record<string, unknown>) => ({
+          value: String(row.id),
+          label: `${row.code || ""} - ${row.fullName || row.id}`,
+        })),
+      )
+      setBranchOptions(
+        (branchesResponse.data.data || []).map((row: Record<string, unknown>) => ({
+          value: String(row.id),
+          label: `${row.slug || ""} - ${row.name || row.id}`,
+        })),
+      )
+      setStaffOptions(
+        (staffResponse.data.data || []).map((row: Record<string, unknown>) => ({
+          value: String(row.id),
+          label: `${row.code || ""} - ${row.fullName || row.id}`,
+        })),
+      )
+      setProductOptions(
+        (productsResponse.data.data || []).map((row: Record<string, unknown>) => ({
+          value: String(row.id),
+          label: `${row.code || ""} - ${row.name || row.id}`,
+          name: String(row.name || row.id),
+          sellingPrice: Number(row.sellingPrice || 0),
+        })),
+      )
+    } catch (error: any) {
+      message.error(getApiErrorMessage(error, "Không tải được danh sách sản phẩm/lookup cho đơn hàng"))
+    } finally {
+      setLookupLoading(false)
+    }
   }
 
   async function loadRecord() {
     const response = await api.get(`/records/service-orders/${id}`)
     const data = response.data.data
+    const normalizedItems = normalizeItems(data.items)
     form.setFieldsValue({
       ...data,
       ...(initialValues || {}),
-      items: Array.isArray(data.items) && data.items.length > 0
-        ? data.items.map((item: Record<string, unknown>) => ({
-            productId: item.productId,
-            itemName: item.itemName,
-            quantity: Number(item.quantity || 0),
-            unitPrice: Number(item.unitPrice || 0),
-          }))
-        : [createEmptyItem()],
+      items: normalizedItems.length > 0 ? normalizedItems : [createEmptyItem()],
     })
   }
 
   function handleProductChange(index: number, productId?: string) {
     const product = productOptions.find((item) => item.value === productId)
-    const nextItems = [...(form.getFieldValue("items") || [])]
+    const nextItems = normalizeItems(form.getFieldValue("items"))
     nextItems[index] = {
       ...nextItems[index],
       productId,
@@ -130,7 +134,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
   }
 
   function handleItemFieldChange<K extends keyof OrderLineValue>(index: number, key: K, fieldValue: OrderLineValue[K]) {
-    const nextItems = [...(form.getFieldValue("items") || [])]
+    const nextItems = normalizeItems(form.getFieldValue("items"))
     nextItems[index] = {
       ...nextItems[index],
       [key]: fieldValue,
@@ -141,7 +145,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
   async function submit(values: Record<string, unknown>) {
     setSubmitting(true)
     try {
-      const normalizedItems = ((values.items as OrderLineValue[] | undefined) || [])
+      const normalizedItems = normalizeItems(form.getFieldValue("items"))
         .map((item) => ({
           productId: item.productId,
           itemName: item.itemName,
@@ -171,6 +175,8 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       }
       message.success("Đã lưu đơn hàng")
       onSuccess?.()
+    } catch (error: any) {
+      message.error(getApiErrorMessage(error, "Không thể lưu đơn hàng"))
     } finally {
       setSubmitting(false)
     }
@@ -184,10 +190,15 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       width: 280,
       render: (_value, row) => (
         <Select
+          getPopupContainer={(triggerNode) => triggerNode.parentElement || document.body}
+          loading={lookupLoading}
+          notFoundContent={lookupLoading ? "Đang tải sản phẩm..." : "Không có sản phẩm"}
           options={productOptions}
-          placeholder="Chọn sản phẩm"
-          showSearch
           optionFilterProp="label"
+          placeholder="Chọn sản phẩm"
+          popupMatchSelectWidth={false}
+          showSearch
+          style={{ width: "100%" }}
           value={row.productId}
           onChange={(value) => handleProductChange(row.index, value)}
         />
@@ -225,7 +236,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       key: "lineTotal",
       width: 150,
       render: (_value, row) => {
-        const currentItems = form.getFieldValue("items") || []
+        const currentItems = normalizeItems(form.getFieldValue("items"))
         const item = currentItems[row.index] || {}
         return <Typography.Text>{formatNumber(Number(item.quantity || 0) * Number(item.unitPrice || 0))}</Typography.Text>
       },
@@ -241,18 +252,18 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
   ]
 
   function addItem() {
-    const currentItems = [...(form.getFieldValue("items") || [])]
+    const currentItems = normalizeItems(form.getFieldValue("items"))
     currentItems.push(createEmptyItem())
     form.setFieldsValue({ items: currentItems })
   }
 
   function removeItem(index: number) {
-    const currentItems = [...(form.getFieldValue("items") || [])]
+    const currentItems = normalizeItems(form.getFieldValue("items"))
     currentItems.splice(index, 1)
     form.setFieldsValue({ items: currentItems.length > 0 ? currentItems : [createEmptyItem()] })
   }
 
-  const dataSource = ((items || []) as OrderLineValue[]).map((item, index) => ({ ...item, key: index, index }))
+  const dataSource = normalizeItems(items).map((item, index) => ({ ...item, key: index, index }))
 
   return (
     <>
@@ -302,6 +313,16 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
 
 function createEmptyItem(): OrderLineValue {
   return { quantity: 1, unitPrice: 0 }
+}
+
+function normalizeItems(value: unknown): OrderLineValue[] {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => ({
+    productId: (item as Record<string, unknown>)?.productId ? String((item as Record<string, unknown>).productId) : undefined,
+    itemName: (item as Record<string, unknown>)?.itemName ? String((item as Record<string, unknown>).itemName) : undefined,
+    quantity: Number((item as Record<string, unknown>)?.quantity || 0),
+    unitPrice: Number((item as Record<string, unknown>)?.unitPrice || 0),
+  }))
 }
 
 function formatNumber(value: number) {

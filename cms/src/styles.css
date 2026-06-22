@@ -65,9 +65,9 @@ body::before {
   border: 1px solid var(--app-line);
   border-radius: calc(var(--app-radius) + 8px);
   display: flex;
-  gap: 12px;
-  min-height: 72px;
-  padding: 12px;
+  gap: 10px;
+  min-height: 60px;
+  padding: 10px 11px;
 }
 
 .brand-copy {
@@ -79,6 +79,10 @@ body::before {
   color: var(--app-text) !important;
   line-height: 1.1 !important;
   margin: 0 !important;
+}
+
+.brand-card .ant-typography {
+  font-size: 1.5rem !important;
 }
 
 .brand-kicker,
@@ -98,11 +102,13 @@ body::before {
   box-shadow: 0 14px 30px rgba(232, 137, 174, 0.26);
   color: #180c12;
   display: flex;
+  flex: 0 0 auto;
   font-weight: 900;
-  height: 44px;
+  font-size: 16px;
+  height: 36px;
   justify-content: center;
   letter-spacing: -0.05em;
-  width: 44px;
+  width: 36px;
 }
 
 .brand-mark img {
@@ -286,7 +292,7 @@ body::before {
 
 .hero-panel h1 {
   color: #fff7fb !important;
-  font-size: clamp(32px, 4vw, 56px) !important;
+  font-size: clamp(26px, 2.7vw, 40px) !important;
   letter-spacing: -0.06em;
   margin: 4px 0 10px !important;
 }
@@ -956,6 +962,114 @@ textarea.ant-input {
   margin: 0 !important;
 }
 
+.zalo-inbox-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 320px 360px minmax(0, 1fr);
+}
+
+.zalo-account-panel,
+.zalo-conversation-panel,
+.zalo-message-panel {
+  min-height: 72vh;
+}
+
+.zalo-account-panel .ant-card-body,
+.zalo-conversation-panel .ant-card-body,
+.zalo-message-panel .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+.zalo-account-item,
+.zalo-conversation-item {
+  border-radius: calc(var(--app-radius) + 2px);
+  cursor: pointer;
+  margin-bottom: 6px;
+  padding: 10px 12px !important;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.zalo-account-item:hover,
+.zalo-conversation-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.zalo-account-item.active,
+.zalo-conversation-item.active {
+  background: linear-gradient(135deg, rgba(232, 137, 174, 0.14), rgba(215, 164, 91, 0.08));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.zalo-empty-state {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  min-height: 240px;
+}
+
+.zalo-link-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: calc(var(--app-radius) + 2px);
+  padding: 12px;
+}
+
+.zalo-link-select {
+  min-width: 220px;
+}
+
+.zalo-message-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 58vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.zalo-message-bubble {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px 18px 18px 6px;
+  max-width: min(76%, 640px);
+  padding: 12px 14px;
+}
+
+.zalo-message-bubble.outbound {
+  align-self: flex-end;
+  background: linear-gradient(135deg, rgba(232, 137, 174, 0.2), rgba(215, 164, 91, 0.08));
+  border-radius: 18px 18px 6px 18px;
+}
+
+.zalo-message-bubble .ant-typography {
+  display: block;
+  margin-bottom: 0 !important;
+}
+
+.zalo-qr-modal {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
+  min-height: 340px;
+  text-align: center;
+}
+
+.zalo-qr-image {
+  background: white;
+  border-radius: 18px;
+  max-width: 280px;
+  padding: 10px;
+  width: 100%;
+}
+
 .image-library-tree {
   background: rgba(255, 255, 255, 0.02);
   border-radius: 14px;
@@ -1454,6 +1568,10 @@ textarea.ant-input {
     grid-template-columns: 1fr;
   }
 
+  .zalo-inbox-layout {
+    grid-template-columns: 1fr;
+  }
+
   .service-order-grid {
     grid-template-columns: 1fr;
   }
@@ -1467,6 +1585,10 @@ textarea.ant-input {
   .dashboard-mini-grid,
   .dashboard-week-grid {
     grid-template-columns: 1fr;
+  }
+
+  .zalo-message-bubble {
+    max-width: 100%;
   }
 }
 

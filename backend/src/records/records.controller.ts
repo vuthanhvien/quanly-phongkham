@@ -38,6 +38,11 @@ export class RecordsController {
     return this.records.uploadFiles(files, payload, request.user);
   }
 
+  @Get('records/service-orders/product-options')
+  serviceOrderProductOptions(@Request() request: { user: AuthUser }) {
+    return this.records.serviceOrderProductOptions(request.user);
+  }
+
   @Get('records/:resource/:id')
   find(@Param('resource') resource: string, @Param('id') id: string, @Request() request: { user: AuthUser }) {
     return this.records.find(resource, id, request.user);

@@ -27,6 +27,7 @@ import { api } from "../api"
 import { FileUploadPanel } from "./FileUploadPanel"
 import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
 import { loadRelationOptions, LookupMap } from "../relations"
+import { getApiErrorMessage } from "../utils/apiError"
 import { buildFolderPathMap, buildFolderTree, FolderTreeNode, normalizeFileFolderRows } from "../utils/fileFolders"
 import {
   getFieldCatalog,
@@ -123,8 +124,25 @@ export function RecordFormContent({
       onSuccess?.()
     }
     if (editing)
-      update({ resource, id: id!, values: payload }, { onSuccess: done })
-    else create({ resource, values: payload }, { onSuccess: done })
+      update(
+        { resource, id: id!, values: payload },
+        {
+          onSuccess: done,
+          onError: (error) => {
+            message.error(getApiErrorMessage(error, "Không thể lưu dữ liệu"))
+          },
+        },
+      )
+    else
+      create(
+        { resource, values: payload },
+        {
+          onSuccess: done,
+          onError: (error) => {
+            message.error(getApiErrorMessage(error, "Không thể lưu dữ liệu"))
+          },
+        },
+      )
   }
 
   return (

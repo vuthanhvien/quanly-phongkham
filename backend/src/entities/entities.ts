@@ -272,6 +272,134 @@ export class LeadActivity extends ConfigurableEntity {
   content: string;
 }
 
+@Entity('zalo_accounts')
+export class ZaloAccount extends ConfigurableEntity {
+  @Column()
+  label: string;
+
+  @Column({ nullable: true })
+  staffId?: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ nullable: true })
+  displayName?: string;
+
+  @Column({ nullable: true })
+  avatarUrl?: string;
+
+  @Column({ nullable: true })
+  zaloUserId?: string;
+
+  @Column({ default: 'DISCONNECTED' })
+  connectionStatus: string;
+
+  @Column({ default: false })
+  listenerEnabled: boolean;
+
+  @Column({ default: false })
+  listenerActive: boolean;
+
+  @Column({ type: 'jsonb', nullable: true })
+  sessionData?: Record<string, unknown>;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  lastConnectedAt?: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  lastMessageAt?: Date;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('zalo_conversations')
+@Index(['accountId', 'threadId'], { unique: true })
+export class ZaloConversation extends ConfigurableEntity {
+  @Column()
+  accountId: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column()
+  threadId: string;
+
+  @Column()
+  threadType: string;
+
+  @Column()
+  displayName: string;
+
+  @Column({ nullable: true })
+  participantId?: string;
+
+  @Column({ nullable: true })
+  avatarUrl?: string;
+
+  @Column({ nullable: true })
+  customerId?: string;
+
+  @Column({ nullable: true })
+  leadId?: string;
+
+  @Column({ nullable: true })
+  contactPhone?: string;
+
+  @Column({ type: 'text', nullable: true })
+  lastMessageText?: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  lastMessageAt?: Date;
+
+  @Column({ default: 0 })
+  unreadCount: number;
+}
+
+@Entity('zalo_messages')
+@Index(['accountId', 'messageId'], { unique: true })
+export class ZaloMessage extends ConfigurableEntity {
+  @Column()
+  accountId: string;
+
+  @Column()
+  conversationId: string;
+
+  @Column()
+  threadId: string;
+
+  @Column()
+  threadType: string;
+
+  @Column()
+  messageId: string;
+
+  @Column({ nullable: true })
+  clientMessageId?: string;
+
+  @Column({ nullable: true })
+  senderId?: string;
+
+  @Column({ nullable: true })
+  senderName?: string;
+
+  @Column()
+  direction: string;
+
+  @Column({ type: 'text', nullable: true })
+  contentText?: string;
+
+  @Column({ type: 'jsonb', default: {} })
+  contentJson: Record<string, unknown>;
+
+  @Column({ type: 'timestamptz' })
+  sentAt: Date;
+
+  @Column({ default: false })
+  isSelf: boolean;
+}
+
 @Entity('suppliers')
 export class Supplier extends ConfigurableEntity {
   @Column({ unique: true })
@@ -955,6 +1083,9 @@ export const ENTITIES = [
   Customer,
   Lead,
   LeadActivity,
+  ZaloAccount,
+  ZaloConversation,
+  ZaloMessage,
   Supplier,
   Product,
   MedicalEpisode,

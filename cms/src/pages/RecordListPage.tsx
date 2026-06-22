@@ -1,5 +1,6 @@
 import { useDelete, useList } from "@refinedev/core"
 import {
+  CopyOutlined,
   DeleteOutlined,
   EditOutlined,
   EyeOutlined,
@@ -52,6 +53,8 @@ export function RecordListPage() {
   >([])
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [duplicateValues, setDuplicateValues] = useState<Record<string, unknown> | undefined>(undefined)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [lookups, setLookups] = useState<LookupMap>({})
   const [fileLookups, setFileLookups] = useState<FileLookupMap>({})
   const query = useList({
@@ -70,6 +73,8 @@ export function RecordListPage() {
     setCurrentPage(1)
     setCreating(false)
     setEditingId(null)
+    setDuplicateValues(undefined)
+    setDuplicatingId(null)
   }, [resource])
 
   useEffect(() => {
@@ -133,6 +138,16 @@ export function RecordListPage() {
             {hasActionAccess(resource, "update") && (
               <Tooltip title="Chỉnh sửa">
                 <Button icon={<EditOutlined />} type="text" onClick={() => setEditingId(String(row.id))} />
+              </Tooltip>
+            )}
+            {hasActionAccess(resource, "create") && resource !== "files" && (
+              <Tooltip title="Nhân bản">
+                <Button
+                  icon={<CopyOutlined />}
+                  loading={duplicatingId === String(row.id)}
+                  type="text"
+                  onClick={() => void duplicateRecord(String(row.id))}
+                />
               </Tooltip>
             )}
             {resource === "customers" && hasActionAccess(resource, "reveal-phone") && (
@@ -211,6 +226,21 @@ export function RecordListPage() {
     navigate(`/customers/${response.data.data.id}`)
   }
 
+  async function duplicateRecord(recordId: string) {
+    setDuplicatingId(recordId)
+    try {
+      const response = await api.get(`/records/${resource}/${recordId}`)
+      const preparedValues = buildDuplicateValues(response.data.data)
+      setEditingId(null)
+      setDuplicateValues(preparedValues)
+      setCreating(true)
+    } catch (error: any) {
+      message.error(String(error?.response?.data?.message || "Không thể nhân bản bản ghi"))
+    } finally {
+      setDuplicatingId(null)
+    }
+  }
+
   return (
     <>
       <div className="page-header">
@@ -285,6 +315,7 @@ export function RecordListPage() {
         onClose={() => {
           setCreating(false)
           setEditingId(null)
+          setDuplicateValues(undefined)
         }}
       >
         {resource === "files" && !editingId ? (
@@ -299,13 +330,16 @@ export function RecordListPage() {
           <ServiceOrderForm
             compact
             id={editingId || undefined}
+            initialValues={editingId ? undefined : duplicateValues}
             onCancel={() => {
               setCreating(false)
               setEditingId(null)
+              setDuplicateValues(undefined)
             }}
             onSuccess={() => {
               setCreating(false)
               setEditingId(null)
+              setDuplicateValues(undefined)
               refresh()
             }}
           />
@@ -313,14 +347,17 @@ export function RecordListPage() {
           <RecordFormContent
             compact
             id={editingId || undefined}
+            initialValues={editingId ? undefined : duplicateValues}
             resource={resource}
             onCancel={() => {
               setCreating(false)
               setEditingId(null)
+              setDuplicateValues(undefined)
             }}
             onSuccess={() => {
               setCreating(false)
               setEditingId(null)
+              setDuplicateValues(undefined)
               refresh()
             }}
           />
@@ -328,4 +365,31 @@ export function RecordListPage() {
       </Drawer>
     </>
   )
+}
+
+function buildDuplicateValues(record: Record<string, unknown>) {
+  const {
+    id: _id,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    deletedAt: _deletedAt,
+    createdById: _createdById,
+    updatedById: _updatedById,
+    customFields,
+    ...rest
+  } = record
+
+  const nextValues: Record<string, unknown> = {
+    ...rest,
+    ...((customFields as Record<string, unknown> | undefined) || {}),
+  }
+
+  if (typeof nextValues.code === "string" && nextValues.code.trim()) {
+    nextValues.code = `${nextValues.code}-COPY`
+  }
+  if (typeof nextValues.slug === "string" && nextValues.slug.trim()) {
+    nextValues.slug = `${nextValues.slug}-copy`
+  }
+
+  return nextValues
 }

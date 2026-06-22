@@ -15,6 +15,7 @@ import {
   GlobalOutlined,
   InteractionOutlined,
   LineChartOutlined,
+  MessageOutlined,
   MedicineBoxOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -50,6 +51,7 @@ const menuIcons: Record<string, React.ReactNode> = {
   customers: <TeamOutlined />,
   leads: <LineChartOutlined />,
   "lead-activities": <InteractionOutlined />,
+  "zalo-inbox": <MessageOutlined />,
   "medical-episodes": <MedicineBoxOutlined />,
   appointments: <CalendarOutlined />,
   "work-schedules": <CalendarOutlined />,
@@ -151,6 +153,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
           icon: menuIcons[key] || <SolutionOutlined />,
           label: <Link to={`/${key}`}>{entityLabels[key]}</Link>,
         })),
+        ...(group.key === "front-office" && hasScreenAccess("zalo-inbox")
+          ? [
+              {
+                key: "/zalo-inbox",
+                icon: menuIcons["zalo-inbox"],
+                label: <Link to="/zalo-inbox">Zalo Inbox</Link>,
+              },
+            ]
+          : []),
         ...(group.key === "admin" && hasScreenAccess("settings")
           ? [
               {
@@ -210,9 +221,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ].filter(Boolean),
     },
   ].filter((item) => item && (item.key !== "system-tools" || ((item.children as []) || []).length > 0))
-  const selected = location.pathname === "/" ? "/" : `/${currentResource}`
+  const selected =
+    location.pathname === "/"
+      ? "/"
+      : location.pathname.startsWith("/zalo-inbox")
+        ? "/zalo-inbox"
+        : `/${currentResource}`
   const defaultOpenKeys = [
     resourceToGroup[currentResource] ||
+    (location.pathname.startsWith("/zalo-inbox")
+      ? "front-office"
+      : undefined) ||
     (location.pathname === "/roles" || location.pathname === "/branch-role-assignments"
       ? "admin"
       : undefined),

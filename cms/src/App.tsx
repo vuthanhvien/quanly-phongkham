@@ -22,6 +22,7 @@ import { RecordListPage } from './pages/RecordListPage';
 import { RolesPage } from './pages/RolesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { UiSettingsPage } from './pages/UiSettingsPage';
+import { ZaloInboxPage } from './pages/ZaloInboxPage';
 
 const resources = Object.entries(entityLabels).map(([name, label]) => ({
   name,
@@ -140,6 +141,9 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedLayout />}>
               <Route index element={<DashboardPage />} />
+              <Route element={<ScreenGuard screen="zalo-inbox" />}>
+                <Route path="/zalo-inbox" element={<ZaloInboxPage />} />
+              </Route>
               <Route element={<ScreenGuard screen="settings" />}>
                 <Route path="/custom-fields" element={<CustomFieldsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

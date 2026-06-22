@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
 import { promises as fs } from 'fs';
 import { extname, join } from 'path';
-import { FindOptionsWhere, ILike, In, LessThan, MoreThan, Repository } from 'typeorm';
+import { FindOptionsWhere, ILike, In, LessThan, MoreThan, QueryFailedError, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
 import {
   Appointment,
@@ -199,7 +199,7 @@ export class RecordsService {
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
-    const record = await repository.save(repository.create(normalized));
+    const record = await this.saveRecord(resource, repository.create(normalized), repository);
     if (resource === 'service-orders') await this.replaceServiceOrderItems(record.id, serviceOrderItems);
     await this.replaceCustomFieldValues(resource, record.id, (payload.customFields || {}) as Record<string, unknown>);
     await this.audit(user, 'CREATE', resource, record.id, normalized);
@@ -226,7 +226,7 @@ export class RecordsService {
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized, id);
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
-    const record = await repository.save(repository.merge(previous, normalized));
+    const record = await this.saveRecord(resource, repository.merge(previous, normalized), repository);
     if (resource === 'service-orders') await this.replaceServiceOrderItems(id, serviceOrderItems);
     await this.replaceCustomFieldValues(resource, id, mergedCustomFields);
     await this.audit(user, 'UPDATE', resource, id, { before: previous, changes: normalized });
@@ -289,6 +289,66 @@ export class RecordsService {
     return { data: await this.findRaw('customers', customer.id) };
   }
 
+  private async saveRecord(resource: string, entity: any, repository: ResourceRepository) {
+    try {
+      return await repository.save(entity);
+    } catch (error) {
+      this.handlePersistenceError(resource, error);
+      throw error;
+    }
+  }
+
+  private handlePersistenceError(resource: string, error: unknown): never | void {
+    if (!(error instanceof QueryFailedError)) return;
+    const driverError = error.driverError as { code?: string; detail?: string; constraint?: string } | undefined;
+    if (driverError?.code !== '23505') return;
+
+    const field = this.extractUniqueField(driverError.detail, driverError.constraint);
+    const resourceLabel = this.resourceLabel(resource);
+    if (field === 'code') {
+      throw new BadRequestException(`Mã ${resourceLabel.toLowerCase()} đã tồn tại`);
+    }
+    if (field === 'slug') {
+      throw new BadRequestException(`Slug ${resourceLabel.toLowerCase()} đã tồn tại`);
+    }
+    if (field === 'email') {
+      throw new BadRequestException(`Email ${resourceLabel.toLowerCase()} đã tồn tại`);
+    }
+    if (field === 'barcode') {
+      throw new BadRequestException(`Mã vạch ${resourceLabel.toLowerCase()} đã tồn tại`);
+    }
+    throw new BadRequestException(`Dữ liệu ${resourceLabel.toLowerCase()} đã tồn tại`);
+  }
+
+  private extractUniqueField(detail?: string, constraint?: string) {
+    const detailMatch = detail?.match(/\(([^)]+)\)=/)
+    if (detailMatch?.[1]) return detailMatch[1];
+    const constraintMatch = constraint?.match(/_([a-zA-Z0-9]+)_key$/)
+    if (constraintMatch?.[1]) return constraintMatch[1];
+    return undefined;
+  }
+
+  private resourceLabel(resource: string) {
+    const labels: Record<string, string> = {
+      branches: 'chi nhánh',
+      departments: 'phòng ban',
+      staff: 'nhân viên',
+      customers: 'khách hàng',
+      leads: 'lead',
+      suppliers: 'nhà cung cấp',
+      products: 'sản phẩm',
+      consultations: 'phiếu thăm khám',
+      'service-orders': 'đơn hàng',
+      invoices: 'hóa đơn',
+      expenses: 'phiếu chi',
+      treatments: 'liệu trình',
+      'user-accounts': 'tài khoản',
+      files: 'file',
+      'file-folders': 'folder',
+    };
+    return labels[resource] || resource;
+  }
+
   async uploadFiles(files: any[], payload: { folderId?: string; title?: string; note?: string }, user: AuthUser) {
     await this.assertPermission(user, 'files', 'create');
     if (!payload.folderId) {
@@ -308,6 +368,18 @@ export class RecordsService {
     );
 
     return { data: uploaded };
+  }
+
+  async serviceOrderProductOptions(user?: AuthUser) {
+    await this.assertAnyActionPermission(user, 'service-orders', ['create', 'update', 'view']);
+    const rows = await this.products.find({
+      order: { createdAt: 'DESC' },
+      take: 500,
+    });
+    return {
+      data: rows.map((item) => this.protect('products', item as unknown as ConfigurableEntity)),
+      total: rows.length,
+    };
   }
 
   private async storeUploadedFile(
@@ -630,6 +702,15 @@ export class RecordsService {
     const matched = !branchId ? branches.length > 0 : branches.includes(branchId);
     if (!matched) {
       throw new ForbiddenException('Ban khong co quyen thuc hien thao tac nay tai chi nhanh hien tai');
+    }
+  }
+
+  private async assertAnyActionPermission(user: AuthUser | undefined, resource: string, actions: string[]) {
+    this.assertResourceAccess(user, resource);
+    if (!user) return;
+    const allowedActions = await this.resolveAllowedActions(resource, user.activeRole || user.role, user.roleMain || user.role);
+    if (!actions.some((action) => allowedActions.includes(action))) {
+      throw new ForbiddenException('Role hien tai khong duoc su dung thao tac nay');
     }
   }
 
