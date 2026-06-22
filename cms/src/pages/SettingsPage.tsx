@@ -50,11 +50,328 @@ interface Template {
   htmlTemplate: string
 }
 
-const DEFAULT_TEMPLATE_HTML = `<section>
+interface TemplatePreset {
+  key: string
+  entityType: string
+  label: string
+  description: string
+  htmlTemplate: string
+}
+
+const DEFAULT_TEMPLATE_HTML = `<style>
+  .print-root {
+    color: #1f1720;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .print-root h1 {
+    font-size: 24px;
+    margin: 0 0 12px;
+  }
+
+  .print-kv {
+    border: 1px solid #e7d8df;
+    border-radius: 12px;
+    padding: 14px;
+  }
+</style>
+
+<section class="print-root">
   <h1>Phiếu điều trị</h1>
-  <p>Khách hàng: {{fullName}}</p>
-  <p>Mã hồ sơ: {{code}}</p>
+  <div class="print-kv">
+    <p><strong>Khách hàng:</strong> {{fullName}}</p>
+    <p><strong>Mã hồ sơ:</strong> {{code}}</p>
+  </div>
 </section>`
+
+const TEMPLATE_PRESETS: TemplatePreset[] = [
+  {
+    key: "service-order-modern",
+    entityType: "service-orders",
+    label: "Đơn hàng hiện đại",
+    description: "Mẫu in có header, khối thông tin và phần tổng tiền rõ ràng.",
+    htmlTemplate: `<style>
+  .print-root {
+    color: #23171d;
+    font-family: "Arial", sans-serif;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .print-shell {
+    border: 1px solid #eadbe1;
+    border-radius: 18px;
+    overflow: hidden;
+  }
+
+  .print-header {
+    background: linear-gradient(135deg, #f7d9e6, #fff3e8);
+    padding: 20px 24px;
+  }
+
+  .print-header h1 {
+    font-size: 24px;
+    margin: 0 0 4px;
+  }
+
+  .print-header p {
+    color: #6f5963;
+    margin: 0;
+  }
+
+  .print-body {
+    padding: 18px 24px 24px;
+  }
+
+  .grid {
+    display: grid;
+    gap: 12px 18px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 18px;
+  }
+
+  .box {
+    background: #fffafb;
+    border: 1px solid #eadbe1;
+    border-radius: 14px;
+    padding: 12px 14px;
+  }
+
+  .label {
+    color: #8b6d78;
+    display: block;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  .value {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .summary {
+    align-items: center;
+    background: #23171d;
+    border-radius: 16px;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 18px;
+    padding: 16px 18px;
+  }
+
+  .summary strong {
+    font-size: 22px;
+  }
+</style>
+
+<section class="print-root">
+  <div class="print-shell">
+    <div class="print-header">
+      <h1>Đơn hàng dịch vụ</h1>
+      <p>Mã đơn {{code}} · Ngày {{orderDate}}</p>
+    </div>
+    <div class="print-body">
+      <div class="grid">
+        <div class="box">
+          <span class="label">Khách hàng</span>
+          <div class="value">{{customerId}}</div>
+        </div>
+        <div class="box">
+          <span class="label">Chi nhánh</span>
+          <div class="value">{{branchId}}</div>
+        </div>
+        <div class="box">
+          <span class="label">Dịch vụ sử dụng</span>
+          <div class="value">{{serviceName}}</div>
+        </div>
+        <div class="box">
+          <span class="label">Nhân sự thực hiện</span>
+          <div class="value">{{performerStaffId}}</div>
+        </div>
+        <div class="box">
+          <span class="label">Trạng thái</span>
+          <div class="value">{{status}}</div>
+        </div>
+        <div class="box">
+          <span class="label">Ghi chú</span>
+          <div class="value">{{note}}</div>
+        </div>
+      </div>
+      <div class="summary">
+        <span>Tổng thanh toán</span>
+        <strong>{{totalAmount}}</strong>
+      </div>
+    </div>
+  </div>
+</section>`,
+  },
+  {
+    key: "service-order-a4",
+    entityType: "service-orders",
+    label: "Phiếu A4 chuẩn",
+    description: "Mẫu in rõ nét kiểu biểu mẫu nội bộ, phù hợp in A4.",
+    htmlTemplate: `<style>
+  .sheet {
+    color: #1d161b;
+    font-family: "Times New Roman", serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .sheet h1 {
+    font-size: 26px;
+    margin: 0 0 4px;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .sheet .sub {
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .info-table {
+    border-collapse: collapse;
+    margin-bottom: 18px;
+    width: 100%;
+  }
+
+  .info-table td {
+    border: 1px solid #d8c8cf;
+    padding: 10px 12px;
+    vertical-align: top;
+  }
+
+  .note-box {
+    border: 1px dashed #b69ea8;
+    border-radius: 12px;
+    min-height: 100px;
+    padding: 12px;
+  }
+
+  .sign-row {
+    display: grid;
+    gap: 24px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 26px;
+    text-align: center;
+  }
+</style>
+
+<section class="sheet">
+  <h1>Phiếu xác nhận đơn hàng</h1>
+  <div class="sub">Mã đơn: <strong>{{code}}</strong></div>
+
+  <table class="info-table">
+    <tr>
+      <td><strong>Khách hàng</strong><br />{{customerId}}</td>
+      <td><strong>Ngày đơn</strong><br />{{orderDate}}</td>
+    </tr>
+    <tr>
+      <td><strong>Dịch vụ</strong><br />{{serviceName}}</td>
+      <td><strong>Trạng thái</strong><br />{{status}}</td>
+    </tr>
+    <tr>
+      <td><strong>Số lượng</strong><br />{{quantity}}</td>
+      <td><strong>Đơn giá</strong><br />{{unitPrice}}</td>
+    </tr>
+    <tr>
+      <td colspan="2"><strong>Tổng tiền</strong><br />{{totalAmount}}</td>
+    </tr>
+  </table>
+
+  <div class="note-box">
+    <strong>Ghi chú</strong><br />
+    {{note}}
+  </div>
+
+  <div class="sign-row">
+    <div>
+      <strong>Khách hàng</strong>
+      <p>(Ký và ghi rõ họ tên)</p>
+    </div>
+    <div>
+      <strong>Nhân viên xác nhận</strong>
+      <p>(Ký và ghi rõ họ tên)</p>
+    </div>
+  </div>
+</section>`,
+  },
+  {
+    key: "service-order-compact",
+    entityType: "service-orders",
+    label: "Đơn hàng compact",
+    description: "Mẫu gọn, ít mực in, phù hợp phiếu xác nhận nhanh.",
+    htmlTemplate: `<style>
+  .ticket {
+    color: #22181d;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .ticket-header {
+    border-bottom: 2px solid #22181d;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+  }
+
+  .ticket-title {
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .ticket-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .ticket-row strong {
+    min-width: 120px;
+  }
+
+  .ticket-total {
+    border-top: 1px solid #cab4be;
+    margin-top: 16px;
+    padding-top: 12px;
+    text-align: right;
+  }
+
+  .ticket-total strong {
+    font-size: 22px;
+  }
+</style>
+
+<section class="ticket">
+  <div class="ticket-header">
+    <div>
+      <div class="ticket-title">Đơn hàng dịch vụ</div>
+      <div>{{code}}</div>
+    </div>
+    <div>{{orderDate}}</div>
+  </div>
+
+  <div class="ticket-row"><strong>Khách hàng</strong><span>{{customerId}}</span></div>
+  <div class="ticket-row"><strong>Dịch vụ</strong><span>{{serviceName}}</span></div>
+  <div class="ticket-row"><strong>Người thực hiện</strong><span>{{performerStaffId}}</span></div>
+  <div class="ticket-row"><strong>Trạng thái</strong><span>{{status}}</span></div>
+  <div class="ticket-row"><strong>Ghi chú</strong><span>{{note}}</span></div>
+
+  <div class="ticket-total">
+    Thành tiền: <strong>{{totalAmount}}</strong>
+  </div>
+</section>`,
+  },
+]
 
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -106,6 +423,10 @@ export function SettingsPage() {
   )
   const actionOptions = useMemo(
     () => getResourceActionOptions(entityType),
+    [entityType],
+  )
+  const templatePresets = useMemo(
+    () => TEMPLATE_PRESETS.filter((preset) => preset.entityType === entityType),
     [entityType],
   )
   const viewSources = useMemo(
@@ -235,10 +556,30 @@ export function SettingsPage() {
     setTemplateModal(true)
   }
 
+  function openCreateTemplateFromPreset(preset: TemplatePreset) {
+    setEditingTemplate(null)
+    templateForm.resetFields()
+    templateForm.setFieldsValue({
+      name: preset.label,
+      htmlTemplate: preset.htmlTemplate,
+    })
+    setTemplateModal(true)
+  }
+
   function openEditTemplate(template: Template) {
     setEditingTemplate(template)
     templateForm.setFieldsValue(template)
     setTemplateModal(true)
+  }
+
+  function applyPresetToEditor(presetKey: string) {
+    const preset = templatePresets.find((item) => item.key === presetKey)
+    if (!preset) return
+    templateForm.setFieldsValue({
+      name: templateForm.getFieldValue("name") || preset.label,
+      htmlTemplate: preset.htmlTemplate,
+    })
+    message.success(`Đã nạp mẫu ${preset.label}`)
   }
 
   function updateConfig(
@@ -438,9 +779,32 @@ export function SettingsPage() {
                   <div className="settings-tab-header">
                     <Typography.Paragraph type="secondary">
                       Dùng biến theo cú pháp Handlebars như {"{{fullName}}"} hoặc {"{{custom_key}}"}.
+                      Có thể nhúng CSS trực tiếp bằng thẻ {"<style>...</style>"} ở đầu template.
                     </Typography.Paragraph>
-                    <Button onClick={openCreateTemplate}>Thêm mẫu</Button>
+                    <Space wrap>
+                      <Button onClick={openCreateTemplate}>Thêm mẫu</Button>
+                      {templatePresets.length > 0 && (
+                        <Button onClick={() => openCreateTemplateFromPreset(templatePresets[0])}>
+                          Tạo từ mẫu có sẵn
+                        </Button>
+                      )}
+                    </Space>
                   </div>
+                  {templatePresets.length > 0 && (
+                    <div className="template-preset-grid">
+                      {templatePresets.map((preset) => (
+                        <Card className="template-preset-card" key={preset.key} size="small">
+                          <Space direction="vertical" size={6} style={{ width: "100%" }}>
+                            <Typography.Text strong>{preset.label}</Typography.Text>
+                            <Typography.Text type="secondary">{preset.description}</Typography.Text>
+                            <Button onClick={() => openCreateTemplateFromPreset(preset)}>
+                              Dùng mẫu này
+                            </Button>
+                          </Space>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
                   <div className="template-variable-cloud">
                     {templateVariables.map((variable) => (
                       <Tag className="soft-tag" key={variable}>
@@ -512,6 +876,19 @@ export function SettingsPage() {
         <Form form={templateForm} layout="vertical" onFinish={saveTemplate}>
           <div className="template-editor-layout">
             <div>
+              {templatePresets.length > 0 && (
+                <Form.Item label="Mẫu có sẵn">
+                  <Select
+                    allowClear
+                    placeholder="Chọn mẫu để nạp nhanh vào editor"
+                    options={templatePresets.map((preset) => ({
+                      value: preset.key,
+                      label: preset.label,
+                    }))}
+                    onChange={(value) => value && applyPresetToEditor(String(value))}
+                  />
+                </Form.Item>
+              )}
               <Form.Item
                 name="name"
                 label="Tên mẫu"

@@ -43,8 +43,20 @@ body::before {
   background: var(--app-sider-bg) !important;
   border-right: 1px solid var(--app-line);
   box-shadow: 24px 0 80px rgba(0, 0, 0, 0.3);
-  overflow-y: auto;
+  height: 100vh;
+  overflow: hidden;
   padding: 16px 12px;
+  position: sticky !important;
+  top: 0;
+}
+
+.app-sider .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .brand-card {
@@ -103,8 +115,27 @@ body::before {
 .side-menu {
   background: transparent !important;
   border-inline-end: 0 !important;
-  margin-top: 14px;
+  margin-top: 0;
   padding-inline: 2px;
+}
+
+.side-menu-scroll {
+  flex: 1;
+  height: 100%;
+  margin-top: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+.side-menu-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.side-menu-scroll::-webkit-scrollbar-thumb {
+  background: rgba(232, 137, 174, 0.22);
+  border-radius: 999px;
 }
 
 .side-menu .ant-menu-item {
@@ -417,6 +448,80 @@ body::before {
   justify-content: space-between;
 }
 
+.dashboard-mini-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-mini-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+}
+
+.dashboard-mini-card h4 {
+  margin: 0 !important;
+}
+
+.dashboard-week-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.dashboard-week-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  display: grid;
+  gap: 10px;
+  min-height: 180px;
+  padding: 12px;
+}
+
+.dashboard-week-events {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-week-event {
+  background: rgba(232, 137, 174, 0.08);
+  border: 1px solid rgba(232, 137, 174, 0.18);
+  border-radius: 12px;
+  color: #fff7fb;
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.dashboard-week-event:hover {
+  background: rgba(232, 137, 174, 0.14);
+  border-color: rgba(232, 137, 174, 0.3);
+}
+
+.dashboard-week-event strong {
+  font-size: 12px;
+}
+
+.dashboard-week-event span {
+  color: #d8bdca;
+  font-size: 11px;
+}
+
+.calendar-range-label {
+  color: #fff7fb !important;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 132px;
+  text-align: center;
+}
+
 .ant-timeline-item-tail {
   border-inline-start-color: rgba(255, 255, 255, 0.14) !important;
 }
@@ -617,6 +722,18 @@ body::before {
   gap: 8px;
 }
 
+.template-preset-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: 12px;
+}
+
+.template-preset-card {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
 .template-editor-layout .monaco-editor,
 .template-editor-layout .monaco-editor-background,
 .template-editor-layout .margin {
@@ -774,6 +891,16 @@ body::before {
 
 .ant-table {
   background: transparent !important;
+  font-size: 13px !important;
+}
+
+.ant-table-thead > tr > th {
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.ant-table-tbody > tr > td {
+  font-size: 13px !important;
 }
 
 .ant-table-tbody > tr > td {
@@ -1131,7 +1258,7 @@ textarea.ant-input {
 }
 
 .document-files-table {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .document-files-table .ant-table-thead > tr > th,
@@ -1140,6 +1267,10 @@ textarea.ant-input {
 }
 
 .document-files-table .ant-table-thead > tr > th {
+  font-size: 11px;
+}
+
+.document-files-table .ant-table-tbody > tr > td {
   font-size: 12px;
 }
 
@@ -1181,12 +1312,12 @@ textarea.ant-input {
 
 .document-file-copy strong {
   color: #fff7fb;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .document-file-copy span {
   color: #b89ca9;
-  font-size: 12px;
+  font-size: 11px;
   overflow-wrap: anywhere;
 }
 
@@ -1331,6 +1462,11 @@ textarea.ant-input {
   .image-library-preview,
   .image-library-tree {
     max-height: none;
+  }
+
+  .dashboard-mini-grid,
+  .dashboard-week-grid {
+    grid-template-columns: 1fr;
   }
 }
 

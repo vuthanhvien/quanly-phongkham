@@ -51,6 +51,7 @@ export function RecordListPage() {
     Array<{ id: string; name: string }>
   >([])
   const [creating, setCreating] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [lookups, setLookups] = useState<LookupMap>({})
   const [fileLookups, setFileLookups] = useState<FileLookupMap>({})
   const query = useList({
@@ -67,6 +68,8 @@ export function RecordListPage() {
 
   useEffect(() => {
     setCurrentPage(1)
+    setCreating(false)
+    setEditingId(null)
   }, [resource])
 
   useEffect(() => {
@@ -129,9 +132,7 @@ export function RecordListPage() {
             )}
             {hasActionAccess(resource, "update") && (
               <Tooltip title="Chỉnh sửa">
-                <Link to={`/${resource}/${row.id}/edit`}>
-                  <Button icon={<EditOutlined />} type="text" />
-                </Link>
+                <Button icon={<EditOutlined />} type="text" onClick={() => setEditingId(String(row.id))} />
               </Tooltip>
             )}
             {resource === "customers" && hasActionAccess(resource, "reveal-phone") && (
@@ -277,13 +278,16 @@ export function RecordListPage() {
         className="quick-drawer"
         destroyOnClose
         maskClosable={false}
-        open={creating}
+        open={creating || Boolean(editingId)}
         placement="right"
-        title={`Thêm nhanh ${entityLabels[resource] || resource}`}
+        title={editingId ? `Chỉnh sửa ${entityLabels[resource] || resource}` : `Thêm nhanh ${entityLabels[resource] || resource}`}
         width={resource === "service-orders" ? 980 : 560}
-        onClose={() => setCreating(false)}
+        onClose={() => {
+          setCreating(false)
+          setEditingId(null)
+        }}
       >
-        {resource === "files" ? (
+        {resource === "files" && !editingId ? (
           <FileUploadPanel
             onCancel={() => setCreating(false)}
             onSuccess={() => {
@@ -294,19 +298,29 @@ export function RecordListPage() {
         ) : resource === "service-orders" ? (
           <ServiceOrderForm
             compact
-            onCancel={() => setCreating(false)}
+            id={editingId || undefined}
+            onCancel={() => {
+              setCreating(false)
+              setEditingId(null)
+            }}
             onSuccess={() => {
               setCreating(false)
+              setEditingId(null)
               refresh()
             }}
           />
         ) : (
           <RecordFormContent
             compact
+            id={editingId || undefined}
             resource={resource}
-            onCancel={() => setCreating(false)}
+            onCancel={() => {
+              setCreating(false)
+              setEditingId(null)
+            }}
             onSuccess={() => {
               setCreating(false)
+              setEditingId(null)
               refresh()
             }}
           />

@@ -262,14 +262,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Typography.Title level={4}>{settings.appName}</Typography.Title>
           </div>
         </div>
-        <Menu
-          className="side-menu"
-          defaultOpenKeys={defaultOpenKeys}
-          items={items}
-          selectedKeys={[selected]}
-          mode="inline"
-          theme="dark"
-        />
+        <div className="side-menu-scroll">
+          <Menu
+            className="side-menu"
+            defaultOpenKeys={defaultOpenKeys}
+            items={items}
+            selectedKeys={[selected]}
+            mode="inline"
+            theme="dark"
+          />
+        </div>
       </Sider>
       <Layout>
         <Header className="app-header">
