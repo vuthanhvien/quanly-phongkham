@@ -12,6 +12,7 @@ import { AuditPage } from './pages/AuditPage';
 import { BranchRoleAssignmentsPage } from './pages/BranchRoleAssignmentsPage';
 import { CustomFieldsPage } from './pages/CustomFieldsPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { FileFoldersPage } from './pages/FileFoldersPage';
 import { LoginPage } from './pages/LoginPage';
 import { LandingPagesPage } from './pages/LandingPagesPage';
 import { RecordDetailPage } from './pages/RecordDetailPage';
@@ -151,6 +152,7 @@ export function App() {
                 <Route path="/audit-logs" element={<AuditPage />} />
               </Route>
               <Route element={<ResourceGuard />}>
+                <Route path="/file-folders" element={<FileFoldersPage />} />
                 <Route path="/:resource" element={<RecordListPage />} />
                 <Route path="/:resource/import" element={<RecordImportPage />} />
                 <Route path="/:resource/:id/edit" element={<RecordFormPage />} />
