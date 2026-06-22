@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ThreadType, Zalo, type Message } from 'zca-js';
+import { ThreadType, Zalo, type AttachmentSource, type Message } from 'zca-js';
 import { ILike, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
 import { Branch, Customer, Lead, Staff, ZaloAccount, ZaloConversation, ZaloMessage } from '../entities/entities';
@@ -16,6 +16,13 @@ interface LoginStateSnapshot {
   scannedAvatar?: string;
   error?: string;
   updatedAt: string;
+}
+
+interface UploadedBinaryFile {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+  size: number;
 }
 
 type ZaloRuntimeApi = Awaited<ReturnType<Zalo['loginQR']>>;
@@ -45,8 +52,10 @@ export class ZaloService implements OnModuleInit {
   }
 
   async listAccounts(user: AuthUser) {
-    this.assertAdmin(user);
-    const rows = await this.accounts.find({ order: { updatedAt: 'DESC' } });
+    const rows = await this.accounts.find({
+      where: this.accountScope(user),
+      order: { updatedAt: 'DESC' },
+    });
     return {
       data: rows.map((row) => ({
         ...row,
@@ -161,7 +170,7 @@ export class ZaloService implements OnModuleInit {
   }
 
   async listConversations(accountId: string, search: string | undefined, user: AuthUser) {
-    this.assertAdmin(user);
+    const account = await this.assertAccountAccess(accountId, user);
     if (!accountId) throw new BadRequestException('accountId là bắt buộc');
     const where = search
       ? [
@@ -174,11 +183,12 @@ export class ZaloService implements OnModuleInit {
       order: { lastMessageAt: 'DESC', updatedAt: 'DESC' },
       take: 200,
     });
+    void account;
     return { data: rows };
   }
 
   async listMessages(conversationId: string, pageSize: number, user: AuthUser) {
-    this.assertAdmin(user);
+    await this.assertConversationAccess(conversationId, user);
     const limit = Number.isFinite(pageSize) ? Math.min(Math.max(pageSize, 20), 500) : 100;
     const rows = await this.messages.find({
       where: { conversationId },
@@ -193,9 +203,7 @@ export class ZaloService implements OnModuleInit {
     payload: { customerId?: string; leadId?: string; contactPhone?: string },
     user: AuthUser,
   ) {
-    this.assertAdmin(user);
-    const conversation = await this.conversations.findOne({ where: { id } });
-    if (!conversation) throw new BadRequestException('Không tìm thấy hội thoại');
+    const conversation = await this.assertConversationAccess(id, user);
     if (payload.customerId) await this.ensureCustomer(payload.customerId);
     if (payload.leadId) await this.ensureLead(payload.leadId);
     conversation.customerId = this.normalizeOptionalString(payload.customerId);
@@ -203,6 +211,90 @@ export class ZaloService implements OnModuleInit {
     conversation.contactPhone = this.normalizeOptionalString(payload.contactPhone);
     const saved = await this.conversations.save(conversation);
     return { data: saved };
+  }
+
+  async sendMessage(conversationId: string, text: string | undefined, files: UploadedBinaryFile[], user: AuthUser) {
+    const conversation = await this.assertConversationAccess(conversationId, user);
+    const account = await this.getAccountOrFail(conversation.accountId);
+    const api = await this.ensureApi(account);
+    const messageText = (text || '').trim();
+    if (!messageText && files.length === 0) {
+      throw new BadRequestException('Cần nhập nội dung hoặc chọn ảnh để gửi');
+    }
+
+    const attachments = files.map((file) => this.toAttachmentSource(file));
+    const response = await api.sendMessage(
+      {
+        msg: messageText || (attachments.length > 0 ? '[Hình ảnh]' : ''),
+        attachments: attachments.length > 0 ? attachments : undefined,
+      },
+      conversation.threadId,
+      this.toThreadType(conversation.threadType),
+    );
+
+    const sentAt = new Date();
+    const persisted = await this.messages.save(
+      this.messages.create({
+        accountId: account.id,
+        conversationId: conversation.id,
+        threadId: conversation.threadId,
+        threadType: conversation.threadType,
+        messageId: String(response.message?.msgId || response.attachment?.[0]?.msgId || `local-${Date.now()}`),
+        clientMessageId: String(Date.now()),
+        senderId: account.zaloUserId,
+        senderName: account.displayName || account.label,
+        direction: 'OUTBOUND',
+        contentText: messageText || (attachments.length > 0 ? '[Hình ảnh]' : ''),
+        contentJson: attachments.length > 0 ? { attachments: files.map((file) => ({ name: file.originalname, mimeType: file.mimetype })) } as any : {},
+        sentAt,
+        isSelf: true,
+      }),
+    );
+
+    conversation.lastMessageAt = sentAt;
+    conversation.lastMessageText = messageText || '[Hình ảnh]';
+    await this.conversations.save(conversation);
+    account.lastMessageAt = sentAt;
+    await this.accounts.save(account);
+
+    return { data: persisted };
+  }
+
+  async createCustomerFromConversation(
+    conversationId: string,
+    payload: { fullName?: string; phone?: string; branchId?: string; note?: string },
+    user: AuthUser,
+  ) {
+    const conversation = await this.assertConversationAccess(conversationId, user);
+    if (conversation.customerId) {
+      throw new BadRequestException('Hội thoại này đã liên kết với khách hàng');
+    }
+
+    const account = await this.getAccountOrFail(conversation.accountId);
+    const branchId = this.normalizeOptionalString(payload.branchId) || conversation.branchId || account.branchId || user.branchId;
+    const phone = this.normalizeOptionalString(payload.phone) || conversation.contactPhone;
+    const fullName = this.normalizeOptionalString(payload.fullName) || conversation.displayName || 'Khách Zalo';
+
+    if (!branchId) throw new BadRequestException('Cần chọn chi nhánh để tạo khách hàng');
+    if (!phone) throw new BadRequestException('Cần số điện thoại để tạo khách hàng');
+
+    await this.ensureBranch(branchId);
+    const customer = await this.customers.save(
+      this.customers.create({
+        code: await this.generateCustomerCode(),
+        fullName,
+        phone,
+        branchId,
+        note: this.normalizeOptionalString(payload.note) || `Tạo từ hội thoại Zalo ${conversation.displayName}`,
+        status: 'CONSULTING',
+        tier: 'MEMBER',
+      }),
+    );
+
+    conversation.customerId = customer.id;
+    conversation.contactPhone = phone;
+    await this.conversations.save(conversation);
+    return { data: customer };
   }
 
   private async runLoginFlow(account: ZaloAccount) {
@@ -255,6 +347,7 @@ export class ZaloService implements OnModuleInit {
       }
 
       this.apis.set(account.id, api);
+      await this.hydrateAccountProfile(account.id, api);
       const saved = await this.getAccountOrFail(account.id);
       saved.connectionStatus = 'CONNECTED';
       saved.lastConnectedAt = new Date();
@@ -300,6 +393,7 @@ export class ZaloService implements OnModuleInit {
     const zalo = new Zalo();
     const api = await zalo.login(account.sessionData as never);
     this.apis.set(account.id, api);
+    await this.hydrateAccountProfile(account.id, api);
     account.connectionStatus = 'CONNECTED';
     account.lastConnectedAt = new Date();
     await this.accounts.save(account);
@@ -317,6 +411,9 @@ export class ZaloService implements OnModuleInit {
     const onMessage = (message: Message) => {
       void this.persistMessage(account.id, message);
     };
+    const onOldMessages = (messages: Message[]) => {
+      void this.persistMessages(account.id, messages);
+    };
     const onError = (error: unknown) => {
       this.loginStates.set(account.id, {
         ...this.buildLoginState('ERROR'),
@@ -329,13 +426,23 @@ export class ZaloService implements OnModuleInit {
     };
 
     listener.on('message', onMessage);
+    listener.on('old_messages', onOldMessages);
     listener.on('error', onError);
     listener.on('closed', onClosed);
+    listener.on('connected', () => {
+      try {
+        listener.requestOldMessages(ThreadType.User);
+        listener.requestOldMessages(ThreadType.Group);
+      } catch {
+        // ignore historical sync failures and keep realtime listener alive
+      }
+    });
     listener.start({ retryOnClose: true });
 
     this.listeners.set(account.id, {
       stop: () => {
         listener.off('message', onMessage);
+        listener.off('old_messages', onOldMessages);
         listener.off('error', onError);
         listener.off('closed', onClosed);
         listener.stop();
@@ -391,6 +498,26 @@ export class ZaloService implements OnModuleInit {
     await this.accounts.save(account);
   }
 
+  private async persistMessages(accountId: string, messages: Message[]) {
+    for (const item of messages) {
+      await this.persistMessage(accountId, item);
+    }
+  }
+
+  private toAttachmentSource(file: UploadedBinaryFile): AttachmentSource {
+    return {
+      data: file.buffer,
+      filename: file.originalname as `${string}.${string}`,
+      metadata: {
+        totalSize: file.size,
+      },
+    };
+  }
+
+  private toThreadType(value: string) {
+    return value === 'GROUP' ? ThreadType.Group : ThreadType.User;
+  }
+
   private async upsertConversation(
     account: ZaloAccount,
     payload: {
@@ -424,6 +551,24 @@ export class ZaloService implements OnModuleInit {
       conversation.unreadCount = Number(conversation.unreadCount || 0) + payload.unreadDelta;
     }
     return this.conversations.save(conversation);
+  }
+
+  private async hydrateAccountProfile(accountId: string, api: ZaloRuntimeApi) {
+    try {
+      const info = await api.fetchAccountInfo();
+      const profile = info?.profile;
+      if (!profile) return;
+      await this.accounts.update(
+        { id: accountId },
+        {
+          displayName: profile.displayName || profile.zaloName || profile.username,
+          avatarUrl: profile.avatar || undefined,
+          zaloUserId: profile.userId || profile.globalId || undefined,
+        },
+      );
+    } catch {
+      // keep login successful even when profile hydration fails
+    }
   }
 
   private buildLoginState(status: LoginStateStatus): LoginStateSnapshot {
@@ -485,5 +630,33 @@ export class ZaloService implements OnModuleInit {
   private assertAdmin(user: AuthUser | undefined) {
     if (!user || (user.roleMain || user.role) === 'ADMIN') return;
     throw new ForbiddenException('Chỉ ADMIN mới được thao tác Zalo integration');
+  }
+
+  private accountScope(user: AuthUser | undefined) {
+    if (!user || (user.roleMain || user.role) === 'ADMIN') return {};
+    if (user.staffId) return { staffId: user.staffId };
+    throw new ForbiddenException('Tài khoản hiện tại chưa được gán nhân viên để dùng Zalo Inbox');
+  }
+
+  private async assertAccountAccess(accountId: string, user: AuthUser | undefined) {
+    const account = await this.getAccountOrFail(accountId);
+    if (!user || (user.roleMain || user.role) === 'ADMIN') return account;
+    if (user.staffId && account.staffId === user.staffId) return account;
+    throw new ForbiddenException('Bạn không có quyền dùng tài khoản Zalo này');
+  }
+
+  private async assertConversationAccess(conversationId: string, user: AuthUser | undefined) {
+    const conversation = await this.conversations.findOne({ where: { id: conversationId } });
+    if (!conversation) throw new BadRequestException('Không tìm thấy hội thoại');
+    await this.assertAccountAccess(conversation.accountId, user);
+    return conversation;
+  }
+
+  private async generateCustomerCode() {
+    let candidate = `KH-ZALO-${Date.now()}`;
+    while (await this.customers.findOne({ where: { code: candidate } })) {
+      candidate = `KH-ZALO-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    }
+    return candidate;
   }
 }

@@ -27,8 +27,10 @@ import {
   Switch,
   Tag,
   Typography,
+  Upload,
   message,
 } from "antd"
+import type { UploadFile } from "antd/es/upload/interface"
 import dayjs from "dayjs"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
@@ -103,7 +105,13 @@ export function ZaloInboxPage() {
   const [customerOptions, setCustomerOptions] = useState<OptionItem[]>([])
   const [leadOptions, setLeadOptions] = useState<OptionItem[]>([])
   const [linking, setLinking] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [composerText, setComposerText] = useState("")
+  const [composerFiles, setComposerFiles] = useState<UploadFile[]>([])
+  const [customerModalOpen, setCustomerModalOpen] = useState(false)
+  const [creatingCustomer, setCreatingCustomer] = useState(false)
   const [accountForm] = Form.useForm()
+  const [customerForm] = Form.useForm()
 
   useEffect(() => {
     void Promise.all([loadAccounts(), loadLookups()])
@@ -131,10 +139,23 @@ export function ZaloInboxPage() {
   useEffect(() => {
     if (!selectedConversation?.id) {
       setMessagesRows([])
+      setComposerText("")
+      setComposerFiles([])
       return
     }
     void loadMessages(selectedConversation.id)
   }, [selectedConversation?.id])
+
+  useEffect(() => {
+    if (!selectedAccountId) return
+    const timer = window.setInterval(() => {
+      void loadConversations(selectedAccountId)
+      if (selectedConversation?.id) {
+        void loadMessages(selectedConversation.id)
+      }
+    }, 5000)
+    return () => window.clearInterval(timer)
+  }, [selectedAccountId, selectedConversation?.id])
 
   useEffect(() => {
     if (!qrAccountId) return
@@ -343,6 +364,62 @@ export function ZaloInboxPage() {
     }
   }
 
+  async function submitComposer() {
+    if (!selectedConversation) return
+    setSending(true)
+    try {
+      const formData = new FormData()
+      if (composerText.trim()) {
+        formData.append("text", composerText.trim())
+      }
+      composerFiles.forEach((file) => {
+        if (file.originFileObj) {
+          formData.append("files", file.originFileObj)
+        }
+      })
+      await api.post(`/zalo/conversations/${selectedConversation.id}/send`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      message.success("Đã gửi tin nhắn Zalo")
+      setComposerText("")
+      setComposerFiles([])
+      await loadMessages(selectedConversation.id)
+      if (selectedAccountId) await loadConversations(selectedAccountId)
+    } catch (error) {
+      message.error(getApiErrorMessage(error, "Không thể gửi tin nhắn Zalo"))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  function openCreateCustomer() {
+    if (!selectedConversation) return
+    customerForm.setFieldsValue({
+      fullName: selectedConversation.displayName,
+      phone: selectedConversation.contactPhone,
+      branchId: selectedAccount?.branchId,
+      note: `Tạo từ hội thoại Zalo ${selectedConversation.displayName}`,
+    })
+    setCustomerModalOpen(true)
+  }
+
+  async function submitCreateCustomer(values: Record<string, unknown>) {
+    if (!selectedConversation) return
+    setCreatingCustomer(true)
+    try {
+      const response = await api.post(`/zalo/conversations/${selectedConversation.id}/create-customer`, values)
+      const customer = response.data.data
+      message.success("Đã tạo khách hàng và liên kết hội thoại")
+      setSelectedConversation((current) => (current ? { ...current, customerId: customer.id, contactPhone: String(customer.phone || "") } : current))
+      setCustomerModalOpen(false)
+      if (selectedAccountId) await loadConversations(selectedAccountId)
+    } catch (error) {
+      message.error(getApiErrorMessage(error, "Không thể tạo khách hàng từ hội thoại"))
+    } finally {
+      setCreatingCustomer(false)
+    }
+  }
+
   return (
     <>
       <div className="page-header">
@@ -541,7 +618,19 @@ export function ZaloInboxPage() {
         <Card
           className="glass-card zalo-message-panel"
           title={selectedConversation ? selectedConversation.displayName : "Tin nhắn"}
-          extra={selectedConversation ? <Tag className="soft-tag">{messagesRows.length} tin</Tag> : null}
+          extra={
+            selectedConversation ? (
+              <Space wrap>
+                {selectedConversation.customerId ? <Tag color="blue">Đã có khách hàng</Tag> : null}
+                <Tag className="soft-tag">{messagesRows.length} tin</Tag>
+                {!selectedConversation.customerId ? (
+                  <Button size="small" type="primary" onClick={openCreateCustomer}>
+                    Tạo khách hàng
+                  </Button>
+                ) : null}
+              </Space>
+            ) : null
+          }
         >
           {selectedConversation ? (
             <div className="zalo-link-card">
@@ -603,17 +692,41 @@ export function ZaloInboxPage() {
           ) : messagesRows.length === 0 ? (
             <div className="zalo-empty-state"><Empty description="Chưa có tin nhắn nào được listener lưu lại" /></div>
           ) : (
-            <div className="zalo-message-list">
-              {messagesRows.map((item) => (
-                <div key={item.id} className={`zalo-message-bubble ${item.direction === "OUTBOUND" ? "outbound" : "inbound"}`}>
-                  <Typography.Text strong>{item.senderName || (item.direction === "OUTBOUND" ? "Nhân viên" : "Khách Zalo")}</Typography.Text>
-                  <Typography.Paragraph>
-                    {item.contentText || renderContentPreview(item.contentJson)}
-                  </Typography.Paragraph>
-                  <Typography.Text type="secondary">{formatDateTime(item.sentAt)}</Typography.Text>
+            <>
+              <div className="zalo-message-list">
+                {messagesRows.map((item) => (
+                  <div key={item.id} className={`zalo-message-bubble ${item.direction === "OUTBOUND" ? "outbound" : "inbound"}`}>
+                    <Typography.Text strong>{item.senderName || (item.direction === "OUTBOUND" ? "Nhân viên" : "Khách Zalo")}</Typography.Text>
+                    <Typography.Paragraph>
+                      {item.contentText || renderContentPreview(item.contentJson)}
+                    </Typography.Paragraph>
+                    <Typography.Text type="secondary">{formatDateTime(item.sentAt)}</Typography.Text>
+                  </div>
+                ))}
+              </div>
+              <div className="zalo-composer">
+                <Input.TextArea
+                  placeholder="Nhập nội dung chat với khách tại đây..."
+                  rows={3}
+                  value={composerText}
+                  onChange={(event) => setComposerText(event.target.value)}
+                />
+                <div className="zalo-composer-actions">
+                  <Upload
+                    beforeUpload={() => false}
+                    fileList={composerFiles}
+                    multiple
+                    accept="image/*"
+                    onChange={({ fileList }) => setComposerFiles(fileList)}
+                  >
+                    <Button>Chọn ảnh</Button>
+                  </Upload>
+                  <Button loading={sending} type="primary" onClick={() => void submitComposer()}>
+                    Gửi Zalo
+                  </Button>
                 </div>
-              ))}
-            </div>
+              </div>
+            </>
           )}
         </Card>
       </div>
@@ -664,15 +777,26 @@ export function ZaloInboxPage() {
             message="Mở Zalo trên điện thoại của nhân viên, chọn biểu tượng quét QR rồi quét mã bên dưới."
             type="info"
           />
-          {qrState?.status === "QR_PENDING" && qrState.qrImage ? (
+          {qrState?.status === "QR_PENDING" && normalizeQrImageSrc(qrState.qrImage) ? (
             <>
-              <img alt="QR Zalo login" className="zalo-qr-image" src={qrState.qrImage} />
+              <img
+                alt="QR Zalo login"
+                className="zalo-qr-image"
+                src={normalizeQrImageSrc(qrState.qrImage)}
+              />
               <div className="zalo-qr-steps">
                 <div><CheckCircleOutlined /> Mở app Zalo trên điện thoại</div>
                 <div><CheckCircleOutlined /> Vào quét QR</div>
                 <div><CheckCircleOutlined /> Quét mã này và xác nhận đăng nhập</div>
               </div>
             </>
+          ) : qrState?.status === "QR_PENDING" ? (
+            <Space direction="vertical" style={{ width: "100%" }}>
+              <Spin />
+              <Typography.Text type="secondary">
+                QR đang được tạo hoặc dữ liệu ảnh chưa sẵn sàng. Bạn chờ thêm 1-2 giây rồi mở lại.
+              </Typography.Text>
+            </Space>
           ) : qrState?.status === "QR_SCANNED" ? (
             <Space direction="vertical" style={{ width: "100%" }}>
               <Avatar size={72} src={qrState.scannedAvatar} />
@@ -685,6 +809,29 @@ export function ZaloInboxPage() {
             <div className="zalo-empty-state"><Spin /></div>
           )}
         </div>
+      </Modal>
+
+      <Modal
+        confirmLoading={creatingCustomer}
+        open={customerModalOpen}
+        title="Tạo khách hàng từ hội thoại Zalo"
+        onCancel={() => setCustomerModalOpen(false)}
+        onOk={() => void customerForm.submit()}
+      >
+        <Form form={customerForm} layout="vertical" onFinish={(values) => void submitCreateCustomer(values)}>
+          <Form.Item label="Họ tên" name="fullName" rules={[{ required: true, message: "Nhập họ tên khách hàng" }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item label="Số điện thoại" name="phone" rules={[{ required: true, message: "Nhập số điện thoại" }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item label="Chi nhánh" name="branchId" rules={[{ required: true, message: "Chọn chi nhánh" }]}>
+            <Select options={branchOptions} showSearch />
+          </Form.Item>
+          <Form.Item label="Ghi chú" name="note">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+        </Form>
       </Modal>
     </>
   )
@@ -726,4 +873,13 @@ function renderContentPreview(content?: Record<string, unknown>) {
   if (typeof content.title === "string") return content.title
   if (typeof content.description === "string") return content.description
   return "[Tin nhắn đính kèm]"
+}
+
+function normalizeQrImageSrc(value?: string) {
+  if (!value) return ""
+  const trimmed = value.trim()
+  if (!trimmed) return ""
+  if (trimmed.startsWith("data:image/")) return trimmed
+  const compact = trimmed.replace(/\s+/g, "")
+  return `data:image/png;base64,${compact}`
 }

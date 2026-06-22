@@ -28,7 +28,7 @@ export function hasResourceAccess(resource: string) {
 }
 
 export function hasScreenAccess(screen: string) {
-  void screen
+  if (screen === "zalo-inbox") return Boolean(readStoredUser())
   return isAdmin(readStoredUser())
 }
 

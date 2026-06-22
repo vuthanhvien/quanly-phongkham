@@ -1,6 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { AuthUser } from '../common/auth';
 import { ZaloService } from './zalo.service';
+
+interface UploadedBinaryFile {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+  size: number;
+}
 
 @Controller('zalo')
 export class ZaloController {
@@ -75,5 +83,25 @@ export class ZaloController {
     @Request() request: { user: AuthUser },
   ): Promise<any> {
     return this.zalo.listMessages(id, Number(pageSize || 100), request.user);
+  }
+
+  @Post('conversations/:id/send')
+  @UseInterceptors(FilesInterceptor('files', 10))
+  sendMessage(
+    @Param('id') id: string,
+    @UploadedFiles() files: UploadedBinaryFile[],
+    @Body() payload: { text?: string },
+    @Request() request: { user: AuthUser },
+  ): Promise<any> {
+    return this.zalo.sendMessage(id, payload.text, files || [], request.user);
+  }
+
+  @Post('conversations/:id/create-customer')
+  createCustomerFromConversation(
+    @Param('id') id: string,
+    @Body() payload: { fullName?: string; phone?: string; branchId?: string; note?: string },
+    @Request() request: { user: AuthUser },
+  ): Promise<any> {
+    return this.zalo.createCustomerFromConversation(id, payload, request.user);
   }
 }
