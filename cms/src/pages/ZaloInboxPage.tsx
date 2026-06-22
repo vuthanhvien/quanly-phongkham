@@ -1,6 +1,8 @@
 import {
+  CheckCircleOutlined,
   DeleteOutlined,
   EditOutlined,
+  InfoCircleOutlined,
   LinkOutlined,
   MessageOutlined,
   PlayCircleOutlined,
@@ -9,6 +11,7 @@ import {
   StopOutlined,
 } from "@ant-design/icons"
 import {
+  Alert,
   Avatar,
   Button,
   Card,
@@ -355,6 +358,39 @@ export function ZaloInboxPage() {
         </Space>
       </div>
 
+      <Card className="glass-card zalo-guide-card">
+        <div className="zalo-guide-head">
+          <div>
+            <Typography.Text className="eyebrow">Cách đăng nhập</Typography.Text>
+            <Typography.Title level={4}>Luồng dùng Zalo cá nhân cho nhân viên</Typography.Title>
+          </div>
+          <Tag color="blue">MVP</Tag>
+        </div>
+        <div className="zalo-guide-grid">
+          <div className="zalo-guide-step">
+            <span>1</span>
+            <div>
+              <Typography.Text strong>Tạo tài khoản nội bộ</Typography.Text>
+              <Typography.Paragraph>Nhấn `Thêm tài khoản Zalo`, gán nhân viên và chi nhánh nếu cần.</Typography.Paragraph>
+            </div>
+          </div>
+          <div className="zalo-guide-step">
+            <span>2</span>
+            <div>
+              <Typography.Text strong>Đăng nhập bằng QR</Typography.Text>
+              <Typography.Paragraph>Trong thẻ tài khoản, bấm `Đăng nhập QR`, modal QR sẽ bật lên để quét bằng điện thoại.</Typography.Paragraph>
+            </div>
+          </div>
+          <div className="zalo-guide-step">
+            <span>3</span>
+            <div>
+              <Typography.Text strong>Bật listener để lưu tin nhắn</Typography.Text>
+              <Typography.Paragraph>Sau khi login xong, bấm `Bật listener`. Từ lúc đó message mới sẽ được lưu về hệ thống.</Typography.Paragraph>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <div className="zalo-inbox-layout">
         <Card
           className="glass-card zalo-account-panel"
@@ -372,46 +408,83 @@ export function ZaloInboxPage() {
                 <List.Item
                   className={`zalo-account-item${selectedAccountId === account.id ? " active" : ""}`}
                   onClick={() => setSelectedAccountId(account.id)}
-                  actions={[
-                    <Button key="qr" icon={<QrcodeOutlined />} type="text" onClick={(event) => {
-                      event.stopPropagation()
-                      void startQrLogin(account)
-                    }} />,
-                    account.listenerActive ? (
-                      <Button key="stop" icon={<StopOutlined />} type="text" onClick={(event) => {
-                        event.stopPropagation()
-                        void stopListener(account.id)
-                      }} />
-                    ) : (
-                      <Button key="start" icon={<PlayCircleOutlined />} type="text" onClick={(event) => {
-                        event.stopPropagation()
-                        void startListener(account.id)
-                      }} />
-                    ),
-                    <Button key="edit" icon={<EditOutlined />} type="text" onClick={(event) => {
-                      event.stopPropagation()
-                      openEditAccount(account)
-                    }} />,
-                    <Popconfirm
-                      key="delete"
-                      title="Xóa tài khoản Zalo này?"
-                      onConfirm={() => void deleteAccount(account.id)}
-                    >
-                      <Button danger icon={<DeleteOutlined />} type="text" onClick={(event) => event.stopPropagation()} />
-                    </Popconfirm>,
-                  ]}
                 >
                   <List.Item.Meta
                     avatar={<Avatar src={account.avatarUrl} icon={<MessageOutlined />} />}
                     description={
-                      <Space direction="vertical" size={4}>
-                        <Typography.Text strong>{account.label}</Typography.Text>
+                      <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                        <div className="zalo-account-copy">
+                          <Typography.Text strong>{account.label}</Typography.Text>
+                          <Typography.Text type="secondary">
+                            {account.displayName || "Chưa đăng nhập"}
+                          </Typography.Text>
+                        </div>
                         <Space size={6} wrap>
                           <Tag color={statusColor(account.connectionStatus)}>{statusLabel(account.connectionStatus)}</Tag>
                           {account.listenerActive ? <Tag color="green">Listener ON</Tag> : <Tag>Listener OFF</Tag>}
                         </Space>
+                        <div className="zalo-account-actions">
+                          <Button
+                            icon={<QrcodeOutlined />}
+                            size="small"
+                            type="primary"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void startQrLogin(account)
+                            }}
+                          >
+                            Đăng nhập QR
+                          </Button>
+                          {account.listenerActive ? (
+                            <Button
+                              icon={<StopOutlined />}
+                              size="small"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                void stopListener(account.id)
+                              }}
+                            >
+                              Tắt listener
+                            </Button>
+                          ) : (
+                            <Button
+                              icon={<PlayCircleOutlined />}
+                              size="small"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                void startListener(account.id)
+                              }}
+                            >
+                              Bật listener
+                            </Button>
+                          )}
+                          <Button
+                            icon={<EditOutlined />}
+                            size="small"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              openEditAccount(account)
+                            }}
+                          >
+                            Sửa
+                          </Button>
+                          <Popconfirm
+                            title="Xóa tài khoản Zalo này?"
+                            onConfirm={() => void deleteAccount(account.id)}
+                          >
+                            <Button
+                              danger
+                              icon={<DeleteOutlined />}
+                              size="small"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              Xóa
+                            </Button>
+                          </Popconfirm>
+                        </div>
                         <Typography.Text type="secondary">
-                          {account.displayName || "Chưa đăng nhập"} {account.lastMessageAt ? `• ${formatDateTime(account.lastMessageAt)}` : ""}
+                          {account.lastConnectedAt ? `Kết nối: ${formatDateTime(account.lastConnectedAt)}` : "Chưa có phiên đăng nhập"}
+                          {account.lastMessageAt ? ` • Tin cuối: ${formatDateTime(account.lastMessageAt)}` : ""}
                         </Typography.Text>
                       </Space>
                     }
@@ -585,12 +658,20 @@ export function ZaloInboxPage() {
         }}
       >
         <div className="zalo-qr-modal">
+          <Alert
+            banner
+            icon={<InfoCircleOutlined />}
+            message="Mở Zalo trên điện thoại của nhân viên, chọn biểu tượng quét QR rồi quét mã bên dưới."
+            type="info"
+          />
           {qrState?.status === "QR_PENDING" && qrState.qrImage ? (
             <>
               <img alt="QR Zalo login" className="zalo-qr-image" src={qrState.qrImage} />
-              <Typography.Paragraph>
-                Mở Zalo trên điện thoại của nhân viên, vào quét QR để đăng nhập tài khoản vào hệ thống.
-              </Typography.Paragraph>
+              <div className="zalo-qr-steps">
+                <div><CheckCircleOutlined /> Mở app Zalo trên điện thoại</div>
+                <div><CheckCircleOutlined /> Vào quét QR</div>
+                <div><CheckCircleOutlined /> Quét mã này và xác nhận đăng nhập</div>
+              </div>
             </>
           ) : qrState?.status === "QR_SCANNED" ? (
             <Space direction="vertical" style={{ width: "100%" }}>

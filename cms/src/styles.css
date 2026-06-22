@@ -968,6 +968,56 @@ textarea.ant-input {
   grid-template-columns: 320px 360px minmax(0, 1fr);
 }
 
+.zalo-guide-card {
+  margin-bottom: 16px;
+}
+
+.zalo-guide-head {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.zalo-guide-head h4 {
+  margin: 4px 0 0 !important;
+}
+
+.zalo-guide-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.zalo-guide-step {
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+}
+
+.zalo-guide-step > span {
+  align-items: center;
+  background: linear-gradient(135deg, rgba(232, 137, 174, 0.9), rgba(215, 164, 91, 0.7));
+  border-radius: 999px;
+  color: #180c12;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 800;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.zalo-guide-step .ant-typography {
+  margin-bottom: 0 !important;
+}
+
 .zalo-account-panel,
 .zalo-conversation-panel,
 .zalo-message-panel {
@@ -1001,6 +1051,22 @@ textarea.ant-input {
 .zalo-conversation-item.active {
   background: linear-gradient(135deg, rgba(232, 137, 174, 0.14), rgba(215, 164, 91, 0.08));
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.zalo-account-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.zalo-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.zalo-account-actions .ant-btn {
+  border-radius: 999px;
 }
 
 .zalo-empty-state {
@@ -1068,6 +1134,20 @@ textarea.ant-input {
   max-width: 280px;
   padding: 10px;
   width: 100%;
+}
+
+.zalo-qr-steps {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.zalo-qr-steps > div {
+  align-items: center;
+  display: flex;
+  gap: 8px;
 }
 
 .image-library-tree {
@@ -1569,6 +1649,10 @@ textarea.ant-input {
   }
 
   .zalo-inbox-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .zalo-guide-grid {
     grid-template-columns: 1fr;
   }
 
