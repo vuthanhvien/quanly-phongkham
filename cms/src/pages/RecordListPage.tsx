@@ -123,11 +123,12 @@ export function RecordListPage() {
           />,
       })),
       {
-        title: "Thao tác",
+        title: "",
         key: "action",
-        width: 220,
+        fixed: "right" as const,
+        width: 160,
         render: (_: unknown, row: Record<string, any>) => (
-          <Space>
+          <Space size={2}>
             {hasActionAccess(resource, "view") && (
               <Tooltip title="Xem chi tiết">
                 <Link to={`/${resource}/${row.id}`}>

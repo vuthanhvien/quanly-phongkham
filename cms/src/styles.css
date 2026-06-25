@@ -240,6 +240,30 @@ body::before {
   margin: 2px 0 0 !important;
 }
 
+.profile-trigger {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--app-radius);
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  padding: 4px 8px;
+  transition: background 0.15s;
+}
+
+.profile-trigger:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.profile-name {
+  font-size: 13px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .app-content {
   padding: 18px;
 }
@@ -577,8 +601,48 @@ body::before {
   margin-bottom: 14px;
 }
 
+.detail-split-row {
+  align-items: flex-start !important;
+}
+
+.detail-tabs-col {
+  min-width: 0;
+}
+
+.detail-tabs-card .ant-card-body {
+  padding-top: 0;
+}
+
+.detail-tabs-card .ant-tabs-nav {
+  margin-bottom: 0 !important;
+  padding-top: 4px;
+}
+
+.detail-tabs-card .ant-tabs-content-holder {
+  padding-top: 12px;
+}
+
+.detail-right-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: sticky;
+  top: 82px;
+}
+
 .detail-grid {
   margin-top: 8px;
+}
+
+.detail-grid-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 0;
+}
+
+.detail-grid-stacked .detail-item {
+  border-radius: 10px;
 }
 
 .detail-item {
@@ -592,14 +656,31 @@ body::before {
 .detail-item-label {
   background: rgba(255, 255, 255, 0.045);
   color: #eab4ca;
-  font-weight: 800;
-  padding: 10px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 7px 10px;
 }
 
 .detail-item-content {
   background: rgba(255, 255, 255, 0.025);
-  min-height: 48px;
-  padding: 12px;
+  min-height: 36px;
+  padding: 8px 10px;
+}
+
+.related-tab-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.tab-count {
+  background: color-mix(in srgb, var(--app-primary) 18%, transparent);
+  border-radius: 20px;
+  color: var(--app-primary);
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 6px;
+  padding: 1px 7px;
 }
 
 .drag-handle {

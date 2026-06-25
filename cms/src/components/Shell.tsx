@@ -15,6 +15,7 @@ import {
   GlobalOutlined,
   InteractionOutlined,
   LineChartOutlined,
+  LogoutOutlined,
   MessageOutlined,
   MedicineBoxOutlined,
   MenuFoldOutlined,
@@ -25,12 +26,13 @@ import {
   ShopOutlined,
   SolutionOutlined,
   TeamOutlined,
+  UserOutlined,
 } from "@ant-design/icons"
-import { useLogout } from "@refinedev/core"
-import { Button, Layout, Menu, Space, Tag, Typography } from "antd"
+import { useGetIdentity, useLogout } from "@refinedev/core"
+import { Avatar, Button, Dropdown, Layout, Menu, Space, Typography } from "antd"
 import type { MenuProps } from "antd"
 import { useState } from "react"
-import { Link, useLocation } from "react-router-dom"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { hasResourceAccess, hasScreenAccess } from "../access"
 import { useAppUi } from "../app-ui"
 import { entityLabels } from "../models"
@@ -121,7 +123,9 @@ const resourceToGroup = Object.fromEntries(
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const { mutate: logout } = useLogout()
+  const { data: identity } = useGetIdentity<{ name?: string; email?: string }>()
   const { settings } = useAppUi()
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -301,16 +305,40 @@ export function Shell({ children }: { children: React.ReactNode }) {
               icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={toggleCollapsed}
             />
-            <div>
-              <Typography.Text className="eyebrow">
-                {settings.appDescription || "CMS vận hành viện thẩm mỹ"}
-              </Typography.Text>
-            </div>
           </Space>
-          <Space>
-            <Tag className="soft-tag">Live</Tag>
-            <Button onClick={() => logout()}>Đăng xuất</Button>
-          </Space>
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: "profile",
+                  icon: <UserOutlined />,
+                  label: "Hồ sơ cá nhân",
+                  onClick: () => navigate("/profile"),
+                },
+                { type: "divider" },
+                {
+                  key: "logout",
+                  icon: <LogoutOutlined />,
+                  label: "Đăng xuất",
+                  danger: true,
+                  onClick: () => logout(),
+                },
+              ],
+            }}
+            placement="bottomRight"
+            trigger={["click"]}
+          >
+            <button className="profile-trigger">
+              <Avatar
+                icon={<UserOutlined />}
+                size={32}
+                style={{ background: "var(--app-primary)", color: "#180c12", cursor: "pointer", flexShrink: 0 }}
+              />
+              {identity?.name && (
+                <Typography.Text className="profile-name">{identity.name}</Typography.Text>
+              )}
+            </button>
+          </Dropdown>
         </Header>
         <Content className="app-content">{children}</Content>
       </Layout>

@@ -234,7 +234,7 @@ export function RecordImportPage() {
         </Space>
       </div>
 
-      <div className="template-layout">
+      {/* <div className="template-layout">
         <Card className="glass-card settings-card" loading={loading}>
           {unsupported ? (
             <Alert
@@ -273,7 +273,7 @@ export function RecordImportPage() {
             </Typography.Paragraph>
           </Space>
         </Card>
-      </div>
+      </div> */}
 
       <Card className="table-card">
         {draftRows.length === 0 ? (

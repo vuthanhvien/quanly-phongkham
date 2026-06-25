@@ -96,8 +96,20 @@ export function RecordFormContent({
       return
     }
     if (!editing && fields.length > 0) {
+      const todayDate = new Date().toISOString().slice(0, 10)
+      const todayDatetime = new Date().toISOString().slice(0, 16)
       form.setFieldsValue(
         {
+          ...Object.fromEntries(
+            fields
+              .filter((field) => field.type === "date")
+              .map((field) => [field.key, todayDate]),
+          ),
+          ...Object.fromEntries(
+            fields
+              .filter((field) => field.type === "datetime")
+              .map((field) => [field.key, todayDatetime]),
+          ),
           ...Object.fromEntries(
             fields
               .filter((field) => field.defaultValue !== undefined)

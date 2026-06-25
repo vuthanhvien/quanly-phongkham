@@ -19,6 +19,7 @@ import { RecordDetailPage } from './pages/RecordDetailPage';
 import { RecordFormPage } from './pages/RecordFormPage';
 import { RecordImportPage } from './pages/RecordImportPage';
 import { RecordListPage } from './pages/RecordListPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { RolesPage } from './pages/RolesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { UiSettingsPage } from './pages/UiSettingsPage';
@@ -141,6 +142,7 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedLayout />}>
               <Route index element={<DashboardPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
               <Route element={<ScreenGuard screen="zalo-inbox" />}>
                 <Route path="/zalo-inbox" element={<ZaloInboxPage />} />
               </Route>

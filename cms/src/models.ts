@@ -16,6 +16,8 @@ export interface FieldSpec {
 export interface RelationSpec {
   resource: string;
   labelFields: string[];
+  params?: Record<string, string>;
+  lookupKey?: string;
 }
 
 export interface CustomField {
@@ -172,7 +174,7 @@ export const relationFields: Record<string, RelationSpec> = {
   assignedStaffId: { resource: 'staff', labelFields: ['code', 'fullName'] },
   ownerStaffId: { resource: 'staff', labelFields: ['code', 'fullName'] },
   consultantStaffId: { resource: 'staff', labelFields: ['code', 'fullName'] },
-  doctorStaffId: { resource: 'staff', labelFields: ['code', 'fullName'] },
+  doctorStaffId: { resource: 'staff', labelFields: ['code', 'fullName'], params: { type: 'DOCTOR' }, lookupKey: 'staff-doctor' },
   performerStaffId: { resource: 'staff', labelFields: ['code', 'fullName'] },
   userId: { resource: 'user-accounts', labelFields: ['email', 'fullName'] },
   convertedCustomerId: { resource: 'customers', labelFields: ['code', 'fullName'] },

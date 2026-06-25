@@ -435,7 +435,7 @@ export function ZaloInboxPage() {
         </Space>
       </div>
 
-      <Card className="glass-card zalo-guide-card">
+      {/* <Card className="glass-card zalo-guide-card">
         <div className="zalo-guide-head">
           <div>
             <Typography.Text className="eyebrow">Cách đăng nhập</Typography.Text>
@@ -466,7 +466,7 @@ export function ZaloInboxPage() {
             </div>
           </div>
         </div>
-      </Card>
+      </Card> */}
 
       <div className="zalo-inbox-layout">
         <Card

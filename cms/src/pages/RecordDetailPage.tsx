@@ -6,6 +6,7 @@ import {
   Drawer,
   Empty,
   Popconfirm,
+  Tabs,
   Tooltip,
   message,
   Row,
@@ -169,24 +170,215 @@ export function RecordDetailPage() {
         </Space>
       </div>
 
-      <Row gutter={[18, 18]}>
-        <Col
-          xs={24}
-          xl={resource === "customers" || resource === "staff" ? 15 : 24}
-        >
-          <Card className="glass-card detail-card" loading={loading}>
-            <Typography.Title level={4}>Thông tin chính</Typography.Title>
-            <Row gutter={[16, 16]} className="detail-grid">
-              {fields.map((field) => (
-                <Col key={field.key} span={detailWidthToSpan(field.width)} xs={24}>
-                  <div className="detail-item">
+      <Row gutter={[18, 18]} align="stretch" className="detail-split-row">
+        {/* Left: related tabs */}
+        <Col xs={24} xl={18} className="detail-tabs-col">
+          {(() => {
+            const serviceOrderItemsTab = resource === "service-orders" && Array.isArray(record?.items) && record.items.length > 0
+              ? [{
+                  key: "__service-order-items",
+                  label: "Sản phẩm trong đơn",
+                  children: (
+                    <Table
+                      columns={[
+                        { title: "Sản phẩm", dataIndex: "itemName", key: "itemName" },
+                        { title: "Số lượng", dataIndex: "quantity", key: "quantity", width: 120 },
+                        { title: "Đơn giá", dataIndex: "unitPrice", key: "unitPrice", width: 140 },
+                        { title: "Thành tiền", dataIndex: "lineTotal", key: "lineTotal", width: 160 },
+                      ]}
+                      dataSource={record.items}
+                      pagination={false}
+                      rowKey="id"
+                      scroll={{ x: "max-content" }}
+                      size="small"
+                    />
+                  ),
+                }]
+              : []
+
+            const relatedTabs = related.map((block) => ({
+              key: block.resource,
+              label: (
+                <span>
+                  {block.title}
+                  {block.rows.length > 0 && (
+                    <span className="tab-count">{block.rows.length}</span>
+                  )}
+                </span>
+              ),
+              children: (
+                <div>
+                  {hasActionAccess(block.resource, "create") && (
+                    <div className="related-tab-toolbar">
+                      <Button size="small" type="primary" onClick={() => setQuickCreateBlock(block)}>
+                        Thêm nhanh
+                      </Button>
+                    </div>
+                  )}
+                  <Table
+                    columns={[
+                      ...block.tableFields.map((field) => ({
+                        title: field.label,
+                        dataIndex: field.key,
+                        key: field.key,
+                        width: field.tableWidth,
+                        render: (_: unknown, row: Record<string, any>) =>
+                          <RecordValueView compact field={field} fileLookups={fileLookups} lookups={lookups} value={row[field.key] ?? row.customFields?.[field.key]} />,
+                      })),
+                      {
+                        title: "",
+                        key: "action",
+                        fixed: "right" as const,
+                        width: 140,
+                        render: (_: unknown, row: any) => (
+                          <Space size={2}>
+                            {hasActionAccess(block.resource, "view") && (
+                              <Tooltip title="Xem nhanh">
+                                <Button
+                                  icon={<EyeOutlined />}
+                                  size="small"
+                                  type="text"
+                                  onClick={() => void openRelatedDetail(block, row.id)}
+                                />
+                              </Tooltip>
+                            )}
+                            {hasActionAccess(block.resource, "update") && (
+                              <Tooltip title="Chỉnh sửa">
+                                <Link to={`/${block.resource}/${row.id}/edit`}>
+                                  <Button icon={<EditOutlined />} size="small" type="text" />
+                                </Link>
+                              </Tooltip>
+                            )}
+                            {block.resource === "customers" && hasActionAccess(block.resource, "reveal-phone") && (
+                              <Tooltip title="Xem số điện thoại">
+                                <Button
+                                  icon={<PhoneOutlined />}
+                                  size="small"
+                                  type="text"
+                                  onClick={() => void revealPhone(row.id)}
+                                />
+                              </Tooltip>
+                            )}
+                            {block.resource === "leads" && !row.convertedCustomerId && hasActionAccess(block.resource, "convert-to-customer") && (
+                              <Tooltip title="Chuyển thành khách hàng">
+                                <Button
+                                  icon={<SwapOutlined />}
+                                  size="small"
+                                  type="text"
+                                  onClick={() => void convertRelatedLead(row.id)}
+                                />
+                              </Tooltip>
+                            )}
+                            {block.printTemplateId && hasActionAccess(block.resource, "print") && (
+                              <Tooltip title="In biểu mẫu">
+                                <Button
+                                  icon={<PrinterOutlined />}
+                                  size="small"
+                                  type="text"
+                                  onClick={() => void printRecord(block.printTemplateId!, row.id)}
+                                />
+                              </Tooltip>
+                            )}
+                            {hasActionAccess(block.resource, "delete") && (
+                              <Popconfirm
+                                title="Xóa bản ghi này?"
+                                onConfirm={() =>
+                                  deleteRecord(
+                                    { resource: block.resource, id: row.id },
+                                    {
+                                      onSuccess: () => {
+                                        message.success("Đã xóa")
+                                        if (relatedDetail?.record?.id === row.id) {
+                                          setRelatedDetail(null)
+                                        }
+                                        void reloadRelatedBlocks()
+                                      },
+                                    },
+                                  )
+                                }
+                              >
+                                <Tooltip title="Xóa bản ghi">
+                                  <Button danger icon={<DeleteOutlined />} size="small" type="text" />
+                                </Tooltip>
+                              </Popconfirm>
+                            )}
+                          </Space>
+                        ),
+                      },
+                    ]}
+                    dataSource={block.rows}
+                    pagination={false}
+                    rowKey="id"
+                    scroll={{ x: "max-content" }}
+                    size="small"
+                  />
+                </div>
+              ),
+            }))
+
+            const allTabs = [...relatedTabs, ...serviceOrderItemsTab]
+            if (allTabs.length === 0) {
+              return <Card className="glass-card detail-card" loading={loading}><Empty description="Không có dữ liệu liên kết" /></Card>
+            }
+            return (
+              <Card className="glass-card detail-card detail-tabs-card" loading={loading}>
+                <Tabs items={allTabs} />
+              </Card>
+            )
+          })()}
+        </Col>
+
+        {/* Right: detail info */}
+        <Col xs={24} xl={6}>
+          <div className="detail-right-stack">
+            {(resource === "customers" || resource === "staff") && (
+              <Card className="glass-card detail-card" loading={loading}>
+                <div className="profile-summary">
+                  <div>
+                    <Typography.Text type="secondary">Trạng thái</Typography.Text>
+                    <Tag className="soft-tag">
+                      {record?.status || record?.role || "ACTIVE"}
+                    </Tag>
+                  </div>
+                  {resource === "customers" && (
+                    <>
+                      <div>
+                        <Typography.Text type="secondary">Hạng khách</Typography.Text>
+                        <Typography.Title level={3}>{record?.tier || "MEMBER"}</Typography.Title>
+                      </div>
+                      <div>
+                        <Typography.Text type="secondary">Tổng chi tiêu</Typography.Text>
+                        <Typography.Title level={4}>{formatValue(record?.totalSpent)}</Typography.Title>
+                      </div>
+                    </>
+                  )}
+                  {resource === "staff" && (
+                    <>
+                      <div>
+                        <Typography.Text type="secondary">Chức danh</Typography.Text>
+                        <Typography.Title level={4}>{record?.position || "-"}</Typography.Title>
+                      </div>
+                      <div>
+                        <Typography.Text type="secondary">Chi nhánh mặc định</Typography.Text>
+                        <Typography.Text>
+                          <RecordValueView field="defaultBranchId" fileLookups={fileLookups} lookups={lookups} value={record?.defaultBranchId} />
+                        </Typography.Text>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </Card>
+            )}
+            <Card className="glass-card detail-card" loading={loading}>
+              <Typography.Title level={5} style={{ marginBottom: 16 }}>Thông tin chi tiết</Typography.Title>
+              <div className="detail-grid detail-grid-stacked">
+                {fields.map((field) => (
+                  <div key={field.key} className="detail-item">
                     <div className="detail-item-label">
                       {field.description ? (
                         <Space direction="vertical" size={0}>
                           <span>{field.label}</span>
-                          <Typography.Text type="secondary">
-                            {field.description}
-                          </Typography.Text>
+                          <Typography.Text type="secondary">{field.description}</Typography.Text>
                         </Space>
                       ) : (
                         field.label
@@ -196,201 +388,12 @@ export function RecordDetailPage() {
                       <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={record?.[field.key] ?? record?.customFields?.[field.key]} />
                     </div>
                   </div>
-                </Col>
-              ))}
-            </Row>
-          </Card>
-        </Col>
-        {(resource === "customers" || resource === "staff") && (
-          <Col xs={24} xl={9}>
-            <Card className="glass-card detail-card" loading={loading}>
-              <Typography.Title level={4}>
-                {resource === "customers"
-                  ? "Tổng quan khách hàng"
-                  : "Tổng quan nhân viên"}
-              </Typography.Title>
-              <div className="profile-summary">
-                <div>
-                  <Typography.Text type="secondary">Trạng thái</Typography.Text>
-                  <Tag className="soft-tag">
-                    {record?.status || record?.role || "ACTIVE"}
-                  </Tag>
-                </div>
-                {resource === "customers" && (
-                  <>
-                    <div>
-                      <Typography.Text type="secondary">
-                        Hạng khách
-                      </Typography.Text>
-                      <Typography.Title level={3}>
-                        {record?.tier || "MEMBER"}
-                      </Typography.Title>
-                    </div>
-                    <div>
-                      <Typography.Text type="secondary">
-                        Tổng chi tiêu
-                      </Typography.Text>
-                      <Typography.Title level={4}>
-                        {formatValue(record?.totalSpent)}
-                      </Typography.Title>
-                    </div>
-                  </>
-                )}
-                {resource === "staff" && (
-                  <>
-                    <div>
-                      <Typography.Text type="secondary">
-                        Chức danh
-                      </Typography.Text>
-                      <Typography.Title level={4}>
-                        {record?.position || "-"}
-                      </Typography.Title>
-                    </div>
-                    <div>
-                      <Typography.Text type="secondary">
-                        Chi nhánh mặc định
-                      </Typography.Text>
-                      <Typography.Text>
-                        <RecordValueView field="defaultBranchId" fileLookups={fileLookups} lookups={lookups} value={record?.defaultBranchId} />
-                      </Typography.Text>
-                    </div>
-                  </>
-                )}
+                ))}
               </div>
             </Card>
-          </Col>
-        )}
+          </div>
+        </Col>
       </Row>
-
-      {related.map((block) => (
-        <Card
-          className="glass-card detail-card"
-          key={block.title}
-          title={block.title}
-          extra={
-            hasActionAccess(block.resource, "create") ? (
-              <Button size="small" type="primary" onClick={() => setQuickCreateBlock(block)}>
-                Thêm nhanh
-              </Button>
-            ) : null
-          }
-        >
-          <Table
-            columns={[
-              ...block.tableFields.map((field) => ({
-                title: field.label,
-                dataIndex: field.key,
-                key: field.key,
-                width: field.tableWidth,
-                render: (_: unknown, row: Record<string, any>) =>
-                  <RecordValueView compact field={field} fileLookups={fileLookups} lookups={lookups} value={row[field.key] ?? row.customFields?.[field.key]} />,
-              })),
-              {
-                title: "",
-                key: "action",
-                width: 260,
-                render: (_: unknown, row: any) => (
-                  <Space>
-                    {hasActionAccess(block.resource, "view") && (
-                      <Tooltip title="Xem nhanh">
-                        <Button
-                          icon={<EyeOutlined />}
-                          size="small"
-                          type="text"
-                          onClick={() => void openRelatedDetail(block, row.id)}
-                        />
-                      </Tooltip>
-                    )}
-                    {hasActionAccess(block.resource, "update") && (
-                      <Tooltip title="Chỉnh sửa">
-                        <Link to={`/${block.resource}/${row.id}/edit`}>
-                          <Button icon={<EditOutlined />} size="small" type="text" />
-                        </Link>
-                      </Tooltip>
-                    )}
-                    {block.resource === "customers" && hasActionAccess(block.resource, "reveal-phone") && (
-                      <Tooltip title="Xem số điện thoại">
-                        <Button
-                          icon={<PhoneOutlined />}
-                          size="small"
-                          type="text"
-                          onClick={() => void revealPhone(row.id)}
-                        />
-                      </Tooltip>
-                    )}
-                    {block.resource === "leads" && !row.convertedCustomerId && hasActionAccess(block.resource, "convert-to-customer") && (
-                      <Tooltip title="Chuyển thành khách hàng">
-                        <Button
-                          icon={<SwapOutlined />}
-                          size="small"
-                          type="text"
-                          onClick={() => void convertRelatedLead(row.id)}
-                        />
-                      </Tooltip>
-                    )}
-                    {block.printTemplateId && hasActionAccess(block.resource, "print") && (
-                      <Tooltip title="In biểu mẫu">
-                        <Button
-                          icon={<PrinterOutlined />}
-                          size="small"
-                          type="text"
-                          onClick={() => void printRecord(block.printTemplateId!, row.id)}
-                        />
-                      </Tooltip>
-                    )}
-                    {hasActionAccess(block.resource, "delete") && (
-                      <Popconfirm
-                        title="Xóa bản ghi này?"
-                        onConfirm={() =>
-                          deleteRecord(
-                            { resource: block.resource, id: row.id },
-                            {
-                              onSuccess: () => {
-                                message.success("Đã xóa")
-                                if (relatedDetail?.record?.id === row.id) {
-                                  setRelatedDetail(null)
-                                }
-                                void reloadRelatedBlocks()
-                              },
-                            },
-                          )
-                        }
-                      >
-                        <Tooltip title="Xóa bản ghi">
-                          <Button danger icon={<DeleteOutlined />} size="small" type="text" />
-                        </Tooltip>
-                      </Popconfirm>
-                    )}
-                  </Space>
-                ),
-              },
-            ]}
-            dataSource={block.rows}
-            pagination={false}
-            rowKey="id"
-            scroll={{ x: "max-content" }}
-            size="small"
-          />
-        </Card>
-      ))}
-
-      {resource === "service-orders" && Array.isArray(record?.items) && record.items.length > 0 && (
-        <Card className="glass-card detail-card" title="Sản phẩm trong đơn hàng">
-          <Table
-            columns={[
-              { title: "Sản phẩm", dataIndex: "itemName", key: "itemName" },
-              { title: "Số lượng", dataIndex: "quantity", key: "quantity", width: 120 },
-              { title: "Đơn giá", dataIndex: "unitPrice", key: "unitPrice", width: 140 },
-              { title: "Thành tiền", dataIndex: "lineTotal", key: "lineTotal", width: 160 },
-            ]}
-            dataSource={record.items}
-            pagination={false}
-            rowKey="id"
-            scroll={{ x: "max-content" }}
-            size="small"
-          />
-        </Card>
-      )}
 
       <Drawer
         destroyOnClose
