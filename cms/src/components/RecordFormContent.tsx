@@ -315,7 +315,7 @@ function FieldInput({
         disabled={field.disabled}
         showSearch
         optionFilterProp="label"
-        options={Object.entries(lookups[relation.resource] || {}).map(
+        options={Object.entries(lookups[relation.lookupKey || relation.resource] || {}).map(
           ([v, label]) => ({ value: v, label }),
         )}
         placeholder={field.placeholder || `Chọn ${field.label.toLowerCase()}`}

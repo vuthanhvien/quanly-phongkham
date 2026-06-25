@@ -38,14 +38,16 @@ export async function loadRelationOptions(fields: Array<string | FieldSpec>) {
   const relationSpecs = fields
     .map((field) => resolveRelationSpec(field))
     .filter(Boolean) as RelationSpec[];
-  const uniqueResources = Array.from(new Set(relationSpecs.map((spec) => spec.resource)));
+  const uniqueKeys = Array.from(new Set(relationSpecs.map((spec) => spec.lookupKey || spec.resource)));
   const entries = await Promise.all(
-    uniqueResources.map(async (resource) => {
-      const response = await api.get(`/records/${resource}`, { params: { pageSize: 500 } }).catch(() => ({ data: { data: [] } }));
-      const spec = relationSpecs.find((item) => item.resource === resource)!;
-      if (resource === 'file-folders') {
+    uniqueKeys.map(async (key) => {
+      const spec = relationSpecs.find((item) => (item.lookupKey || item.resource) === key)!;
+      const response = await api
+        .get(`/records/${spec.resource}`, { params: { pageSize: 500, ...spec.params } })
+        .catch(() => ({ data: { data: [] } }));
+      if (spec.resource === 'file-folders') {
         const rows = normalizeFileFolderRows(response.data.data || []);
-        return [resource, buildFolderPathMap(rows)] as const;
+        return [key, buildFolderPathMap(rows)] as const;
       }
       const byId = Object.fromEntries(
         response.data.data.map((row: Record<string, unknown>) => [
@@ -53,7 +55,7 @@ export async function loadRelationOptions(fields: Array<string | FieldSpec>) {
           relationLabel(row, spec),
         ]),
       );
-      return [resource, byId] as const;
+      return [key, byId] as const;
     }),
   );
   return Object.fromEntries(entries) as LookupMap;
@@ -82,7 +84,7 @@ export function displayValue(field: string | FieldSpec, value: unknown, lookups:
     if (relation) return value.map((item) => lookups[relation.resource]?.[String(item)] || String(item)).join(', ');
     return value.join(', ');
   }
-  if (relation) return lookups[relation.resource]?.[String(value)] || String(value);
+  if (relation) return lookups[relation.lookupKey || relation.resource]?.[String(value)] || lookups[relation.resource]?.[String(value)] || String(value);
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
