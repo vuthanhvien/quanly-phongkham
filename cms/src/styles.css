@@ -61,13 +61,12 @@ body::before {
 
 .brand-card {
   align-items: center;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 10%, white), color-mix(in srgb, var(--app-primary) 22%, transparent));
-  border: 1px solid var(--app-line);
-  border-radius: calc(var(--app-radius) + 8px);
+  background: color-mix(in srgb, var(--app-primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--app-primary) 20%, transparent);
+  border-radius: var(--app-radius);
   display: flex;
-  gap: 10px;
-  min-height: 60px;
-  padding: 10px 11px;
+  gap: 8px;
+  padding: 8px 10px;
 }
 
 .brand-copy {
@@ -77,38 +76,39 @@ body::before {
 .brand-card h3,
 .brand-card h4 {
   color: var(--app-text) !important;
-  line-height: 1.1 !important;
+  font-size: 13px !important;
+  line-height: 1.2 !important;
   margin: 0 !important;
 }
 
 .brand-card .ant-typography {
-  font-size: 1.5rem !important;
+  font-size: 13px !important;
 }
 
 .brand-kicker,
 .eyebrow {
   color: var(--app-text-soft) !important;
   display: block;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .brand-mark {
   align-items: center;
   background: linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 54%, white), var(--app-primary) 52%, #d7a45b);
-  border-radius: calc(var(--app-radius) + 2px);
-  box-shadow: 0 14px 30px rgba(232, 137, 174, 0.26);
+  border-radius: calc(var(--app-radius) - 2px);
+  box-shadow: 0 4px 12px rgba(232, 137, 174, 0.2);
   color: #180c12;
   display: flex;
   flex: 0 0 auto;
-  font-weight: 900;
-  font-size: 16px;
-  height: 36px;
+  font-weight: 800;
+  font-size: 13px;
+  height: 30px;
   justify-content: center;
-  letter-spacing: -0.05em;
-  width: 36px;
+  letter-spacing: -0.03em;
+  width: 30px;
 }
 
 .brand-mark img {
