@@ -544,7 +544,6 @@ async function loadRelated(
         title: "Nhật ký chăm lead",
         resource: "lead-activities",
         field: "leadId",
-        columns: ["activityType", "scheduledAt", "ownerStaffId", "status"],
       },
     ]
     return loadBlocks(specs, id, role)
@@ -555,43 +554,36 @@ async function loadRelated(
         title: "Lịch hẹn liên quan",
         resource: "appointments",
         field: "customerId",
-        columns: ["type", "startTime", "status", "doctorName"],
       },
       {
         title: "Hồ sơ bệnh án",
         resource: "medical-episodes",
         field: "customerId",
-        columns: ["serviceName", "doctorName", "status", "operationDate"],
       },
       {
         title: "Liệu trình",
         resource: "treatments",
         field: "customerId",
-        columns: ["name", "totalSessions", "completedSessions", "status"],
       },
       {
         title: "Thăm khám",
         resource: "consultations",
         field: "customerId",
-        columns: ["consultedAt", "consultantStaffId", "doctorStaffId", "status"],
       },
       {
         title: "Đơn hàng / dịch vụ sử dụng",
         resource: "service-orders",
         field: "customerId",
-        columns: ["code", "serviceName", "quantity", "totalAmount", "status"],
       },
       {
         title: "Hình ảnh - chẩn đoán",
         resource: "customer-images",
         field: "customerId",
-        columns: ["mediaType", "title", "capturedAt", "diagnosisNote"],
       },
       {
         title: "Phiếu thu / hóa đơn",
         resource: "invoices",
         field: "customerId",
-        columns: ["code", "totalAmount", "paidAmount", "status"],
       },
     ]
     return loadBlocks(specs, id, role)
@@ -599,22 +591,69 @@ async function loadRelated(
   if (resource === "staff") {
     const specs = [
       {
+        title: "Hợp đồng lao động",
+        resource: "work-contracts",
+        field: "staffId",
+      },
+      {
+        title: "Bảo hiểm",
+        resource: "staff-insurances",
+        field: "staffId",
+      },
+      {
+        title: "Chấm công",
+        resource: "attendances",
+        field: "staffId",
+      },
+      {
+        title: "Nghỉ phép",
+        resource: "leave-requests",
+        field: "staffId",
+      },
+      {
+        title: "Bảng lương",
+        resource: "payrolls",
+        field: "staffId",
+      },
+      {
+        title: "Lịch làm việc",
+        resource: "work-schedules",
+        field: "staffId",
+      },
+      {
+        title: "Khen thưởng & Kỷ luật",
+        resource: "staff-rewards",
+        field: "staffId",
+      },
+      {
+        title: "Đào tạo & Chứng chỉ",
+        resource: "staff-trainings",
+        field: "staffId",
+      },
+      {
+        title: "Đánh giá hiệu suất",
+        resource: "performance-reviews",
+        field: "staffId",
+      },
+      {
+        title: "Lịch sử thăng tiến",
+        resource: "position-histories",
+        field: "staffId",
+      },
+      {
         title: "Quyền theo chi nhánh",
         resource: "branch-role-assignments",
         field: "staffId",
-        columns: ["branchId", "roleName", "roleKeys"],
       },
       {
         title: "Tài khoản đăng nhập",
         resource: "user-accounts",
         field: "staffId",
-        columns: ["email", "role", "branchId", "isActive"],
       },
       {
-        title: "Hoa hồng liên quan",
+        title: "Hoa hồng",
         resource: "commissions",
         field: "staffName",
-        columns: ["invoiceId", "roleType", "amount", "status"],
       },
     ]
     return loadBlocks(specs, id, role)
@@ -627,7 +666,6 @@ async function loadBlocks(
     title: string
     resource: string
     field: string
-    columns: string[]
   }>,
   id: string,
   role: string,
