@@ -95,24 +95,37 @@ export function PayrollsPage() {
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1)
   const [filterYear, setFilterYear] = useState(CURRENT_YEAR)
 
-  useEffect(() => { void load() }, [filterMonth, filterYear])
+  useEffect(() => { void loadStaff() }, [])
+  useEffect(() => { void loadPayrolls() }, [filterMonth, filterYear])
 
-  async function load() {
-    setLoading(true)
+  async function loadStaff() {
     try {
-      const [pr, sr] = await Promise.all([
-        api.get("/records/payrolls", { params: { pageSize: 500, month: filterMonth, year: filterYear } }),
-        api.get("/records/staff", { params: { pageSize: 500 } }),
-      ])
-      setPayrolls(pr.data.data as Payroll[])
+      const sr = await api.get("/records/staff", { params: { pageSize: 500 } })
       setStaffList(sr.data.data.map((r: Record<string, unknown>) => ({
         id: String(r.id),
         fullName: String(r.fullName || r.code),
         code: String(r.code),
       })))
+    } catch {
+      // ignore
+    }
+  }
+
+  async function loadPayrolls() {
+    setLoading(true)
+    try {
+      const pr = await api.get("/records/payrolls", { params: { pageSize: 500 } })
+      const all = pr.data.data as Payroll[]
+      setPayrolls(all.filter((p) => p.month === filterMonth && p.year === filterYear))
+    } catch {
+      setPayrolls([])
     } finally {
       setLoading(false)
     }
+  }
+
+  async function load() {
+    await Promise.all([loadStaff(), loadPayrolls()])
   }
 
   async function runGenerate(values: Record<string, unknown>) {
@@ -286,7 +299,7 @@ export function PayrollsPage() {
               {generating && genProgress ? `Đang tính... (${genProgress.done}/${genProgress.total})` : "Tính lương"}
             </Button>
           </Form>
-        ) : (
+        ) : genResult ? (
           <div>
             <Alert
               type="success"

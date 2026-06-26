@@ -7,6 +7,7 @@ import { FindOptionsWhere, ILike, In, LessThan, MoreThan, QueryFailedError, Repo
 import { AuthUser } from '../common/auth';
 import {
   Appointment,
+  Attendance,
   AuditLog,
   BranchRoleAssignment,
   Branch,
@@ -24,16 +25,24 @@ import {
   Invoice,
   Lead,
   LeadActivity,
+  LeaveRequest,
   MedicalEpisode,
+  Payroll,
+  PerformanceReview,
+  PositionHistory,
   Product,
   ServiceOrder,
   ServiceOrderItem,
   Staff,
+  StaffInsurance,
+  StaffReward,
+  StaffTraining,
   StockBatch,
   Supplier,
   Treatment,
   User,
   ViewSetting,
+  WorkContract,
   WorkSchedule,
 } from '../entities/entities';
 
@@ -94,6 +103,15 @@ export class RecordsService {
     @InjectRepository(CustomFieldValue) private readonly customFieldValues: Repository<CustomFieldValue>,
     @InjectRepository(ViewSetting) private readonly viewSettings: Repository<ViewSetting>,
     @InjectRepository(AuditLog) private readonly auditLogs: Repository<AuditLog>,
+    @InjectRepository(WorkContract) private readonly workContracts: Repository<WorkContract>,
+    @InjectRepository(StaffInsurance) private readonly staffInsurances: Repository<StaffInsurance>,
+    @InjectRepository(Attendance) private readonly attendances: Repository<Attendance>,
+    @InjectRepository(LeaveRequest) private readonly leaveRequests: Repository<LeaveRequest>,
+    @InjectRepository(Payroll) private readonly payrolls: Repository<Payroll>,
+    @InjectRepository(StaffReward) private readonly staffRewards: Repository<StaffReward>,
+    @InjectRepository(StaffTraining) private readonly staffTrainings: Repository<StaffTraining>,
+    @InjectRepository(PerformanceReview) private readonly performanceReviews: Repository<PerformanceReview>,
+    @InjectRepository(PositionHistory) private readonly positionHistories: Repository<PositionHistory>,
   ) {}
 
   private repository(resource: string): ResourceRepository {
@@ -122,6 +140,15 @@ export class RecordsService {
       expenses: this.expenses,
       treatments: this.treatments,
       commissions: this.commissions,
+      'work-contracts': this.workContracts,
+      'staff-insurances': this.staffInsurances,
+      attendances: this.attendances,
+      'leave-requests': this.leaveRequests,
+      payrolls: this.payrolls,
+      'staff-rewards': this.staffRewards,
+      'staff-trainings': this.staffTrainings,
+      'performance-reviews': this.performanceReviews,
+      'position-histories': this.positionHistories,
     };
     const repository = map[resource];
     if (!repository) throw new NotFoundException('Phan he khong ton tai');
