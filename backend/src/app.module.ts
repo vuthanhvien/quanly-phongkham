@@ -10,6 +10,7 @@ import { SeedModule } from './seed/seed.module';
 import { SettingsModule } from './settings/settings.module';
 import { ZaloModule } from './zalo/zalo.module';
 import { CategoriesModule } from './categories/categories.module';
+import { PayrollModule } from './payroll/payroll.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { CategoriesModule } from './categories/categories.module';
     SeedModule,
     ZaloModule,
     CategoriesModule,
+    PayrollModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

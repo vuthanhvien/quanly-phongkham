@@ -72,6 +72,11 @@ const menuIcons: Record<string, React.ReactNode> = {
   commissions: <GiftOutlined />,
   'file-folders': <FolderOpenOutlined />,
   files: <FileDoneOutlined />,
+  attendances: <CalendarOutlined />,
+  'leave-requests': <FileDoneOutlined />,
+  payrolls: <DollarOutlined />,
+  'work-contracts': <SolutionOutlined />,
+  'staff-insurances': <AuditOutlined />,
 }
 
 const menuGroups = [
@@ -85,7 +90,7 @@ const menuGroups = [
     key: "clinical",
     label: "Chuyên môn điều trị",
     icon: <MedicineBoxOutlined />,
-    resources: ["medical-episodes", "consultations", "service-orders", "customer-images", "work-schedules", "treatments"],
+    resources: ["medical-episodes", "consultations", "service-orders", "customer-images", "treatments"],
   },
   {
     key: "inventory",
@@ -103,11 +108,11 @@ const menuGroups = [
     key: "finance",
     label: "Tài chính & lương",
     icon: <DollarOutlined />,
-    resources: ["invoices", "expenses", "commissions"],
+    resources: ["invoices", "expenses", "commissions", "payrolls", "attendances", "leave-requests", "work-schedules", "work-contracts", "staff-insurances"],
   },
   {
     key: "admin",
-    label: "Quản trị hệ thống",
+    label: "Quản trị",
     icon: <SettingOutlined />,
     resources: [
       "branches",

@@ -1145,6 +1145,172 @@ export class ItemCategory {
   updatedAt: Date;
 }
 
+@Entity('work_contracts')
+export class WorkContract extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column({ default: 'full_time' })
+  contractType: string; // full_time | part_time | probation | freelance | seasonal
+
+  @Column({ type: 'date' })
+  startDate: string;
+
+  @Column({ type: 'date', nullable: true })
+  endDate?: string;
+
+  @Column({ type: 'float', default: 0 })
+  baseSalary: number;
+
+  @Column({ nullable: true })
+  position?: string;
+
+  @Column({ type: 'float', default: 8 })
+  workingHoursPerDay: number;
+
+  @Column({ type: 'float', default: 26 })
+  workingDaysPerMonth: number;
+
+  @Column({ default: 'active' })
+  status: string; // draft | active | expired | terminated
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('staff_insurances')
+export class StaffInsurance extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  // BHXH | BHYT | BHTN
+  @Column()
+  insuranceType: string;
+
+  // % trích từ lương nhân viên
+  @Column({ type: 'float', default: 0 })
+  employeeRate: number;
+
+  // % công ty đóng thêm
+  @Column({ type: 'float', default: 0 })
+  employerRate: number;
+
+  // nếu null → dùng baseSalary hợp đồng
+  @Column({ type: 'float', nullable: true })
+  salaryBase?: number;
+
+  @Column({ type: 'date', nullable: true })
+  startDate?: string;
+
+  @Column({ type: 'date', nullable: true })
+  endDate?: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('attendances')
+export class Attendance extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column({ type: 'date' })
+  date: string;
+
+  @Column({ nullable: true })
+  checkIn?: string;
+
+  @Column({ nullable: true })
+  checkOut?: string;
+
+  @Column({ default: 'present' })
+  status: string; // present | absent | late | half_day | holiday
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('leave_requests')
+export class LeaveRequest extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column({ type: 'date' })
+  startDate: string;
+
+  @Column({ type: 'date' })
+  endDate: string;
+
+  @Column({ default: 'annual' })
+  leaveType: string; // annual | sick | personal | unpaid | maternity | other
+
+  @Column({ default: 'pending' })
+  status: string; // pending | approved | rejected | cancelled
+
+  @Column({ type: 'text', nullable: true })
+  reason?: string;
+
+  @Column({ nullable: true })
+  approvedById?: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+}
+
+@Entity('payrolls')
+export class Payroll extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column({ type: 'int' })
+  month: number;
+
+  @Column({ type: 'int' })
+  year: number;
+
+  @Column({ type: 'float', default: 0 })
+  baseSalary: number;
+
+  @Column({ type: 'float', default: 0 })
+  workingDays: number;
+
+  @Column({ type: 'float', default: 0 })
+  actualDays: number;
+
+  @Column({ type: 'float', default: 0 })
+  overtimeHours: number;
+
+  @Column({ type: 'float', default: 0 })
+  bonus: number;
+
+  @Column({ type: 'float', default: 0 })
+  deduction: number;
+
+  @Column({ type: 'float', default: 0 })
+  netSalary: number;
+
+  @Column({ default: 'draft' })
+  status: string; // draft | confirmed | paid
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+}
+
 @Entity('audit_logs')
 export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
@@ -1212,4 +1378,9 @@ export const ENTITIES = [
   ChatbotSetting,
   LandingThemeSetting,
   ItemCategory,
+  WorkContract,
+  StaffInsurance,
+  Attendance,
+  LeaveRequest,
+  Payroll,
 ];

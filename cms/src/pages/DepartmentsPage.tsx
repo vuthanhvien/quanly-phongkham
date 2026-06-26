@@ -251,10 +251,14 @@ export function DepartmentsPage() {
           <Form.Item name="code" label="Mã phòng ban" rules={[{ required: true, message: "Nhập mã" }]}>
             <Input placeholder="VD: PB-001" />
           </Form.Item>
-          <Form.Item name="parentId" label="Thuộc phòng ban (cha)">
+          <Form.Item
+            name="parentId"
+            label="Thuộc phòng ban (cha)"
+            extra="Để trống → phòng ban cấp gốc. Xóa giá trị để đưa lên top."
+          >
             <Select
               allowClear
-              placeholder="— Cấp gốc —"
+              placeholder="— Cấp gốc (không có cha) —"
               options={parentOptions}
               showSearch
               optionFilterProp="label"
