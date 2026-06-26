@@ -1495,11 +1495,24 @@ textarea.ant-input {
   padding: 10px;
 }
 
+.document-tree .ant-tree-treenode {
+  align-items: center;
+}
+
+.document-tree .ant-tree-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+}
+
 .document-tree .ant-tree-node-content-wrapper {
   border-radius: 12px;
   color: #f3d4e1;
   min-height: 34px;
   padding: 5px 10px !important;
+  display: flex;
+  align-items: center;
 }
 
 .document-tree .ant-tree-node-content-wrapper:hover,
@@ -1779,7 +1792,15 @@ textarea.ant-input {
 
 .app-sider.ant-layout-sider-collapsed .brand-card {
   justify-content: center;
-  padding-inline: 0;
+  padding: 6px;
+  gap: 0;
+}
+
+.app-sider.ant-layout-sider-collapsed .brand-mark {
+  width: 44px;
+  height: 44px;
+  font-size: 15px;
+  border-radius: 10px;
 }
 
 .app-sider.ant-layout-sider-collapsed .brand-copy {
@@ -1788,17 +1809,24 @@ textarea.ant-input {
 
 .app-sider.ant-layout-sider-collapsed .side-menu {
   margin-top: 10px;
+  padding-inline: 0;
 }
 
 .app-sider.ant-layout-sider-collapsed .side-menu .ant-menu-item,
 .app-sider.ant-layout-sider-collapsed .side-menu .ant-menu-submenu-title {
-  padding-inline: calc(50% - 17px) !important;
-}
-
-.app-sider.ant-layout-sider-collapsed .side-menu {
-  padding-inline: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 0 !important;
+  width: 100%;
 }
 
 .app-sider.ant-layout-sider-collapsed .side-menu .ant-menu-title-content {
-  margin-inline-start: 0 !important;
+  display: none !important;
+}
+
+.app-sider.ant-layout-sider-collapsed .side-menu .ant-menu-item .anticon,
+.app-sider.ant-layout-sider-collapsed .side-menu .ant-menu-submenu-title .anticon {
+  margin-inline-end: 0 !important;
+  font-size: 18px;
 }

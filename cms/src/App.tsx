@@ -9,7 +9,6 @@ import { authProvider, dataProvider, api } from './api';
 import { Shell } from './components/Shell';
 import { entityLabels } from './models';
 import { AuditPage } from './pages/AuditPage';
-import { BranchRoleAssignmentsPage } from './pages/BranchRoleAssignmentsPage';
 import { CustomFieldsPage } from './pages/CustomFieldsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { FileFoldersPage } from './pages/FileFoldersPage';
@@ -156,7 +155,7 @@ export function App() {
                 <Route path="/chatbot-settings" element={<ChatbotSettingsPage />} />
                 <Route path="/landing-theme" element={<LandingThemePage />} />
                 <Route path="/roles" element={<RolesPage />} />
-                <Route path="/branch-role-assignments" element={<BranchRoleAssignmentsPage />} />
+                <Route path="/branch-role-assignments" element={<Navigate to="/roles" replace />} />
                 <Route path="/ui-settings" element={<UiSettingsPage />} />
               </Route>
               <Route element={<ScreenGuard screen="audit-logs" />}>

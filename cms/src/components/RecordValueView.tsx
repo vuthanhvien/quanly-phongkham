@@ -5,6 +5,7 @@ import {
   FileTextOutlined,
 } from "@ant-design/icons"
 import { Image, Space, Typography } from "antd"
+import { resolveFileUrl } from "../api"
 import { displayValue, FileLookupMap, LookupMap } from "../relations"
 import { FieldSpec } from "../models"
 
@@ -61,9 +62,9 @@ function renderFileValue(value: unknown, lookups: LookupMap, fileLookups: FileLo
   return (
     <div className={`record-media-stack${compact ? " compact" : ""}`}>
       {resolved.map((file) => (
-        <a key={file.id} className="record-media-card" href={file.publicUrl} rel="noreferrer" target="_blank">
+        <a key={file.id} className="record-media-card" href={resolveFileUrl(file.publicUrl)} rel="noreferrer" target="_blank">
           {isImageFile(file) ? (
-            <img alt={file.title} src={file.publicUrl} />
+            <img alt={file.title} src={resolveFileUrl(file.publicUrl)} />
           ) : (
             <div className="record-file-fallback">{renderFileIcon(file, true)}</div>
           )}

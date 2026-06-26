@@ -23,7 +23,7 @@ import {
   message,
 } from "antd"
 import { useEffect, useState } from "react"
-import { api } from "../api"
+import { api, resolveFileUrl } from "../api"
 import { FileUploadPanel } from "./FileUploadPanel"
 import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
 import { loadRelationOptions, LookupMap } from "../relations"
@@ -425,7 +425,7 @@ function FileSelectInput({
       (filesResponse.data.data || []).map((row: Record<string, unknown>) => ({
         value: String(row.id),
         title: String(row.title || row.originalName || row.id),
-        previewUrl: String(row.publicUrl || ""),
+        previewUrl: resolveFileUrl(String(row.publicUrl || "")),
         fileId: String(row.id),
         folderId: row.folderId ? String(row.folderId) : undefined,
         folderLabel: folders[String(row.folderId)],
@@ -719,7 +719,7 @@ function ImageLibrarySelectInput({
       .map((row: Record<string, unknown>) => {
         const title = String(row.title || row.originalName || row.id)
         const folderLabel = folders[String(row.folderId)]
-        const previewUrl = String(row.publicUrl || "")
+        const previewUrl = resolveFileUrl(String(row.publicUrl || ""))
         return {
           value: previewUrl,
           title: `${title}${folderLabel ? ` ${folderLabel}` : ""}`,
@@ -893,7 +893,7 @@ function ImageLibrarySelectInput({
           multiple={false}
           onCancel={() => setOpenUpload(false)}
           onSuccess={(files) => {
-            const uploadedUrl = files[0]?.publicUrl
+            const uploadedUrl = resolveFileUrl(files[0]?.publicUrl)
             void loadOptions()
             if (uploadedUrl) {
               setDraftValue(uploadedUrl)

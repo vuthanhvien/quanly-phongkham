@@ -31,7 +31,7 @@ import {
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { hasActionAccess } from "../access"
-import { api } from "../api"
+import { api, resolveFileUrl } from "../api"
 import { FileUploadPanel } from "../components/FileUploadPanel"
 import { buildFolderPathMap, buildFolderTree, FolderTreeNode, normalizeFileFolderRows, type FileFolderRow } from "../utils/fileFolders"
 
@@ -202,7 +202,7 @@ export function FileFoldersPage() {
               alt={row.title}
               className="document-file-thumb"
               preview={{ mask: "Xem" }}
-              src={row.publicUrl}
+              src={resolveFileUrl(row.publicUrl)}
             />
           ) : (
             <div className="document-file-icon">{renderFileIcon(row)}</div>
@@ -242,7 +242,7 @@ export function FileFoldersPage() {
       render: (_, row) => (
         <Space>
           <Button
-            href={row.publicUrl}
+            href={resolveFileUrl(row.publicUrl)}
             icon={<EyeOutlined />}
             rel="noreferrer"
             target="_blank"
@@ -324,7 +324,6 @@ export function FileFoldersPage() {
             <Space direction="vertical" size={14} style={{ width: "100%" }}>
               <div className="document-files-header">
                 <div>
-                  <Typography.Text className="eyebrow">Folder đang chọn</Typography.Text>
                   <Typography.Title level={3}>{selectedFolder.name}</Typography.Title>
                   <Typography.Text type="secondary">
                     {folderPathMap[selectedFolder.id]}

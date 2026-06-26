@@ -33,6 +33,7 @@ import {
 } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
+import { ImagePickerInput } from '../components/ImagePickerInput'
 import type { LandingBlock, LandingBlockType, LandingFormField, LandingPage } from '../models'
 import { LandingThemeEditor } from './LandingThemePage'
 
@@ -1174,7 +1175,7 @@ export function LandingPagesPage() {
                                 {block.type === 'image' ? (
                                   <>
                                     <Form.Item label="URL ảnh" style={{ marginBottom: 8 }}>
-                                      <Input value={block.url} onChange={(e) => updateBlock(block.id, { url: e.target.value })} placeholder="https://..." />
+                                      <ImagePickerInput value={block.url} onChange={(url) => updateBlock(block.id, { url })} />
                                     </Form.Item>
                                     <Form.Item label="Alt" style={{ marginBottom: 8 }}>
                                       <Input value={block.alt} onChange={(e) => updateBlock(block.id, { alt: e.target.value })} />

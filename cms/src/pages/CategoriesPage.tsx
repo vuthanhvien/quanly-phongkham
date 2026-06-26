@@ -1,10 +1,13 @@
 import {
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   PlusCircleOutlined,
   PlusOutlined,
+  UploadOutlined,
 } from "@ant-design/icons"
 import {
+  Alert,
   Button,
   Card,
   Form,
@@ -16,9 +19,12 @@ import {
   Table,
   Tag,
   Typography,
+  Upload,
   message,
 } from "antd"
+import type { UploadFile } from "antd"
 import { useEffect, useState } from "react"
+import * as XLSX from "xlsx"
 import { api } from "../api"
 
 interface ItemCategory {
@@ -31,6 +37,22 @@ interface ItemCategory {
   sortOrder: number
   isActive: boolean
   children?: ItemCategory[]
+}
+
+interface ImportRow {
+  code?: string
+  name?: string
+  parentCode?: string
+  description?: string
+  sortOrder?: number
+  isActive?: boolean | string | number
+}
+
+interface ImportResult {
+  success: number
+  failed: number
+  results: Array<ItemCategory & { _action: string }>
+  errors: Array<{ rowIndex: number; code?: string; error: string }>
 }
 
 const LEVEL_LABELS: Record<number, string> = { 1: "Ngành", 2: "Nhóm", 3: "Loại" }
@@ -68,6 +90,13 @@ export function CategoriesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<ItemCategory | null>(null)
   const [form] = Form.useForm()
+
+  // Import state
+  const [importModal, setImportModal] = useState(false)
+  const [importRows, setImportRows] = useState<ImportRow[]>([])
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [fileList, setFileList] = useState<UploadFile[]>([])
 
   useEffect(() => {
     void load()
@@ -146,6 +175,56 @@ export function CategoriesPage() {
     })
   }
 
+  function downloadTemplate() {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["code", "name", "parentCode", "description", "sortOrder", "isActive"],
+      ["DA-LIEU", "Da liễu", "", "Nhóm ngành da liễu", "1", "1"],
+      ["DIEU-TRI-MUN", "Điều trị mụn", "DA-LIEU", "Dịch vụ điều trị mụn", "1", "1"],
+      ["CAM-MUN-CAP-DO-1", "Cấm mụn cấp độ 1", "DIEU-TRI-MUN", "", "1", "1"],
+    ])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "categories")
+    XLSX.writeFile(wb, "categories-template.xlsx")
+  }
+
+  function handleFileUpload(file: File) {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const data = new Uint8Array(e.target?.result as ArrayBuffer)
+      const wb = XLSX.read(data, { type: "array" })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json<ImportRow>(ws, { defval: "" })
+      setImportRows(rows)
+      setImportResult(null)
+    }
+    reader.readAsArrayBuffer(file)
+    return false
+  }
+
+  async function runImport() {
+    if (!importRows.length) return
+    setImporting(true)
+    try {
+      const res = await api.post("/product-categories/import", { rows: importRows })
+      setImportResult(res.data as ImportResult)
+      await load()
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        "Import thất bại"
+      void message.error(msg)
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  function closeImport() {
+    setImportModal(false)
+    setImportRows([])
+    setImportResult(null)
+    setFileList([])
+  }
+
   const tree = buildTree(flat)
 
   const parentOptions = flat
@@ -220,15 +299,35 @@ export function CategoriesPage() {
     },
   ]
 
+  const importPreviewColumns = [
+    { title: "code", dataIndex: "code", key: "code", width: 120 },
+    { title: "name", dataIndex: "name", key: "name" },
+    { title: "parentCode", dataIndex: "parentCode", key: "parentCode", width: 120 },
+    { title: "description", dataIndex: "description", key: "description" },
+    { title: "sortOrder", dataIndex: "sortOrder", key: "sortOrder", width: 80 },
+    {
+      title: "isActive",
+      dataIndex: "isActive",
+      key: "isActive",
+      width: 80,
+      render: (v: unknown) => String(v),
+    },
+  ]
+
   return (
     <>
       <div className="page-header">
         <div>
           <Typography.Title level={3}>Ngành / Nhóm / Loại</Typography.Title>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>
-          Thêm ngành
-        </Button>
+        <Space>
+          <Button icon={<UploadOutlined />} onClick={() => setImportModal(true)}>
+            Import
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>
+            Thêm ngành
+          </Button>
+        </Space>
       </div>
 
       <Card className="glass-card">
@@ -249,6 +348,7 @@ export function CategoriesPage() {
         />
       </Card>
 
+      {/* Create / Edit modal */}
       <Modal
         title={editing ? "Chỉnh sửa danh mục" : "Thêm danh mục"}
         open={modalOpen}
@@ -288,6 +388,124 @@ export function CategoriesPage() {
             {editing ? "Cập nhật" : "Thêm danh mục"}
           </Button>
         </Form>
+      </Modal>
+
+      {/* Import modal */}
+      <Modal
+        title="Import Ngành / Nhóm / Loại"
+        open={importModal}
+        onCancel={closeImport}
+        footer={null}
+        width={860}
+      >
+        {!importResult ? (
+          <>
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message='Dùng cột "parentCode" để xác định cha con'
+              description="File cần có cột: code, name, parentCode (để trống nếu là Ngành gốc), description, sortOrder, isActive (1/0). Nếu code đã tồn tại sẽ cập nhật, chưa có thì tạo mới."
+            />
+            <Space style={{ marginBottom: 16 }}>
+              <Button icon={<DownloadOutlined />} onClick={downloadTemplate}>
+                Tải file mẫu
+              </Button>
+            </Space>
+            <Upload
+              accept=".xlsx,.xls,.csv"
+              fileList={fileList}
+              beforeUpload={(file) => {
+                setFileList([file as UploadFile])
+                handleFileUpload(file)
+                return false
+              }}
+              onRemove={() => {
+                setFileList([])
+                setImportRows([])
+              }}
+              maxCount={1}
+            >
+              <Button icon={<UploadOutlined />}>Chọn file Excel / CSV</Button>
+            </Upload>
+
+            {importRows.length > 0 && (
+              <>
+                <Typography.Text type="secondary" style={{ display: "block", margin: "12px 0 8px" }}>
+                  Đọc được {importRows.length} dòng — xem trước:
+                </Typography.Text>
+                <Table
+                  rowKey={(_, i) => String(i)}
+                  dataSource={importRows.slice(0, 20)}
+                  columns={importPreviewColumns}
+                  pagination={false}
+                  size="small"
+                  scroll={{ x: "max-content", y: 260 }}
+                  style={{ marginBottom: 16 }}
+                />
+                {importRows.length > 20 && (
+                  <Typography.Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
+                    ... và {importRows.length - 20} dòng khác
+                  </Typography.Text>
+                )}
+                <Button
+                  type="primary"
+                  className="primary-glow"
+                  loading={importing}
+                  onClick={runImport}
+                >
+                  Xác nhận import {importRows.length} dòng
+                </Button>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <Space style={{ marginBottom: 16 }} size={12}>
+              <Tag color="success" style={{ fontSize: 14, padding: "4px 10px" }}>
+                Thành công: {importResult.success}
+              </Tag>
+              {importResult.failed > 0 && (
+                <Tag color="error" style={{ fontSize: 14, padding: "4px 10px" }}>
+                  Thất bại: {importResult.failed}
+                </Tag>
+              )}
+            </Space>
+
+            {importResult.errors.length > 0 && (
+              <Alert
+                type="error"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message={`${importResult.failed} dòng lỗi`}
+                description={
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {importResult.errors.map((e, i) => (
+                      <li key={i}>
+                        Dòng {e.rowIndex}{e.code ? ` (code: ${e.code})` : ""}: {e.error}
+                      </li>
+                    ))}
+                  </ul>
+                }
+              />
+            )}
+
+            <Space>
+              <Button type="primary" onClick={closeImport}>
+                Đóng
+              </Button>
+              <Button
+                onClick={() => {
+                  setImportResult(null)
+                  setImportRows([])
+                  setFileList([])
+                }}
+              >
+                Import thêm
+              </Button>
+            </Space>
+          </>
+        )}
       </Modal>
     </>
   )

@@ -4,6 +4,16 @@ import axios from 'axios';
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 export const api = axios.create({ baseURL: API_URL });
 
+// Resolves a relative backend path (e.g. /uploads/...) to an absolute URL.
+// publicUrl values stored in DB are root-relative; the backend serves them
+// on the same host as the API but without the /api prefix.
+export function resolveFileUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('//')) return url;
+  const backendOrigin = API_URL.replace(/\/api\/?$/, '');
+  return backendOrigin + (url.startsWith('/') ? url : `/${url}`);
+}
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('clinic-token');
   if (token) config.headers.Authorization = `Bearer ${token}`;

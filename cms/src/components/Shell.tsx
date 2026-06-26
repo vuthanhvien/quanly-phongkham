@@ -174,12 +174,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               {
                 key: "/roles",
                 icon: menuIcons.roles,
-                label: <Link to="/roles">Vai trò</Link>,
-              },
-              {
-                key: "/branch-role-assignments",
-                icon: menuIcons["branch-role-assignments"],
-                label: <Link to="/branch-role-assignments">Role theo chi nhánh</Link>,
+                label: <Link to="/roles">Vai trò & Phân quyền</Link>,
               },
             ]
           : []),
@@ -246,7 +241,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     (location.pathname.startsWith("/zalo-inbox")
       ? "front-office"
       : undefined) ||
-    (location.pathname === "/roles" || location.pathname === "/branch-role-assignments"
+    (location.pathname === "/roles"
       ? "admin"
       : undefined),
     location.pathname.startsWith("/settings") ||
