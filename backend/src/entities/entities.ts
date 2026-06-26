@@ -109,6 +109,12 @@ export class Department extends ConfigurableEntity {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
+  @Column({ nullable: true })
+  parentId?: string;
+
+  @Column({ default: 0 })
+  sortOrder: number;
+
   @Column({ default: true })
   isActive: boolean;
 }

@@ -2,13 +2,12 @@ import {
   DeleteOutlined,
   EditOutlined,
   PlusOutlined,
-  SearchOutlined,
-  UserOutlined,
+  UserAddOutlined,
 } from "@ant-design/icons"
 import {
   Button,
-  Card,
   Checkbox,
+  Empty,
   Flex,
   Form,
   Input,
@@ -16,9 +15,7 @@ import {
   Popconfirm,
   Select,
   Space,
-  Table,
   Tag,
-  Tabs,
   Typography,
   message,
 } from "antd"
@@ -34,9 +31,8 @@ interface RoleFormValues {
 }
 
 interface AssignmentFormValues {
-  userId: string
+  userIds: string[]
   branchId: string
-  roleKeys: string[]
   isActive: boolean
 }
 
@@ -55,29 +51,20 @@ const ROLE_MAIN_LABEL: Record<string, string> = {
 export function RolesPage() {
   const [roles, setRoles] = useState<DynamicRole[]>([])
   const [assignments, setAssignments] = useState<BranchRoleAssignment[]>([])
-  const [userOptions, setUserOptions] = useState<Array<{ value: string; label: string }>>([])
+  const [userOptions, setUserOptions] = useState<Array<{ value: string; label: string; email?: string; role?: string }>>([])
   const [branchOptions, setBranchOptions] = useState<Array<{ value: string; label: string }>>([])
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState("roles")
+  const [selectedRoleKey, setSelectedRoleKey] = useState<string | null>(null)
 
-  // Role modal
   const [roleModal, setRoleModal] = useState(false)
   const [editingRole, setEditingRole] = useState<DynamicRole | null>(null)
   const [roleForm] = Form.useForm<RoleFormValues>()
 
-  // Assignment modal
   const [assignModal, setAssignModal] = useState(false)
   const [editingAssign, setEditingAssign] = useState<BranchRoleAssignment | null>(null)
   const [assignForm] = Form.useForm<AssignmentFormValues>()
 
-  // Filters
-  const [assignSearch, setAssignSearch] = useState("")
-  const [filterBranch, setFilterBranch] = useState<string | null>(null)
-  const [filterRole, setFilterRole] = useState<string | null>(null)
-
-  useEffect(() => {
-    void load()
-  }, [])
+  useEffect(() => { void load() }, [])
 
   async function load() {
     setLoading(true)
@@ -88,26 +75,32 @@ export function RolesPage() {
         api.get("/records/user-accounts", { params: { pageSize: 200 } }),
         api.get("/records/branches", { params: { pageSize: 200 } }),
       ])
-      setRoles(rolesRes.data.data)
+      const nextRoles: DynamicRole[] = rolesRes.data.data
+      setRoles(nextRoles)
       setAssignments(assignRes.data.data)
       setUserOptions(
-        usersRes.data.data.map((row: Record<string, unknown>) => ({
-          value: String(row.id),
-          label: `${row.fullName || row.email}`,
+        usersRes.data.data.map((r: Record<string, unknown>) => ({
+          value: String(r.id),
+          label: String(r.fullName || r.email),
+          email: String(r.email || ""),
+          role: String(r.role || ""),
         })),
       )
       setBranchOptions(
-        branchesRes.data.data.map((row: Record<string, unknown>) => ({
-          value: String(row.id),
-          label: String(row.name || row.slug),
+        branchesRes.data.data.map((r: Record<string, unknown>) => ({
+          value: String(r.id),
+          label: String(r.name || r.slug),
         })),
+      )
+      setSelectedRoleKey((prev) =>
+        prev && nextRoles.some((r) => r.key === prev) ? prev : (nextRoles[0]?.key ?? null),
       )
     } finally {
       setLoading(false)
     }
   }
 
-  // ── Roles CRUD ──────────────────────────────────────────
+  // ── Roles ────────────────────────────────────────────────
 
   function openCreateRole() {
     setEditingRole(null)
@@ -116,7 +109,8 @@ export function RolesPage() {
     setRoleModal(true)
   }
 
-  function openEditRole(role: DynamicRole) {
+  function openEditRole(role: DynamicRole, e: React.MouseEvent) {
+    e.stopPropagation()
     setEditingRole(role)
     roleForm.setFieldsValue(role)
     setRoleModal(true)
@@ -136,34 +130,63 @@ export function RolesPage() {
     await load()
   }
 
-  async function deleteRole(id: string) {
-    await api.delete(`/settings/dynamic-roles/${id}`)
+  async function deleteRole(role: DynamicRole, e?: React.MouseEvent) {
+    e?.stopPropagation()
+    await api.delete(`/settings/dynamic-roles/${role.id}`)
     void message.success("Đã xóa vai trò")
     await load()
   }
 
-  // ── Assignments CRUD ─────────────────────────────────────
+  // ── Assignments ──────────────────────────────────────────
 
   function openCreateAssign() {
     setEditingAssign(null)
     assignForm.resetFields()
-    assignForm.setFieldsValue({ userId: undefined as unknown as string, branchId: undefined as unknown as string, roleKeys: [], isActive: true })
+    assignForm.setFieldsValue({ userIds: [], branchId: undefined as unknown as string, isActive: true })
     setAssignModal(true)
   }
 
-  function openEditAssign(a: BranchRoleAssignment) {
+  function openEditAssign(a: BranchRoleAssignment, e: React.MouseEvent) {
+    e.stopPropagation()
     setEditingAssign(a)
-    assignForm.setFieldsValue(a)
+    assignForm.setFieldsValue({ userIds: [a.userId], branchId: a.branchId, isActive: a.isActive })
     setAssignModal(true)
   }
 
   async function saveAssign(values: AssignmentFormValues) {
+    if (!selectedRoleKey) return
+
     if (editingAssign) {
-      await api.patch(`/settings/branch-role-assignments/${editingAssign.id}`, values)
-      void message.success("Đã cập nhật phân quyền")
+      // Edit mode: single record, keep original roleKeys + ensure selectedRoleKey included
+      const roleKeys = Array.from(new Set([...editingAssign.roleKeys, selectedRoleKey]))
+      await api.patch(`/settings/branch-role-assignments/${editingAssign.id}`, {
+        userId: values.userIds[0],
+        branchId: values.branchId,
+        roleKeys,
+        isActive: values.isActive,
+      })
+      void message.success("Đã cập nhật")
     } else {
-      await api.post("/settings/branch-role-assignments", values)
-      void message.success("Đã thêm phân quyền")
+      // Create mode: upsert for each selected user
+      await Promise.all(
+        values.userIds.map(async (userId) => {
+          const existing = assignments.find(
+            (a) => a.userId === userId && a.branchId === values.branchId,
+          )
+          if (existing) {
+            const newKeys = Array.from(new Set([...existing.roleKeys, selectedRoleKey]))
+            await api.patch(`/settings/branch-role-assignments/${existing.id}`, { roleKeys: newKeys, isActive: values.isActive })
+          } else {
+            await api.post("/settings/branch-role-assignments", {
+              userId,
+              branchId: values.branchId,
+              roleKeys: [selectedRoleKey],
+              isActive: values.isActive,
+            })
+          }
+        }),
+      )
+      void message.success(`Đã thêm ${values.userIds.length} người vào vai trò`)
     }
     setAssignModal(false)
     setEditingAssign(null)
@@ -171,230 +194,318 @@ export function RolesPage() {
     await load()
   }
 
-  async function deleteAssign(id: string) {
-    await api.delete(`/settings/branch-role-assignments/${id}`)
-    void message.success("Đã xóa phân quyền")
+  async function removeRoleFromAssign(assign: BranchRoleAssignment, e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!selectedRoleKey) return
+    const newKeys = assign.roleKeys.filter((k) => k !== selectedRoleKey)
+    if (newKeys.length === 0) {
+      await api.delete(`/settings/branch-role-assignments/${assign.id}`)
+    } else {
+      await api.patch(`/settings/branch-role-assignments/${assign.id}`, { roleKeys: newKeys })
+    }
+    void message.success("Đã xóa")
     await load()
   }
 
-  // ── Derived data ─────────────────────────────────────────
+  // ── Derived ──────────────────────────────────────────────
 
   const userMap = useMemo(
-    () => Object.fromEntries(userOptions.map((o) => [o.value, o.label])),
+    () => Object.fromEntries(userOptions.map((o) => [o.value, o])),
     [userOptions],
   )
   const branchMap = useMemo(
     () => Object.fromEntries(branchOptions.map((o) => [o.value, o.label])),
     [branchOptions],
   )
-  const roleMap = useMemo(
-    () => Object.fromEntries(roles.map((r) => [r.key, r])),
-    [roles],
+
+  const selectedRole = roles.find((r) => r.key === selectedRoleKey) ?? null
+
+  // Only users whose account.role matches the selected role's roleMain (ADMIN users can have any role)
+  const compatibleUserOptions = useMemo(() => {
+    if (!selectedRole) return userOptions
+    return userOptions.filter((u) => u.role === "ADMIN" || u.role === selectedRole.roleMain)
+  }, [userOptions, selectedRole])
+
+  // Assignments that include this role, grouped by branch
+  const roleAssignments = useMemo(
+    () => assignments.filter((a) => (a.roleKeys || []).includes(selectedRoleKey ?? "")),
+    [assignments, selectedRoleKey],
   )
 
-  const filteredAssignments = useMemo(() => {
-    return assignments.filter((a) => {
-      if (filterBranch && a.branchId !== filterBranch) return false
-      if (filterRole && !(a.roleKeys || []).includes(filterRole)) return false
-      if (assignSearch) {
-        const q = assignSearch.toLowerCase()
-        const userName = (userMap[a.userId] || "").toLowerCase()
-        const branchName = (branchMap[a.branchId] || "").toLowerCase()
-        if (!userName.includes(q) && !branchName.includes(q)) return false
-      }
-      return true
+  const byBranch = useMemo(() => {
+    const map = new Map<string, BranchRoleAssignment[]>()
+    roleAssignments.forEach((a) => {
+      const list = map.get(a.branchId) ?? []
+      list.push(a)
+      map.set(a.branchId, list)
     })
-  }, [assignments, filterBranch, filterRole, assignSearch, userMap, branchMap])
-
-  // ── Render ────────────────────────────────────────────────
-
-  const rolesTab = (
-    <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      <Flex justify="flex-end">
-        <Button icon={<PlusOutlined />} type="primary" className="primary-glow" onClick={openCreateRole}>
-          Thêm vai trò
-        </Button>
-      </Flex>
-      <Table
-        loading={loading}
-        size="small"
-        pagination={false}
-        rowKey="id"
-        dataSource={roles}
-        scroll={{ x: "max-content" }}
-        columns={[
-          {
-            title: "Tên vai trò",
-            dataIndex: "name",
-            render: (name: string, row: DynamicRole) => (
-              <Space>
-                <Typography.Text strong>{name}</Typography.Text>
-                <code style={{ fontSize: 11, opacity: 0.7 }}>{row.key}</code>
-              </Space>
-            ),
-          },
-          {
-            title: "Loại",
-            dataIndex: "roleMain",
-            width: 140,
-            render: (v: string) => (
-              <Tag color={ROLE_MAIN_COLOR[v] || "default"}>
-                {ROLE_MAIN_LABEL[v] || v}
-              </Tag>
-            ),
-          },
-          {
-            title: "Trạng thái",
-            dataIndex: "isActive",
-            width: 100,
-            render: (v: boolean) => (
-              <Tag color={v ? "success" : "default"}>{v ? "Bật" : "Tắt"}</Tag>
-            ),
-          },
-          {
-            title: "",
-            key: "actions",
-            width: 80,
-            render: (_: unknown, row: DynamicRole) => (
-              <Space size={0}>
-                <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEditRole(row)} />
-                <Popconfirm title={`Xóa vai trò "${row.name}"?`} okType="danger" okText="Xóa" cancelText="Hủy" onConfirm={() => void deleteRole(row.id)}>
-                  <Button type="link" size="small" danger icon={<DeleteOutlined />} />
-                </Popconfirm>
-              </Space>
-            ),
-          },
-        ]}
-      />
-    </Space>
-  )
-
-  const assignTab = (
-    <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      <Flex gap={8} wrap="wrap" justify="space-between">
-        <Space wrap>
-          <Input
-            prefix={<SearchOutlined />}
-            placeholder="Tìm theo tên user / chi nhánh..."
-            value={assignSearch}
-            onChange={(e) => setAssignSearch(e.target.value)}
-            allowClear
-            style={{ width: 240 }}
-          />
-          <Select
-            allowClear
-            placeholder="Lọc theo chi nhánh"
-            options={branchOptions}
-            value={filterBranch}
-            onChange={(v) => setFilterBranch(v ?? null)}
-            showSearch
-            optionFilterProp="label"
-            style={{ width: 200 }}
-          />
-          <Select
-            allowClear
-            placeholder="Lọc theo vai trò"
-            options={roles.map((r) => ({ value: r.key, label: r.name }))}
-            value={filterRole}
-            onChange={(v) => setFilterRole(v ?? null)}
-            style={{ width: 180 }}
-          />
-        </Space>
-        <Button icon={<PlusOutlined />} type="primary" className="primary-glow" onClick={openCreateAssign}>
-          Thêm phân quyền
-        </Button>
-      </Flex>
-      <Table
-        loading={loading}
-        size="small"
-        pagination={{ pageSize: 20, showSizeChanger: true }}
-        rowKey="id"
-        dataSource={filteredAssignments}
-        scroll={{ x: "max-content" }}
-        columns={[
-          {
-            title: "Người dùng",
-            dataIndex: "userId",
-            render: (v: string) => (
-              <Space>
-                <UserOutlined style={{ opacity: 0.5 }} />
-                <Typography.Text>{userMap[v] || v}</Typography.Text>
-              </Space>
-            ),
-          },
-          {
-            title: "Chi nhánh",
-            dataIndex: "branchId",
-            render: (v: string) => branchMap[v] || v,
-          },
-          {
-            title: "Vai trò",
-            dataIndex: "roleKeys",
-            render: (keys: string[]) => (
-              <Space size={4} wrap>
-                {(keys || []).map((key) => {
-                  const role = roleMap[key]
-                  return (
-                    <Tag key={key} color={role ? ROLE_MAIN_COLOR[role.roleMain] : "default"}>
-                      {role?.name || key}
-                    </Tag>
-                  )
-                })}
-              </Space>
-            ),
-          },
-          {
-            title: "Trạng thái",
-            dataIndex: "isActive",
-            width: 100,
-            render: (v: boolean) => (
-              <Tag color={v ? "success" : "default"}>{v ? "Bật" : "Tắt"}</Tag>
-            ),
-          },
-          {
-            title: "",
-            key: "actions",
-            width: 80,
-            render: (_: unknown, row: BranchRoleAssignment) => (
-              <Space size={0}>
-                <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEditAssign(row)} />
-                <Popconfirm title="Xóa phân quyền này?" okType="danger" okText="Xóa" cancelText="Hủy" onConfirm={() => void deleteAssign(row.id)}>
-                  <Button type="link" size="small" danger icon={<DeleteOutlined />} />
-                </Popconfirm>
-              </Space>
-            ),
-          },
-        ]}
-      />
-    </Space>
-  )
+    return map
+  }, [roleAssignments])
 
   return (
     <>
       <div className="page-header">
-        <div>
-          <Typography.Title level={3}>Vai trò & Phân quyền</Typography.Title>
-        </div>
+        <Typography.Title level={3} style={{ margin: 0 }}>Vai trò & Phân quyền</Typography.Title>
       </div>
 
-      <Card className="glass-card">
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={[
-            {
-              key: "roles",
-              label: `Vai trò (${roles.length})`,
-              children: rolesTab,
-            },
-            {
-              key: "assignments",
-              label: `Phân quyền chi nhánh (${assignments.length})`,
-              children: assignTab,
-            },
-          ]}
-        />
-      </Card>
+      <div style={{ display: "flex", gap: 16, height: "calc(100vh - 120px)", minHeight: 0 }}>
+
+        {/* ── Left: role list ───────────────────────── */}
+        <div style={{ width: 260, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          <Flex justify="space-between" align="center">
+            <Typography.Text strong>Vai trò</Typography.Text>
+            <Button size="small" icon={<PlusOutlined />} onClick={openCreateRole}>Thêm</Button>
+          </Flex>
+
+          <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+            {roles.map((role) => {
+              const count = assignments.filter((a) => (a.roleKeys || []).includes(role.key)).length
+              const active = role.key === selectedRoleKey
+              return (
+                <div
+                  key={role.key}
+                  onClick={() => setSelectedRoleKey(role.key)}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    cursor: "pointer",
+                    border: `1px solid ${active ? "var(--app-primary)" : "rgba(255,255,255,0.08)"}`,
+                    background: active
+                      ? "color-mix(in srgb, var(--app-primary) 12%, transparent)"
+                      : "rgba(255,255,255,0.03)",
+                    transition: "all .15s",
+                  }}
+                >
+                  <Flex justify="space-between" align="flex-start">
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <Flex align="center" gap={6} style={{ marginBottom: 4 }}>
+                        <Tag
+                          color={ROLE_MAIN_COLOR[role.roleMain] || "default"}
+                          style={{ margin: 0, fontSize: 10, padding: "0 5px" }}
+                        >
+                          {ROLE_MAIN_LABEL[role.roleMain] || role.roleMain}
+                        </Tag>
+                        {!role.isActive && <Tag style={{ margin: 0, fontSize: 10 }}>Tắt</Tag>}
+                      </Flex>
+                      <Typography.Text strong style={{ fontSize: 13, display: "block" }}>
+                        {role.name}
+                      </Typography.Text>
+                      <Flex align="center" gap={6} style={{ marginTop: 2 }}>
+                        <code style={{ fontSize: 10, opacity: 0.5 }}>{role.key}</code>
+                        {count > 0 && (
+                          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                            · {count} phân quyền
+                          </Typography.Text>
+                        )}
+                      </Flex>
+                    </div>
+                    <Space size={0} onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<EditOutlined style={{ fontSize: 12 }} />}
+                        onClick={(e) => openEditRole(role, e)}
+                      />
+                      <Popconfirm
+                        title={`Xóa "${role.name}"?`}
+                        okType="danger"
+                        okText="Xóa"
+                        cancelText="Hủy"
+                        onConfirm={() => void deleteRole(role)}
+                        onPopupClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          type="text"
+                          size="small"
+                          danger
+                          icon={<DeleteOutlined style={{ fontSize: 12 }} />}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </Popconfirm>
+                    </Space>
+                  </Flex>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* ── Right: assignments for selected role ─── */}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+          {!selectedRole ? (
+            <div style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 12,
+            }}>
+              <Empty description="Chọn một vai trò bên trái" />
+            </div>
+          ) : (
+            <>
+              {/* Role info header */}
+              <div style={{
+                padding: "14px 18px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "rgba(255,255,255,0.03)",
+              }}>
+                <Flex align="center" justify="space-between">
+                  <Flex align="center" gap={10}>
+                    <Tag color={ROLE_MAIN_COLOR[selectedRole.roleMain] || "default"} style={{ fontSize: 12 }}>
+                      {ROLE_MAIN_LABEL[selectedRole.roleMain] || selectedRole.roleMain}
+                    </Tag>
+                    <Typography.Title level={4} style={{ margin: 0 }}>{selectedRole.name}</Typography.Title>
+                    <code style={{ fontSize: 12, opacity: 0.5 }}>{selectedRole.key}</code>
+                    <Tag color={selectedRole.isActive ? "success" : "default"}>
+                      {selectedRole.isActive ? "Bật" : "Tắt"}
+                    </Tag>
+                  </Flex>
+                  <Button
+                    type="primary"
+                    className="primary-glow"
+                    icon={<UserAddOutlined />}
+                    onClick={openCreateAssign}
+                    loading={loading}
+                  >
+                    Thêm phân quyền
+                  </Button>
+                </Flex>
+              </div>
+
+              {/* Assignments grouped by branch */}
+              <div style={{ flex: 1, overflowY: "auto" }}>
+                {byBranch.size === 0 ? (
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    height: 200,
+                    border: "1px dashed rgba(255,255,255,0.12)",
+                    borderRadius: 12,
+                    gap: 12,
+                  }}>
+                    <Empty description={`Chưa có ai được gán vai trò "${selectedRole.name}"`} />
+                    <Button icon={<UserAddOutlined />} onClick={openCreateAssign}>Thêm phân quyền</Button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {Array.from(byBranch.entries()).map(([branchId, assignList]) => (
+                      <div
+                        key={branchId}
+                        style={{
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          borderRadius: 12,
+                          overflow: "hidden",
+                        }}
+                      >
+                        {/* Branch header */}
+                        <div style={{
+                          padding: "8px 14px",
+                          background: "rgba(255,255,255,0.04)",
+                          borderBottom: "1px solid rgba(255,255,255,0.06)",
+                        }}>
+                          <Flex align="center" gap={8}>
+                            <Typography.Text strong style={{ fontSize: 13 }}>
+                              {branchMap[branchId] || branchId}
+                            </Typography.Text>
+                            <Tag style={{ fontSize: 11 }}>{assignList.length} người</Tag>
+                          </Flex>
+                        </div>
+
+                        {/* Users in this branch */}
+                        {assignList.map((assign) => {
+                          const user = userMap[assign.userId]
+                          const otherRoles = (assign.roleKeys || []).filter((k) => k !== selectedRoleKey)
+                          return (
+                            <div
+                              key={assign.id}
+                              style={{
+                                padding: "10px 14px",
+                                borderBottom: "1px solid rgba(255,255,255,0.04)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 12,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: "50%",
+                                  background: "color-mix(in srgb, var(--app-primary) 20%, transparent)",
+                                  border: "1px solid color-mix(in srgb, var(--app-primary) 30%, transparent)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 13,
+                                  fontWeight: 700,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {(user?.label?.[0] || "?").toUpperCase()}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <Typography.Text strong style={{ display: "block", fontSize: 13 }}>
+                                  {user?.label || assign.userId}
+                                </Typography.Text>
+                                {otherRoles.length > 0 && (
+                                  <Flex gap={4} style={{ marginTop: 3 }}>
+                                    <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                                      Cũng có:
+                                    </Typography.Text>
+                                    {otherRoles.map((k) => {
+                                      const r = roles.find((ro) => ro.key === k)
+                                      return (
+                                        <Tag key={k} style={{ fontSize: 10, padding: "0 4px", margin: 0 }}
+                                          color={r ? ROLE_MAIN_COLOR[r.roleMain] : "default"}>
+                                          {r?.name || k}
+                                        </Tag>
+                                      )
+                                    })}
+                                  </Flex>
+                                )}
+                              </div>
+                              <Tag color={assign.isActive ? "success" : "default"} style={{ flexShrink: 0 }}>
+                                {assign.isActive ? "Bật" : "Tắt"}
+                              </Tag>
+                              <Space size={0}>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<EditOutlined style={{ fontSize: 12 }} />}
+                                  onClick={(e) => openEditAssign(assign, e)}
+                                />
+                                <Popconfirm
+                                  title="Xóa phân quyền này?"
+                                  okType="danger"
+                                  okText="Xóa"
+                                  cancelText="Hủy"
+                                  onConfirm={() => void removeRoleFromAssign(assign, { stopPropagation: () => {} } as React.MouseEvent)}
+                                >
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    danger
+                                    icon={<DeleteOutlined style={{ fontSize: 12 }} />}
+                                  />
+                                </Popconfirm>
+                              </Space>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Role Modal */}
       <Modal
@@ -405,7 +516,7 @@ export function RolesPage() {
         onCancel={() => { setRoleModal(false); setEditingRole(null) }}
       >
         <Form form={roleForm} layout="vertical" onFinish={saveRole}>
-          <Form.Item name="name" label="Tên vai trò" rules={[{ required: true, message: "Nhập tên vai trò" }]}>
+          <Form.Item name="name" label="Tên vai trò" rules={[{ required: true, message: "Nhập tên" }]}>
             <Input placeholder="VD: Lễ tân, Bác sĩ điều trị..." />
           </Form.Item>
           <Form.Item name="key" label="Key (mã định danh)" rules={[{ required: true, message: "Nhập key" }]}>
@@ -425,41 +536,36 @@ export function RolesPage() {
 
       {/* Assignment Modal */}
       <Modal
-        title={editingAssign ? "Cập nhật phân quyền" : "Thêm phân quyền chi nhánh"}
+        title={
+          editingAssign
+            ? "Cập nhật phân quyền"
+            : `Thêm người vào vai trò "${selectedRole?.name}"`
+        }
         open={assignModal}
         footer={null}
         maskClosable={false}
         onCancel={() => { setAssignModal(false); setEditingAssign(null) }}
       >
         <Form form={assignForm} layout="vertical" onFinish={saveAssign}>
-          <Form.Item name="userId" label="Người dùng" rules={[{ required: true, message: "Chọn người dùng" }]}>
+          <Form.Item name="userIds" label="Người dùng" rules={[{ required: true, type: "array", min: 1, message: "Chọn ít nhất 1 người" }]}>
             <Select
-              options={userOptions}
+              mode="multiple"
+              options={compatibleUserOptions}
               showSearch
               optionFilterProp="label"
-              placeholder="Tìm theo tên hoặc email..."
+              placeholder="Tìm và chọn nhiều tài khoản..."
+              maxTagCount="responsive"
+              disabled={Boolean(editingAssign)}
             />
           </Form.Item>
           <Form.Item name="branchId" label="Chi nhánh" rules={[{ required: true, message: "Chọn chi nhánh" }]}>
             <Select options={branchOptions} showSearch optionFilterProp="label" placeholder="Chọn chi nhánh..." />
           </Form.Item>
-          <Form.Item name="roleKeys" label="Vai trò" rules={[{ required: true, message: "Chọn ít nhất 1 vai trò" }]}>
-            <Select
-              mode="multiple"
-              placeholder="Chọn vai trò..."
-              options={roles
-                .filter((r) => r.isActive)
-                .map((r) => ({
-                  value: r.key,
-                  label: `${r.name} (${ROLE_MAIN_LABEL[r.roleMain] || r.roleMain})`,
-                }))}
-            />
-          </Form.Item>
           <Form.Item name="isActive" valuePropName="checked" initialValue>
             <Checkbox>Đang hoạt động</Checkbox>
           </Form.Item>
           <Button className="primary-glow" htmlType="submit" type="primary">
-            {editingAssign ? "Cập nhật" : "Lưu phân quyền"}
+            {editingAssign ? "Cập nhật" : "Thêm"}
           </Button>
         </Form>
       </Modal>
