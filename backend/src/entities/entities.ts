@@ -1046,6 +1046,99 @@ export class CustomFieldValue {
   updatedAt: Date;
 }
 
+@Entity('chatbot_settings')
+export class ChatbotSetting {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ default: 'default' })
+  settingKey: string;
+
+  @Column({ type: 'text', nullable: true })
+  systemPrompt?: string;
+
+  @Column({ type: 'text', nullable: true })
+  apiKey?: string;
+
+  @Column({ default: 'claude-sonnet-4-6' })
+  model: string;
+
+  @Column({ default: true })
+  toolSearchServices: boolean;
+
+  @Column({ default: true })
+  toolCreateAppointment: boolean;
+
+  @Column({ default: true })
+  toolCheckDoctorSchedule: boolean;
+
+  @Column({ default: true })
+  toolLookupAppointments: boolean;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
+@Entity('landing_theme_settings')
+export class LandingThemeSetting {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ default: 'default' })
+  settingKey: string;
+
+  @Column({ default: 'warm-classic' })
+  themeKey: string;
+
+  @Column({ nullable: true })
+  accent?: string;
+
+  @Column({ nullable: true })
+  fontFamily?: string;
+
+  @Column({ type: 'int', nullable: true })
+  borderRadius?: number;
+
+  @Column({ type: 'text', nullable: true })
+  customCss?: string;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
+@Entity('item_categories')
+export class ItemCategory {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  name: string;
+
+  @Column({ nullable: true })
+  code?: string;
+
+  @Column({ nullable: true })
+  description?: string;
+
+  @Column({ nullable: true })
+  parentId?: string;
+
+  @Column({ default: 1 })
+  level: number;
+
+  @Column({ default: 0 })
+  sortOrder: number;
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
 @Entity('audit_logs')
 export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
@@ -1110,4 +1203,7 @@ export const ENTITIES = [
   AppUiSetting,
   LandingFormSubmission,
   AuditLog,
+  ChatbotSetting,
+  LandingThemeSetting,
+  ItemCategory,
 ];

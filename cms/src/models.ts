@@ -1,9 +1,24 @@
+export type SelectOption = string | { value: string; label: string };
+
+export function normalizeSelectOption(opt: SelectOption): { value: string; label: string } {
+  return typeof opt === 'string' ? { value: opt, label: opt } : opt;
+}
+
+export function getFieldLabel(resource: string, fieldKey: string, value: string): string {
+  const fields = (baseFields as Record<string, FieldSpec[]>)[resource] || [];
+  const field = fields.find((f) => f.key === fieldKey);
+  if (!field?.options) return value;
+  const opt = field.options.find((o) => (typeof o === 'string' ? o : o.value) === value);
+  if (!opt) return value;
+  return typeof opt === 'string' ? opt : opt.label;
+}
+
 export interface FieldSpec {
   key: string;
   label: string;
   type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative' | 'file';
   required?: boolean;
-  options?: string[];
+  options?: SelectOption[];
   defaultValue?: unknown;
   width?: '25' | '33' | '50' | '66' | '100';
   tableWidth?: number;
@@ -114,6 +129,12 @@ export interface ResourceActionOption {
 
 export const systemRoleOptions = ['ADMIN', 'STAFF', 'DOCTOR'];
 
+export const systemRoleSelectOptions: Array<{ value: string; label: string }> = [
+  { value: 'ADMIN', label: 'Quản trị viên' },
+  { value: 'STAFF', label: 'Nhân viên' },
+  { value: 'DOCTOR', label: 'Bác sĩ' },
+];
+
 const DEFAULT_RESOURCE_ACTIONS: ResourceActionOption[] = [
   { key: 'view', label: 'Xem chi tiết' },
   { key: 'create', label: 'Tạo mới' },
@@ -146,6 +167,7 @@ export const entityLabels: Record<string, string> = {
   'customer-images': 'Hình ảnh - chẩn đoán',
   suppliers: 'Nhà cung cấp',
   products: 'Hàng hóa / vật tư',
+  'product-categories': 'Ngành / Nhóm / Loại',
   'stock-batches': 'Tồn kho / lô hàng',
   treatments: 'Liệu trình',
   invoices: 'Phiếu thu / hóa đơn',
@@ -219,7 +241,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'departmentId', label: 'Phòng ban', width: '50', tableWidth: 200 },
     { key: 'defaultBranchId', label: 'Chi nhánh mặc định', width: '50', tableWidth: 200 },
     { key: 'userId', label: 'Tài khoản đăng nhập', width: '50', tableWidth: 220 },
-    { key: 'status', label: 'Trạng thái', type: 'select', options: ['ACTIVE', 'INACTIVE', 'ON_LEAVE'], width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'ACTIVE', label: 'Đang làm' }, { value: 'INACTIVE', label: 'Ngừng' }, { value: 'ON_LEAVE', label: 'Nghỉ phép' }], width: '33', tableWidth: 140 },
     { key: 'joinedAt', label: 'Ngày vào làm', type: 'date', width: '33', tableWidth: 150 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
@@ -237,7 +259,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'email', label: 'Email đăng nhập', required: true, width: '66', tableWidth: 240 },
     { key: 'password', label: 'Mật khẩu mới', width: '50', tableWidth: 180 },
     { key: 'fullName', label: 'Tên hiển thị', required: true, width: '66', tableWidth: 220 },
-    { key: 'role', label: 'Vai trò hệ thống', type: 'select', options: systemRoleOptions, required: true, width: '33', tableWidth: 140 },
+    { key: 'role', label: 'Vai trò hệ thống', type: 'select', options: systemRoleSelectOptions, required: true, width: '33', tableWidth: 140 },
     { key: 'branchId', label: 'Chi nhánh mặc định', width: '50', tableWidth: 200 },
     { key: 'staffId', label: 'Nhân viên', width: '50', tableWidth: 220 },
   ],
@@ -246,10 +268,10 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'fullName', label: 'Họ tên', required: true, width: '66', tableWidth: 220 },
     { key: 'phone', label: 'Điện thoại', required: true, width: '33', tableWidth: 170 },
     { key: 'email', label: 'Email', width: '50', tableWidth: 220 },
-    { key: 'gender', label: 'Giới tính', type: 'select', options: ['NAM', 'NỮ', 'KHÁC'], width: '33', tableWidth: 120 },
+    { key: 'gender', label: 'Giới tính', type: 'select', options: [{ value: 'NAM', label: 'Nam' }, { value: 'NỮ', label: 'Nữ' }, { value: 'KHÁC', label: 'Khác' }], width: '33', tableWidth: 120 },
     { key: 'idNumber', label: 'CCCD', width: '50', tableWidth: 180 },
     { key: 'address', label: 'Địa chỉ', width: '100', tableWidth: 300 },
-    { key: 'status', label: 'Trạng thái', type: 'select', options: ['CONSULTING', 'WAITING_SURGERY', 'IN_TREATMENT', 'COMPLETED', 'INACTIVE'], width: '33', tableWidth: 160 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'CONSULTING', label: 'Đang tư vấn' }, { value: 'WAITING_SURGERY', label: 'Chờ phẫu thuật' }, { value: 'IN_TREATMENT', label: 'Đang điều trị' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'INACTIVE', label: 'Ngừng hoạt động' }], width: '33', tableWidth: 160 },
     { key: 'totalSpent', label: 'Tổng chi tiêu', type: 'number', width: '33', tableWidth: 160 },
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
@@ -260,7 +282,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'phone', label: 'Điện thoại', required: true, width: '33', tableWidth: 170 },
     { key: 'email', label: 'Email', width: '50', tableWidth: 220 },
     { key: 'source', label: 'Nguồn lead', width: '50', tableWidth: 180 },
-    { key: 'status', label: 'Trạng thái', type: 'select', options: ['NEW', 'CONTACTING', 'QUALIFIED', 'CONVERTED', 'LOST'], width: '33', tableWidth: 150 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'NEW', label: 'Mới' }, { value: 'CONTACTING', label: 'Đang liên hệ' }, { value: 'QUALIFIED', label: 'Tiềm năng' }, { value: 'CONVERTED', label: 'Đã chuyển đổi' }, { value: 'LOST', label: 'Mất' }], width: '33', tableWidth: 150 },
     { key: 'assignedStaffId', label: 'Nhân viên phụ trách', width: '50', tableWidth: 220 },
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
     { key: 'convertedCustomerId', label: 'Khách hàng đã chuyển đổi', disabled: true, width: '66', tableWidth: 240 },
@@ -269,10 +291,10 @@ export const baseFields: Record<string, FieldSpec[]> = {
   'lead-activities': [
     { key: 'leadId', label: 'Lead', required: true, width: '50', tableWidth: 220 },
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
-    { key: 'activityType', label: 'Loại hoạt động', type: 'select', options: ['CALL', 'MESSAGE', 'MEETING', 'FOLLOW_UP'], width: '33', tableWidth: 150 },
+    { key: 'activityType', label: 'Loại hoạt động', type: 'select', options: [{ value: 'CALL', label: 'Cuộc gọi' }, { value: 'MESSAGE', label: 'Tin nhắn' }, { value: 'MEETING', label: 'Gặp mặt' }, { value: 'FOLLOW_UP', label: 'Theo dõi' }], width: '33', tableWidth: 150 },
     { key: 'scheduledAt', label: 'Thời gian', type: 'datetime', width: '50', tableWidth: 190 },
     { key: 'ownerStaffId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
-    { key: 'status', label: 'Trạng thái', type: 'select', options: ['OPEN', 'DONE', 'CANCELLED'], width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'OPEN', label: 'Đang mở' }, { value: 'DONE', label: 'Hoàn thành' }, { value: 'CANCELLED', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'content', label: 'Nội dung', type: 'textarea', required: true, width: '100', tableWidth: 320 },
   ],
   suppliers: [
@@ -288,7 +310,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'code', label: 'Mã SP', required: true, width: '33', tableWidth: 130 },
     { key: 'name', label: 'Tên sản phẩm', required: true, width: '66', tableWidth: 240 },
     { key: 'barcode', label: 'Mã vạch', width: '50', tableWidth: 180 },
-    { key: 'productType', label: 'Loại', type: 'select', options: ['CONSUMABLE', 'REUSABLE', 'RETAIL', 'SERVICE'], width: '33', tableWidth: 150 },
+    { key: 'productType', label: 'Loại', type: 'select', options: [{ value: 'CONSUMABLE', label: 'Vật tư tiêu hao' }, { value: 'REUSABLE', label: 'Thiết bị tái dùng' }, { value: 'RETAIL', label: 'Sản phẩm bán lẻ' }, { value: 'SERVICE', label: 'Dịch vụ' }, { value: 'COMBO', label: 'Combo / Gói dịch vụ' }], width: '33', tableWidth: 150 },
     { key: 'category', label: 'Ngành / nhóm / loại', width: '50', tableWidth: 180 },
     { key: 'purchaseUnit', label: 'Đơn vị nhập', width: '33', tableWidth: 140 },
     { key: 'usageUnit', label: 'Đơn vị xuất', width: '33', tableWidth: 140 },
@@ -301,7 +323,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
     { key: 'serviceName', label: 'Dịch vụ', required: true, width: '66', tableWidth: 240 },
     { key: 'doctorName', label: 'Bác sĩ', width: '50', tableWidth: 180 },
-    { key: 'status', label: 'Trạng thái', type: 'select', options: ['ACTIVE', 'COMPLETED', 'CANCELLED'], width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'ACTIVE', label: 'Đang điều trị' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'CANCELLED', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'chiefComplaint', label: 'Bệnh sử', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'allergyWarning', label: 'Cảnh báo dị ứng', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'diagnosis', label: 'Chẩn đoán', type: 'textarea', width: '100', tableWidth: 320 },
@@ -310,13 +332,13 @@ export const baseFields: Record<string, FieldSpec[]> = {
   appointments: [
     { key: 'customerId', label: 'Khách hàng', required: true, width: '50', tableWidth: 220 },
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
-    { key: 'type', label: 'Loại hẹn', type: 'select', options: ['CONSULTATION', 'SURGERY', 'FOLLOWUP', 'TREATMENT'], width: '33', tableWidth: 150 },
+    { key: 'type', label: 'Loại hẹn', type: 'select', options: [{ value: 'CONSULTATION', label: 'Tư vấn' }, { value: 'SURGERY', label: 'Phẫu thuật' }, { value: 'FOLLOWUP', label: 'Tái khám' }, { value: 'TREATMENT', label: 'Điều trị' }], width: '33', tableWidth: 150 },
     { key: 'startTime', label: 'Bắt đầu', type: 'datetime', required: true, width: '50', tableWidth: 190 },
     { key: 'endTime', label: 'Kết thúc', type: 'datetime', required: true, width: '50', tableWidth: 190 },
     { key: 'doctorName', label: 'Bác sĩ', width: '50', tableWidth: 180 },
     { key: 'room', label: 'Phòng', width: '33', tableWidth: 130 },
     { key: 'equipment', label: 'Máy móc', width: '50', tableWidth: 180 },
-    { key: 'status', label: 'Trạng thái', type: 'select', options: ['SCHEDULED', 'WAITING', 'IN_PROGRESS', 'COMPLETED', 'NO_SHOW'], width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'SCHEDULED', label: 'Đã đặt lịch' }, { value: 'WAITING', label: 'Đang chờ' }, { value: 'IN_PROGRESS', label: 'Đang thực hiện' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'NO_SHOW', label: 'Không đến' }], width: '33', tableWidth: 140 },
   ],
   'work-schedules': [
     { key: 'staffId', label: 'Nhân sự', required: true, width: '50', tableWidth: 220 },
@@ -326,7 +348,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'startTime', label: 'Bắt đầu', type: 'datetime', width: '50', tableWidth: 190 },
     { key: 'endTime', label: 'Kết thúc', type: 'datetime', width: '50', tableWidth: 190 },
     { key: 'room', label: 'Phòng', width: '33', tableWidth: 130 },
-    { key: 'status', label: 'Trạng thái', type: 'select', options: ['PLANNED', 'CONFIRMED', 'OFF'], width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'PLANNED', label: 'Dự kiến' }, { value: 'CONFIRMED', label: 'Đã xác nhận' }, { value: 'OFF', label: 'Nghỉ' }], width: '33', tableWidth: 140 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   consultations: [
@@ -335,7 +357,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'consultedAt', label: 'Thời gian thăm khám', type: 'datetime', required: true, width: '50', tableWidth: 190 },
     { key: 'consultantStaffId', label: 'TVV phụ trách', width: '50', tableWidth: 220 },
     { key: 'doctorStaffId', label: 'Bác sĩ phụ trách', width: '50', tableWidth: 220 },
-    { key: 'status', label: 'Trạng thái', type: 'select', options: ['OPEN', 'COMPLETED', 'FOLLOW_UP'], width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'OPEN', label: 'Đang mở' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'FOLLOW_UP', label: 'Cần theo dõi' }], width: '33', tableWidth: 140 },
     { key: 'summary', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'diagnosis', label: 'Chẩn đoán', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'nextAction', label: 'Hướng xử lý tiếp', type: 'textarea', width: '100', tableWidth: 320 },
@@ -350,13 +372,13 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'unitPrice', label: 'Đơn giá', type: 'number', width: '33', tableWidth: 140 },
     { key: 'totalAmount', label: 'Thành tiền', type: 'number', disabled: true, width: '33', tableWidth: 150 },
     { key: 'performerStaffId', label: 'Nhân sự thực hiện', width: '50', tableWidth: 220 },
-    { key: 'status', label: 'Trạng thái', type: 'select', options: ['DRAFT', 'CONFIRMED', 'COMPLETED', 'CANCELLED'], width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'DRAFT', label: 'Nháp' }, { value: 'CONFIRMED', label: 'Đã xác nhận' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'CANCELLED', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   'customer-images': [
     { key: 'customerId', label: 'Khách hàng', required: true, width: '50', tableWidth: 220 },
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
-    { key: 'mediaType', label: 'Loại', type: 'select', options: ['BEFORE', 'AFTER', 'PROGRESS', 'DIAGNOSIS'], width: '33', tableWidth: 150 },
+    { key: 'mediaType', label: 'Loại', type: 'select', options: [{ value: 'BEFORE', label: 'Trước điều trị' }, { value: 'AFTER', label: 'Sau điều trị' }, { value: 'PROGRESS', label: 'Tiến trình' }, { value: 'DIAGNOSIS', label: 'Chẩn đoán' }], width: '33', tableWidth: 150 },
     { key: 'title', label: 'Tiêu đề', width: '66', tableWidth: 220 },
     { key: 'imageUrl', label: 'Link hình ảnh', required: true, width: '100', tableWidth: 320 },
     { key: 'capturedAt', label: 'Thời gian chụp', type: 'datetime', width: '50', tableWidth: 190 },
@@ -378,7 +400,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'totalSessions', label: 'Số buổi', type: 'number', width: '33', tableWidth: 140 },
     { key: 'completedSessions', label: 'Đã hoàn thành', type: 'number', width: '33', tableWidth: 150 },
     { key: 'intervalDays', label: 'Khoảng cách ngày', type: 'number', width: '33', tableWidth: 150 },
-    { key: 'status', label: 'Trạng thái', type: 'select', options: ['ACTIVE', 'COMPLETED', 'CANCELLED'], width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'ACTIVE', label: 'Đang hoạt động' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'CANCELLED', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
   ],
   invoices: [
     { key: 'code', label: 'Mã phiếu thu', required: true, width: '33', tableWidth: 130 },
@@ -386,8 +408,8 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
     { key: 'totalAmount', label: 'Tổng tiền', type: 'number', required: true, width: '33', tableWidth: 150 },
     { key: 'paidAmount', label: 'Đã thu', type: 'number', width: '33', tableWidth: 150 },
-    { key: 'method', label: 'Thanh toán', type: 'select', options: ['CASH', 'TRANSFER', 'CARD'], width: '33', tableWidth: 140 },
-    { key: 'status', label: 'Trạng thái', type: 'select', options: ['UNPAID', 'PARTIAL', 'PAID'], width: '33', tableWidth: 140 },
+    { key: 'method', label: 'Thanh toán', type: 'select', options: [{ value: 'CASH', label: 'Tiền mặt' }, { value: 'TRANSFER', label: 'Chuyển khoản' }, { value: 'CARD', label: 'Thẻ' }], width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'UNPAID', label: 'Chưa thanh toán' }, { value: 'PARTIAL', label: 'Thanh toán một phần' }, { value: 'PAID', label: 'Đã thanh toán' }], width: '33', tableWidth: 140 },
   ],
   expenses: [
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
@@ -401,6 +423,6 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'invoiceId', label: 'Hóa đơn', required: true, width: '50', tableWidth: 220 },
     { key: 'roleType', label: 'Vai trò', required: true, width: '33', tableWidth: 150 },
     { key: 'amount', label: 'Hoa hồng', type: 'number', required: true, width: '33', tableWidth: 150 },
-    { key: 'status', label: 'Trạng thái', type: 'select', options: ['PENDING', 'PAID'], width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'PENDING', label: 'Chờ xử lý' }, { value: 'PAID', label: 'Đã thanh toán' }], width: '33', tableWidth: 140 },
   ],
 };

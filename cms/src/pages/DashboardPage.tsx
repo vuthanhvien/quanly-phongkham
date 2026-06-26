@@ -22,6 +22,7 @@ import type {
   QuickStat,
 } from "../components/dashboard/types"
 import { EMPTY_LIST, formatCompactCurrency, formatCurrency, formatEventTime, isSameDay, parseAmount } from "../components/dashboard/utils"
+import { getFieldLabel } from "../models"
 import { loadRelationOptions, type LookupMap } from "../relations"
 
 async function fetchList<T>(resource: string, pageSize = 10000) {
@@ -187,11 +188,11 @@ function buildEvents(
     (item: Record<string, any>) => ({
       id: item.id,
       type: "appointment" as const,
-      title: `${item.type || "Lịch hẹn"} - ${relationLookups.customers?.[item.customerId] || item.customerId || "Khách hàng"}`,
+      title: `${getFieldLabel("appointments", "type", item.type) || "Lịch hẹn"} - ${relationLookups.customers?.[item.customerId] || item.customerId || "Khách hàng"}`,
       start: String(item.startTime || item.createdAt || ""),
       end: item.endTime ? String(item.endTime) : undefined,
       tone: "magenta",
-      meta: [item.status, item.doctorName, item.room].filter(Boolean).join(" | "),
+      meta: [item.status ? getFieldLabel("appointments", "status", String(item.status)) : null, item.doctorName, item.room].filter(Boolean).join(" | "),
     }),
   )
 
@@ -203,7 +204,7 @@ function buildEvents(
       start: String(item.startTime || item.workDate || item.createdAt || ""),
       end: item.endTime ? String(item.endTime) : undefined,
       tone: "cyan",
-      meta: [item.status, item.room, item.note].filter(Boolean).join(" | "),
+      meta: [item.status ? getFieldLabel("work-schedules", "status", String(item.status)) : null, item.room, item.note].filter(Boolean).join(" | "),
     }),
   )
 
@@ -334,8 +335,8 @@ function buildRecentActivities(
       .slice(0, 3)
       .map((item) => ({
         id: `appointment-${item.id}`,
-        title: `${item.type || "Lịch hẹn"} - ${relationLookups.customers?.[item.customerId] || item.customerId || "Khách hàng"}`,
-        meta: [formatEventTime(String(item.startTime || ""), item.endTime), item.status, item.room].filter(Boolean).join(" | "),
+        title: `${getFieldLabel("appointments", "type", item.type) || "Lịch hẹn"} - ${relationLookups.customers?.[item.customerId] || item.customerId || "Khách hàng"}`,
+        meta: [formatEventTime(String(item.startTime || ""), item.endTime), item.status ? getFieldLabel("appointments", "status", String(item.status)) : null, item.room].filter(Boolean).join(" | "),
         tone: "magenta",
       })),
     ...invoiceRows
@@ -344,7 +345,7 @@ function buildRecentActivities(
       .map((item) => ({
         id: `invoice-${item.id}`,
         title: `Hóa đơn ${item.code || item.id}`,
-        meta: `${formatCurrency(parseAmount(item.totalAmount))} đ | ${item.status || "UNPAID"}`,
+        meta: `${formatCurrency(parseAmount(item.totalAmount))} đ | ${getFieldLabel("invoices", "status", String(item.status || "UNPAID"))}`,
         tone: "cyan",
       })),
   ].slice(0, 6)

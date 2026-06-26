@@ -286,7 +286,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
             <Select allowClear options={staffOptions} optionFilterProp="label" placeholder="Chọn nhân sự" showSearch />
           </Form.Item>
           <Form.Item label="Trạng thái" name="status" rules={[{ required: true, message: "Chọn trạng thái" }]}>
-            <Select options={["DRAFT", "CONFIRMED", "COMPLETED", "CANCELLED"].map((item) => ({ value: item, label: item }))} />
+            <Select options={[{ value: 'DRAFT', label: 'Nháp' }, { value: 'CONFIRMED', label: 'Đã xác nhận' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'CANCELLED', label: 'Đã hủy' }]} />
           </Form.Item>
         </div>
 

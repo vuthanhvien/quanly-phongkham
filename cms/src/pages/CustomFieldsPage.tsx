@@ -8,14 +8,14 @@ import { api } from "../api"
 import { CustomField, entityLabels } from "../models"
 
 const CUSTOM_FIELD_TYPES = [
-  "text",
-  "number",
-  "date",
-  "boolean",
-  "select",
-  "textarea",
-  "relative",
-  "file",
+  { value: "text", label: "Văn bản (text)" },
+  { value: "number", label: "Số (number)" },
+  { value: "date", label: "Ngày tháng (date)" },
+  { value: "boolean", label: "Bật/tắt (boolean)" },
+  { value: "select", label: "Danh sách chọn (select)" },
+  { value: "textarea", label: "Đoạn văn bản (textarea)" },
+  { value: "relative", label: "Liên kết bản ghi (relative)" },
+  { value: "file", label: "Tệp đính kèm (file)" },
 ]
 
 const RELATIVE_RESOURCE_OPTIONS = Object.entries(entityLabels).map(
@@ -301,10 +301,7 @@ export function CustomFieldsPage() {
           </Form.Item>
           <Form.Item name="dataType" label="Kiểu" initialValue="text">
             <Select
-              options={CUSTOM_FIELD_TYPES.map((value) => ({
-                value,
-                label: value,
-              }))}
+              options={CUSTOM_FIELD_TYPES}
             />
           </Form.Item>
           {currentFieldType === "select" && (
@@ -582,7 +579,7 @@ function buildBatchColumns(
       render: (_, row) => (
         <Select
           value={row.dataType}
-          options={CUSTOM_FIELD_TYPES.map((value) => ({ value, label: value }))}
+          options={CUSTOM_FIELD_TYPES}
           onChange={(value) =>
             setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, dataType: value, relationResource: value === "relative" ? item.relationResource : undefined, options: value === "select" ? item.options : "" } : item))
           }

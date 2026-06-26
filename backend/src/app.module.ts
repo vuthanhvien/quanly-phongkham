@@ -9,6 +9,7 @@ import { RecordsModule } from './records/records.module';
 import { SeedModule } from './seed/seed.module';
 import { SettingsModule } from './settings/settings.module';
 import { ZaloModule } from './zalo/zalo.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ZaloModule } from './zalo/zalo.module';
     SettingsModule,
     SeedModule,
     ZaloModule,
+    CategoriesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

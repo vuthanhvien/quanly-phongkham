@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, Request } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, Request, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthUser, Public } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, LandingPage, PrintTemplate } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, DynamicRoleDefinition, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
 import { SettingsService } from './settings.service';
 
 @Controller('settings')
@@ -111,6 +112,31 @@ export class SettingsController {
     return { data: await this.settings.updateAppUiSettings(payload, request?.user) };
   }
 
+  @Get('chatbot')
+  async getChatbotSettings(@Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.getChatbotSettings(request?.user) };
+  }
+
+  @Put('chatbot')
+  async updateChatbotSettings(@Body() payload: Partial<ChatbotSetting>, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.updateChatbotSettings(payload, request?.user) };
+  }
+
+  @Get('landing-theme')
+  async getLandingTheme(@Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.getLandingThemeSettings(request?.user) };
+  }
+
+  @Put('landing-theme')
+  async updateLandingTheme(@Body() payload: Partial<LandingThemeSetting>, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.updateLandingThemeSettings(payload, request?.user) };
+  }
+
+  @Get('landing-theme/presets')
+  async getLandingThemePresets() {
+    return { data: await this.settings.getLandingThemePresets() };
+  }
+
   @Post('landing-pages')
   async createLandingPage(@Body() payload: Partial<LandingPage>, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.createLandingPage(payload, request?.user) };
@@ -140,6 +166,20 @@ export class SettingsController {
   @Header('Content-Type', 'text/html; charset=utf-8')
   render(@Param('id') id: string, @Param('recordId') recordId: string) {
     return this.settings.renderTemplate(id, recordId);
+  }
+}
+
+@Controller('public/landing-theme')
+export class PublicLandingThemeController {
+  constructor(private readonly settings: SettingsService) {}
+
+  @Public()
+  @Get('style.css')
+  async getThemeCss(@Res() res: Response) {
+    const css = await this.settings.getLandingThemeCss();
+    res.setHeader('Content-Type', 'text/css; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=120, stale-while-revalidate=300');
+    res.send(css);
   }
 }
 

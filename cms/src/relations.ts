@@ -79,6 +79,17 @@ export async function loadFileLookupMap(pageSize = 500) {
 
 export function displayValue(field: string | FieldSpec, value: unknown, lookups: LookupMap) {
   if (value === null || value === undefined || value === '') return '-';
+
+  // Resolve label from select options when available
+  if (typeof field !== 'string' && (field.type === 'select' || field.type === 'multi-select') && field.options?.length) {
+    const optionMap = new Map(
+      field.options.map((opt) => (typeof opt === 'string' ? [opt, opt] : [opt.value, opt.label])),
+    );
+    if (Array.isArray(value)) return value.map((item) => optionMap.get(String(item)) ?? String(item)).join(', ');
+    const label = optionMap.get(String(value));
+    if (label !== undefined) return label;
+  }
+
   const relation = resolveRelationSpec(field);
   if (Array.isArray(value)) {
     if (relation) return value.map((item) => lookups[relation.resource]?.[String(item)] || String(item)).join(', ');

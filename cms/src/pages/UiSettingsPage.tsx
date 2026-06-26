@@ -40,7 +40,7 @@ export function UiSettingsPage() {
     <Space direction="vertical" size={20} style={{ width: '100%' }}>
       <Flex align="start" justify="space-between" gap={16} wrap>
         <div>
-          <Typography.Title level={2} style={{ marginBottom: 4 }}>
+          <Typography.Title level={3} style={{ marginBottom: 4 }}>
             UI settings
           </Typography.Title>
           <Typography.Paragraph style={{ margin: 0 }}>

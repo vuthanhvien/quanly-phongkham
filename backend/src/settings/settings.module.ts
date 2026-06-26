@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AppUiSetting, BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, LandingFormSubmission, LandingPage, PrintTemplate, User, ViewSetting } from '../entities/entities';
+import { Appointment, AppUiSetting, BranchRoleAssignment, ChatbotSetting, Customer, CustomFieldDefinition, DynamicRoleDefinition, LandingFormSubmission, LandingPage, LandingThemeSetting, PrintTemplate, Treatment, User, ViewSetting, WorkSchedule } from '../entities/entities';
 import { RecordsModule } from '../records/records.module';
-import { PublicLandingPagesController, SettingsController } from './settings.controller';
+import { ChatbotController } from './chatbot.controller';
+import { PublicLandingPagesController, PublicLandingThemeController, SettingsController } from './settings.controller';
 import { SettingsService } from './settings.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CustomFieldDefinition, ViewSetting, PrintTemplate, DynamicRoleDefinition, User, BranchRoleAssignment, LandingPage, LandingFormSubmission, AppUiSetting]), RecordsModule],
-  controllers: [SettingsController, PublicLandingPagesController],
+  imports: [TypeOrmModule.forFeature([CustomFieldDefinition, ViewSetting, PrintTemplate, DynamicRoleDefinition, User, BranchRoleAssignment, LandingPage, LandingFormSubmission, AppUiSetting, ChatbotSetting, LandingThemeSetting, Treatment, Appointment, WorkSchedule, Customer]), RecordsModule],
+  controllers: [SettingsController, PublicLandingPagesController, PublicLandingThemeController, ChatbotController],
   providers: [SettingsService],
 })
 export class SettingsModule {}

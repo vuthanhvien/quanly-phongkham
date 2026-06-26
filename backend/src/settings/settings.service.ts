@@ -4,7 +4,8 @@ import { randomUUID } from 'crypto';
 import Handlebars from 'handlebars';
 import { IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, CustomFieldDefinition, DynamicRoleDefinition, LandingFormSubmission, LandingPage, PrintTemplate, User, ViewSetting } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, DynamicRoleDefinition, LandingFormSubmission, LandingPage, LandingThemeSetting, PrintTemplate, User, ViewSetting } from '../entities/entities';
+import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
 
 const DEFAULT_ROLE_SCOPE = 'ALL';
@@ -55,9 +56,11 @@ export class SettingsService {
     @InjectRepository(LandingPage) private readonly landingPages: Repository<LandingPage>,
     @InjectRepository(LandingFormSubmission) private readonly landingFormSubmissions: Repository<LandingFormSubmission>,
     @InjectRepository(AppUiSetting) private readonly appUiSettings: Repository<AppUiSetting>,
+    @InjectRepository(ChatbotSetting) private readonly chatbotSettings: Repository<ChatbotSetting>,
     @InjectRepository(DynamicRoleDefinition) private readonly roles: Repository<DynamicRoleDefinition>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(BranchRoleAssignment) private readonly branchRoles: Repository<BranchRoleAssignment>,
+    @InjectRepository(LandingThemeSetting) private readonly landingThemeSettings: Repository<LandingThemeSetting>,
     private readonly records: RecordsService,
   ) {}
 
@@ -154,6 +157,91 @@ export class SettingsService {
     const current = await this.ensureAppUiSettings();
     const next = this.appUiSettings.merge(current, this.normalizeAppUiPayload(payload, current));
     return this.appUiSettings.save(next);
+  }
+
+  async getChatbotSettings(user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    return this.ensureChatbotSettings();
+  }
+
+  async updateChatbotSettings(payload: Partial<ChatbotSetting>, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const current = await this.ensureChatbotSettings();
+    const next = this.chatbotSettings.merge(current, {
+      systemPrompt: payload.systemPrompt !== undefined ? String(payload.systemPrompt || '').trim() || undefined : current.systemPrompt,
+      apiKey: payload.apiKey !== undefined ? String(payload.apiKey || '').trim() || undefined : current.apiKey,
+      model: payload.model ? String(payload.model).trim() : current.model,
+      toolSearchServices: payload.toolSearchServices !== undefined ? Boolean(payload.toolSearchServices) : current.toolSearchServices,
+      toolCreateAppointment: payload.toolCreateAppointment !== undefined ? Boolean(payload.toolCreateAppointment) : current.toolCreateAppointment,
+      toolCheckDoctorSchedule: payload.toolCheckDoctorSchedule !== undefined ? Boolean(payload.toolCheckDoctorSchedule) : current.toolCheckDoctorSchedule,
+      toolLookupAppointments: payload.toolLookupAppointments !== undefined ? Boolean(payload.toolLookupAppointments) : current.toolLookupAppointments,
+    });
+    return this.chatbotSettings.save(next);
+  }
+
+  async getChatbotPublicConfig() {
+    const config = await this.ensureChatbotSettings();
+    return {
+      enabled: Boolean(config.apiKey),
+      toolSearchServices: config.toolSearchServices,
+      toolCreateAppointment: config.toolCreateAppointment,
+      toolCheckDoctorSchedule: config.toolCheckDoctorSchedule,
+    };
+  }
+
+  async getChatbotInternalConfig() {
+    return this.ensureChatbotSettings();
+  }
+
+  private async ensureChatbotSettings() {
+    const existing = await this.chatbotSettings.findOne({ where: { settingKey: 'default' } });
+    if (existing) return existing;
+    return this.chatbotSettings.save(this.chatbotSettings.create({
+      settingKey: 'default',
+      model: 'claude-sonnet-4-6',
+      toolSearchServices: true,
+      toolCreateAppointment: true,
+      toolCheckDoctorSchedule: true,
+      toolLookupAppointments: true,
+    }));
+  }
+
+  async getLandingThemeSettings(user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    return this.ensureLandingThemeSettings();
+  }
+
+  async updateLandingThemeSettings(payload: Partial<LandingThemeSetting>, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const current = await this.ensureLandingThemeSettings();
+    const next = this.landingThemeSettings.merge(current, {
+      themeKey: payload.themeKey ? String(payload.themeKey) : current.themeKey,
+      accent: payload.accent !== undefined ? (String(payload.accent || '').trim() || undefined) : current.accent,
+      fontFamily: payload.fontFamily !== undefined ? (String(payload.fontFamily || '').trim() || undefined) : current.fontFamily,
+      borderRadius: payload.borderRadius !== undefined ? (payload.borderRadius === null ? undefined : Number(payload.borderRadius)) : current.borderRadius,
+      customCss: payload.customCss !== undefined ? (String(payload.customCss || '').trim() || undefined) : current.customCss,
+    });
+    return this.landingThemeSettings.save(next);
+  }
+
+  async getLandingThemePresets() {
+    return THEME_PRESETS;
+  }
+
+  async getLandingThemeCss(): Promise<string> {
+    const settings = await this.ensureLandingThemeSettings();
+    return generateLandingThemeCss(settings.themeKey, {
+      accent: settings.accent,
+      fontFamily: settings.fontFamily,
+      borderRadius: settings.borderRadius,
+      customCss: settings.customCss,
+    });
+  }
+
+  private async ensureLandingThemeSettings() {
+    const existing = await this.landingThemeSettings.findOne({ where: { settingKey: 'default' } });
+    if (existing) return existing;
+    return this.landingThemeSettings.save(this.landingThemeSettings.create({ settingKey: 'default', themeKey: 'warm-classic' }));
   }
 
   async createLandingPage(payload: Partial<LandingPage>, user?: AuthUser) {

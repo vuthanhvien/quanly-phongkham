@@ -254,10 +254,9 @@ function FieldInput({
     return (
       <Select
         disabled={field.disabled}
-        options={(field.options || []).map((opt) => ({
-          label: opt,
-          value: opt,
-        }))}
+        options={(field.options || []).map((opt) =>
+          typeof opt === "string" ? { value: opt, label: opt } : opt,
+        )}
         placeholder={field.placeholder}
         value={value}
         onChange={onChange}
@@ -268,10 +267,9 @@ function FieldInput({
       <Select
         disabled={field.disabled}
         mode="multiple"
-        options={(field.options || []).map((opt) => ({
-          label: opt,
-          value: opt,
-        }))}
+        options={(field.options || []).map((opt) =>
+          typeof opt === "string" ? { value: opt, label: opt } : opt,
+        )}
         placeholder={field.placeholder}
         value={value}
         onChange={onChange}

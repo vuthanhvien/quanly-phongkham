@@ -1,7 +1,9 @@
 import {
   AppstoreOutlined,
+  ApartmentOutlined,
   AuditOutlined,
   BankOutlined,
+  BgColorsOutlined,
   CalendarOutlined,
   DeploymentUnitOutlined,
   DashboardOutlined,
@@ -22,6 +24,7 @@ import {
   MenuUnfoldOutlined,
   PictureOutlined,
   ProductOutlined,
+  RobotOutlined,
   SettingOutlined,
   ShopOutlined,
   SolutionOutlined,
@@ -62,6 +65,7 @@ const menuIcons: Record<string, React.ReactNode> = {
   "customer-images": <PictureOutlined />,
   suppliers: <ShopOutlined />,
   products: <ProductOutlined />,
+  "product-categories": <ApartmentOutlined />,
   "stock-batches": <DatabaseOutlined />,
   treatments: <ExperimentOutlined />,
   invoices: <FileDoneOutlined />,
@@ -88,7 +92,7 @@ const menuGroups = [
     key: "inventory",
     label: "Kho & mua hàng",
     icon: <DatabaseOutlined />,
-    resources: ["suppliers", "products", "stock-batches"],
+    resources: ["suppliers", "products", "product-categories", "stock-batches"],
   },
   {
     key: "documents",
@@ -203,6 +207,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
           : null,
         hasScreenAccess("settings")
           ? {
+              key: "/chatbot-settings",
+              icon: <RobotOutlined />,
+              label: <Link to="/chatbot-settings">Chatbot</Link>,
+            }
+          : null,
+        hasScreenAccess("settings")
+          ? {
+              key: "/landing-theme",
+              icon: <BgColorsOutlined />,
+              label: <Link to="/landing-theme">Giao diện Landing</Link>,
+            }
+          : null,
+        hasScreenAccess("settings")
+          ? {
               key: "/custom-fields",
               icon: menuIcons["custom-fields"],
               label: <Link to="/custom-fields">Custom fields</Link>,
@@ -242,6 +260,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
     location.pathname.startsWith("/settings") ||
     location.pathname.startsWith("/ui-settings") ||
     location.pathname.startsWith("/landing-pages") ||
+    location.pathname.startsWith("/landing-theme") ||
+    location.pathname.startsWith("/chatbot-settings") ||
     location.pathname.startsWith("/custom-fields") ||
     location.pathname.startsWith("/audit-logs")
       ? "system-tools"

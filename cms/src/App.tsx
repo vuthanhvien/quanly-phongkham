@@ -22,6 +22,9 @@ import { RecordListPage } from './pages/RecordListPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RolesPage } from './pages/RolesPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ChatbotSettingsPage } from './pages/ChatbotSettingsPage';
+import { LandingThemePage } from './pages/LandingThemePage';
+import { CategoriesPage } from './pages/CategoriesPage';
 import { UiSettingsPage } from './pages/UiSettingsPage';
 import { ZaloInboxPage } from './pages/ZaloInboxPage';
 
@@ -150,6 +153,8 @@ export function App() {
                 <Route path="/custom-fields" element={<CustomFieldsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/landing-pages" element={<LandingPagesPage />} />
+                <Route path="/chatbot-settings" element={<ChatbotSettingsPage />} />
+                <Route path="/landing-theme" element={<LandingThemePage />} />
                 <Route path="/roles" element={<RolesPage />} />
                 <Route path="/branch-role-assignments" element={<BranchRoleAssignmentsPage />} />
                 <Route path="/ui-settings" element={<UiSettingsPage />} />
@@ -159,6 +164,7 @@ export function App() {
               </Route>
               <Route element={<ResourceGuard />}>
                 <Route path="/file-folders" element={<FileFoldersPage />} />
+                <Route path="/product-categories" element={<CategoriesPage />} />
                 <Route path="/:resource" element={<RecordListPage />} />
                 <Route path="/:resource/import" element={<RecordImportPage />} />
                 <Route path="/:resource/:id/edit" element={<RecordFormPage />} />

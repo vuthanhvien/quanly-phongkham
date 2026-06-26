@@ -246,8 +246,7 @@ export function RecordListPage() {
     <>
       <div className="page-header">
         <div>
-          <Typography.Text className="eyebrow">Quản lý dữ liệu</Typography.Text>
-          <Typography.Title level={2}>
+          <Typography.Title level={3}>
             {entityLabels[resource] || resource}
           </Typography.Title>
         </div>

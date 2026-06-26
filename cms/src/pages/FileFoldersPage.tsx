@@ -261,8 +261,7 @@ export function FileFoldersPage() {
     <>
       <div className="page-header">
         <div>
-          <Typography.Text className="eyebrow">Tài liệu & file</Typography.Text>
-          <Typography.Title level={2}>Folder tài liệu</Typography.Title>
+          <Typography.Title level={3}>Folder tài liệu</Typography.Title>
         </div>
         <Space wrap>
           {hasActionAccess("file-folders", "create") && (

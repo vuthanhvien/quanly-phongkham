@@ -309,7 +309,7 @@ function buildFieldGuide(field: FieldSpec, lookups: LookupMap) {
   }
   if (field.type === "select" || field.type === "multi-select") {
     return field.options?.length
-      ? `Chọn một trong các giá trị: ${field.options.join(", ")}`
+      ? `Chọn một trong: ${field.options.map((o) => (typeof o === "string" ? o : o.value)).join(", ")}`
       : "Có thể nhập nhiều giá trị, ngăn cách bằng dấu phẩy"
   }
   if (field.type === "number") return "Nhập số"
@@ -382,12 +382,13 @@ function generateFakeFieldValue(
   }
 
   if (field.type === "select") {
-    return field.options?.length ? field.options[index % field.options.length] : ""
+    const opts = (field.options || []).map((o) => (typeof o === "string" ? o : o.value))
+    return opts.length ? opts[index % opts.length] : ""
   }
 
   if (field.type === "multi-select") {
-    const options = field.options || []
-    return options.slice(0, Math.min(2, options.length)).join(", ")
+    const opts = (field.options || []).map((o) => (typeof o === "string" ? o : o.value))
+    return opts.slice(0, Math.min(2, opts.length)).join(", ")
   }
 
   if (field.type === "number") {
@@ -615,7 +616,8 @@ function parseFieldValue(
   if (field.type === "multi-select") {
     const values = splitMultiValue(rawValue)
     if (field.options?.length) {
-      const normalizedOptions = new Map(field.options.map((option) => [normalizeToken(option), option]))
+      const optValues = (field.options).map((o) => (typeof o === "string" ? o : o.value))
+      const normalizedOptions = new Map(optValues.map((v) => [normalizeToken(v), v]))
       const invalid = values.find((value) => !normalizedOptions.has(normalizeToken(value)))
       if (invalid) return { error: `Giá trị không hợp lệ: ${invalid}` }
       return { value: values.map((value) => normalizedOptions.get(normalizeToken(value)) || value) }
@@ -625,8 +627,9 @@ function parseFieldValue(
 
   if (field.type === "select") {
     if (!field.options?.length) return { value: String(rawValue).trim() }
-    const matched = field.options.find((option) => normalizeToken(option) === normalizeToken(rawValue))
-    return matched ? { value: matched } : { error: `Chỉ nhận: ${field.options.join(", ")}` }
+    const optValues = (field.options).map((o) => (typeof o === "string" ? o : o.value))
+    const matched = optValues.find((v) => normalizeToken(v) === normalizeToken(rawValue))
+    return matched ? { value: matched } : { error: `Chỉ nhận: ${optValues.join(", ")}` }
   }
 
   if (field.type === "date") {

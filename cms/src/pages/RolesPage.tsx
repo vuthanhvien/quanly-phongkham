@@ -1,7 +1,7 @@
 import { Button, Card, Checkbox, Form, Input, Modal, Select, Space, Table, Typography, message } from "antd"
 import { useEffect, useState } from "react"
 import { api } from "../api"
-import { DynamicRole, systemRoleOptions } from "../models"
+import { DynamicRole, systemRoleSelectOptions } from "../models"
 
 interface RoleFormValues {
   key: string
@@ -126,7 +126,7 @@ export function RolesPage() {
             <Input placeholder="STAFF_1" disabled={Boolean(editingRole)} />
           </Form.Item>
           <Form.Item name="roleMain" label="Main role" rules={[{ required: true }]}>
-            <Select options={systemRoleOptions.map((value) => ({ value, label: value }))} />
+            <Select options={systemRoleSelectOptions} />
           </Form.Item>
           <Form.Item name="isActive" valuePropName="checked" initialValue>
             <Checkbox>Cho phép sử dụng</Checkbox>
