@@ -53,8 +53,19 @@ interface GenerateMeta {
   contract: { contractType: string; baseSalary: number }
   attendanceSummary: { total: number; actualDays: number }
   insuranceBreakdown: { type: string; rate: number; amount: number }[]
+  pit: {
+    grossSalary: number
+    insuranceDeduction: number
+    personalDeduction: number
+    dependants: number
+    dependantDeduction: number
+    taxableIncome: number
+    pitTax: number
+  }
   grossSalary: number
   insuranceDeduction: number
+  pitTax: number
+  totalDeduction: number
   netSalary: number
 }
 
@@ -76,7 +87,9 @@ export function PayrollsPage() {
 
   const [genOpen, setGenOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null)
   const [genResult, setGenResult] = useState<{ payroll: Payroll; meta: GenerateMeta } | null>(null)
+  const [batchResult, setBatchResult] = useState<{ success: string[]; failed: { name: string; error: string }[] } | null>(null)
   const [genForm] = Form.useForm()
 
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1)
@@ -103,23 +116,57 @@ export function PayrollsPage() {
   }
 
   async function runGenerate(values: Record<string, unknown>) {
+    const isAll = values.staffId === "__ALL__"
+    const targets = isAll ? staffList.map((s) => s.id) : [values.staffId as string]
+
     setGenerating(true)
     setGenResult(null)
-    try {
-      const res = await api.post("/payroll/generate", values)
-      setGenResult({ payroll: res.data.data as Payroll, meta: res.data.meta as GenerateMeta })
-      void message.success("Đã tính lương thành công")
-      await load()
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Có lỗi xảy ra"
-      void message.error(msg)
-    } finally {
-      setGenerating(false)
+    setBatchResult(null)
+    setGenProgress(isAll ? { done: 0, total: targets.length } : null)
+
+    if (!isAll) {
+      try {
+        const res = await api.post("/payroll/generate", values)
+        setGenResult({ payroll: res.data.data as Payroll, meta: res.data.meta as GenerateMeta })
+        void message.success("Đã tính lương thành công")
+        await load()
+      } catch (err: unknown) {
+        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Có lỗi xảy ra"
+        void message.error(msg)
+        setGenerating(false)
+      } finally {
+        setGenerating(false)
+      }
+      return
     }
+
+    // Batch: tính lần lượt từng NV
+    const success: string[] = []
+    const failed: { name: string; error: string }[] = []
+    const staffMap2 = Object.fromEntries(staffList.map((s) => [s.id, `${s.fullName} (${s.code})`]))
+
+    for (let i = 0; i < targets.length; i++) {
+      const id = targets[i]
+      try {
+        await api.post("/payroll/generate", { ...values, staffId: id })
+        success.push(staffMap2[id] || id)
+      } catch (err: unknown) {
+        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Lỗi không xác định"
+        failed.push({ name: staffMap2[id] || id, error: msg })
+      }
+      setGenProgress({ done: i + 1, total: targets.length })
+    }
+
+    setBatchResult({ success, failed })
+    setGenerating(false)
+    setGenProgress(null)
+    await load()
   }
 
   function openGenerate() {
     setGenResult(null)
+    setBatchResult(null)
+    setGenProgress(null)
     genForm.resetFields()
     genForm.setFieldsValue({ month: filterMonth, year: filterYear })
     setGenOpen(true)
@@ -190,7 +237,7 @@ export function PayrollsPage() {
         maskClosable={false}
         onCancel={() => { setGenOpen(false); setGenResult(null) }}
       >
-        {!genResult ? (
+        {!genResult && !batchResult ? (
           <Form form={genForm} layout="vertical" onFinish={runGenerate}>
             <Row gutter={12}>
               <Col span={12}>
@@ -198,8 +245,11 @@ export function PayrollsPage() {
                   <Select
                     showSearch
                     placeholder="Chọn nhân viên..."
-                    options={staffList.map((s) => ({ value: s.id, label: `${s.fullName} (${s.code})` }))}
                     optionFilterProp="label"
+                    options={[
+                      { value: "__ALL__", label: "🟢 Tất cả nhân viên" },
+                      ...staffList.map((s) => ({ value: s.id, label: `${s.fullName} (${s.code})` })),
+                    ]}
                   />
                 </Form.Item>
               </Col>
@@ -233,7 +283,7 @@ export function PayrollsPage() {
               message="Hệ thống sẽ tự động tính dựa trên hợp đồng lao động đang hiệu lực, dữ liệu chấm công trong tháng, và các khoản bảo hiểm đã cấu hình (mặc định theo luật VN: BHXH 8% + BHYT 1.5% + BHTN 1%)."
             />
             <Button type="primary" htmlType="submit" loading={generating} block icon={<CalculatorOutlined />} className="primary-glow">
-              Tính lương
+              {generating && genProgress ? `Đang tính... (${genProgress.done}/${genProgress.total})` : "Tính lương"}
             </Button>
           </Form>
         ) : (
@@ -264,8 +314,31 @@ export function PayrollsPage() {
               <Col><Typography.Text strong>Tổng khấu trừ BH</Typography.Text></Col>
               <Col><Typography.Text type="danger" strong>- {fmt(genResult.meta.insuranceDeduction)}</Typography.Text></Col>
             </Row>
+            <Divider orientation="left" style={{ fontSize: 13 }}>Thuế TNCN</Divider>
+            <Row justify="space-between" style={{ marginBottom: 4, fontSize: 13 }}>
+              <Col>Lương gộp</Col>
+              <Col>{fmt(genResult.meta.pit.grossSalary)}</Col>
+            </Row>
+            <Row justify="space-between" style={{ marginBottom: 4, fontSize: 13 }}>
+              <Col>- Giảm trừ bản thân</Col>
+              <Col><Typography.Text type="secondary">- {fmt(genResult.meta.pit.personalDeduction)}</Typography.Text></Col>
+            </Row>
+            {genResult.meta.pit.dependants > 0 && (
+              <Row justify="space-between" style={{ marginBottom: 4, fontSize: 13 }}>
+                <Col>- Giảm trừ người phụ thuộc ({genResult.meta.pit.dependants} người)</Col>
+                <Col><Typography.Text type="secondary">- {fmt(genResult.meta.pit.dependantDeduction)}</Typography.Text></Col>
+              </Row>
+            )}
+            <Row justify="space-between" style={{ marginBottom: 4, fontSize: 13 }}>
+              <Col><strong>Thu nhập chịu thuế</strong></Col>
+              <Col><strong>{fmt(genResult.meta.pit.taxableIncome)}</strong></Col>
+            </Row>
+            <Row justify="space-between" style={{ fontSize: 13 }}>
+              <Col>Thuế TNCN phải nộp</Col>
+              <Col><Typography.Text type="danger">- {fmt(genResult.meta.pit.pitTax)}</Typography.Text></Col>
+            </Row>
             {genResult.payroll.bonus > 0 && (
-              <Row justify="space-between" style={{ marginTop: 4, fontSize: 15 }}>
+              <Row justify="space-between" style={{ marginTop: 8, fontSize: 15 }}>
                 <Col><Typography.Text strong>Thưởng</Typography.Text></Col>
                 <Col><Typography.Text style={{ color: "#52c41a" }} strong>+ {fmt(genResult.payroll.bonus)}</Typography.Text></Col>
               </Row>
@@ -285,7 +358,37 @@ export function PayrollsPage() {
               Đóng
             </Button>
           </div>
-        )}
+        ) : batchResult ? (
+          <div>
+            <Alert
+              type={batchResult.failed.length === 0 ? "success" : "warning"}
+              showIcon
+              message={`Hoàn tất: ${batchResult.success.length} thành công, ${batchResult.failed.length} thất bại`}
+              style={{ marginBottom: 16 }}
+            />
+            {batchResult.success.length > 0 && (
+              <>
+                <Typography.Text strong style={{ color: "#52c41a" }}>Thành công ({batchResult.success.length})</Typography.Text>
+                <ul style={{ marginTop: 4, marginBottom: 12, paddingLeft: 20, maxHeight: 160, overflowY: "auto" }}>
+                  {batchResult.success.map((name) => <li key={name} style={{ fontSize: 13 }}>{name}</li>)}
+                </ul>
+              </>
+            )}
+            {batchResult.failed.length > 0 && (
+              <>
+                <Typography.Text strong type="danger">Thất bại ({batchResult.failed.length})</Typography.Text>
+                <ul style={{ marginTop: 4, marginBottom: 12, paddingLeft: 20, maxHeight: 160, overflowY: "auto" }}>
+                  {batchResult.failed.map((f) => (
+                    <li key={f.name} style={{ fontSize: 13 }}>
+                      <strong>{f.name}</strong>: <Typography.Text type="secondary">{f.error}</Typography.Text>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <Button block onClick={() => { setGenOpen(false); setBatchResult(null) }}>Đóng</Button>
+          </div>
+        ) : null}
       </Modal>
     </>
   )

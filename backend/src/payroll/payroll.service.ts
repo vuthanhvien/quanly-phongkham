@@ -1,14 +1,43 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
-import { Attendance, LeaveRequest, Payroll, StaffInsurance, WorkContract } from '../entities/entities';
+import { Attendance, LeaveRequest, Payroll, Staff, StaffInsurance, WorkContract } from '../entities/entities';
 
-// Mức đóng bảo hiểm mặc định theo luật VN (nếu chưa cấu hình)
+// Mức đóng bảo hiểm mặc định theo luật VN
 const DEFAULT_INSURANCE_RATES: Record<string, { employee: number; employer: number }> = {
   BHXH: { employee: 8, employer: 17.5 },
   BHYT: { employee: 1.5, employer: 3 },
   BHTN: { employee: 1, employer: 1 },
 };
+
+// Biểu thuế TNCN lũy tiến từng phần (Điều 22 Luật Thuế TNCN)
+const PIT_BRACKETS = [
+  { limit: 5_000_000, rate: 0.05 },
+  { limit: 10_000_000, rate: 0.10 },
+  { limit: 18_000_000, rate: 0.15 },
+  { limit: 32_000_000, rate: 0.20 },
+  { limit: 52_000_000, rate: 0.25 },
+  { limit: 80_000_000, rate: 0.30 },
+  { limit: Infinity, rate: 0.35 },
+];
+
+const PERSONAL_DEDUCTION = 11_000_000;   // giảm trừ bản thân
+const DEPENDANT_DEDUCTION = 4_400_000;   // giảm trừ mỗi người phụ thuộc
+
+function calcPIT(taxableIncome: number): number {
+  if (taxableIncome <= 0) return 0;
+  let tax = 0;
+  let prev = 0;
+  for (const bracket of PIT_BRACKETS) {
+    const bracketSize = bracket.limit - prev;
+    if (taxableIncome <= prev) break;
+    const inBracket = Math.min(taxableIncome - prev, bracketSize);
+    tax += inBracket * bracket.rate;
+    prev = bracket.limit;
+    if (bracket.limit === Infinity) break;
+  }
+  return Math.round(tax);
+}
 
 @Injectable()
 export class PayrollService {
@@ -18,6 +47,7 @@ export class PayrollService {
     @InjectRepository(Attendance) private attendances: Repository<Attendance>,
     @InjectRepository(LeaveRequest) private leaveRequests: Repository<LeaveRequest>,
     @InjectRepository(Payroll) private payrolls: Repository<Payroll>,
+    @InjectRepository(Staff) private staffRepo: Repository<Staff>,
   ) {}
 
   async generate(dto: {
@@ -33,7 +63,7 @@ export class PayrollService {
 
     // --- Hợp đồng đang hiệu lực ---
     const periodStart = `${year}-${String(month).padStart(2, '0')}-01`;
-    const periodEnd = new Date(year, month, 0).toISOString().slice(0, 10); // last day of month
+    const periodEnd = new Date(year, month, 0).toISOString().slice(0, 10);
 
     const contract = await this.contracts
       .createQueryBuilder('c')
@@ -49,6 +79,10 @@ export class PayrollService {
         `Nhân viên chưa có hợp đồng lao động đang hiệu lực trong tháng ${month}/${year}`,
       );
     }
+
+    // --- Số người phụ thuộc từ hồ sơ nhân viên ---
+    const staff = await this.staffRepo.findOne({ where: { id: staffId } });
+    const dependants = staff?.dependants ?? 0;
 
     // --- Chấm công tháng ---
     const attendanceList = await this.attendances.find({
@@ -66,7 +100,6 @@ export class PayrollService {
       where: { staffId, isActive: true },
     });
 
-    // Nếu chưa cấu hình → dùng mức mặc định theo luật
     const activeTypes = insuranceList.map((i) => i.insuranceType);
     const missingTypes = Object.keys(DEFAULT_INSURANCE_RATES).filter((t) => !activeTypes.includes(t));
     const allInsurances = [
@@ -78,7 +111,7 @@ export class PayrollService {
       })),
     ];
 
-    // --- Tính lương ---
+    // --- Tính lương gộp ---
     const workingDaysPerMonth = contract.workingDaysPerMonth || 26;
     const grossSalary = contract.baseSalary * (actualDays / workingDaysPerMonth);
 
@@ -89,9 +122,15 @@ export class PayrollService {
       insuranceDeduction += base * (rate / 100);
     }
 
+    // --- Thuế TNCN (Điều 22 Luật Thuế TNCN) ---
+    const taxableIncome =
+      grossSalary - insuranceDeduction - PERSONAL_DEDUCTION - dependants * DEPENDANT_DEDUCTION;
+    const pitTax = calcPIT(taxableIncome);
+
     const bonus = dto.bonus ?? 0;
     const manualDeduction = dto.deduction ?? 0;
-    const netSalary = grossSalary - insuranceDeduction - manualDeduction + bonus;
+    const totalDeduction = insuranceDeduction + pitTax + manualDeduction;
+    const netSalary = grossSalary - totalDeduction + bonus;
 
     // --- Upsert Payroll ---
     const existing = await this.payrolls.findOne({ where: { staffId, month, year } });
@@ -106,7 +145,7 @@ export class PayrollService {
       workingDays: workingDaysPerMonth,
       actualDays,
       bonus,
-      deduction: insuranceDeduction + manualDeduction,
+      deduction: Math.round(totalDeduction),
       netSalary: Math.round(netSalary),
       status: existing?.status === 'paid' ? 'paid' : 'draft',
       note: dto.note ?? existing?.note,
@@ -128,14 +167,34 @@ export class PayrollService {
             amount: Math.round(base * (rate / 100)),
           };
         }),
+        pit: {
+          grossSalary: Math.round(grossSalary),
+          insuranceDeduction: Math.round(insuranceDeduction),
+          personalDeduction: PERSONAL_DEDUCTION,
+          dependants,
+          dependantDeduction: dependants * DEPENDANT_DEDUCTION,
+          taxableIncome: Math.max(0, Math.round(taxableIncome)),
+          pitTax,
+        },
         grossSalary: Math.round(grossSalary),
         insuranceDeduction: Math.round(insuranceDeduction),
+        pitTax,
+        totalDeduction: Math.round(totalDeduction),
         netSalary: Math.round(netSalary),
       },
     };
   }
 
   async defaultRates() {
-    return { data: DEFAULT_INSURANCE_RATES };
+    return {
+      data: {
+        insurance: DEFAULT_INSURANCE_RATES,
+        pit: {
+          brackets: PIT_BRACKETS.map((b) => ({ limit: b.limit, rate: b.rate * 100 })),
+          personalDeduction: PERSONAL_DEDUCTION,
+          dependantDeduction: DEPENDANT_DEDUCTION,
+        },
+      },
+    };
   }
 }

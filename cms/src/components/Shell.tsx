@@ -77,6 +77,10 @@ const menuIcons: Record<string, React.ReactNode> = {
   payrolls: <DollarOutlined />,
   'work-contracts': <SolutionOutlined />,
   'staff-insurances': <AuditOutlined />,
+  'staff-rewards': <GiftOutlined />,
+  'staff-trainings': <ExperimentOutlined />,
+  'performance-reviews': <LineChartOutlined />,
+  'position-histories': <DeploymentUnitOutlined />,
 }
 
 const menuGroups = [
@@ -105,10 +109,26 @@ const menuGroups = [
     resources: ["file-folders", "files"],
   },
   {
+    key: "hr",
+    label: "Nhân sự",
+    icon: <TeamOutlined />,
+    resources: [
+      "work-contracts",
+      "staff-insurances",
+      "attendances",
+      "leave-requests",
+      "work-schedules",
+      "staff-rewards",
+      "staff-trainings",
+      "performance-reviews",
+      "position-histories",
+    ],
+  },
+  {
     key: "finance",
     label: "Tài chính & lương",
     icon: <DollarOutlined />,
-    resources: ["invoices", "expenses", "commissions", "payrolls", "attendances", "leave-requests", "work-schedules", "work-contracts", "staff-insurances"],
+    resources: ["invoices", "expenses", "commissions", "payrolls"],
   },
   {
     key: "admin",

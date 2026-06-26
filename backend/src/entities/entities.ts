@@ -151,6 +151,58 @@ export class Staff extends ConfigurableEntity {
   @Column({ type: 'date', nullable: true })
   joinedAt?: string;
 
+  // Hồ sơ cá nhân
+  @Column({ type: 'date', nullable: true })
+  dateOfBirth?: string;
+
+  @Column({ nullable: true })
+  gender?: string; // male | female | other
+
+  @Column({ nullable: true })
+  idCardNumber?: string;
+
+  @Column({ type: 'date', nullable: true })
+  idCardIssuedDate?: string;
+
+  @Column({ nullable: true })
+  idCardIssuedPlace?: string;
+
+  @Column({ type: 'text', nullable: true })
+  address?: string;
+
+  @Column({ nullable: true })
+  avatarUrl?: string;
+
+  // Liên hệ khẩn cấp
+  @Column({ nullable: true })
+  emergencyContactName?: string;
+
+  @Column({ nullable: true })
+  emergencyContactPhone?: string;
+
+  @Column({ nullable: true })
+  emergencyContactRelation?: string;
+
+  // Ngân hàng
+  @Column({ nullable: true })
+  bankAccountNumber?: string;
+
+  @Column({ nullable: true })
+  bankAccountName?: string;
+
+  @Column({ nullable: true })
+  bankName?: string;
+
+  @Column({ nullable: true })
+  bankBranch?: string;
+
+  // Thuế
+  @Column({ nullable: true })
+  taxCode?: string;
+
+  @Column({ type: 'int', default: 0 })
+  dependants: number;
+
   @Column({ type: 'text', nullable: true })
   note?: string;
 }
@@ -1145,6 +1197,135 @@ export class ItemCategory {
   updatedAt: Date;
 }
 
+@Entity('staff_rewards')
+export class StaffReward extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column({ default: 'reward' })
+  type: string; // reward | discipline
+
+  @Column()
+  title: string;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ type: 'date' })
+  date: string;
+
+  @Column({ nullable: true })
+  issuedBy?: string;
+
+  @Column({ type: 'float', nullable: true })
+  amount?: number;
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('staff_trainings')
+export class StaffTraining extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column()
+  trainingName: string;
+
+  @Column({ nullable: true })
+  provider?: string;
+
+  @Column({ type: 'date', nullable: true })
+  startDate?: string;
+
+  @Column({ type: 'date', nullable: true })
+  endDate?: string;
+
+  @Column({ nullable: true })
+  certificateNumber?: string;
+
+  @Column({ type: 'date', nullable: true })
+  expiryDate?: string;
+
+  @Column({ default: 'completed' })
+  status: string; // planned | in_progress | completed | cancelled
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('performance_reviews')
+export class PerformanceReview extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column({ type: 'int' })
+  reviewMonth: number;
+
+  @Column({ type: 'int' })
+  reviewYear: number;
+
+  @Column({ nullable: true })
+  reviewerId?: string;
+
+  @Column({ type: 'float', nullable: true })
+  score?: number; // 1-5
+
+  @Column({ type: 'text', nullable: true })
+  strengths?: string;
+
+  @Column({ type: 'text', nullable: true })
+  improvements?: string;
+
+  @Column({ type: 'text', nullable: true })
+  goals?: string;
+
+  @Column({ default: 'draft' })
+  status: string; // draft | submitted | approved
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('position_histories')
+export class PositionHistory extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column({ nullable: true })
+  fromPosition?: string;
+
+  @Column()
+  toPosition: string;
+
+  @Column({ nullable: true })
+  fromDepartmentId?: string;
+
+  @Column({ nullable: true })
+  toDepartmentId?: string;
+
+  @Column({ type: 'date' })
+  effectiveDate: string;
+
+  @Column({ type: 'text', nullable: true })
+  reason?: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
 @Entity('work_contracts')
 export class WorkContract extends ConfigurableEntity {
   @Column()
@@ -1378,6 +1559,10 @@ export const ENTITIES = [
   ChatbotSetting,
   LandingThemeSetting,
   ItemCategory,
+  StaffReward,
+  StaffTraining,
+  PerformanceReview,
+  PositionHistory,
   WorkContract,
   StaffInsurance,
   Attendance,
