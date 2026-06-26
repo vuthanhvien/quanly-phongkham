@@ -25,6 +25,7 @@ import { ChatbotSettingsPage } from './pages/ChatbotSettingsPage';
 import { LandingThemePage } from './pages/LandingThemePage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { DepartmentsPage } from './pages/DepartmentsPage';
+import { PayrollsPage } from './pages/PayrollsPage';
 import { UiSettingsPage } from './pages/UiSettingsPage';
 import { ZaloInboxPage } from './pages/ZaloInboxPage';
 
@@ -166,6 +167,7 @@ export function App() {
                 <Route path="/file-folders" element={<FileFoldersPage />} />
                 <Route path="/product-categories" element={<CategoriesPage />} />
                 <Route path="/departments" element={<DepartmentsPage />} />
+                <Route path="/payrolls" element={<PayrollsPage />} />
                 <Route path="/:resource" element={<RecordListPage />} />
                 <Route path="/:resource/import" element={<RecordImportPage />} />
                 <Route path="/:resource/:id/edit" element={<RecordFormPage />} />
