@@ -10,10 +10,7 @@ export function AuditPage() {
   return (
     <>
       <div className="page-header">
-        <div>
-          <Typography.Text className="eyebrow">Security trail</Typography.Text>
-          <Typography.Title level={2}>Audit log</Typography.Title>
-        </div>
+          <Typography.Title level={3}>Audit log</Typography.Title>
       </div>
       <Card className="table-card">
         <Table

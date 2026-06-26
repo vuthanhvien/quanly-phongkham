@@ -267,7 +267,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
 
   return (
     <>
-      {!compact && <Typography.Title level={2}>{editing ? "Cập nhật" : "Thêm"} đơn hàng</Typography.Title>}
+      {!compact && <Typography.Title level={3}>{editing ? "Cập nhật" : "Thêm"} đơn hàng</Typography.Title>}
       <Form form={form} layout="vertical" onFinish={(values) => void submit(values)}>
         <div className="service-order-grid">
           <Form.Item label="Mã đơn" name="code" rules={[{ required: true, message: "Nhập mã đơn" }]}>

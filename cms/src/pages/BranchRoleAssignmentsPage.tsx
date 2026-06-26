@@ -1,4 +1,15 @@
-import { Button, Card, Checkbox, Form, Modal, Select, Space, Table, Typography, message } from "antd"
+import {
+  Button,
+  Card,
+  Checkbox,
+  Form,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Typography,
+  message,
+} from "antd"
 import { useEffect, useState } from "react"
 import { api } from "../api"
 import { BranchRoleAssignment, DynamicRole } from "../models"
@@ -13,10 +24,15 @@ interface AssignmentFormValues {
 export function BranchRoleAssignmentsPage() {
   const [assignments, setAssignments] = useState<BranchRoleAssignment[]>([])
   const [dynamicRoles, setDynamicRoles] = useState<DynamicRole[]>([])
-  const [userOptions, setUserOptions] = useState<Array<{ value: string; label: string }>>([])
-  const [branchOptions, setBranchOptions] = useState<Array<{ value: string; label: string }>>([])
+  const [userOptions, setUserOptions] = useState<
+    Array<{ value: string; label: string }>
+  >([])
+  const [branchOptions, setBranchOptions] = useState<
+    Array<{ value: string; label: string }>
+  >([])
   const [assignmentModal, setAssignmentModal] = useState(false)
-  const [editingAssignment, setEditingAssignment] = useState<BranchRoleAssignment | null>(null)
+  const [editingAssignment, setEditingAssignment] =
+    useState<BranchRoleAssignment | null>(null)
   const [assignmentForm] = Form.useForm<AssignmentFormValues>()
 
   useEffect(() => {
@@ -24,12 +40,13 @@ export function BranchRoleAssignmentsPage() {
   }, [])
 
   async function load() {
-    const [assignmentResponse, roleResponse, usersResponse, branchesResponse] = await Promise.all([
-      api.get("/settings/branch-role-assignments"),
-      api.get("/settings/dynamic-roles"),
-      api.get("/records/user-accounts", { params: { pageSize: 200 } }),
-      api.get("/records/branches", { params: { pageSize: 200 } }),
-    ])
+    const [assignmentResponse, roleResponse, usersResponse, branchesResponse] =
+      await Promise.all([
+        api.get("/settings/branch-role-assignments"),
+        api.get("/settings/dynamic-roles"),
+        api.get("/records/user-accounts", { params: { pageSize: 200 } }),
+        api.get("/records/branches", { params: { pageSize: 200 } }),
+      ])
     setAssignments(assignmentResponse.data.data)
     setDynamicRoles(roleResponse.data.data)
     setUserOptions(
@@ -66,7 +83,10 @@ export function BranchRoleAssignmentsPage() {
 
   async function saveAssignment(values: AssignmentFormValues) {
     if (editingAssignment) {
-      await api.patch(`/settings/branch-role-assignments/${editingAssignment.id}`, values)
+      await api.patch(
+        `/settings/branch-role-assignments/${editingAssignment.id}`,
+        values,
+      )
       message.success("Đã cập nhật gán role")
     } else {
       await api.post("/settings/branch-role-assignments", values)
@@ -87,17 +107,13 @@ export function BranchRoleAssignmentsPage() {
   return (
     <>
       <div className="page-header">
-        <div>
-          <Typography.Text className="eyebrow">
-            System administration
-          </Typography.Text>
-          <Typography.Title level={2}>Role theo chi nhánh</Typography.Title>
-        </div>
+        <Typography.Title level={3}>Role theo chi nhánh</Typography.Title>
         <Button onClick={openCreateAssignment}>Thêm gán role</Button>
       </div>
       <Card className="glass-card settings-card">
         <Typography.Paragraph type="secondary">
-          Mỗi user có thể thuộc nhiều chi nhánh. Ở mỗi chi nhánh, user có thể được gán một hoặc nhiều role khác nhau.
+          Mỗi user có thể thuộc nhiều chi nhánh. Ở mỗi chi nhánh, user có thể
+          được gán một hoặc nhiều role khác nhau.
         </Typography.Paragraph>
         <Table
           size="small"
@@ -108,17 +124,25 @@ export function BranchRoleAssignmentsPage() {
           columns={[
             {
               title: "User",
-              render: (_, row) => userOptions.find((item) => item.value === row.userId)?.label || row.userId,
+              render: (_, row) =>
+                userOptions.find((item) => item.value === row.userId)?.label ||
+                row.userId,
             },
             {
               title: "Chi nhánh",
-              render: (_, row) => branchOptions.find((item) => item.value === row.branchId)?.label || row.branchId,
+              render: (_, row) =>
+                branchOptions.find((item) => item.value === row.branchId)
+                  ?.label || row.branchId,
             },
             {
               title: "Role",
               render: (_, row) =>
                 (row.roleKeys || [])
-                  .map((key: string) => dynamicRoles.find((role) => role.key === key)?.name || key)
+                  .map(
+                    (key: string) =>
+                      dynamicRoles.find((role) => role.key === key)?.name ||
+                      key,
+                  )
                   .join(", "),
             },
             {
@@ -132,7 +156,11 @@ export function BranchRoleAssignmentsPage() {
                   <Button type="link" onClick={() => openEditAssignment(row)}>
                     Sửa
                   </Button>
-                  <Button type="link" danger onClick={() => deleteAssignment(row.id)}>
+                  <Button
+                    type="link"
+                    danger
+                    onClick={() => deleteAssignment(row.id)}
+                  >
                     Xóa
                   </Button>
                 </Space>
@@ -142,7 +170,11 @@ export function BranchRoleAssignmentsPage() {
         />
       </Card>
       <Modal
-        title={editingAssignment ? "Cập nhật role theo chi nhánh" : "Thêm role theo chi nhánh"}
+        title={
+          editingAssignment
+            ? "Cập nhật role theo chi nhánh"
+            : "Thêm role theo chi nhánh"
+        }
         open={assignmentModal}
         footer={null}
         maskClosable={false}
@@ -155,15 +187,26 @@ export function BranchRoleAssignmentsPage() {
           <Form.Item name="userId" label="User" rules={[{ required: true }]}>
             <Select options={userOptions} showSearch optionFilterProp="label" />
           </Form.Item>
-          <Form.Item name="branchId" label="Chi nhánh" rules={[{ required: true }]}>
-            <Select options={branchOptions} showSearch optionFilterProp="label" />
+          <Form.Item
+            name="branchId"
+            label="Chi nhánh"
+            rules={[{ required: true }]}
+          >
+            <Select
+              options={branchOptions}
+              showSearch
+              optionFilterProp="label"
+            />
           </Form.Item>
-          <Form.Item name="roleKeys" label="Role" rules={[{ required: true }]}> 
+          <Form.Item name="roleKeys" label="Role" rules={[{ required: true }]}>
             <Select
               mode="multiple"
               options={dynamicRoles
                 .filter((role) => role.isActive)
-                .map((role) => ({ value: role.key, label: `${role.name} (${role.key})` }))}
+                .map((role) => ({
+                  value: role.key,
+                  label: `${role.name} (${role.key})`,
+                }))}
             />
           </Form.Item>
           <Form.Item name="isActive" valuePropName="checked" initialValue>

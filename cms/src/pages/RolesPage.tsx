@@ -67,10 +67,7 @@ export function RolesPage() {
     <>
       <div className="page-header">
         <div>
-          <Typography.Text className="eyebrow">
-            System administration
-          </Typography.Text>
-          <Typography.Title level={2}>Vai trò</Typography.Title>
+          <Typography.Title level={3}>Vai trò</Typography.Title>
         </div>
         <Button onClick={openCreateRole}>Thêm role</Button>
       </div>

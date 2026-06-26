@@ -160,12 +160,9 @@ export function RecordFormContent({
   return (
     <>
       {!compact && (
-        <>
-          <Typography.Text className="eyebrow">Dynamic form</Typography.Text>
-          <Typography.Title level={2}>
+          <Typography.Title level={3}>
             {editing ? "Cập nhật" : "Thêm"} {entityLabels[resource] || resource}
           </Typography.Title>
-        </>
       )}
       <Form
         className="record-form"

@@ -625,12 +625,7 @@ export function SettingsPage() {
   return (
     <>
       <div className="page-header">
-        <div>
-          <Typography.Text className="eyebrow">
-            No-code operations
-          </Typography.Text>
-          <Typography.Title level={2}>Cấu hình động</Typography.Title>
-        </div>
+          <Typography.Title level={3}>Cấu hình động</Typography.Title>
         <Space wrap>
           <Select
             value={entityType}

@@ -203,8 +203,7 @@ export function RecordImportPage() {
     <>
       <div className="page-header">
         <div>
-          <Typography.Text className="eyebrow">Import dữ liệu</Typography.Text>
-          <Typography.Title level={2}>
+          <Typography.Title level={3}>
             Import {entityLabels[resource] || resource}
           </Typography.Title>
         </div>

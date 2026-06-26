@@ -3,7 +3,6 @@ import {
   ApartmentOutlined,
   AuditOutlined,
   BankOutlined,
-  BgColorsOutlined,
   CalendarOutlined,
   DeploymentUnitOutlined,
   DashboardOutlined,
@@ -210,13 +209,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
               key: "/chatbot-settings",
               icon: <RobotOutlined />,
               label: <Link to="/chatbot-settings">Chatbot</Link>,
-            }
-          : null,
-        hasScreenAccess("settings")
-          ? {
-              key: "/landing-theme",
-              icon: <BgColorsOutlined />,
-              label: <Link to="/landing-theme">Giao diện Landing</Link>,
             }
           : null,
         hasScreenAccess("settings")

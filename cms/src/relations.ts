@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 import { api } from './api';
 import { FieldSpec, relationFields, RelationSpec } from './models';
 import { buildFolderPathMap, normalizeFileFolderRows } from './utils/fileFolders';
@@ -77,6 +78,8 @@ export async function loadFileLookupMap(pageSize = 500) {
   return Object.fromEntries(entries) as FileLookupMap;
 }
 
+const DATETIME_KEYS = new Set(['createdAt', 'updatedAt', 'deletedAt']);
+
 export function displayValue(field: string | FieldSpec, value: unknown, lookups: LookupMap) {
   if (value === null || value === undefined || value === '') return '-';
 
@@ -88,6 +91,18 @@ export function displayValue(field: string | FieldSpec, value: unknown, lookups:
     if (Array.isArray(value)) return value.map((item) => optionMap.get(String(item)) ?? String(item)).join(', ');
     const label = optionMap.get(String(value));
     if (label !== undefined) return label;
+  }
+
+  // Date / datetime formatting
+  const fieldType = typeof field === 'string' ? undefined : field.type;
+  const fieldKey = typeof field === 'string' ? field : field.key;
+  if (fieldType === 'date') {
+    const parsed = dayjs(String(value));
+    if (parsed.isValid()) return parsed.format('DD/MM/YYYY');
+  }
+  if (fieldType === 'datetime' || DATETIME_KEYS.has(fieldKey)) {
+    const parsed = dayjs(String(value));
+    if (parsed.isValid()) return parsed.format('DD/MM/YYYY HH:mm');
   }
 
   const relation = resolveRelationSpec(field);

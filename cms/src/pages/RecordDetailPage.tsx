@@ -138,8 +138,7 @@ export function RecordDetailPage() {
     <>
       <div className="page-header">
         <div>
-          <Typography.Text className="eyebrow">Hồ sơ chi tiết</Typography.Text>
-          <Typography.Title level={2}>
+          <Typography.Title level={3}>
             {detailTitle(resource, record)}
           </Typography.Title>
         </div>

@@ -1,26 +1,28 @@
 import {
   DeleteOutlined,
+  EditOutlined,
   EyeOutlined,
   FormOutlined,
   InsertRowAboveOutlined,
   PictureOutlined,
   PlusOutlined,
+  ReloadOutlined,
   SaveOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons'
 import {
   Button,
   Card,
-  Col,
+  Collapse,
   Empty,
   Flex,
   Form,
   Input,
   InputNumber,
-  List,
   Modal,
   Popconfirm,
   Row,
+  Col,
   Select,
   Space,
   Switch,
@@ -29,9 +31,10 @@ import {
   Typography,
   message,
 } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import type { LandingBlock, LandingBlockType, LandingFormField, LandingPage } from '../models'
+import { LandingThemeEditor } from './LandingThemePage'
 
 const LANDING_URL = import.meta.env.VITE_LANDING_URL || 'http://localhost:3001'
 
@@ -690,6 +693,10 @@ export function LandingPagesPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [templateModal, setTemplateModal] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [iframeKey, setIframeKey] = useState(0)
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const selectedPage = useMemo(
     () => pages.find((item) => item.id === selectedId) || null,
@@ -962,387 +969,358 @@ export function LandingPagesPage() {
       }, {})
   }, [draft.blocks])
 
+  const iframeUrl = useMemo(() => {
+    const sep = previewUrl.includes('?') ? '&' : '?'
+    return editMode ? `${previewUrl}${sep}cms_edit=1` : previewUrl
+  }, [previewUrl, editMode])
+
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (!editMode) return
+      const data = event.data as { type?: string; blockId?: string }
+      if (data?.type === 'cms-block-select' && data.blockId) {
+        setSelectedBlockId(data.blockId)
+        document.getElementById(`block-panel-${data.blockId}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+    }
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [editMode])
+
+  function blockPreview(block: LandingBlock): string {
+    const text = block.title ?? block.text ?? block.url ?? ''
+    return text.slice(0, 50)
+  }
+
   return (
-    <Space direction="vertical" size={20} style={{ width: '100%' }}>
-      <div className="page-header">
-        <div>
-          <Typography.Title level={3}>Landing pages</Typography.Title>
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Tạo page mới, sắp xếp block theo row 12 cột, và xuất bản cho app landing Next.js.
-          </Typography.Paragraph>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', gap: 0 }}>
+      {/* ── Header ── */}
+      <div className="page-header" style={{ flexShrink: 0 }}>
+        <Flex align="center" gap={12} wrap="wrap">
+          <Typography.Title level={3} style={{ margin: 0 }}>Landing pages</Typography.Title>
+          <Select
+            style={{ minWidth: 240 }}
+            placeholder="Chọn page..."
+            value={selectedId}
+            onChange={(id) => setSelectedId(id)}
+            loading={loading}
+            options={pages.map((p) => ({ value: p.id, label: p.title || p.path || p.slug }))}
+          />
+          <Tag color={draft.isPublished ? 'green' : 'default'}>
+            {draft.isPublished ? 'Đã xuất bản' : 'Nháp'}
+          </Tag>
+        </Flex>
         <Space wrap>
-          <Button icon={<PlusOutlined />} onClick={startCreatePage}>Page mới</Button>
+          <Button icon={<PlusOutlined />} onClick={startCreatePage}>Trang mới</Button>
+          {selectedId ? (
+            <Popconfirm title="Xóa landing page này?" onConfirm={() => void deletePage()}>
+              <Button danger icon={<DeleteOutlined />}>Xóa</Button>
+            </Popconfirm>
+          ) : null}
           <Button icon={<SaveOutlined />} loading={saving} onClick={savePage}>Lưu</Button>
           <Button icon={<EyeOutlined />} loading={saving} type="primary" onClick={() => void saveAndOpen()}>Lưu & Mở</Button>
         </Space>
       </div>
 
-      <Row gutter={[20, 20]} align="top">
-        <Col xs={24} xl={7}>
-          <Card className="glass-card" loading={loading} title="Danh sách pages" extra={<Tag>{pages.length} page</Tag>}>
-            <List
-              dataSource={pages}
-              locale={{ emptyText: 'Chưa có landing page nào' }}
-              renderItem={(item) => (
-                <List.Item
-                  style={{ cursor: 'pointer', paddingInline: 0 }}
-                  onClick={() => setSelectedId(item.id)}
-                  actions={[item.isPublished ? <Tag color="green">Đã xuất bản</Tag> : <Tag>Nháp</Tag>]}
-                >
-                  <List.Item.Meta
-                    title={<Typography.Text strong={item.id === selectedId}>{item.title}</Typography.Text>}
-                    description={
-                      <Space direction="vertical" size={2}>
-                        <Typography.Text type="secondary">{item.path}</Typography.Text>
-                        <Typography.Text type="secondary">/{item.slug}</Typography.Text>
-                      </Space>
-                    }
-                  />
-                </List.Item>
-              )}
-            />
-          </Card>
-        </Col>
+      {/* ── Two-column body ── */}
+      <div style={{ flex: 1, display: 'flex', gap: 16, overflow: 'hidden', minHeight: 0, padding: '0 0 16px' }}>
 
-        <Col xs={24} xl={17}>
-          <Space direction="vertical" size={20} style={{ width: '100%' }}>
-            <Card className="glass-card" title="Thông tin page">
-              <Form layout="vertical">
-                <Row gutter={16}>
-                  <Col xs={24} md={12}>
-                    <Form.Item label="Tên page">
-                      <Input value={draft.title} onChange={(event) => syncSlugFromTitle(event.target.value)} placeholder="Ví dụ: Ưu đãi nâng mũi tháng 6" />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item label="Slug">
-                      <Input value={draft.slug} onChange={(event) => updateDraft({ slug: slugify(event.target.value) })} placeholder="uu-dai-nang-mui" />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item label="Path public">
-                      <Input value={draft.path} onChange={(event) => updateDraft({ path: normalizePath(event.target.value) })} placeholder="/uu-dai-nang-mui" />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item label="Xuất bản">
-                      <Flex align="center" gap={12}>
-                        <Switch checked={draft.isPublished} onChange={(checked) => updateDraft({ isPublished: checked })} />
-                        <Typography.Text type="secondary">{draft.isPublished ? 'Đang public' : 'Đang ở draft'}</Typography.Text>
-                      </Flex>
-                    </Form.Item>
-                  </Col>
-                  <Col span={24}>
-                    <Form.Item label="Mô tả ngắn">
-                      <Input.TextArea rows={3} value={draft.description} onChange={(event) => updateDraft({ description: event.target.value })} />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item label="SEO title">
-                      <Input value={draft.seoTitle} onChange={(event) => updateDraft({ seoTitle: event.target.value })} />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} md={12}>
-                    <Form.Item label="SEO description">
-                      <Input value={draft.seoDescription} onChange={(event) => updateDraft({ seoDescription: event.target.value })} />
-                    </Form.Item>
-                  </Col>
-                </Row>
-              </Form>
-              <Space wrap>
-                <Typography.Text type="secondary">Public URL: {previewUrl}</Typography.Text>
-                {draft.isPublished ? (
-                  <Button href={previewUrl} icon={<EyeOutlined />} rel="noreferrer" target="_blank">
-                    Mở landing
-                  </Button>
-                ) : null}
-                {selectedId ? (
-                  <Popconfirm title="Xóa landing page này?" onConfirm={() => void deletePage()}>
-                    <Button danger icon={<DeleteOutlined />}>Xóa page</Button>
-                  </Popconfirm>
-                ) : null}
-              </Space>
-            </Card>
+        {/* Left 30% — info + blocks + theme */}
+        <div style={{ width: '30%', minWidth: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <Tabs
+            size="small"
+            style={{ flex: 1 }}
+            items={[
+              {
+                key: 'content',
+                label: 'Nội dung',
+                children: (
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                    {/* Page meta */}
+                    <Card className="glass-card" size="small" title="Thông tin page">
+                      <Form layout="vertical" size="small">
+                        <Form.Item label="Tên page" style={{ marginBottom: 8 }}>
+                          <Input value={draft.title} onChange={(event) => syncSlugFromTitle(event.target.value)} placeholder="Ví dụ: Trang chủ" />
+                        </Form.Item>
+                        <Row gutter={8}>
+                          <Col span={12}>
+                            <Form.Item label="Slug" style={{ marginBottom: 8 }}>
+                              <Input value={draft.slug} onChange={(event) => updateDraft({ slug: slugify(event.target.value) })} placeholder="trang-chu" />
+                            </Form.Item>
+                          </Col>
+                          <Col span={12}>
+                            <Form.Item label="Path" style={{ marginBottom: 8 }}>
+                              <Input value={draft.path} onChange={(event) => updateDraft({ path: normalizePath(event.target.value) })} placeholder="/" />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        <Form.Item label="Mô tả ngắn" style={{ marginBottom: 8 }}>
+                          <Input.TextArea rows={2} value={draft.description} onChange={(event) => updateDraft({ description: event.target.value })} />
+                        </Form.Item>
+                        <Row gutter={8}>
+                          <Col span={12}>
+                            <Form.Item label="SEO title" style={{ marginBottom: 8 }}>
+                              <Input value={draft.seoTitle} onChange={(event) => updateDraft({ seoTitle: event.target.value })} />
+                            </Form.Item>
+                          </Col>
+                          <Col span={12}>
+                            <Form.Item label="SEO desc" style={{ marginBottom: 8 }}>
+                              <Input value={draft.seoDescription} onChange={(event) => updateDraft({ seoDescription: event.target.value })} />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        <Form.Item label="Xuất bản" style={{ marginBottom: 0 }}>
+                          <Flex align="center" gap={8}>
+                            <Switch size="small" checked={draft.isPublished} onChange={(checked) => updateDraft({ isPublished: checked })} />
+                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>{draft.isPublished ? 'Đang public' : 'Draft'}</Typography.Text>
+                          </Flex>
+                        </Form.Item>
+                      </Form>
+                    </Card>
 
-            <Card
-              className="glass-card"
-              title="Blocks"
-              extra={
-                <Space wrap>
-                  {blockTypeOptions.map((option) => (
-                    <Button key={option.value} icon={<PlusOutlined />} onClick={() => addBlock(option.value)}>
-                      {option.label}
-                    </Button>
-                  ))}
-                </Space>
-              }
-            >
-              {draft.blocks.length === 0 ? (
-                <Empty description="Chưa có block nào" />
-              ) : (
-                <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                  {draft.blocks.map((block, index) => (
+                    {/* Blocks */}
                     <Card
-                      key={block.id}
+                      className="glass-card"
                       size="small"
-                      title={
-                        <Space>
-                          {blockTypeIcons[block.type]}
-                          <Typography.Text strong>
-                            {blockTypeOptions.find((option) => option.value === block.type)?.label} #{index + 1}
-                          </Typography.Text>
-                        </Space>
-                      }
+                      title={<span>Blocks <Tag style={{ marginLeft: 4 }}>{draft.blocks.length}</Tag></span>}
                       extra={
-                        <Space>
-                          <Button size="small" onClick={() => moveBlock(block.id, -1)} disabled={index === 0}>Lên</Button>
-                          <Button size="small" onClick={() => moveBlock(block.id, 1)} disabled={index === draft.blocks.length - 1}>Xuống</Button>
-                          <Button danger size="small" onClick={() => removeBlock(block.id)}>Xóa</Button>
-                        </Space>
+                        <Flex gap={4} wrap="wrap">
+                          {blockTypeOptions.map((option) => (
+                            <Button key={option.value} size="small" icon={<PlusOutlined />} onClick={() => addBlock(option.value)}>
+                              {option.label}
+                            </Button>
+                          ))}
+                        </Flex>
                       }
                     >
-                      <Row gutter={16}>
-                        <Col xs={24} md={8}>
-                          <Form.Item label="Row" style={{ marginBottom: 12 }}>
-                            <InputNumber min={1} value={block.row} onChange={(value) => updateBlock(block.id, { row: Number(value || 1) })} style={{ width: '100%' }} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8}>
-                          <Form.Item label="Span / 12" style={{ marginBottom: 12 }}>
-                            <InputNumber min={1} max={12} value={block.span} onChange={(value) => updateBlock(block.id, { span: Number(value || 12) })} style={{ width: '100%' }} />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8}>
-                          <Form.Item label="Canh lề" style={{ marginBottom: 12 }}>
-                            <Select
-                              value={block.align || 'left'}
-                              onChange={(value) => updateBlock(block.id, { align: value })}
-                              options={[
-                                { value: 'left', label: 'Trái' },
-                                { value: 'center', label: 'Giữa' },
-                                { value: 'right', label: 'Phải' },
-                              ]}
-                              disabled={!['title', 'text'].includes(block.type)}
-                            />
-                          </Form.Item>
-                        </Col>
-                      </Row>
+                      {draft.blocks.length === 0 ? (
+                        <Typography.Text type="secondary">Chưa có block nào</Typography.Text>
+                      ) : (
+                        <Collapse
+                          accordion
+                          size="small"
+                          activeKey={selectedBlockId ?? undefined}
+                          onChange={(key) => setSelectedBlockId((Array.isArray(key) ? key[0] : key) as string | null)}
+                          items={draft.blocks.map((block, index) => ({
+                            key: block.id,
+                            id: `block-panel-${block.id}`,
+                            label: (
+                              <Flex align="center" gap={6}>
+                                {blockTypeIcons[block.type]}
+                                <span style={{ fontSize: 12 }}>
+                                  {blockTypeOptions.find((o) => o.value === block.type)?.label} #{index + 1}
+                                </span>
+                                {blockPreview(block) ? (
+                                  <Typography.Text type="secondary" style={{ fontSize: 11, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {blockPreview(block)}
+                                  </Typography.Text>
+                                ) : null}
+                              </Flex>
+                            ),
+                            extra: (
+                              <Space size={0} onClick={(e) => e.stopPropagation()}>
+                                <Button type="link" size="small" onClick={() => moveBlock(block.id, -1)} disabled={index === 0}>↑</Button>
+                                <Button type="link" size="small" onClick={() => moveBlock(block.id, 1)} disabled={index === draft.blocks.length - 1}>↓</Button>
+                                <Button type="link" size="small" danger onClick={() => removeBlock(block.id)}>×</Button>
+                              </Space>
+                            ),
+                            children: (
+                              <Form layout="vertical" size="small">
+                                <Row gutter={8}>
+                                  <Col span={8}>
+                                    <Form.Item label="Row" style={{ marginBottom: 8 }}>
+                                      <InputNumber min={1} value={block.row} onChange={(v) => updateBlock(block.id, { row: Number(v || 1) })} style={{ width: '100%' }} />
+                                    </Form.Item>
+                                  </Col>
+                                  <Col span={8}>
+                                    <Form.Item label="Span/12" style={{ marginBottom: 8 }}>
+                                      <InputNumber min={1} max={12} value={block.span} onChange={(v) => updateBlock(block.id, { span: Number(v || 12) })} style={{ width: '100%' }} />
+                                    </Form.Item>
+                                  </Col>
+                                  <Col span={8}>
+                                    <Form.Item label="Align" style={{ marginBottom: 8 }}>
+                                      <Select
+                                        size="small"
+                                        value={block.align || 'left'}
+                                        onChange={(v) => updateBlock(block.id, { align: v })}
+                                        disabled={!['title', 'text'].includes(block.type)}
+                                        options={[{ value: 'left', label: 'Trái' }, { value: 'center', label: 'Giữa' }, { value: 'right', label: 'Phải' }]}
+                                      />
+                                    </Form.Item>
+                                  </Col>
+                                </Row>
 
-                      {block.type === 'title' ? (
-                        <Row gutter={16}>
-                          <Col xs={24} md={16}>
-                            <Form.Item label="Nội dung title" style={{ marginBottom: 12 }}>
-                              <Input value={block.title} onChange={(event) => updateBlock(block.id, { title: event.target.value })} />
-                            </Form.Item>
-                          </Col>
-                          <Col xs={24} md={8}>
-                            <Form.Item label="Heading level" style={{ marginBottom: 12 }}>
-                              <InputNumber min={1} max={6} value={block.level || 2} onChange={(value) => updateBlock(block.id, { level: Number(value || 2) })} style={{ width: '100%' }} />
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                      ) : null}
-
-                      {block.type === 'text' ? (
-                        <Form.Item label="Nội dung text" style={{ marginBottom: 12 }}>
-                          <Input.TextArea rows={5} value={block.text} onChange={(event) => updateBlock(block.id, { text: event.target.value })} />
-                        </Form.Item>
-                      ) : null}
-
-                      {block.type === 'image' ? (
-                        <Row gutter={16}>
-                          <Col xs={24} md={12}>
-                            <Form.Item label="URL hình ảnh" style={{ marginBottom: 12 }}>
-                              <Input value={block.url} onChange={(event) => updateBlock(block.id, { url: event.target.value })} placeholder="https://..." />
-                            </Form.Item>
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Form.Item label="Alt text" style={{ marginBottom: 12 }}>
-                              <Input value={block.alt} onChange={(event) => updateBlock(block.id, { alt: event.target.value })} />
-                            </Form.Item>
-                          </Col>
-                          <Col span={24}>
-                            <Form.Item label="Caption" style={{ marginBottom: 12 }}>
-                              <Input value={block.caption} onChange={(event) => updateBlock(block.id, { caption: event.target.value })} />
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                      ) : null}
-
-                      {block.type === 'video' ? (
-                        <Row gutter={16}>
-                          <Col xs={24} md={12}>
-                            <Form.Item label="URL video / Youtube" style={{ marginBottom: 12 }}>
-                              <Input value={block.url} onChange={(event) => updateBlock(block.id, { url: event.target.value })} placeholder="https://youtu.be/..." />
-                            </Form.Item>
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Form.Item label="Tiêu đề video" style={{ marginBottom: 12 }}>
-                              <Input value={block.title} onChange={(event) => updateBlock(block.id, { title: event.target.value })} />
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                      ) : null}
-
-                      {block.type === 'form' ? (
-                        <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                          <Row gutter={16}>
-                            <Col xs={24} md={12}>
-                              <Form.Item label="Tên form" style={{ marginBottom: 12 }}>
-                                <Input value={block.title} onChange={(event) => updateBlock(block.id, { title: event.target.value })} />
-                              </Form.Item>
-                            </Col>
-                            <Col xs={24} md={12}>
-                              <Form.Item label="Nhãn nút submit" style={{ marginBottom: 12 }}>
-                                <Input value={block.submitLabel} onChange={(event) => updateBlock(block.id, { submitLabel: event.target.value })} />
-                              </Form.Item>
-                            </Col>
-                            <Col span={24}>
-                              <Form.Item label="Mô tả form" style={{ marginBottom: 12 }}>
-                                <Input.TextArea rows={3} value={block.description} onChange={(event) => updateBlock(block.id, { description: event.target.value })} />
-                              </Form.Item>
-                            </Col>
-                            <Col span={24}>
-                              <Form.Item label="Thông báo thành công" style={{ marginBottom: 12 }}>
-                                <Input value={block.successMessage} onChange={(event) => updateBlock(block.id, { successMessage: event.target.value })} />
-                              </Form.Item>
-                            </Col>
-                          </Row>
-
-                          <Flex justify="space-between" align="center">
-                            <Typography.Text strong>Fields của form</Typography.Text>
-                            <Button icon={<PlusOutlined />} onClick={() => addFormField(block.id)}>Thêm field</Button>
-                          </Flex>
-
-                          {(block.fields || []).map((field) => (
-                            <Card key={field.id} size="small">
-                              <Row gutter={12}>
-                                <Col xs={24} md={6}>
-                                  <Form.Item label="Label" style={{ marginBottom: 12 }}>
-                                    <Input value={field.label} onChange={(event) => updateFormField(block.id, field.id, { label: event.target.value })} />
-                                  </Form.Item>
-                                </Col>
-                                <Col xs={24} md={6}>
-                                  <Form.Item label="Name" style={{ marginBottom: 12 }}>
-                                    <Input value={field.name} onChange={(event) => updateFormField(block.id, field.id, { name: slugify(event.target.value).replace(/-/g, '_') })} />
-                                  </Form.Item>
-                                </Col>
-                                <Col xs={24} md={4}>
-                                  <Form.Item label="Type" style={{ marginBottom: 12 }}>
-                                    <Select
-                                      value={field.type}
-                                      onChange={(value) => updateFormField(block.id, field.id, { type: value })}
-                                      options={[
-                                        { value: 'text', label: 'Text' },
-                                        { value: 'textarea', label: 'Textarea' },
-                                        { value: 'email', label: 'Email' },
-                                        { value: 'tel', label: 'Điện thoại' },
-                                        { value: 'number', label: 'Số' },
-                                      ]}
-                                    />
-                                  </Form.Item>
-                                </Col>
-                                <Col xs={24} md={4}>
-                                  <Form.Item label="Span / 12" style={{ marginBottom: 12 }}>
-                                    <InputNumber min={1} max={12} value={field.span} onChange={(value) => updateFormField(block.id, field.id, { span: Number(value || 12) })} style={{ width: '100%' }} />
-                                  </Form.Item>
-                                </Col>
-                                <Col xs={24} md={4}>
-                                  <Form.Item label="Bắt buộc" style={{ marginBottom: 12 }}>
-                                    <Flex align="center" style={{ minHeight: 32 }}>
-                                      <Switch checked={field.required} onChange={(checked) => updateFormField(block.id, field.id, { required: checked })} />
-                                    </Flex>
-                                  </Form.Item>
-                                </Col>
-                                <Col xs={24} md={20}>
-                                  <Form.Item label="Placeholder" style={{ marginBottom: 0 }}>
-                                    <Input value={field.placeholder} onChange={(event) => updateFormField(block.id, field.id, { placeholder: event.target.value })} />
-                                  </Form.Item>
-                                </Col>
-                                <Col xs={24} md={4}>
-                                  <Form.Item label=" " style={{ marginBottom: 0 }}>
-                                    <Button danger block onClick={() => removeFormField(block.id, field.id)}>Xóa field</Button>
-                                  </Form.Item>
-                                </Col>
-                              </Row>
-                            </Card>
-                          ))}
-                        </Space>
-                      ) : null}
-                    </Card>
-                  ))}
-                </Space>
-              )}
-            </Card>
-
-            <Card className="glass-card" title="Preview layout">
-              {draft.blocks.length === 0 ? (
-                <Empty description="Thêm block để xem preview" />
-              ) : (
-                <Space direction="vertical" size={20} style={{ width: '100%' }}>
-                  {Object.entries(rows)
-                    .sort(([left], [right]) => Number(left) - Number(right))
-                    .map(([rowKey, blocks]) => (
-                      <div key={rowKey}>
-                        <Typography.Text type="secondary">Row {rowKey}</Typography.Text>
-                        <div
-                          style={{
-                            display: 'grid',
-                            gap: 16,
-                            gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
-                            marginTop: 8,
-                          }}
-                        >
-                          {blocks.map((block) => (
-                            <Card key={block.id} size="small" style={{ gridColumn: `span ${block.span}` }}>
-                              {block.type === 'title' ? (
-                                <Typography.Title level={titleLevel(block.level)} style={{ marginBottom: 0, textAlign: block.align }}>
-                                  {block.title || 'Title'}
-                                </Typography.Title>
-                              ) : null}
-                              {block.type === 'text' ? (
-                                <Typography.Paragraph style={{ marginBottom: 0, textAlign: block.align, whiteSpace: 'pre-wrap' }}>
-                                  {block.text || 'Text block'}
-                                </Typography.Paragraph>
-                              ) : null}
-                              {block.type === 'image' ? (
-                                <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                                  {block.url ? <img alt={block.alt || block.title || 'Landing image'} src={block.url} style={{ width: '100%', borderRadius: 12, objectFit: 'cover' }} /> : <Tag>Chưa có ảnh</Tag>}
-                                  {block.caption ? <Typography.Text type="secondary">{block.caption}</Typography.Text> : null}
-                                </Space>
-                              ) : null}
-                              {block.type === 'video' ? (
-                                block.url ? (
-                                  <iframe allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" src={toEmbedUrl(block.url)} style={{ width: '100%', minHeight: 220, border: 0, borderRadius: 12 }} title={block.title || 'Video preview'} />
-                                ) : <Tag>Chưa có video</Tag>
-                              ) : null}
-                              {block.type === 'form' ? (
-                                <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                                  <Typography.Title level={4} style={{ marginBottom: 0 }}>{block.title || 'Form custom'}</Typography.Title>
-                                  {block.description ? <Typography.Paragraph type="secondary">{block.description}</Typography.Paragraph> : null}
-                                  <Row gutter={[12, 12]}>
-                                    {(block.fields || []).map((field) => (
-                                      <Col key={field.id} span={Math.max(1, Math.min(24, field.span * 2))}>
-                                        <Input placeholder={field.placeholder || field.label} />
-                                      </Col>
-                                    ))}
+                                {block.type === 'title' ? (
+                                  <Row gutter={8}>
+                                    <Col span={16}>
+                                      <Form.Item label="Nội dung" style={{ marginBottom: 8 }}>
+                                        <Input value={block.title} onChange={(e) => updateBlock(block.id, { title: e.target.value })} />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col span={8}>
+                                      <Form.Item label="Level" style={{ marginBottom: 8 }}>
+                                        <InputNumber min={1} max={6} value={block.level || 2} onChange={(v) => updateBlock(block.id, { level: Number(v || 2) })} style={{ width: '100%' }} />
+                                      </Form.Item>
+                                    </Col>
                                   </Row>
-                                  <Button type="primary">{block.submitLabel || 'Gửi thông tin'}</Button>
-                                </Space>
-                              ) : null}
-                            </Card>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                </Space>
-              )}
-            </Card>
-          </Space>
-        </Col>
-      </Row>
+                                ) : null}
 
+                                {block.type === 'text' ? (
+                                  <Form.Item label="Nội dung" style={{ marginBottom: 8 }}>
+                                    <Input.TextArea rows={4} value={block.text} onChange={(e) => updateBlock(block.id, { text: e.target.value })} />
+                                  </Form.Item>
+                                ) : null}
+
+                                {block.type === 'image' ? (
+                                  <>
+                                    <Form.Item label="URL ảnh" style={{ marginBottom: 8 }}>
+                                      <Input value={block.url} onChange={(e) => updateBlock(block.id, { url: e.target.value })} placeholder="https://..." />
+                                    </Form.Item>
+                                    <Form.Item label="Alt" style={{ marginBottom: 8 }}>
+                                      <Input value={block.alt} onChange={(e) => updateBlock(block.id, { alt: e.target.value })} />
+                                    </Form.Item>
+                                    <Form.Item label="Caption" style={{ marginBottom: 8 }}>
+                                      <Input value={block.caption} onChange={(e) => updateBlock(block.id, { caption: e.target.value })} />
+                                    </Form.Item>
+                                  </>
+                                ) : null}
+
+                                {block.type === 'video' ? (
+                                  <>
+                                    <Form.Item label="URL video / YouTube" style={{ marginBottom: 8 }}>
+                                      <Input value={block.url} onChange={(e) => updateBlock(block.id, { url: e.target.value })} placeholder="https://youtu.be/..." />
+                                    </Form.Item>
+                                    <Form.Item label="Tiêu đề video" style={{ marginBottom: 8 }}>
+                                      <Input value={block.title} onChange={(e) => updateBlock(block.id, { title: e.target.value })} />
+                                    </Form.Item>
+                                  </>
+                                ) : null}
+
+                                {block.type === 'form' ? (
+                                  <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                                    <Row gutter={8}>
+                                      <Col span={12}>
+                                        <Form.Item label="Tên form" style={{ marginBottom: 8 }}>
+                                          <Input value={block.title} onChange={(e) => updateBlock(block.id, { title: e.target.value })} />
+                                        </Form.Item>
+                                      </Col>
+                                      <Col span={12}>
+                                        <Form.Item label="Nút submit" style={{ marginBottom: 8 }}>
+                                          <Input value={block.submitLabel} onChange={(e) => updateBlock(block.id, { submitLabel: e.target.value })} />
+                                        </Form.Item>
+                                      </Col>
+                                    </Row>
+                                    <Form.Item label="Mô tả form" style={{ marginBottom: 8 }}>
+                                      <Input.TextArea rows={2} value={block.description} onChange={(e) => updateBlock(block.id, { description: e.target.value })} />
+                                    </Form.Item>
+                                    <Form.Item label="Thông báo thành công" style={{ marginBottom: 8 }}>
+                                      <Input value={block.successMessage} onChange={(e) => updateBlock(block.id, { successMessage: e.target.value })} />
+                                    </Form.Item>
+                                    <Flex justify="space-between" align="center">
+                                      <Typography.Text strong style={{ fontSize: 12 }}>Fields</Typography.Text>
+                                      <Button size="small" icon={<PlusOutlined />} onClick={() => addFormField(block.id)}>Thêm field</Button>
+                                    </Flex>
+                                    {(block.fields || []).map((field) => (
+                                      <Card key={field.id} size="small">
+                                        <Row gutter={8}>
+                                          <Col span={12}>
+                                            <Form.Item label="Label" style={{ marginBottom: 6 }}>
+                                              <Input size="small" value={field.label} onChange={(e) => updateFormField(block.id, field.id, { label: e.target.value })} />
+                                            </Form.Item>
+                                          </Col>
+                                          <Col span={12}>
+                                            <Form.Item label="Name" style={{ marginBottom: 6 }}>
+                                              <Input size="small" value={field.name} onChange={(e) => updateFormField(block.id, field.id, { name: slugify(e.target.value).replace(/-/g, '_') })} />
+                                            </Form.Item>
+                                          </Col>
+                                          <Col span={8}>
+                                            <Form.Item label="Type" style={{ marginBottom: 6 }}>
+                                              <Select
+                                                size="small"
+                                                value={field.type}
+                                                onChange={(v) => updateFormField(block.id, field.id, { type: v })}
+                                                options={[
+                                                  { value: 'text', label: 'Text' },
+                                                  { value: 'textarea', label: 'Textarea' },
+                                                  { value: 'email', label: 'Email' },
+                                                  { value: 'tel', label: 'Tel' },
+                                                  { value: 'number', label: 'Số' },
+                                                ]}
+                                              />
+                                            </Form.Item>
+                                          </Col>
+                                          <Col span={8}>
+                                            <Form.Item label="Span" style={{ marginBottom: 6 }}>
+                                              <InputNumber size="small" min={1} max={12} value={field.span} onChange={(v) => updateFormField(block.id, field.id, { span: Number(v || 12) })} style={{ width: '100%' }} />
+                                            </Form.Item>
+                                          </Col>
+                                          <Col span={8}>
+                                            <Form.Item label="Bắt buộc" style={{ marginBottom: 6 }}>
+                                              <Switch size="small" checked={field.required} onChange={(checked) => updateFormField(block.id, field.id, { required: checked })} />
+                                            </Form.Item>
+                                          </Col>
+                                          <Col span={20}>
+                                            <Form.Item label="Placeholder" style={{ marginBottom: 0 }}>
+                                              <Input size="small" value={field.placeholder} onChange={(e) => updateFormField(block.id, field.id, { placeholder: e.target.value })} />
+                                            </Form.Item>
+                                          </Col>
+                                          <Col span={4}>
+                                            <Form.Item label=" " style={{ marginBottom: 0 }}>
+                                              <Button size="small" danger block onClick={() => removeFormField(block.id, field.id)}>×</Button>
+                                            </Form.Item>
+                                          </Col>
+                                        </Row>
+                                      </Card>
+                                    ))}
+                                  </Space>
+                                ) : null}
+                              </Form>
+                            ),
+                          }))}
+                        />
+                      )}
+                    </Card>
+                  </Space>
+                ),
+              },
+              {
+                key: 'theme',
+                label: 'Giao diện',
+                children: <LandingThemeEditor />,
+              },
+            ]}
+          />
+        </div>
+
+        {/* Right 70% — iframe preview */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, gap: 8 }}>
+          <Flex align="center" justify="space-between" style={{ flexShrink: 0 }}>
+            <Space>
+              <Button
+                type={editMode ? 'primary' : 'default'}
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setEditMode((prev) => !prev)
+                  setIframeKey((k) => k + 1)
+                }}
+              >
+                {editMode ? 'Chế độ edit (bật)' : 'Chế độ edit'}
+              </Button>
+              <Button icon={<ReloadOutlined />} onClick={() => setIframeKey((k) => k + 1)}>Tải lại</Button>
+            </Space>
+            <Typography.Text type="secondary" style={{ fontSize: 11 }}>{previewUrl}</Typography.Text>
+          </Flex>
+          <iframe
+            key={iframeKey}
+            ref={iframeRef}
+            src={iframeUrl}
+            style={{ flex: 1, border: '1px solid #d9d9d9', borderRadius: 8, background: '#fff', minHeight: 400 }}
+            title="Landing page preview"
+          />
+        </div>
+      </div>
+
+      {/* ── Template Modal ── */}
       <Modal
         footer={null}
         onCancel={() => setTemplateModal(false)}
@@ -1400,6 +1378,6 @@ export function LandingPagesPage() {
           }))}
         />
       </Modal>
-    </Space>
+    </div>
   )
 }

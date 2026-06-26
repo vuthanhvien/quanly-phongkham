@@ -1,3 +1,5 @@
+'use client'
+
 import { FormBlock } from './FormBlock'
 import { LandingPageData, embedVideoUrl, isVideoEmbed, sortBlocks } from '../lib/landing'
 
@@ -9,12 +11,41 @@ function headingTag(level?: number) {
   return 'h2'
 }
 
-export function LandingPageView({ page }: { page: LandingPageData }) {
+export function LandingPageView({ page, editMode = false }: { page: LandingPageData; editMode?: boolean }) {
   const blocks = sortBlocks(page.blocks || [])
+
+  function selectBlock(blockId: string) {
+    if (!editMode) return
+    try {
+      window.parent.postMessage({ type: 'cms-block-select', blockId }, '*')
+    } catch {
+      // cross-origin or no parent — ignore
+    }
+  }
 
   return (
     <main className="shell">
-      <div className="page-frame">
+      {editMode && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            background: '#1677ff',
+            color: '#fff',
+            textAlign: 'center',
+            padding: '4px 0',
+            fontSize: 12,
+            fontFamily: 'system-ui,sans-serif',
+            pointerEvents: 'none',
+          }}
+        >
+          ✏️ Chế độ edit — click vào block để chọn trong CMS
+        </div>
+      )}
+      <div className="page-frame" style={editMode ? { marginTop: 26 } : undefined}>
         <section className="hero">
           <div className="eyebrow">Thiện Chánh clinic landing</div>
           <h1>{page.seoTitle || page.title}</h1>
@@ -27,7 +58,13 @@ export function LandingPageView({ page }: { page: LandingPageData }) {
             const span = Math.max(1, Math.min(12, block.span || 12))
 
             return (
-              <article className="landing-block" key={block.id} style={{ ['--span' as string]: span }}>
+              <article
+                className={`landing-block${editMode ? ' cms-editable' : ''}`}
+                key={block.id}
+                data-block-id={block.id}
+                style={{ ['--span' as string]: span, cursor: editMode ? 'pointer' : undefined }}
+                onClick={editMode ? () => selectBlock(block.id) : undefined}
+              >
                 {block.type === 'title' ? (
                   <Tag className="landing-title" style={{ fontSize: 'clamp(1.8rem, 4vw, 3rem)', textAlign: block.align || 'left' }}>
                     {block.title}

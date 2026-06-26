@@ -424,8 +424,7 @@ export function ZaloInboxPage() {
     <>
       <div className="page-header">
         <div>
-          <Typography.Text className="eyebrow">Zalo integration</Typography.Text>
-          <Typography.Title level={2}>Zalo Inbox</Typography.Title>
+          <Typography.Title level={3}>Zalo Inbox</Typography.Title>
         </div>
         <Space>
           <Button icon={<PlusOutlined />} type="primary" onClick={openCreateAccount}>
@@ -435,38 +434,7 @@ export function ZaloInboxPage() {
         </Space>
       </div>
 
-      {/* <Card className="glass-card zalo-guide-card">
-        <div className="zalo-guide-head">
-          <div>
-            <Typography.Text className="eyebrow">Cách đăng nhập</Typography.Text>
-            <Typography.Title level={4}>Luồng dùng Zalo cá nhân cho nhân viên</Typography.Title>
-          </div>
-          <Tag color="blue">MVP</Tag>
-        </div>
-        <div className="zalo-guide-grid">
-          <div className="zalo-guide-step">
-            <span>1</span>
-            <div>
-              <Typography.Text strong>Tạo tài khoản nội bộ</Typography.Text>
-              <Typography.Paragraph>Nhấn `Thêm tài khoản Zalo`, gán nhân viên và chi nhánh nếu cần.</Typography.Paragraph>
-            </div>
-          </div>
-          <div className="zalo-guide-step">
-            <span>2</span>
-            <div>
-              <Typography.Text strong>Đăng nhập bằng QR</Typography.Text>
-              <Typography.Paragraph>Trong thẻ tài khoản, bấm `Đăng nhập QR`, modal QR sẽ bật lên để quét bằng điện thoại.</Typography.Paragraph>
-            </div>
-          </div>
-          <div className="zalo-guide-step">
-            <span>3</span>
-            <div>
-              <Typography.Text strong>Bật listener để lưu tin nhắn</Typography.Text>
-              <Typography.Paragraph>Sau khi login xong, bấm `Bật listener`. Từ lúc đó message mới sẽ được lưu về hệ thống.</Typography.Paragraph>
-            </div>
-          </div>
-        </div>
-      </Card> */}
+   
 
       <div className="zalo-inbox-layout">
         <Card

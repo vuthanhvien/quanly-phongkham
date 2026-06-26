@@ -25,4 +25,9 @@ export class CategoriesController {
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }
+
+  @Post('import')
+  importBatch(@Body() body: { rows: Array<Record<string, unknown>> }) {
+    return this.service.importBatch(body.rows as any);
+  }
 }

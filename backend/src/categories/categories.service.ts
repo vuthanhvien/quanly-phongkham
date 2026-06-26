@@ -59,4 +59,75 @@ export class CategoriesService {
     await this.repo.delete(id);
     return { success: true };
   }
+
+  async importBatch(rows: Array<Partial<ItemCategory> & { parentCode?: string }>) {
+    // Pre-load all existing codes → id
+    const existing = await this.repo.find({ select: ['id', 'code'] as (keyof ItemCategory)[] });
+    const codeMap = new Map<string, string>();
+    for (const cat of existing) {
+      if (cat.code) codeMap.set(cat.code.trim(), cat.id);
+    }
+
+    // Process root rows first (no parentCode), then children
+    const sorted = [...rows].sort((a, b) => {
+      const aHas = a.parentCode ? 1 : 0;
+      const bHas = b.parentCode ? 1 : 0;
+      return aHas - bHas;
+    });
+
+    const results: Array<ItemCategory & { _action: string }> = [];
+    const errors: Array<{ rowIndex: number; code?: string; error: string }> = [];
+
+    for (let i = 0; i < sorted.length; i++) {
+      const row = sorted[i];
+      try {
+        let parentId: string | undefined;
+        let level = 1;
+
+        if (row.parentCode?.trim()) {
+          const pid = codeMap.get(row.parentCode.trim());
+          if (!pid) throw new Error(`Không tìm thấy danh mục cha với mã "${row.parentCode}"`);
+          const parent = await this.repo.findOne({ where: { id: pid } });
+          if (!parent) throw new Error(`Danh mục cha không còn tồn tại`);
+          if (parent.level >= 3) throw new Error('Tối đa 3 cấp danh mục');
+          parentId = pid;
+          level = parent.level + 1;
+        }
+
+        const payload: Partial<ItemCategory> = {
+          name: row.name,
+          code: row.code?.trim() || undefined,
+          description: row.description || undefined,
+          sortOrder: row.sortOrder != null ? Number(row.sortOrder) : 0,
+          isActive: row.isActive !== false && String(row.isActive) !== '0' && String(row.isActive).toLowerCase() !== 'false',
+          parentId,
+          level,
+        };
+
+        const existingId = row.code ? codeMap.get(row.code.trim()) : undefined;
+        if (existingId) {
+          const cat = await this.repo.findOne({ where: { id: existingId } });
+          if (cat) {
+            Object.assign(cat, payload);
+            const saved = await this.repo.save(cat);
+            if (saved.code) codeMap.set(saved.code, saved.id);
+            results.push({ ...saved, _action: 'updated' });
+          }
+        } else {
+          const cat = this.repo.create(payload);
+          const saved = await this.repo.save(cat);
+          if (saved.code) codeMap.set(saved.code, saved.id);
+          results.push({ ...saved, _action: 'created' });
+        }
+      } catch (err) {
+        errors.push({
+          rowIndex: i + 1,
+          code: row.code,
+          error: err instanceof Error ? err.message : 'Lỗi không xác định',
+        });
+      }
+    }
+
+    return { success: results.length, failed: errors.length, results, errors };
+  }
 }

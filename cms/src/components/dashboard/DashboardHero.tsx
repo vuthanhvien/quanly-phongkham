@@ -6,7 +6,7 @@ export function DashboardHero({ revenueToday }: { revenueToday: number }) {
   return (
     <div className="hero-panel">
       <div>
-        <Typography.Title level={2}>Tổng quan vận hành</Typography.Title>
+        <Typography.Title level={3}>Tổng quan vận hành</Typography.Title>
         <Typography.Paragraph>
           Dashboard này đang ưu tiên số liệu vận hành trong ngày và các chỉ số cần theo dõi nhanh để tránh nhìn nhầm số tích lũy thành số hôm nay.
         </Typography.Paragraph>

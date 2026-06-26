@@ -1,5 +1,26 @@
-import { AppstoreOutlined, DeleteOutlined, DownloadOutlined, ImportOutlined, PlusOutlined, UploadOutlined } from "@ant-design/icons"
-import { Button, Card, Checkbox, Form, Input, InputNumber, Modal, Select, Space, Table, Typography, Upload, message } from "antd"
+import {
+  AppstoreOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
+  ImportOutlined,
+  PlusOutlined,
+  UploadOutlined,
+} from "@ant-design/icons"
+import {
+  Button,
+  Card,
+  Checkbox,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Space,
+  Table,
+  Typography,
+  Upload,
+  message,
+} from "antd"
 import type { UploadProps } from "antd"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
@@ -34,14 +55,19 @@ export function CustomFieldsPage() {
   const [importPayload, setImportPayload] = useState<ParsedFieldInput[]>([])
   const [fieldForm] = Form.useForm()
   const currentFieldType = Form.useWatch("dataType", fieldForm)
-  const fieldKeys = useMemo(() => new Set(fields.map((field) => field.key)), [fields])
+  const fieldKeys = useMemo(
+    () => new Set(fields.map((field) => field.key)),
+    [fields],
+  )
 
   useEffect(() => {
     void load()
   }, [entityType])
 
   async function load() {
-    const response = await api.get("/settings/custom-fields", { params: { entityType } })
+    const response = await api.get("/settings/custom-fields", {
+      params: { entityType },
+    })
     setFields(response.data.data)
   }
 
@@ -109,13 +135,18 @@ export function CustomFieldsPage() {
         .map((item) => sanitizeFieldKey(String(item.key || "")))
         .filter((key) => fieldKeys.has(key))
       if (duplicateKeys.length > 0) {
-        message.error(`Các key đã tồn tại: ${Array.from(new Set(duplicateKeys)).join(", ")}`)
+        message.error(
+          `Các key đã tồn tại: ${Array.from(new Set(duplicateKeys)).join(", ")}`,
+        )
         return
       }
     }
 
     for (const item of parsed) {
-      const payload = normalizeFieldPayload(item as unknown as Record<string, unknown>, entityType)
+      const payload = normalizeFieldPayload(
+        item as unknown as Record<string, unknown>,
+        entityType,
+      )
       const existing = existingByKey.get(String(payload.key))
       if (existing) {
         await api.patch(`/settings/custom-fields/${existing.id}`, payload)
@@ -170,7 +201,10 @@ export function CustomFieldsPage() {
     await submitBatchPayload(importPayload, mode)
   }
 
-  async function submitBatchPayload(parsed: ParsedFieldInput[], mode: "create" | "upsert") {
+  async function submitBatchPayload(
+    parsed: ParsedFieldInput[],
+    mode: "create" | "upsert",
+  ) {
     const existingByKey = new Map(fields.map((field) => [field.key, field]))
 
     if (mode === "create") {
@@ -178,13 +212,18 @@ export function CustomFieldsPage() {
         .map((item) => sanitizeFieldKey(String(item.key || "")))
         .filter((key) => fieldKeys.has(key))
       if (duplicateKeys.length > 0) {
-        message.error(`Các key đã tồn tại: ${Array.from(new Set(duplicateKeys)).join(", ")}`)
+        message.error(
+          `Các key đã tồn tại: ${Array.from(new Set(duplicateKeys)).join(", ")}`,
+        )
         return
       }
     }
 
     for (const item of parsed) {
-      const payload = normalizeFieldPayload(item as unknown as Record<string, unknown>, entityType)
+      const payload = normalizeFieldPayload(
+        item as unknown as Record<string, unknown>,
+        entityType,
+      )
       const existing = existingByKey.get(String(payload.key))
       if (existing) {
         if (mode === "create") continue
@@ -207,12 +246,7 @@ export function CustomFieldsPage() {
   return (
     <>
       <div className="page-header">
-        <div>
-          <Typography.Text className="eyebrow">
-            No-code operations
-          </Typography.Text>
-          <Typography.Title level={2}>Custom fields</Typography.Title>
-        </div>
+        <Typography.Title level={3}>Custom fields</Typography.Title>
         <Space wrap>
           <Select
             value={entityType}
@@ -223,7 +257,12 @@ export function CustomFieldsPage() {
               label,
             }))}
           />
-          <Button className="primary-glow" icon={<AppstoreOutlined />} type="primary" onClick={openCreateField}>
+          <Button
+            className="primary-glow"
+            icon={<AppstoreOutlined />}
+            type="primary"
+            onClick={openCreateField}
+          >
             Thêm field
           </Button>
           <Button icon={<UploadOutlined />} onClick={() => openBatch("create")}>
@@ -242,7 +281,8 @@ export function CustomFieldsPage() {
       </div>
       <Card className="glass-card settings-card">
         <Typography.Paragraph type="secondary">
-          Custom field dùng chung cho tất cả role. Phần hiển thị và bắt buộc nhập sẽ được cấu hình riêng theo role trong màn Cấu hình động.
+          Custom field dùng chung cho tất cả role. Phần hiển thị và bắt buộc
+          nhập sẽ được cấu hình riêng theo role trong màn Cấu hình động.
         </Typography.Paragraph>
         <Table
           size="small"
@@ -273,7 +313,11 @@ export function CustomFieldsPage() {
                   <Button type="link" onClick={() => openEditField(row)}>
                     Sửa
                   </Button>
-                  <Button danger type="link" onClick={() => deleteField(row.id)}>
+                  <Button
+                    danger
+                    type="link"
+                    onClick={() => deleteField(row.id)}
+                  >
                     Xóa
                   </Button>
                 </Space>
@@ -293,16 +337,22 @@ export function CustomFieldsPage() {
         }}
       >
         <Form form={fieldForm} layout="vertical" onFinish={saveField}>
-          <Form.Item name="label" label="Tên hiển thị" rules={[{ required: true }]}>
+          <Form.Item
+            name="label"
+            label="Tên hiển thị"
+            rules={[{ required: true }]}
+          >
             <Input />
           </Form.Item>
-          <Form.Item name="key" label="Key dữ liệu" rules={[{ required: true }]}>
+          <Form.Item
+            name="key"
+            label="Key dữ liệu"
+            rules={[{ required: true }]}
+          >
             <Input placeholder="vi_du_field" />
           </Form.Item>
           <Form.Item name="dataType" label="Kiểu" initialValue="text">
-            <Select
-              options={CUSTOM_FIELD_TYPES}
-            />
+            <Select options={CUSTOM_FIELD_TYPES} />
           </Form.Item>
           {currentFieldType === "select" && (
             <Form.Item name="options" label="Lựa chọn (ngăn cách dấu phẩy)">
@@ -330,22 +380,46 @@ export function CustomFieldsPage() {
         </Form>
       </Modal>
       <Modal
-        title={batchMode === "create" ? "Add multi custom fields" : "Update multi custom fields"}
+        title={
+          batchMode === "create"
+            ? "Add multi custom fields"
+            : "Update multi custom fields"
+        }
         open={batchModal}
         maskClosable={false}
         onCancel={() => setBatchModal(false)}
         onOk={() => void submitBatch()}
-        okText={batchMode === "create" ? "Thêm hàng loạt" : "Cập nhật hàng loạt"}
+        okText={
+          batchMode === "create" ? "Thêm hàng loạt" : "Cập nhật hàng loạt"
+        }
         width={1440}
       >
         <Typography.Paragraph type="secondary">
-          Chỉnh nhiều field trực tiếp theo dạng bảng. `Add multi` dùng để thêm mới hàng loạt, `Update multi` mở toàn bộ field hiện có để sửa đồng loạt.
+          Chỉnh nhiều field trực tiếp theo dạng bảng. `Add multi` dùng để thêm
+          mới hàng loạt, `Update multi` mở toàn bộ field hiện có để sửa đồng
+          loạt.
         </Typography.Paragraph>
         <Space style={{ marginBottom: 16 }}>
-          <Button icon={<PlusOutlined />} onClick={() => setBatchRows((current) => [...current, createEmptyBatchRow(current.length)])}>
+          <Button
+            icon={<PlusOutlined />}
+            onClick={() =>
+              setBatchRows((current) => [
+                ...current,
+                createEmptyBatchRow(current.length),
+              ])
+            }
+          >
             Thêm dòng
           </Button>
-          <Button onClick={() => setBatchRows(batchMode === "create" ? [createEmptyBatchRow(0)] : fields.map((field, index) => toBatchRow(field, index)))}>
+          <Button
+            onClick={() =>
+              setBatchRows(
+                batchMode === "create"
+                  ? [createEmptyBatchRow(0)]
+                  : fields.map((field, index) => toBatchRow(field, index)),
+              )
+            }
+          >
             Reset dữ liệu
           </Button>
         </Space>
@@ -368,16 +442,22 @@ export function CustomFieldsPage() {
           <Button key="cancel" onClick={() => setImportModal(false)}>
             Hủy
           </Button>,
-          <Button key="create" onClick={() => void confirmImport("create") }>
+          <Button key="create" onClick={() => void confirmImport("create")}>
             Import thêm mới
           </Button>,
-          <Button key="upsert" className="primary-glow" type="primary" onClick={() => void confirmImport("upsert") }>
+          <Button
+            key="upsert"
+            className="primary-glow"
+            type="primary"
+            onClick={() => void confirmImport("upsert")}
+          >
             Import cập nhật
           </Button>,
         ]}
       >
         <Typography.Paragraph type="secondary">
-          Đã đọc được {importPayload.length} field từ file Excel. Chọn cách import phù hợp.
+          Đã đọc được {importPayload.length} field từ file Excel. Chọn cách
+          import phù hợp.
         </Typography.Paragraph>
         <Table
           size="small"
@@ -389,8 +469,17 @@ export function CustomFieldsPage() {
             { title: "Label", dataIndex: "label" },
             { title: "Key", dataIndex: "key" },
             { title: "Type", dataIndex: "dataType" },
-            { title: "Options", dataIndex: "options", render: (value) => Array.isArray(value) ? value.join(", ") : value || "-" },
-            { title: "Relation", dataIndex: "relationResource", render: (value) => value || "-" },
+            {
+              title: "Options",
+              dataIndex: "options",
+              render: (value) =>
+                Array.isArray(value) ? value.join(", ") : value || "-",
+            },
+            {
+              title: "Relation",
+              dataIndex: "relationResource",
+              render: (value) => value || "-",
+            },
           ]}
         />
       </Modal>
@@ -451,7 +540,8 @@ function normalizeBatchRow(row: BatchFieldRow): ParsedFieldInput {
     key: sanitizeFieldKey(row.key),
     dataType: row.dataType,
     options: row.options,
-    relationResource: row.dataType === "relative" ? row.relationResource : undefined,
+    relationResource:
+      row.dataType === "relative" ? row.relationResource : undefined,
     sortOrder: row.sortOrder,
     isActive: row.isActive,
   }
@@ -461,7 +551,10 @@ function sanitizeFieldKey(key: string) {
   return key.trim().replace(/[^a-zA-Z0-9_]/g, "_")
 }
 
-function normalizeFieldPayload(values: Record<string, unknown>, entityType: string) {
+function normalizeFieldPayload(
+  values: Record<string, unknown>,
+  entityType: string,
+) {
   return {
     ...values,
     entityType,
@@ -512,7 +605,9 @@ function parseBatchPayload(text: string): ParsedFieldInput[] {
   const headers = rows[0].split(delimiter).map((item) => item.trim())
   return rows.slice(1).map((row) => {
     const values = row.split(delimiter)
-    const mapped = Object.fromEntries(headers.map((header, index) => [header, values[index]?.trim() || ""]))
+    const mapped = Object.fromEntries(
+      headers.map((header, index) => [header, values[index]?.trim() || ""]),
+    )
     return normalizeParsedField(mapped)
   })
 }
@@ -521,7 +616,9 @@ async function parseExcelFile(file: File) {
   const buffer = await file.arrayBuffer()
   const workbook = XLSX.read(buffer, { type: "array" })
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: "" })
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, {
+    defval: "",
+  })
   return rows.map(normalizeParsedField)
 }
 
@@ -530,15 +627,19 @@ function normalizeParsedField(item: Record<string, unknown>): ParsedFieldInput {
     label: String(item.label || ""),
     key: sanitizeFieldKey(String(item.key || "")),
     dataType: String(item.dataType || "text"),
-    options:
-      Array.isArray(item.options)
-        ? item.options.map((value) => String(value))
-        : item.options !== undefined
-          ? String(item.options)
-          : undefined,
-    relationResource: item.relationResource ? String(item.relationResource) : undefined,
+    options: Array.isArray(item.options)
+      ? item.options.map((value) => String(value))
+      : item.options !== undefined
+        ? String(item.options)
+        : undefined,
+    relationResource: item.relationResource
+      ? String(item.relationResource)
+      : undefined,
     sortOrder: item.sortOrder ? Number(item.sortOrder) : 0,
-    isActive: item.isActive === false || String(item.isActive).toLowerCase() === "false" ? false : true,
+    isActive:
+      item.isActive === false || String(item.isActive).toLowerCase() === "false"
+        ? false
+        : true,
   }
 }
 
@@ -554,7 +655,13 @@ function buildBatchColumns(
         <Input
           value={row.label}
           onChange={(event) =>
-            setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, label: event.target.value } : item))
+            setBatchRows((current) =>
+              current.map((item) =>
+                item.__rowKey === row.__rowKey
+                  ? { ...item, label: event.target.value }
+                  : item,
+              ),
+            )
           }
         />
       ),
@@ -567,7 +674,13 @@ function buildBatchColumns(
         <Input
           value={row.key}
           onChange={(event) =>
-            setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, key: event.target.value } : item))
+            setBatchRows((current) =>
+              current.map((item) =>
+                item.__rowKey === row.__rowKey
+                  ? { ...item, key: event.target.value }
+                  : item,
+              ),
+            )
           }
         />
       ),
@@ -581,7 +694,21 @@ function buildBatchColumns(
           value={row.dataType}
           options={CUSTOM_FIELD_TYPES}
           onChange={(value) =>
-            setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, dataType: value, relationResource: value === "relative" ? item.relationResource : undefined, options: value === "select" ? item.options : "" } : item))
+            setBatchRows((current) =>
+              current.map((item) =>
+                item.__rowKey === row.__rowKey
+                  ? {
+                      ...item,
+                      dataType: value,
+                      relationResource:
+                        value === "relative"
+                          ? item.relationResource
+                          : undefined,
+                      options: value === "select" ? item.options : "",
+                    }
+                  : item,
+              ),
+            )
           }
         />
       ),
@@ -590,33 +717,47 @@ function buildBatchColumns(
       title: "Options",
       dataIndex: "options",
       width: 260,
-      render: (_, row) => (
+      render: (_, row) =>
         row.dataType === "select" ? (
           <Input
             value={row.options}
             placeholder="A, B, C"
             onChange={(event) =>
-              setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, options: event.target.value } : item))
+              setBatchRows((current) =>
+                current.map((item) =>
+                  item.__rowKey === row.__rowKey
+                    ? { ...item, options: event.target.value }
+                    : item,
+                ),
+              )
             }
           />
-        ) : <Typography.Text type="secondary">-</Typography.Text>
-      ),
+        ) : (
+          <Typography.Text type="secondary">-</Typography.Text>
+        ),
     },
     {
       title: "Liên kết",
       dataIndex: "relationResource",
       width: 220,
-      render: (_, row) => (
+      render: (_, row) =>
         row.dataType === "relative" ? (
           <Select
             value={row.relationResource}
             options={RELATIVE_RESOURCE_OPTIONS}
             onChange={(value) =>
-              setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, relationResource: value } : item))
+              setBatchRows((current) =>
+                current.map((item) =>
+                  item.__rowKey === row.__rowKey
+                    ? { ...item, relationResource: value }
+                    : item,
+                ),
+              )
             }
           />
-        ) : <Typography.Text type="secondary">-</Typography.Text>
-      ),
+        ) : (
+          <Typography.Text type="secondary">-</Typography.Text>
+        ),
     },
     {
       title: "Thứ tự",
@@ -626,7 +767,13 @@ function buildBatchColumns(
         <InputNumber
           value={row.sortOrder}
           onChange={(value) =>
-            setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, sortOrder: Number(value || 0) } : item))
+            setBatchRows((current) =>
+              current.map((item) =>
+                item.__rowKey === row.__rowKey
+                  ? { ...item, sortOrder: Number(value || 0) }
+                  : item,
+              ),
+            )
           }
         />
       ),
@@ -639,7 +786,13 @@ function buildBatchColumns(
         <Checkbox
           checked={row.isActive}
           onChange={(event) =>
-            setBatchRows((current) => current.map((item) => item.__rowKey === row.__rowKey ? { ...item, isActive: event.target.checked } : item))
+            setBatchRows((current) =>
+              current.map((item) =>
+                item.__rowKey === row.__rowKey
+                  ? { ...item, isActive: event.target.checked }
+                  : item,
+              ),
+            )
           }
         />
       ),
@@ -653,7 +806,11 @@ function buildBatchColumns(
           danger
           icon={<DeleteOutlined />}
           type="text"
-          onClick={() => setBatchRows((current) => current.filter((item) => item.__rowKey !== row.__rowKey))}
+          onClick={() =>
+            setBatchRows((current) =>
+              current.filter((item) => item.__rowKey !== row.__rowKey),
+            )
+          }
         />
       ),
     },
