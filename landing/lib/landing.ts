@@ -112,12 +112,16 @@ export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
 export async function getMenuSettings(): Promise<NavItem[]> {
   try {
     const res = await fetch(`${API_URL}/public/landing-pages/menu`, { next: { revalidate: 60 } })
-    if (!res.ok) return []
+    if (!res.ok) {
+      const globalSettings = await getGlobalSettings()
+      return normalizeMenuItems(globalSettings.menuItems)
+    }
     const raw = await res.json() as { data?: NavItem[] } | NavItem[]
     const data = Array.isArray(raw) ? raw : (raw.data ?? [])
     return normalizeMenuItems(data)
   } catch {
-    return []
+    const globalSettings = await getGlobalSettings()
+    return normalizeMenuItems(globalSettings.menuItems)
   }
 }
 

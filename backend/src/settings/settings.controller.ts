@@ -102,9 +102,10 @@ export class SettingsController {
     return { data: await this.settings.listLandingPages(request?.user) };
   }
 
+  @Public()
   @Get('app-ui')
   async appUi(@Request() request?: { user: AuthUser }) {
-    return { data: await this.settings.getAppUiSettings(request?.user) };
+    return { data: request?.user ? await this.settings.getAppUiSettings(request?.user) : await this.settings.getPublicAppUiSettings() };
   }
 
   @Patch('app-ui')

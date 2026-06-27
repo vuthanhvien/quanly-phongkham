@@ -180,6 +180,10 @@ export class SettingsService {
     return this.ensureAppUiSettings();
   }
 
+  async getPublicAppUiSettings() {
+    return this.ensureAppUiSettings();
+  }
+
   async updateAppUiSettings(payload: Partial<AppUiSetting>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const current = await this.ensureAppUiSettings();

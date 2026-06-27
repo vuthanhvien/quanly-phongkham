@@ -811,7 +811,13 @@ export function LandingPagesPage() {
       const items = (res.data?.data ?? res.data) as NavItem[]
       setGlobalSettings((current) => ({ ...current, menuItems: normalizeNavTree(items) }))
     } catch {
-      // keep defaults
+      try {
+        const res = await api.get('/settings/landing-global')
+        const payload = (res.data?.data ?? res.data) as LandingGlobalSetting
+        setGlobalSettings((current) => ({ ...current, menuItems: normalizeNavTree(payload.menuItems) }))
+      } catch {
+        // keep defaults
+      }
     }
   }
 
@@ -836,7 +842,13 @@ export function LandingPagesPage() {
       message.success('Đã lưu menu dùng chung')
       setIframeKey((k) => k + 1)
     } catch {
-      message.error('Lưu menu thất bại')
+      try {
+        await api.put('/settings/landing-global', { menuItems: globalSettings.menuItems ?? [] })
+        message.success('Đã lưu menu qua cấu hình site hiện tại')
+        setIframeKey((k) => k + 1)
+      } catch {
+        message.error('Lưu menu thất bại')
+      }
     } finally {
       setMenuSaving(false)
     }

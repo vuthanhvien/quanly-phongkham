@@ -4,7 +4,7 @@ import { ConfigProvider, theme } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
 import { hasResourceAccess, hasScreenAccess } from './access';
-import { AppUiContext, cardPaddingBySize, controlHeightBySize, defaultAppUiSettings, syncDocumentBranding, tablePaddingBySize, useAppUi, type AppUiSettings } from './app-ui';
+import { AppUiContext, cardPaddingBySize, controlHeightBySize, defaultAppUiSettings, loadCachedAppUiSettings, normalizeAppUiSettings, persistAppUiSettings, syncDocumentBranding, tablePaddingBySize, useAppUi, type AppUiSettings } from './app-ui';
 import { authProvider, dataProvider, api } from './api';
 import { Shell } from './components/Shell';
 import { entityLabels } from './models';
@@ -61,8 +61,8 @@ function ResourceGuard() {
 }
 
 export function App() {
-  const [appUiSettings, setAppUiSettings] = useState<AppUiSettings>(defaultAppUiSettings);
-  const [uiLoading, setUiLoading] = useState(true);
+  const [appUiSettings, setAppUiSettings] = useState<AppUiSettings>(() => loadCachedAppUiSettings());
+  const [uiLoading, setUiLoading] = useState(false);
 
   useEffect(() => {
     void loadAppUiSettings();
@@ -70,15 +70,16 @@ export function App() {
 
   useEffect(() => {
     syncDocumentBranding(appUiSettings);
+    persistAppUiSettings(appUiSettings);
   }, [appUiSettings]);
 
   const loadAppUiSettings = useCallback(async () => {
     setUiLoading(true);
     try {
       const response = await api.get('/settings/app-ui');
-      setAppUiSettings({ ...defaultAppUiSettings, ...response.data.data });
+      setAppUiSettings(normalizeAppUiSettings(response.data.data));
     } catch {
-      setAppUiSettings(defaultAppUiSettings);
+      setAppUiSettings((current) => current || defaultAppUiSettings);
     } finally {
       setUiLoading(false);
     }
@@ -86,7 +87,7 @@ export function App() {
 
   const saveAppUiSettings = useCallback(async (payload: Partial<AppUiSettings>) => {
     const response = await api.patch('/settings/app-ui', payload);
-    const next = { ...defaultAppUiSettings, ...response.data.data } as AppUiSettings;
+    const next = normalizeAppUiSettings(response.data.data);
     setAppUiSettings(next);
     return next;
   }, []);
