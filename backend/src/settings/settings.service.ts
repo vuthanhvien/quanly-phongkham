@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import Handlebars from 'handlebars';
 import { IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, DynamicRoleDefinition, LandingFormSubmission, LandingPage, LandingThemeSetting, PrintTemplate, User, ViewSetting } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, DynamicRoleDefinition, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, User, ViewSetting } from '../entities/entities';
 import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
 
@@ -61,8 +61,24 @@ export class SettingsService {
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(BranchRoleAssignment) private readonly branchRoles: Repository<BranchRoleAssignment>,
     @InjectRepository(LandingThemeSetting) private readonly landingThemeSettings: Repository<LandingThemeSetting>,
+    @InjectRepository(LandingGlobalSetting) private readonly landingGlobalSettings: Repository<LandingGlobalSetting>,
     private readonly records: RecordsService,
   ) {}
+
+  async getLandingGlobalSettings() {
+    const existing = await this.landingGlobalSettings.findOne({ where: { settingKey: 'default' } });
+    if (existing) return { data: existing };
+    const fresh = this.landingGlobalSettings.create({ settingKey: 'default', menuItems: [], footerColumns: [], footerSocialLinks: [] });
+    const saved = await this.landingGlobalSettings.save(fresh);
+    return { data: saved };
+  }
+
+  async updateLandingGlobalSettings(payload: Partial<LandingGlobalSetting>) {
+    const { data: current } = await this.getLandingGlobalSettings();
+    const merged = this.landingGlobalSettings.merge(current, payload);
+    const saved = await this.landingGlobalSettings.save(merged);
+    return { data: saved };
+  }
 
   listFields(entityType?: string, user?: AuthUser) {
     this.assertResourceReadable(user, entityType);

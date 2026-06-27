@@ -41,7 +41,56 @@ export interface LandingPageData {
   isPublished: boolean
 }
 
+export interface NavItem {
+  id: string
+  label: string
+  href: string
+  target?: '_blank' | '_self'
+}
+
+export interface FooterLink {
+  id: string
+  label: string
+  href: string
+}
+
+export interface FooterColumn {
+  id: string
+  title: string
+  links: FooterLink[]
+}
+
+export interface SocialLink {
+  id: string
+  platform: string
+  url: string
+}
+
+export interface LandingGlobalSetting {
+  logoUrl?: string
+  logoAlt?: string
+  logoWidth?: number
+  headerSticky?: boolean
+  headerBgColor?: string
+  headerCtaLabel?: string
+  headerCtaHref?: string
+  menuItems?: NavItem[]
+  footerColumns?: FooterColumn[]
+  footerSocialLinks?: SocialLink[]
+  footerCopyright?: string
+}
+
 const API_URL = process.env.LANDING_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
+
+export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
+  try {
+    const res = await fetch(`${API_URL}/public/landing-pages/global`, { next: { revalidate: 60 } })
+    if (!res.ok) return {}
+    return await res.json() as LandingGlobalSetting
+  } catch {
+    return {}
+  }
+}
 
 export async function getLandingPage(pathname: string): Promise<LandingPageData | null> {
   const response = await fetch(`${API_URL}/public/landing-pages/resolve?path=${encodeURIComponent(pathname)}`, {

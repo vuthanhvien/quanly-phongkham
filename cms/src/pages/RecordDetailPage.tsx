@@ -195,6 +195,34 @@ export function RecordDetailPage() {
                 }]
               : []
 
+            const infoTab = fields.length > 0 ? [{
+              key: "__info",
+              label: "Thông tin",
+              children: (
+                <div className="detail-grid">
+                  <Row gutter={[16, 16]}>
+                    {fields.map((field) => (
+                      <Col key={field.key} span={detailWidthToSpan(field.width)} xs={24}>
+                        <div className="detail-item">
+                          <div className="detail-item-label">
+                            {field.description ? (
+                              <Space direction="vertical" size={0}>
+                                <span>{field.label}</span>
+                                <Typography.Text type="secondary">{field.description}</Typography.Text>
+                              </Space>
+                            ) : field.label}
+                          </div>
+                          <div className="detail-item-content">
+                            <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={record?.[field.key] ?? record?.customFields?.[field.key]} />
+                          </div>
+                        </div>
+                      </Col>
+                    ))}
+                  </Row>
+                </div>
+              ),
+            }] : []
+
             const relatedTabs = related.map((block) => ({
               key: block.resource,
               label: (
@@ -315,7 +343,7 @@ export function RecordDetailPage() {
               ),
             }))
 
-            const allTabs = [...relatedTabs, ...serviceOrderItemsTab]
+            const allTabs = [...infoTab, ...relatedTabs, ...serviceOrderItemsTab]
             if (allTabs.length === 0) {
               return <Card className="glass-card detail-card" loading={loading}><Empty description="Không có dữ liệu liên kết" /></Card>
             }
@@ -368,28 +396,6 @@ export function RecordDetailPage() {
                 </div>
               </Card>
             )}
-            <Card className="glass-card detail-card" loading={loading}>
-              <Typography.Title level={5} style={{ marginBottom: 16 }}>Thông tin chi tiết</Typography.Title>
-              <div className="detail-grid detail-grid-stacked">
-                {fields.map((field) => (
-                  <div key={field.key} className="detail-item">
-                    <div className="detail-item-label">
-                      {field.description ? (
-                        <Space direction="vertical" size={0}>
-                          <span>{field.label}</span>
-                          <Typography.Text type="secondary">{field.description}</Typography.Text>
-                        </Space>
-                      ) : (
-                        field.label
-                      )}
-                    </div>
-                    <div className="detail-item-content">
-                      <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={record?.[field.key] ?? record?.customFields?.[field.key]} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
           </div>
         </Col>
       </Row>

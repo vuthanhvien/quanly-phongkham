@@ -1,19 +1,24 @@
 import {
   DeleteOutlined,
+  DesktopOutlined,
   EditOutlined,
   EyeOutlined,
   FormOutlined,
   InsertRowAboveOutlined,
+  MobileOutlined,
   PictureOutlined,
   PlusOutlined,
   ReloadOutlined,
   SaveOutlined,
+  SettingOutlined,
+  TabletOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons'
 import {
   Button,
   Card,
   Collapse,
+  Drawer,
   Empty,
   Flex,
   Form,
@@ -687,6 +692,40 @@ function titleLevel(level?: number): 1 | 2 | 3 | 4 | 5 {
   return next as 1 | 2 | 3 | 4 | 5
 }
 
+type NavItem = { id: string; label: string; href: string; target?: '_blank' | '_self' }
+type FooterColumn = { id: string; title: string; links: Array<{ id: string; label: string; href: string }> }
+type SocialLink = { id: string; platform: string; url: string }
+
+interface LandingGlobalSetting {
+  logoUrl?: string
+  logoAlt?: string
+  logoWidth?: number
+  headerSticky?: boolean
+  headerBgColor?: string
+  headerCtaLabel?: string
+  headerCtaHref?: string
+  menuItems?: NavItem[]
+  footerColumns?: FooterColumn[]
+  footerSocialLinks?: SocialLink[]
+  footerCopyright?: string
+}
+
+function emptyGlobal(): LandingGlobalSetting {
+  return {
+    logoUrl: '',
+    logoAlt: '',
+    logoWidth: 160,
+    headerSticky: true,
+    headerBgColor: '#ffffff',
+    headerCtaLabel: '',
+    headerCtaHref: '',
+    menuItems: [],
+    footerColumns: [],
+    footerSocialLinks: [],
+    footerCopyright: '',
+  }
+}
+
 export function LandingPagesPage() {
   const [pages, setPages] = useState<LandingPage[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -697,6 +736,10 @@ export function LandingPagesPage() {
   const [editMode, setEditMode] = useState(false)
   const [iframeKey, setIframeKey] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
+  const [globalOpen, setGlobalOpen] = useState(false)
+  const [globalSettings, setGlobalSettings] = useState<LandingGlobalSetting>(emptyGlobal())
+  const [globalSaving, setGlobalSaving] = useState(false)
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const selectedPage = useMemo(
@@ -711,7 +754,96 @@ export function LandingPagesPage() {
 
   useEffect(() => {
     void loadPages()
+    void loadGlobalSettings()
   }, [])
+
+  async function loadGlobalSettings() {
+    try {
+      const res = await api.get('/settings/landing-global')
+      setGlobalSettings({ ...emptyGlobal(), ...(res.data as LandingGlobalSetting) })
+    } catch {
+      // keep defaults
+    }
+  }
+
+  async function saveGlobalSettings() {
+    setGlobalSaving(true)
+    try {
+      await api.put('/settings/landing-global', globalSettings)
+      message.success('Đã lưu cài đặt site')
+      setIframeKey((k) => k + 1)
+    } catch {
+      message.error('Lưu thất bại')
+    } finally {
+      setGlobalSaving(false)
+    }
+  }
+
+  function updateGlobal(patch: Partial<LandingGlobalSetting>) {
+    setGlobalSettings((s) => ({ ...s, ...patch }))
+  }
+
+  function addNavItem() {
+    const item: NavItem = { id: crypto.randomUUID(), label: 'Menu mới', href: '/', target: '_self' }
+    updateGlobal({ menuItems: [...(globalSettings.menuItems ?? []), item] })
+  }
+
+  function updateNavItem(id: string, patch: Partial<NavItem>) {
+    updateGlobal({ menuItems: (globalSettings.menuItems ?? []).map((m) => (m.id === id ? { ...m, ...patch } : m)) })
+  }
+
+  function removeNavItem(id: string) {
+    updateGlobal({ menuItems: (globalSettings.menuItems ?? []).filter((m) => m.id !== id) })
+  }
+
+  function addFooterColumn() {
+    const col: FooterColumn = { id: crypto.randomUUID(), title: 'Cột mới', links: [] }
+    updateGlobal({ footerColumns: [...(globalSettings.footerColumns ?? []), col] })
+  }
+
+  function updateFooterColumn(id: string, patch: Partial<FooterColumn>) {
+    updateGlobal({ footerColumns: (globalSettings.footerColumns ?? []).map((c) => (c.id === id ? { ...c, ...patch } : c)) })
+  }
+
+  function removeFooterColumn(id: string) {
+    updateGlobal({ footerColumns: (globalSettings.footerColumns ?? []).filter((c) => c.id !== id) })
+  }
+
+  function addFooterLink(colId: string) {
+    updateGlobal({
+      footerColumns: (globalSettings.footerColumns ?? []).map((c) =>
+        c.id === colId ? { ...c, links: [...c.links, { id: crypto.randomUUID(), label: 'Link', href: '/' }] } : c,
+      ),
+    })
+  }
+
+  function updateFooterLink(colId: string, linkId: string, patch: { label?: string; href?: string }) {
+    updateGlobal({
+      footerColumns: (globalSettings.footerColumns ?? []).map((c) =>
+        c.id === colId ? { ...c, links: c.links.map((l) => (l.id === linkId ? { ...l, ...patch } : l)) } : c,
+      ),
+    })
+  }
+
+  function removeFooterLink(colId: string, linkId: string) {
+    updateGlobal({
+      footerColumns: (globalSettings.footerColumns ?? []).map((c) =>
+        c.id === colId ? { ...c, links: c.links.filter((l) => l.id !== linkId) } : c,
+      ),
+    })
+  }
+
+  function addSocialLink() {
+    updateGlobal({ footerSocialLinks: [...(globalSettings.footerSocialLinks ?? []), { id: crypto.randomUUID(), platform: 'Facebook', url: '' }] })
+  }
+
+  function updateSocialLink(id: string, patch: Partial<SocialLink>) {
+    updateGlobal({ footerSocialLinks: (globalSettings.footerSocialLinks ?? []).map((s) => (s.id === id ? { ...s, ...patch } : s)) })
+  }
+
+  function removeSocialLink(id: string) {
+    updateGlobal({ footerSocialLinks: (globalSettings.footerSocialLinks ?? []).filter((s) => s.id !== id) })
+  }
 
   useEffect(() => {
     if (!selectedPage) return
@@ -1020,6 +1152,7 @@ export function LandingPagesPage() {
           ) : null}
           <Button icon={<SaveOutlined />} loading={saving} onClick={savePage}>Lưu</Button>
           <Button icon={<EyeOutlined />} loading={saving} type="primary" onClick={() => void saveAndOpen()}>Lưu & Mở</Button>
+          <Button icon={<SettingOutlined />} onClick={() => setGlobalOpen(true)}>Cài đặt site</Button>
         </Space>
       </div>
 
@@ -1309,17 +1442,220 @@ export function LandingPagesPage() {
               </Button>
               <Button icon={<ReloadOutlined />} onClick={() => setIframeKey((k) => k + 1)}>Tải lại</Button>
             </Space>
+            <Space.Compact>
+              <Button
+                icon={<DesktopOutlined />}
+                type={previewDevice === 'desktop' ? 'primary' : 'default'}
+                onClick={() => setPreviewDevice('desktop')}
+              >Desktop</Button>
+              <Button
+                icon={<TabletOutlined />}
+                type={previewDevice === 'tablet' ? 'primary' : 'default'}
+                onClick={() => setPreviewDevice('tablet')}
+              >Tablet</Button>
+              <Button
+                icon={<MobileOutlined />}
+                type={previewDevice === 'mobile' ? 'primary' : 'default'}
+                onClick={() => setPreviewDevice('mobile')}
+              >Mobile</Button>
+            </Space.Compact>
             <Typography.Text type="secondary" style={{ fontSize: 11 }}>{previewUrl}</Typography.Text>
           </Flex>
-          <iframe
-            key={iframeKey}
-            ref={iframeRef}
-            src={iframeUrl}
-            style={{ flex: 1, border: '1px solid #d9d9d9', borderRadius: 8, background: '#fff', minHeight: 400 }}
-            title="Landing page preview"
-          />
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', overflow: 'auto', background: previewDevice !== 'desktop' ? '#f0f0f0' : 'transparent', borderRadius: 8, minHeight: 0 }}>
+            <iframe
+              key={iframeKey}
+              ref={iframeRef}
+              src={iframeUrl}
+              style={{
+                border: '1px solid #d9d9d9',
+                borderRadius: 8,
+                background: '#fff',
+                minHeight: 400,
+                width: previewDevice === 'mobile' ? 390 : previewDevice === 'tablet' ? 768 : '100%',
+                height: previewDevice !== 'desktop' ? 'calc(100vh - 180px)' : '100%',
+                flexShrink: 0,
+                transition: 'width 0.25s',
+              }}
+              title="Landing page preview"
+            />
+          </div>
         </div>
       </div>
+
+      {/* ── Site Settings Drawer ── */}
+      <Drawer
+        title="Cài đặt site"
+        width={560}
+        open={globalOpen}
+        onClose={() => setGlobalOpen(false)}
+        rootClassName="quick-drawer"
+        extra={
+          <Button type="primary" loading={globalSaving} onClick={() => void saveGlobalSettings()}>
+            Lưu cài đặt
+          </Button>
+        }
+      >
+        <Tabs
+          size="small"
+          items={[
+            {
+              key: 'logo',
+              label: 'Logo',
+              children: (
+                <Form layout="vertical" size="small">
+                  <Form.Item label="URL Logo">
+                    <ImagePickerInput value={globalSettings.logoUrl} onChange={(url) => updateGlobal({ logoUrl: url })} />
+                  </Form.Item>
+                  <Form.Item label="Alt text">
+                    <Input value={globalSettings.logoAlt} onChange={(e) => updateGlobal({ logoAlt: e.target.value })} placeholder="Tên thương hiệu" />
+                  </Form.Item>
+                  <Form.Item label="Chiều rộng (px)">
+                    <InputNumber min={40} max={600} value={globalSettings.logoWidth} onChange={(v) => updateGlobal({ logoWidth: Number(v ?? 160) })} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Form>
+              ),
+            },
+            {
+              key: 'menu',
+              label: 'Menu',
+              children: (
+                <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                  {(globalSettings.menuItems ?? []).map((item, idx) => (
+                    <Card key={item.id} size="small" style={{ background: '#fafafa' }}>
+                      <Row gutter={8} align="middle">
+                        <Col span={1}>
+                          <Typography.Text type="secondary" style={{ fontSize: 11 }}>{idx + 1}</Typography.Text>
+                        </Col>
+                        <Col span={7}>
+                          <Input size="small" value={item.label} placeholder="Label" onChange={(e) => updateNavItem(item.id, { label: e.target.value })} />
+                        </Col>
+                        <Col span={8}>
+                          <Input size="small" value={item.href} placeholder="/duong-dan" onChange={(e) => updateNavItem(item.id, { href: e.target.value })} />
+                        </Col>
+                        <Col span={5}>
+                          <Select
+                            size="small"
+                            style={{ width: '100%' }}
+                            value={item.target ?? '_self'}
+                            onChange={(v) => updateNavItem(item.id, { target: v as NavItem['target'] })}
+                            options={[{ value: '_self', label: 'Cùng tab' }, { value: '_blank', label: 'Tab mới' }]}
+                          />
+                        </Col>
+                        <Col span={3}>
+                          <Button size="small" danger block onClick={() => removeNavItem(item.id)}>×</Button>
+                        </Col>
+                      </Row>
+                    </Card>
+                  ))}
+                  <Button size="small" icon={<PlusOutlined />} onClick={addNavItem}>Thêm mục menu</Button>
+                </Space>
+              ),
+            },
+            {
+              key: 'header',
+              label: 'Header',
+              children: (
+                <Form layout="vertical" size="small">
+                  <Form.Item label="Dính khi cuộn (sticky)">
+                    <Switch checked={globalSettings.headerSticky} onChange={(v) => updateGlobal({ headerSticky: v })} />
+                  </Form.Item>
+                  <Form.Item label="Màu nền header (hex)">
+                    <Input
+                      value={globalSettings.headerBgColor}
+                      onChange={(e) => updateGlobal({ headerBgColor: e.target.value })}
+                      placeholder="#ffffff"
+                      prefix={
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            width: 14,
+                            height: 14,
+                            borderRadius: 2,
+                            background: globalSettings.headerBgColor || '#ffffff',
+                            border: '1px solid #d9d9d9',
+                          }}
+                        />
+                      }
+                    />
+                  </Form.Item>
+                  <Form.Item label="Nút CTA - Label">
+                    <Input value={globalSettings.headerCtaLabel} onChange={(e) => updateGlobal({ headerCtaLabel: e.target.value })} placeholder="Đặt lịch ngay" />
+                  </Form.Item>
+                  <Form.Item label="Nút CTA - Link">
+                    <Input value={globalSettings.headerCtaHref} onChange={(e) => updateGlobal({ headerCtaHref: e.target.value })} placeholder="/dat-lich" />
+                  </Form.Item>
+                </Form>
+              ),
+            },
+            {
+              key: 'footer',
+              label: 'Footer',
+              children: (
+                <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                  <Form layout="vertical" size="small">
+                    <Form.Item label="Copyright">
+                      <Input value={globalSettings.footerCopyright} onChange={(e) => updateGlobal({ footerCopyright: e.target.value })} placeholder="© 2025 Clinic. All rights reserved." />
+                    </Form.Item>
+                  </Form>
+
+                  <Typography.Text strong style={{ fontSize: 13 }}>Các cột footer</Typography.Text>
+                  {(globalSettings.footerColumns ?? []).map((col) => (
+                    <Card
+                      key={col.id}
+                      size="small"
+                      style={{ background: '#fafafa' }}
+                      title={
+                        <Input
+                          size="small"
+                          value={col.title}
+                          onChange={(e) => updateFooterColumn(col.id, { title: e.target.value })}
+                          placeholder="Tiêu đề cột"
+                          style={{ fontWeight: 600 }}
+                        />
+                      }
+                      extra={<Button size="small" danger onClick={() => removeFooterColumn(col.id)}>×</Button>}
+                    >
+                      <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                        {col.links.map((link) => (
+                          <Row key={link.id} gutter={4} align="middle">
+                            <Col span={10}>
+                              <Input size="small" value={link.label} placeholder="Label" onChange={(e) => updateFooterLink(col.id, link.id, { label: e.target.value })} />
+                            </Col>
+                            <Col span={11}>
+                              <Input size="small" value={link.href} placeholder="/duong-dan" onChange={(e) => updateFooterLink(col.id, link.id, { href: e.target.value })} />
+                            </Col>
+                            <Col span={3}>
+                              <Button size="small" danger block onClick={() => removeFooterLink(col.id, link.id)}>×</Button>
+                            </Col>
+                          </Row>
+                        ))}
+                        <Button size="small" icon={<PlusOutlined />} onClick={() => addFooterLink(col.id)}>Thêm link</Button>
+                      </Space>
+                    </Card>
+                  ))}
+                  <Button size="small" icon={<PlusOutlined />} onClick={addFooterColumn}>Thêm cột</Button>
+
+                  <Typography.Text strong style={{ fontSize: 13 }}>Mạng xã hội</Typography.Text>
+                  {(globalSettings.footerSocialLinks ?? []).map((s) => (
+                    <Row key={s.id} gutter={8} align="middle">
+                      <Col span={7}>
+                        <Input size="small" value={s.platform} placeholder="Facebook" onChange={(e) => updateSocialLink(s.id, { platform: e.target.value })} />
+                      </Col>
+                      <Col span={14}>
+                        <Input size="small" value={s.url} placeholder="https://facebook.com/..." onChange={(e) => updateSocialLink(s.id, { url: e.target.value })} />
+                      </Col>
+                      <Col span={3}>
+                        <Button size="small" danger block onClick={() => removeSocialLink(s.id)}>×</Button>
+                      </Col>
+                    </Row>
+                  ))}
+                  <Button size="small" icon={<PlusOutlined />} onClick={addSocialLink}>Thêm mạng xã hội</Button>
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </Drawer>
 
       {/* ── Template Modal ── */}
       <Modal

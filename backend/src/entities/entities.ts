@@ -1492,6 +1492,61 @@ export class Payroll extends ConfigurableEntity {
   branchId?: string;
 }
 
+@Entity('landing_global_settings')
+export class LandingGlobalSetting {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ default: 'default' })
+  settingKey: string;
+
+  // Logo
+  @Column({ nullable: true })
+  logoUrl?: string;
+
+  @Column({ nullable: true })
+  logoAlt?: string;
+
+  @Column({ type: 'int', nullable: true })
+  logoWidth?: number;
+
+  // Header
+  @Column({ default: false })
+  headerSticky: boolean;
+
+  @Column({ nullable: true })
+  headerBg?: string;
+
+  @Column({ nullable: true })
+  headerCtaLabel?: string;
+
+  @Column({ nullable: true })
+  headerCtaHref?: string;
+
+  // Menu
+  @Column({ type: 'jsonb', default: [] })
+  menuItems: Record<string, unknown>[];
+
+  // Footer
+  @Column({ nullable: true })
+  footerBg?: string;
+
+  @Column({ nullable: true })
+  footerTextColor?: string;
+
+  @Column({ type: 'text', nullable: true })
+  footerCopyright?: string;
+
+  @Column({ type: 'jsonb', default: [] })
+  footerColumns: Record<string, unknown>[];
+
+  @Column({ type: 'jsonb', default: [] })
+  footerSocialLinks: Record<string, unknown>[];
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
 @Entity('audit_logs')
 export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
@@ -1559,6 +1614,7 @@ export const ENTITIES = [
   ChatbotSetting,
   LandingThemeSetting,
   ItemCategory,
+  LandingGlobalSetting,
   StaffReward,
   StaffTraining,
   PerformanceReview,

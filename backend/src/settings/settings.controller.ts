@@ -137,6 +137,16 @@ export class SettingsController {
     return { data: await this.settings.getLandingThemePresets() };
   }
 
+  @Get('landing-global')
+  getLandingGlobal() {
+    return this.settings.getLandingGlobalSettings();
+  }
+
+  @Put('landing-global')
+  updateLandingGlobal(@Body() payload: Record<string, unknown>) {
+    return this.settings.updateLandingGlobalSettings(payload as any);
+  }
+
   @Post('landing-pages')
   async createLandingPage(@Body() payload: Partial<LandingPage>, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.createLandingPage(payload, request?.user) };
@@ -186,6 +196,12 @@ export class PublicLandingThemeController {
 @Controller('public/landing-pages')
 export class PublicLandingPagesController {
   constructor(private readonly settings: SettingsService) {}
+
+  @Public()
+  @Get('global')
+  getLandingGlobal() {
+    return this.settings.getLandingGlobalSettings();
+  }
 
   @Public()
   @Get('resolve')
