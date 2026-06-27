@@ -80,6 +80,18 @@ export class SettingsService {
     return { data: saved };
   }
 
+  async getLandingMenuSettings() {
+    const { data } = await this.getLandingGlobalSettings();
+    return { data: data.menuItems ?? [] };
+  }
+
+  async updateLandingMenuSettings(menuItems: Record<string, unknown>[]) {
+    const { data: current } = await this.getLandingGlobalSettings();
+    current.menuItems = Array.isArray(menuItems) ? menuItems : [];
+    const saved = await this.landingGlobalSettings.save(current);
+    return { data: saved.menuItems ?? [] };
+  }
+
   listFields(entityType?: string, user?: AuthUser) {
     this.assertResourceReadable(user, entityType);
     return this.fields.find({ where: entityType ? { entityType } : {}, order: { entityType: 'ASC', sortOrder: 'ASC' } });

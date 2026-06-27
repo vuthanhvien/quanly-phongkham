@@ -692,7 +692,7 @@ function titleLevel(level?: number): 1 | 2 | 3 | 4 | 5 {
   return next as 1 | 2 | 3 | 4 | 5
 }
 
-type NavItem = { id: string; label: string; href: string; target?: '_blank' | '_self' }
+type NavItem = { id: string; label: string; href: string; target?: '_blank' | '_self'; children?: NavItem[] }
 type FooterColumn = { id: string; title: string; links: Array<{ id: string; label: string; href: string }> }
 type SocialLink = { id: string; platform: string; url: string }
 
@@ -726,6 +726,41 @@ function emptyGlobal(): LandingGlobalSetting {
   }
 }
 
+function createNavItem(label = 'Menu mới'): NavItem {
+  return { id: crypto.randomUUID(), label, href: '/', target: '_self', children: [] }
+}
+
+function normalizeNavItem(item: NavItem, depth = 1): NavItem {
+  return {
+    id: item.id || crypto.randomUUID(),
+    label: item.label || '',
+    href: item.href || '/',
+    target: item.target === '_blank' ? '_blank' : '_self',
+    children: depth >= 3 ? [] : (item.children ?? []).map((child) => normalizeNavItem(child, depth + 1)),
+  }
+}
+
+function normalizeNavTree(items?: NavItem[]) {
+  return (items ?? []).map((item) => normalizeNavItem(item, 1))
+}
+
+function updateNavTree(items: NavItem[], id: string, updater: (item: NavItem) => NavItem): NavItem[] {
+  return items.map((item) => {
+    if (item.id === id) return updater(item)
+    if (!item.children?.length) return item
+    return { ...item, children: updateNavTree(item.children, id, updater) }
+  })
+}
+
+function removeNavTreeItem(items: NavItem[], id: string): NavItem[] {
+  return items
+    .filter((item) => item.id !== id)
+    .map((item) => ({
+      ...item,
+      children: item.children?.length ? removeNavTreeItem(item.children, id) : [],
+    }))
+}
+
 export function LandingPagesPage() {
   const [pages, setPages] = useState<LandingPage[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -739,6 +774,7 @@ export function LandingPagesPage() {
   const [globalOpen, setGlobalOpen] = useState(false)
   const [globalSettings, setGlobalSettings] = useState<LandingGlobalSetting>(emptyGlobal())
   const [globalSaving, setGlobalSaving] = useState(false)
+  const [menuSaving, setMenuSaving] = useState(false)
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
@@ -755,12 +791,25 @@ export function LandingPagesPage() {
   useEffect(() => {
     void loadPages()
     void loadGlobalSettings()
+    void loadMenuSettings()
   }, [])
 
   async function loadGlobalSettings() {
     try {
       const res = await api.get('/settings/landing-global')
-      setGlobalSettings({ ...emptyGlobal(), ...(res.data as LandingGlobalSetting) })
+      const payload = (res.data?.data ?? res.data) as LandingGlobalSetting
+      const next = { ...emptyGlobal(), ...payload }
+      setGlobalSettings((current) => ({ ...current, ...next }))
+    } catch {
+      // keep defaults
+    }
+  }
+
+  async function loadMenuSettings() {
+    try {
+      const res = await api.get('/settings/landing-menu')
+      const items = (res.data?.data ?? res.data) as NavItem[]
+      setGlobalSettings((current) => ({ ...current, menuItems: normalizeNavTree(items) }))
     } catch {
       // keep defaults
     }
@@ -769,13 +818,27 @@ export function LandingPagesPage() {
   async function saveGlobalSettings() {
     setGlobalSaving(true)
     try {
-      await api.put('/settings/landing-global', globalSettings)
+      const { menuItems, ...payload } = globalSettings
+      await api.put('/settings/landing-global', payload)
       message.success('Đã lưu cài đặt site')
       setIframeKey((k) => k + 1)
     } catch {
       message.error('Lưu thất bại')
     } finally {
       setGlobalSaving(false)
+    }
+  }
+
+  async function saveMenuSettings() {
+    setMenuSaving(true)
+    try {
+      await api.put('/settings/landing-menu', { menuItems: globalSettings.menuItems ?? [] })
+      message.success('Đã lưu menu dùng chung')
+      setIframeKey((k) => k + 1)
+    } catch {
+      message.error('Lưu menu thất bại')
+    } finally {
+      setMenuSaving(false)
     }
   }
 
@@ -843,6 +906,85 @@ export function LandingPagesPage() {
 
   function removeSocialLink(id: string) {
     updateGlobal({ footerSocialLinks: (globalSettings.footerSocialLinks ?? []).filter((s) => s.id !== id) })
+  }
+
+  function addRootNavItem() {
+    updateGlobal({ menuItems: [...(globalSettings.menuItems ?? []), createNavItem()] })
+  }
+
+  function patchTreeNavItem(id: string, patch: Partial<NavItem>) {
+    updateGlobal({
+      menuItems: updateNavTree(globalSettings.menuItems ?? [], id, (item) => ({
+        ...item,
+        ...patch,
+        children: patch.children ?? item.children ?? [],
+      })),
+    })
+  }
+
+  function addTreeNavChild(parentId: string, depth: number) {
+    if (depth >= 3) return
+    updateGlobal({
+      menuItems: updateNavTree(globalSettings.menuItems ?? [], parentId, (item) => ({
+        ...item,
+        children: [...(item.children ?? []), createNavItem(depth === 1 ? 'Menu cấp 2' : 'Menu cấp 3')],
+      })),
+    })
+  }
+
+  function removeTreeNavItem(id: string) {
+    updateGlobal({ menuItems: removeNavTreeItem(globalSettings.menuItems ?? [], id) })
+  }
+
+  function renderNavEditor(items: NavItem[], depth = 1): React.ReactNode {
+    return (
+      <Space direction="vertical" size={8} style={{ width: '100%' }}>
+        {items.map((item, idx) => (
+          <Card key={item.id} size="small" className="glass-card">
+            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+              <Flex align="center" justify="space-between" gap={12} wrap="wrap">
+                <Space size={8} wrap>
+                  <Tag bordered={false} color="gold">Cấp {depth}</Tag>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>Mục {idx + 1}</Typography.Text>
+                </Space>
+                <Space size={6} wrap>
+                  {depth < 3 && (
+                    <Button size="small" icon={<PlusOutlined />} onClick={() => addTreeNavChild(item.id, depth)}>
+                      Thêm cấp {depth + 1}
+                    </Button>
+                  )}
+                  <Button size="small" danger onClick={() => removeTreeNavItem(item.id)}>Xóa</Button>
+                </Space>
+              </Flex>
+
+              <Row gutter={[8, 8]} align="middle">
+                <Col xs={24} md={8}>
+                  <Input size="small" value={item.label} placeholder="Label" onChange={(e) => patchTreeNavItem(item.id, { label: e.target.value })} />
+                </Col>
+                <Col xs={24} md={9}>
+                  <Input size="small" value={item.href} placeholder="/duong-dan" onChange={(e) => patchTreeNavItem(item.id, { href: e.target.value })} />
+                </Col>
+                <Col xs={24} md={7}>
+                  <Select
+                    size="small"
+                    style={{ width: '100%' }}
+                    value={item.target ?? '_self'}
+                    onChange={(v) => patchTreeNavItem(item.id, { target: v as NavItem['target'] })}
+                    options={[{ value: '_self', label: 'Cùng tab' }, { value: '_blank', label: 'Tab mới' }]}
+                  />
+                </Col>
+              </Row>
+
+              {item.children && item.children.length > 0 && (
+                <div style={{ paddingLeft: 12, borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+                  {renderNavEditor(item.children, depth + 1)}
+                </div>
+              )}
+            </Space>
+          </Card>
+        ))}
+      </Space>
+    )
   }
 
   useEffect(() => {
@@ -1485,7 +1627,7 @@ export function LandingPagesPage() {
       {/* ── Site Settings Drawer ── */}
       <Drawer
         title="Cài đặt site"
-        width={560}
+        width={860}
         open={globalOpen}
         onClose={() => setGlobalOpen(false)}
         rootClassName="quick-drawer"
@@ -1496,6 +1638,7 @@ export function LandingPagesPage() {
         }
       >
         <Tabs
+          className="settings-inner-tabs"
           size="small"
           items={[
             {
@@ -1520,8 +1663,20 @@ export function LandingPagesPage() {
               label: 'Menu',
               children: (
                 <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                  {(globalSettings.menuItems ?? []).map((item, idx) => (
-                    <Card key={item.id} size="small" style={{ background: '#fafafa' }}>
+                  <Typography.Text type="secondary">
+                    Hỗ trợ tối đa 3 cấp menu. Từ cấp 1 bạn có thể thêm cấp 2, và từ cấp 2 có thể thêm cấp 3.
+                  </Typography.Text>
+	                  <Flex justify="space-between" align="center" gap={12} wrap="wrap">
+	                    <Typography.Text type="secondary">
+	                      Menu này lưu riêng và dùng chung cho toàn bộ web, bao gồm cả landing page.
+	                    </Typography.Text>
+	                    <Button type="primary" loading={menuSaving} onClick={() => void saveMenuSettings()}>
+	                      Lưu menu
+	                    </Button>
+	                  </Flex>
+	                  {renderNavEditor(globalSettings.menuItems ?? [], 1)}
+                  {false && (globalSettings.menuItems ?? []).map((item, idx) => (
+                    <Card key={item.id} size="small" className="glass-card">
                       <Row gutter={8} align="middle">
                         <Col span={1}>
                           <Typography.Text type="secondary" style={{ fontSize: 11 }}>{idx + 1}</Typography.Text>
@@ -1603,7 +1758,7 @@ export function LandingPagesPage() {
                     <Card
                       key={col.id}
                       size="small"
-                      style={{ background: '#fafafa' }}
+                      className="glass-card"
                       title={
                         <Input
                           size="small"

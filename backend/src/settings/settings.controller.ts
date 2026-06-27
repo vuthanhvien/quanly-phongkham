@@ -147,6 +147,16 @@ export class SettingsController {
     return this.settings.updateLandingGlobalSettings(payload as any);
   }
 
+  @Get('landing-menu')
+  getLandingMenu() {
+    return this.settings.getLandingMenuSettings();
+  }
+
+  @Put('landing-menu')
+  updateLandingMenu(@Body() payload: { menuItems?: Record<string, unknown>[] }) {
+    return this.settings.updateLandingMenuSettings(payload?.menuItems ?? []);
+  }
+
   @Post('landing-pages')
   async createLandingPage(@Body() payload: Partial<LandingPage>, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.createLandingPage(payload, request?.user) };
@@ -201,6 +211,12 @@ export class PublicLandingPagesController {
   @Get('global')
   getLandingGlobal() {
     return this.settings.getLandingGlobalSettings();
+  }
+
+  @Public()
+  @Get('menu')
+  getLandingMenu() {
+    return this.settings.getLandingMenuSettings();
   }
 
   @Public()

@@ -46,6 +46,7 @@ export interface NavItem {
   label: string
   href: string
   target?: '_blank' | '_self'
+  children?: NavItem[]
 }
 
 export interface FooterLink {
@@ -80,15 +81,43 @@ export interface LandingGlobalSetting {
   footerCopyright?: string
 }
 
+function normalizeNavItem(item: NavItem, depth = 1): NavItem {
+  return {
+    id: item.id || crypto.randomUUID(),
+    label: item.label || '',
+    href: item.href || '/',
+    target: item.target === '_blank' ? '_blank' : '_self',
+    children: depth >= 3 ? [] : (item.children ?? []).map((child) => normalizeNavItem(child, depth + 1)),
+  }
+}
+
+export function normalizeMenuItems(items?: NavItem[]) {
+  return (items ?? []).map((item) => normalizeNavItem(item, 1))
+}
+
 const API_URL = process.env.LANDING_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
 
 export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
   try {
     const res = await fetch(`${API_URL}/public/landing-pages/global`, { next: { revalidate: 60 } })
     if (!res.ok) return {}
-    return await res.json() as LandingGlobalSetting
+    const raw = await res.json() as { data?: LandingGlobalSetting } | LandingGlobalSetting
+    const data = ('data' in raw ? raw.data : raw) ?? {}
+    return { ...data, menuItems: normalizeMenuItems(data.menuItems) }
   } catch {
     return {}
+  }
+}
+
+export async function getMenuSettings(): Promise<NavItem[]> {
+  try {
+    const res = await fetch(`${API_URL}/public/landing-pages/menu`, { next: { revalidate: 60 } })
+    if (!res.ok) return []
+    const raw = await res.json() as { data?: NavItem[] } | NavItem[]
+    const data = Array.isArray(raw) ? raw : (raw.data ?? [])
+    return normalizeMenuItems(data)
+  } catch {
+    return []
   }
 }
 

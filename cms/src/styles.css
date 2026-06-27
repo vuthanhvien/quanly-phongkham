@@ -592,6 +592,10 @@ body::before {
   border-bottom-color: rgba(255, 255, 255, 0.08) !important;
 }
 
+.quick-drawer .ant-drawer-body {
+  color: #fff7fb;
+}
+
 .quick-drawer .ant-drawer-title {
   color: #fff7fb !important;
   font-weight: 800;
@@ -999,12 +1003,27 @@ body::before {
 }
 
 .ant-input,
+.ant-input-affix-wrapper,
 .ant-input-number,
 .ant-select-selector,
 .ant-picker,
 textarea.ant-input {
   background: rgba(255, 255, 255, 0.055) !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.ant-input-affix-wrapper .ant-input,
+.ant-input-number-input,
+.ant-picker input {
+  background: transparent !important;
+  color: #fff7fb !important;
+}
+
+.ant-select-selection-item,
+.ant-select-selection-placeholder,
+.ant-input,
+textarea.ant-input {
+  color: #fff7fb !important;
 }
 
 .print-sheet {
