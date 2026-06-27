@@ -56,7 +56,9 @@ export interface DynamicRole {
   isActive: boolean;
 }
 
-export type LandingBlockType = 'title' | 'text' | 'image' | 'video' | 'form';
+export type LandingBlockType = 'title' | 'text' | 'image' | 'video' | 'form' | 'slider';
+
+export type LandingSectionWidth = 'container' | 'full';
 
 export interface LandingFormField {
   id: string;
@@ -68,12 +70,23 @@ export interface LandingFormField {
   span: number;
 }
 
+export interface LandingSlide {
+  id: string;
+  url: string;
+  alt?: string;
+  caption?: string;
+}
+
 export interface LandingBlock {
   id: string;
   type: LandingBlockType;
   row: number;
   span: number;
   order: number;
+  sectionId?: string;
+  sectionTitle?: string;
+  sectionWidth?: LandingSectionWidth;
+  sectionOrder?: number;
   title?: string;
   level?: number;
   align?: 'left' | 'center' | 'right';
@@ -85,6 +98,7 @@ export interface LandingBlock {
   submitLabel?: string;
   successMessage?: string;
   fields?: LandingFormField[];
+  slides?: LandingSlide[];
 }
 
 export interface LandingPage {

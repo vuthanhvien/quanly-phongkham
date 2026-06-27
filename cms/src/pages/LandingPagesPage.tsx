@@ -39,7 +39,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { ImagePickerInput } from '../components/ImagePickerInput'
-import type { LandingBlock, LandingBlockType, LandingFormField, LandingPage } from '../models'
+import type { LandingBlock, LandingBlockType, LandingFormField, LandingPage, LandingSectionWidth, LandingSlide } from '../models'
 import { LandingThemeEditor } from './LandingThemePage'
 
 const LANDING_URL = import.meta.env.VITE_LANDING_URL || 'http://localhost:3001'
@@ -48,6 +48,7 @@ const blockTypeOptions: Array<{ value: LandingBlockType; label: string }> = [
   { value: 'title', label: 'Title' },
   { value: 'text', label: 'Text' },
   { value: 'image', label: 'Hình ảnh' },
+  { value: 'slider', label: 'Slider' },
   { value: 'video', label: 'Video' },
   { value: 'form', label: 'Form custom' },
 ]
@@ -56,6 +57,7 @@ const blockTypeIcons: Record<LandingBlockType, React.ReactNode> = {
   title: <FormOutlined />,
   text: <FormOutlined />,
   image: <PictureOutlined />,
+  slider: <DesktopOutlined />,
   video: <VideoCameraOutlined />,
   form: <InsertRowAboveOutlined />,
 }
@@ -87,6 +89,81 @@ function createField(): LandingFormField {
   }
 }
 
+function createSlide(): LandingSlide {
+  return {
+    id: crypto.randomUUID(),
+    url: '',
+    alt: '',
+    caption: '',
+  }
+}
+
+function normalizeSectionWidth(value?: string): LandingSectionWidth {
+  return value === 'full' ? 'full' : 'container'
+}
+
+function createSectionMeta(width: LandingSectionWidth = 'container', order = 1, sectionId?: string) {
+  return {
+    sectionId: sectionId || crypto.randomUUID(),
+    sectionTitle: '',
+    sectionWidth: width,
+    sectionOrder: Math.max(1, order),
+  }
+}
+
+type LandingSectionDraft = {
+  id: string
+  title: string
+  width: LandingSectionWidth
+  order: number
+  blocks: LandingBlock[]
+}
+
+function normalizeBlock(block: LandingBlock, index: number): LandingBlock {
+  const section = createSectionMeta(normalizeSectionWidth(block.sectionWidth), Math.max(1, Number(block.sectionOrder || 1)), block.sectionId)
+  return {
+    ...block,
+    row: Math.max(1, Number(block.row || 1)),
+    span: Math.max(1, Math.min(12, Number(block.span || 12))),
+    order: Math.max(1, Number(block.order || index + 1)),
+    sectionId: section.sectionId,
+    sectionTitle: block.sectionTitle || '',
+    sectionWidth: section.sectionWidth,
+    sectionOrder: section.sectionOrder,
+    fields: block.fields ? block.fields.map((field) => ({ ...field })) : undefined,
+    slides: block.slides ? block.slides.map((slide) => ({ ...slide })) : undefined,
+  }
+}
+
+function normalizeBlocks(blocks: LandingBlock[] = []) {
+  return blocks.map((block, index) => normalizeBlock(block, index))
+}
+
+function deriveSections(blocks: LandingBlock[]): LandingSectionDraft[] {
+  const sectionMap = new Map<string, LandingSectionDraft>()
+  normalizeBlocks(blocks)
+    .sort((left, right) => {
+      if ((left.sectionOrder || 1) !== (right.sectionOrder || 1)) return (left.sectionOrder || 1) - (right.sectionOrder || 1)
+      return left.order - right.order
+    })
+    .forEach((block) => {
+      const sectionId = block.sectionId || 'default-section'
+      const current = sectionMap.get(sectionId) || {
+        id: sectionId,
+        title: block.sectionTitle || '',
+        width: normalizeSectionWidth(block.sectionWidth),
+        order: block.sectionOrder || 1,
+        blocks: [],
+      }
+      current.title = current.title || block.sectionTitle || ''
+      current.width = normalizeSectionWidth(block.sectionWidth || current.width)
+      current.order = Math.min(current.order, block.sectionOrder || current.order || 1)
+      current.blocks.push({ ...block, sectionId, sectionWidth: current.width, sectionOrder: current.order })
+      sectionMap.set(sectionId, current)
+    })
+  return [...sectionMap.values()].sort((left, right) => left.order - right.order)
+}
+
 function createBlock(type: LandingBlockType): LandingBlock {
   const base: LandingBlock = {
     id: crypto.randomUUID(),
@@ -106,6 +183,10 @@ function createBlock(type: LandingBlockType): LandingBlock {
 
   if (type === 'image') {
     return { ...base, url: '', alt: '', caption: '' }
+  }
+
+  if (type === 'slider') {
+    return { ...base, title: 'Slider hÃ¬nh áº£nh', slides: [createSlide(), createSlide()] }
   }
 
   if (type === 'video') {
@@ -1008,10 +1089,7 @@ export function LandingPagesPage() {
       description: selectedPage.description || '',
       seoTitle: selectedPage.seoTitle || '',
       seoDescription: selectedPage.seoDescription || '',
-      blocks: (selectedPage.blocks || []).map((block) => ({
-        ...block,
-        fields: block.fields ? block.fields.map((field) => ({ ...field })) : undefined,
-      })),
+      blocks: normalizeBlocks(selectedPage.blocks || []),
       isPublished: selectedPage.isPublished,
     })
   }, [selectedPage])
@@ -1052,7 +1130,7 @@ export function LandingPagesPage() {
     setSelectedId(null)
     setDraft({
       ...template.page,
-      blocks: template.page.blocks.map((block) => ({ ...block, id: makeId() })),
+      blocks: normalizeBlocks(template.page.blocks.map((block) => ({ ...block, id: makeId() }))),
     })
     setTemplateModal(false)
   }
@@ -1064,7 +1142,7 @@ export function LandingPagesPage() {
       return
     }
 
-    const blocks = template.page.blocks.map((block, index) => ({ ...block, id: makeId(), order: index + 1 }))
+    const blocks = normalizeBlocks(template.page.blocks.map((block, index) => ({ ...block, id: makeId(), order: index + 1 })))
     const payload = {
       ...template.page,
       blocks,
@@ -1099,15 +1177,25 @@ export function LandingPagesPage() {
     setDraft((current) => ({
       ...current,
       blocks: current.blocks.map((block, index) =>
-        block.id === blockId ? { ...block, ...patch, order: index + 1 } : block,
+        block.id === blockId ? normalizeBlock({ ...block, ...patch, order: index + 1 }, index) : normalizeBlock(block, index),
       ),
     }))
   }
 
-  function addBlock(type: LandingBlockType) {
+  function addBlock(type: LandingBlockType, sectionId?: string) {
     setDraft((current) => {
-      const nextRow = current.blocks.length ? Math.max(...current.blocks.map((block) => block.row)) + 1 : 1
-      const block = { ...createBlock(type), row: nextRow, order: current.blocks.length + 1 }
+      const sections = deriveSections(current.blocks)
+      const section = sections.find((item) => item.id === sectionId) || sections[sections.length - 1]
+      const nextRow = section?.blocks.length ? Math.max(...section.blocks.map((block) => block.row)) + 1 : 1
+      const meta = section
+        ? {
+            sectionId: section.id,
+            sectionTitle: section.title,
+            sectionWidth: section.width,
+            sectionOrder: section.order,
+          }
+        : createSectionMeta('container', 1)
+      const block = normalizeBlock({ ...createBlock(type), ...meta, row: nextRow, order: current.blocks.length + 1 }, current.blocks.length)
       return {
         ...current,
         blocks: [...current.blocks, block],
@@ -1115,12 +1203,52 @@ export function LandingPagesPage() {
     })
   }
 
+  function addSection(width: LandingSectionWidth) {
+    setDraft((current) => {
+      const sections = deriveSections(current.blocks)
+      const nextOrder = sections.length ? Math.max(...sections.map((section) => section.order)) + 1 : 1
+      const meta = createSectionMeta(width, nextOrder)
+      const seedBlock = normalizeBlock(
+        {
+          ...createBlock('title'),
+          ...meta,
+          title: width === 'full' ? 'Section full width' : 'Section container',
+        },
+        current.blocks.length,
+      )
+      return {
+        ...current,
+        blocks: [...current.blocks, seedBlock],
+      }
+    })
+  }
+
+  function updateSection(sectionId: string, patch: Partial<Pick<LandingBlock, 'sectionTitle' | 'sectionWidth' | 'sectionOrder'>>) {
+    setDraft((current) => ({
+      ...current,
+      blocks: current.blocks.map((block, index) =>
+        block.sectionId === sectionId
+          ? normalizeBlock({ ...block, ...patch }, index)
+          : normalizeBlock(block, index),
+      ),
+    }))
+  }
+
+  function removeSection(sectionId: string) {
+    setDraft((current) => ({
+      ...current,
+      blocks: current.blocks
+        .filter((block) => block.sectionId !== sectionId)
+        .map((block, index) => normalizeBlock({ ...block, order: index + 1 }, index)),
+    }))
+  }
+
   function removeBlock(blockId: string) {
     setDraft((current) => ({
       ...current,
       blocks: current.blocks
         .filter((block) => block.id !== blockId)
-        .map((block, index) => ({ ...block, order: index + 1 })),
+        .map((block, index) => normalizeBlock({ ...block, order: index + 1 }, index)),
     }))
   }
 
@@ -1134,7 +1262,7 @@ export function LandingPagesPage() {
       next.splice(target, 0, moved)
       return {
         ...current,
-        blocks: next.map((block, orderIndex) => ({ ...block, order: orderIndex + 1 })),
+        blocks: next.map((block, orderIndex) => normalizeBlock({ ...block, order: orderIndex + 1 }, orderIndex)),
       }
     })
   }
@@ -1178,12 +1306,55 @@ export function LandingPagesPage() {
     }))
   }
 
+  function addSlideItem(blockId: string) {
+    setDraft((current) => ({
+      ...current,
+      blocks: current.blocks.map((block, index) =>
+        block.id === blockId
+          ? normalizeBlock({ ...block, slides: [...(block.slides || []), createSlide()] }, index)
+          : normalizeBlock(block, index),
+      ),
+    }))
+  }
+
+  function updateSlideItem(blockId: string, slideId: string, patch: Partial<LandingSlide>) {
+    setDraft((current) => ({
+      ...current,
+      blocks: current.blocks.map((block, index) => {
+        if (block.id !== blockId) return normalizeBlock(block, index)
+        return normalizeBlock(
+          {
+            ...block,
+            slides: (block.slides || []).map((slide) => (slide.id === slideId ? { ...slide, ...patch } : slide)),
+          },
+          index,
+        )
+      }),
+    }))
+  }
+
+  function removeSlideItem(blockId: string, slideId: string) {
+    setDraft((current) => ({
+      ...current,
+      blocks: current.blocks.map((block, index) => {
+        if (block.id !== blockId) return normalizeBlock(block, index)
+        return normalizeBlock(
+          {
+            ...block,
+            slides: (block.slides || []).filter((slide) => slide.id !== slideId),
+          },
+          index,
+        )
+      }),
+    }))
+  }
+
   async function savePage() {
     const payload = {
       ...draft,
       slug: slugify(draft.slug || draft.title),
       path: normalizePath(draft.path || draft.slug || draft.title),
-      blocks: draft.blocks.map((block, index) => ({ ...block, order: index + 1 })),
+      blocks: normalizeBlocks(draft.blocks.map((block, index) => ({ ...block, order: index + 1 }))),
     }
 
     if (!payload.title.trim()) {
@@ -1212,7 +1383,7 @@ export function LandingPagesPage() {
       ...draft,
       slug: slugify(draft.slug || draft.title),
       path: normalizePath(draft.path || draft.slug || draft.title),
-      blocks: draft.blocks.map((block, index) => ({ ...block, order: index + 1 })),
+      blocks: normalizeBlocks(draft.blocks.map((block, index) => ({ ...block, order: index + 1 }))),
     }
     if (!payload.title.trim()) {
       message.error('Cần nhập tên page')
@@ -1247,14 +1418,7 @@ export function LandingPagesPage() {
     await loadPages(null)
   }
 
-  const rows = useMemo(() => {
-    return [...draft.blocks]
-      .sort((left, right) => left.order - right.order)
-      .reduce<Record<number, LandingBlock[]>>((accumulator, block) => {
-        accumulator[block.row] = [...(accumulator[block.row] || []), block]
-        return accumulator
-      }, {})
-  }, [draft.blocks])
+  const sections = useMemo(() => deriveSections(draft.blocks), [draft.blocks])
 
   const iframeUrl = useMemo(() => {
     const sep = previewUrl.includes('?') ? '&' : '?'
@@ -1366,6 +1530,70 @@ export function LandingPagesPage() {
                       </Form>
                     </Card>
 
+                    <Card
+                      className="glass-card"
+                      size="small"
+                      title={<span>Sections <Tag style={{ marginLeft: 4 }}>{sections.length}</Tag></span>}
+                      extra={
+                        <Flex gap={4} wrap="wrap">
+                          <Button size="small" icon={<PlusOutlined />} onClick={() => addSection('container')}>Section container</Button>
+                          <Button size="small" icon={<PlusOutlined />} onClick={() => addSection('full')}>Section full</Button>
+                        </Flex>
+                      }
+                    >
+                      {sections.length === 0 ? (
+                        <Typography.Text type="secondary">No sections yet</Typography.Text>
+                      ) : (
+                        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                          {sections.map((section) => (
+                            <Card
+                              key={section.id}
+                              size="small"
+                              title={
+                                <Flex align="center" gap={8} wrap="wrap">
+                                  <Typography.Text strong>{section.title || `Section ${section.order}`}</Typography.Text>
+                                  <Tag>{section.width === 'full' ? 'Full width' : 'Container'}</Tag>
+                                  <Tag color="blue">{section.blocks.length} blocks</Tag>
+                                </Flex>
+                              }
+                              extra={
+                                <Popconfirm title="Delete this section?" onConfirm={() => removeSection(section.id)}>
+                                  <Button size="small" danger>Delete</Button>
+                                </Popconfirm>
+                              }
+                            >
+                              <Row gutter={8}>
+                                <Col span={14}>
+                                  <Form.Item label="Section name" style={{ marginBottom: 8 }}>
+                                    <Input value={section.title} onChange={(e) => updateSection(section.id, { sectionTitle: e.target.value })} />
+                                  </Form.Item>
+                                </Col>
+                                <Col span={10}>
+                                  <Form.Item label="Width mode" style={{ marginBottom: 8 }}>
+                                    <Select
+                                      value={section.width}
+                                      onChange={(value) => updateSection(section.id, { sectionWidth: value })}
+                                      options={[
+                                        { value: 'container', label: 'Container' },
+                                        { value: 'full', label: 'Full width' },
+                                      ]}
+                                    />
+                                  </Form.Item>
+                                </Col>
+                              </Row>
+                              <Flex gap={4} wrap="wrap">
+                                {blockTypeOptions.map((option) => (
+                                  <Button key={option.value} size="small" icon={<PlusOutlined />} onClick={() => addBlock(option.value, section.id)}>
+                                    {option.label}
+                                  </Button>
+                                ))}
+                              </Flex>
+                            </Card>
+                          ))}
+                        </Space>
+                      )}
+                    </Card>
+
                     {/* Blocks */}
                     <Card
                       className="glass-card"
@@ -1415,17 +1643,38 @@ export function LandingPagesPage() {
                             children: (
                               <Form layout="vertical" size="small">
                                 <Row gutter={8}>
-                                  <Col span={8}>
+                                  <Col span={6}>
+                                    <Form.Item label="Section" style={{ marginBottom: 8 }}>
+                                      <Select
+                                        size="small"
+                                        value={block.sectionId}
+                                        onChange={(value) => {
+                                          const nextSection = sections.find((item) => item.id === value)
+                                          updateBlock(block.id, {
+                                            sectionId: nextSection?.id,
+                                            sectionTitle: nextSection?.title || '',
+                                            sectionWidth: nextSection?.width || 'container',
+                                            sectionOrder: nextSection?.order || 1,
+                                          })
+                                        }}
+                                        options={sections.map((item) => ({
+                                          value: item.id,
+                                          label: item.title || `Section ${item.order}`,
+                                        }))}
+                                      />
+                                    </Form.Item>
+                                  </Col>
+                                  <Col span={6}>
                                     <Form.Item label="Row" style={{ marginBottom: 8 }}>
                                       <InputNumber min={1} value={block.row} onChange={(v) => updateBlock(block.id, { row: Number(v || 1) })} style={{ width: '100%' }} />
                                     </Form.Item>
                                   </Col>
-                                  <Col span={8}>
+                                  <Col span={6}>
                                     <Form.Item label="Span/12" style={{ marginBottom: 8 }}>
                                       <InputNumber min={1} max={12} value={block.span} onChange={(v) => updateBlock(block.id, { span: Number(v || 12) })} style={{ width: '100%' }} />
                                     </Form.Item>
                                   </Col>
-                                  <Col span={8}>
+                                  <Col span={6}>
                                     <Form.Item label="Align" style={{ marginBottom: 8 }}>
                                       <Select
                                         size="small"
@@ -1471,6 +1720,38 @@ export function LandingPagesPage() {
                                       <Input value={block.caption} onChange={(e) => updateBlock(block.id, { caption: e.target.value })} />
                                     </Form.Item>
                                   </>
+                                ) : null}
+
+                                {block.type === 'slider' ? (
+                                  <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                                    <Form.Item label="TiÃªu Ä‘á» slider" style={{ marginBottom: 8 }}>
+                                      <Input value={block.title} onChange={(e) => updateBlock(block.id, { title: e.target.value })} />
+                                    </Form.Item>
+                                    <Flex justify="space-between" align="center">
+                                      <Typography.Text strong style={{ fontSize: 12 }}>Slides</Typography.Text>
+                                      <Button size="small" icon={<PlusOutlined />} onClick={() => addSlideItem(block.id)}>ThÃªm slide</Button>
+                                    </Flex>
+                                    {(block.slides || []).map((slide) => (
+                                      <Card key={slide.id} size="small">
+                                        <Form.Item label="URL áº£nh" style={{ marginBottom: 8 }}>
+                                          <ImagePickerInput value={slide.url} onChange={(url) => updateSlideItem(block.id, slide.id, { url })} />
+                                        </Form.Item>
+                                        <Row gutter={8}>
+                                          <Col span={12}>
+                                            <Form.Item label="Alt" style={{ marginBottom: 8 }}>
+                                              <Input value={slide.alt} onChange={(e) => updateSlideItem(block.id, slide.id, { alt: e.target.value })} />
+                                            </Form.Item>
+                                          </Col>
+                                          <Col span={12}>
+                                            <Form.Item label="Caption" style={{ marginBottom: 8 }}>
+                                              <Input value={slide.caption} onChange={(e) => updateSlideItem(block.id, slide.id, { caption: e.target.value })} />
+                                            </Form.Item>
+                                          </Col>
+                                        </Row>
+                                        <Button size="small" danger block onClick={() => removeSlideItem(block.id, slide.id)}>XÃ³a slide</Button>
+                                      </Card>
+                                    ))}
+                                  </Space>
                                 ) : null}
 
                                 {block.type === 'video' ? (

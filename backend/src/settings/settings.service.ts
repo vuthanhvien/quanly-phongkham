@@ -10,7 +10,7 @@ import { RecordsService } from '../records/records.service';
 
 const DEFAULT_ROLE_SCOPE = 'ALL';
 const SYSTEM_ROLES = ['ADMIN', 'STAFF', 'DOCTOR'];
-const LANDING_BLOCK_TYPES = ['title', 'text', 'image', 'video', 'form'];
+const LANDING_BLOCK_TYPES = ['title', 'text', 'image', 'video', 'form', 'slider'];
 const UI_THEME_OPTIONS = ['dark', 'light'];
 const UI_SIZE_OPTIONS = ['small', 'medium', 'large'];
 const UI_FONT_FAMILIES = [
@@ -543,6 +543,10 @@ export class SettingsService {
         row: Number.isFinite(rowValue) && rowValue > 0 ? Math.floor(rowValue) : 1,
         span: Number.isFinite(spanValue) ? Math.max(1, Math.min(12, Math.floor(spanValue))) : 12,
         order: Number.isFinite(orderValue) ? Math.floor(orderValue) : index + 1,
+        sectionId: String(block?.sectionId || 'default-section'),
+        sectionTitle: String(block?.sectionTitle || ''),
+        sectionWidth: String(block?.sectionWidth || '') === 'full' ? 'full' : 'container',
+        sectionOrder: Math.max(1, Math.floor(Number(block?.sectionOrder ?? 1) || 1)),
       };
 
       if (type === 'title') {
@@ -565,6 +569,17 @@ export class SettingsService {
       if (type === 'video') {
         normalized.url = String(block?.url || '');
         normalized.title = String(block?.title || '');
+      }
+
+      if (type === 'slider') {
+        normalized.title = String(block?.title || '');
+        const slides = Array.isArray(block?.slides) ? block.slides : [];
+        normalized.slides = slides.map((slide, slideIndex) => ({
+          id: String(slide?.id || randomUUID()),
+          url: String(slide?.url || ''),
+          alt: String(slide?.alt || ''),
+          caption: String(slide?.caption || `Slide ${slideIndex + 1}`),
+        }));
       }
 
       if (type === 'form') {

@@ -1,6 +1,7 @@
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons"
-import { Button, Card, Form, Input, InputNumber, Select, Space, Table, Typography, message } from "antd"
+import { Button, Card, DatePicker, Form, Input, InputNumber, Select, Space, Table, Typography, message } from "antd"
 import type { ColumnsType } from "antd/es/table"
+import dayjs from "dayjs"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
 import { getApiErrorMessage } from "../utils/apiError"
@@ -62,7 +63,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
     void loadLookups()
     form.setFieldsValue({
       movementType: "IMPORT",
-      movementDate: new Date().toISOString().slice(0, 10),
+      movementDate: dayjs(),
       items: [createReceiptItem()],
     })
   }, [form])
@@ -96,22 +97,43 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
   async function loadLookups() {
     setLookupLoading(true)
     try {
-      const response = await api.get("/records/stock-batches/form-options")
-      const payload = response.data.data || {}
+      let payload: Record<string, unknown> = {}
+      try {
+        const response = await api.get("/records/stock-batches/form-options")
+        payload = response.data.data || {}
+      } catch {
+        const [productsResponse, branchesResponse, suppliersResponse, batchesResponse] = await Promise.all([
+          api.get("/records/products", { params: { pageSize: 500 } }),
+          api.get("/records/branches", { params: { pageSize: 200 } }),
+          api.get("/records/suppliers", { params: { pageSize: 300 } }),
+          api.get("/records/stock-batches", { params: { pageSize: 500 } }),
+        ])
+        payload = {
+          products: productsResponse.data.data || [],
+          branches: branchesResponse.data.data || [],
+          suppliers: suppliersResponse.data.data || [],
+          batches: batchesResponse.data.data || [],
+        }
+      }
+      const branchRows = Array.isArray(payload.branches) ? payload.branches : []
+      const supplierRows = Array.isArray(payload.suppliers) ? payload.suppliers : []
+      const productRows = Array.isArray(payload.products) ? payload.products : []
+      const batchRows = Array.isArray(payload.batches) ? payload.batches : []
+
       setBranchOptions(
-        (payload.branches || []).map((row: Record<string, unknown>) => ({
+        branchRows.map((row: Record<string, unknown>) => ({
           value: String(row.id),
           label: `${row.slug || ""} - ${row.name || row.id}`,
         })),
       )
       setSupplierOptions(
-        (payload.suppliers || []).map((row: Record<string, unknown>) => ({
+        supplierRows.map((row: Record<string, unknown>) => ({
           value: String(row.id),
           label: `${row.code || ""} - ${row.name || row.id}`,
         })),
       )
       setProductOptions(
-        (payload.products || []).map((row: Record<string, unknown>) => ({
+        productRows.map((row: Record<string, unknown>) => ({
           value: String(row.id),
           label: `${row.code || ""} - ${row.name || row.id}`,
           usageUnit: String(row.usageUnit || "cai"),
@@ -119,7 +141,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
         })),
       )
       setBatchOptions(
-        (payload.batches || []).map((row: Record<string, unknown>) => ({
+        batchRows.map((row: Record<string, unknown>) => ({
           value: String(row.id),
           label: `${row.batchNumber || row.id} - tồn ${formatNumber(Number(row.remainingQuantity || 0))} ${row.unit || ""}`,
           productId: String(row.productId || ""),
@@ -151,7 +173,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
     nextItems[index] = {
       ...nextItems[index],
       productId,
-      unit: nextItems[index]?.unit || product?.usageUnit || product?.purchaseUnit || "cai",
+      unit: product?.usageUnit || product?.purchaseUnit || "cai",
       supplierId: nextItems[index]?.supplierId || supplierId,
     }
     form.setFieldsValue({ items: nextItems })
@@ -221,7 +243,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
 
         await api.post("/records/stock-batches/issue", {
           code: values.code,
-          movementDate: values.movementDate,
+          movementDate: dayjs.isDayjs(values.movementDate) ? values.movementDate.format("YYYY-MM-DD") : values.movementDate,
           note: values.note,
           items: normalizedItems,
         })
@@ -248,7 +270,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
 
       await api.post("/records/stock-batches/receipt", {
         code: values.code,
-        movementDate: values.movementDate,
+        movementDate: dayjs.isDayjs(values.movementDate) ? values.movementDate.format("YYYY-MM-DD") : values.movementDate,
         branchId: values.branchId,
         supplierId: values.supplierId,
         note: values.note,
@@ -280,6 +302,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
           loading={lookupLoading}
           options={productOptions}
           placeholder="Chọn sản phẩm"
+          style={{ width: "100%" }}
           value={row.productId}
           onChange={(value) => handleReceiptProductChange(row.index, value)}
         />
@@ -300,7 +323,14 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
       key: "expiryDate",
       width: 150,
       render: (_value, row) => (
-        <Input type="date" value={row.expiryDate} onChange={(event) => handleReceiptFieldChange(row.index, "expiryDate", event.target.value)} />
+        <DatePicker
+          allowClear
+          format="DD/MM/YYYY"
+          placeholder="Chọn hạn dùng"
+          style={{ width: "100%" }}
+          value={row.expiryDate ? dayjs(row.expiryDate) : null}
+          onChange={(value) => handleReceiptFieldChange(row.index, "expiryDate", value ? value.format("YYYY-MM-DD") : undefined)}
+        />
       ),
     },
     {
@@ -318,7 +348,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
       key: "unit",
       width: 120,
       render: (_value, row) => (
-        <Input value={row.unit} placeholder="cai" onChange={(event) => handleReceiptFieldChange(row.index, "unit", event.target.value)} />
+        <Input disabled value={row.unit} placeholder="Tự động theo sản phẩm" />
       ),
     },
     {
@@ -344,6 +374,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
           loading={lookupLoading}
           options={filteredBatchOptions}
           placeholder="Chọn lô hàng để xuất"
+          style={{ width: "100%" }}
           value={row.batchId}
           onChange={(value) => handleIssueBatchChange(row.index, value)}
         />
@@ -406,7 +437,11 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
             <Input placeholder="PNK-0001 / PXK-0001" />
           </Form.Item>
           <Form.Item label="Ngày phiếu" name="movementDate" rules={[{ required: true, message: "Chọn ngày phiếu" }]}>
-            <Input type="date" />
+            <DatePicker
+              format="DD/MM/YYYY"
+              placeholder="Chọn ngày phiếu"
+              style={{ width: "100%" }}
+            />
           </Form.Item>
           <Form.Item label="Chi nhánh" name="branchId" rules={[{ required: movementType !== "EXPORT", message: "Chọn chi nhánh" }]}>
             <Select allowClear={movementType === "EXPORT"} options={branchOptions} optionFilterProp="label" placeholder="Chọn chi nhánh" showSearch />
