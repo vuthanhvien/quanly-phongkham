@@ -31,6 +31,8 @@ services:
     image: vienvu/quanly-phongkham-cms:${TAG:-latest}
     depends_on:
       - backend
+    ports:
+      - "${CMS_PORT:-8081}:80"
 
   landing:
     image: vienvu/quanly-phongkham-landing:${TAG:-latest}

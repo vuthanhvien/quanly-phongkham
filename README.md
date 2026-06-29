@@ -16,8 +16,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
-- Landing: <http://localhost:3001>
-- CMS: <http://localhost:8080>
+- Landing: [http://localhost:3001](http://localhost:3001)
+- CMS: [http://localhost:8080](http://localhost:8080)
 - API: nội bộ qua proxy
 - PostgreSQL: `localhost:5433`
 
@@ -57,9 +57,9 @@ docker compose -f docker-compose.dev.yml logs -f
 docker compose -f docker-compose.dev.yml down
 ```
 
-- CMS dev: <http://localhost:15173>
-- API dev: <http://localhost:13000/api>
-- Landing dev: <http://localhost:13001>
+- CMS dev: [http://localhost:15173](http://localhost:15173)
+- API dev: [http://localhost:13000/api](http://localhost:13000/api)
+- Landing dev: [http://localhost:13001](http://localhost:13001)
 - PostgreSQL: `localhost:5433`
 
 Nếu lần đầu khởi động thấy watcher chưa bắt thay đổi trên Docker Desktop, compose dev đã bật polling sẵn cho cả backend và cms.
@@ -110,3 +110,11 @@ Khởi động riêng PostgreSQL trước, sau đó:
 cd backend && npm install && DATABASE_URL=postgresql://clinic:clinic_password@localhost:5432/clinic npm run start:dev
 cd cms && npm install && npm run dev
 ```
+
+sh build-push.sh
+
+Ssh root@161.97.181.63
+con server này
+Root/QG5oZjRSn1OH793Q0x53H
+
+cd phongkham && docker compose pull && docker compose up -d
