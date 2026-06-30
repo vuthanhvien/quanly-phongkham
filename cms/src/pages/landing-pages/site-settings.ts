@@ -1,3 +1,5 @@
+import { createId } from '../../utils/createId'
+
 export type NavItem = {
   id: string
   label: string
@@ -49,12 +51,12 @@ export function emptyGlobal(): LandingGlobalSetting {
 }
 
 export function createNavItem(label = 'Menu moi'): NavItem {
-  return { id: crypto.randomUUID(), label, href: '/', target: '_self', children: [] }
+  return { id: createId(), label, href: '/', target: '_self', children: [] }
 }
 
 export function normalizeNavItem(item: NavItem, depth = 1): NavItem {
   return {
-    id: item.id || crypto.randomUUID(),
+    id: item.id || createId(),
     label: item.label || '',
     href: item.href || '/',
     target: item.target === '_blank' ? '_blank' : '_self',

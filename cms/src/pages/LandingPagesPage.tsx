@@ -30,6 +30,7 @@ import {
   Typography,
   message,
 } from 'antd'
+import { createId } from '../utils/createId'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { ImagePickerInput } from '../components/ImagePickerInput'
@@ -194,7 +195,7 @@ export function LandingPagesPage() {
   }
 
   function addNavItem() {
-    const item: NavItem = { id: crypto.randomUUID(), label: 'Menu mới', href: '/', target: '_self' }
+    const item: NavItem = { id: createId(), label: 'Menu mới', href: '/', target: '_self' }
     updateGlobal({ menuItems: [...(globalSettings.menuItems ?? []), item] })
   }
 
@@ -207,7 +208,7 @@ export function LandingPagesPage() {
   }
 
   function addFooterColumn() {
-    const col: FooterColumn = { id: crypto.randomUUID(), title: 'Cột mới', links: [] }
+    const col: FooterColumn = { id: createId(), title: 'Cột mới', links: [] }
     updateGlobal({ footerColumns: [...(globalSettings.footerColumns ?? []), col] })
   }
 
@@ -222,7 +223,7 @@ export function LandingPagesPage() {
   function addFooterLink(colId: string) {
     updateGlobal({
       footerColumns: (globalSettings.footerColumns ?? []).map((c) =>
-        c.id === colId ? { ...c, links: [...c.links, { id: crypto.randomUUID(), label: 'Link', href: '/' }] } : c,
+        c.id === colId ? { ...c, links: [...c.links, { id: createId(), label: 'Link', href: '/' }] } : c,
       ),
     })
   }
@@ -244,7 +245,7 @@ export function LandingPagesPage() {
   }
 
   function addSocialLink() {
-    updateGlobal({ footerSocialLinks: [...(globalSettings.footerSocialLinks ?? []), { id: crypto.randomUUID(), platform: 'Facebook', url: '' }] })
+    updateGlobal({ footerSocialLinks: [...(globalSettings.footerSocialLinks ?? []), { id: createId(), platform: 'Facebook', url: '' }] })
   }
 
   function updateSocialLink(id: string, patch: Partial<SocialLink>) {

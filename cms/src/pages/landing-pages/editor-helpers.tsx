@@ -6,6 +6,7 @@ import {
   VideoCameraOutlined,
 } from '@ant-design/icons'
 import type { LandingBlock, LandingBlockType, LandingFormField, LandingPage, LandingSectionWidth, LandingSlide } from '../../models'
+import { createId } from '../../utils/createId'
 
 export const blockTypeOptions: Array<{ value: LandingBlockType; label: string }> = [
   { value: 'title', label: 'Title' },
@@ -42,7 +43,7 @@ export function normalizePath(value: string) {
 
 export function createField(): LandingFormField {
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     name: 'full_name',
     label: 'Ho ten',
     type: 'text',
@@ -54,7 +55,7 @@ export function createField(): LandingFormField {
 
 export function createSlide(): LandingSlide {
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     url: '',
     alt: '',
     caption: '',
@@ -67,7 +68,7 @@ export function normalizeSectionWidth(value?: string): LandingSectionWidth {
 
 export function createSectionMeta(width: LandingSectionWidth = 'container', order = 1, sectionId?: string) {
   return {
-    sectionId: sectionId || crypto.randomUUID(),
+    sectionId: sectionId || createId(),
     sectionTitle: '',
     sectionWidth: width,
     sectionOrder: Math.max(1, order),
@@ -143,7 +144,7 @@ export function deriveSections(blocks: LandingBlock[]): LandingSectionDraft[] {
 
 export function createBlock(type: LandingBlockType): LandingBlock {
   const base: LandingBlock = {
-    id: crypto.randomUUID(),
+    id: createId(),
     type,
     row: 1,
     span: 12,
@@ -210,5 +211,5 @@ export function emptyPage(): Omit<LandingPage, 'id' | 'createdAt' | 'updatedAt'>
 }
 
 export function makeId() {
-  return crypto.randomUUID()
+  return createId()
 }

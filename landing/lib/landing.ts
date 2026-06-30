@@ -1,3 +1,5 @@
+import { createId } from './create-id'
+
 export type LandingBlockType = 'title' | 'text' | 'image' | 'video' | 'form' | 'slider'
 
 export type LandingSectionWidth = 'container' | 'full'
@@ -105,7 +107,7 @@ export interface LandingGlobalSetting {
 
 function normalizeNavItem(item: NavItem, depth = 1): NavItem {
   return {
-    id: item.id || crypto.randomUUID(),
+    id: item.id || createId(),
     label: item.label || '',
     href: item.href || '/',
     target: item.target === '_blank' ? '_blank' : '_self',
@@ -123,8 +125,8 @@ export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
   try {
     const res = await fetch(`${API_URL}/public/landing-pages/global`, { next: { revalidate: 60 } })
     if (!res.ok) return {}
-    const raw = await res.json() as { data?: LandingGlobalSetting } | LandingGlobalSetting
-    const data = ('data' in raw ? raw.data : raw) ?? {}
+    const raw = await res.json() as LandingGlobalSetting & { data?: LandingGlobalSetting }
+    const data = raw.data ?? raw
     return { ...data, menuItems: normalizeMenuItems(data.menuItems) }
   } catch {
     return {}
