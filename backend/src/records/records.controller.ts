@@ -43,6 +43,21 @@ export class RecordsController {
     return this.records.serviceOrderProductOptions(request.user);
   }
 
+  @Get('records/stock-batches/form-options')
+  stockBatchFormOptions(@Request() request: { user: AuthUser }) {
+    return this.records.stockBatchFormOptions(request.user);
+  }
+
+  @Post('records/stock-batches/receipt')
+  receiptStock(@Body() payload: Record<string, unknown>, @Request() request: { user: AuthUser }) {
+    return this.records.receiptStock(payload, request.user);
+  }
+
+  @Post('records/stock-batches/issue')
+  issueStock(@Body() payload: Record<string, unknown>, @Request() request: { user: AuthUser }) {
+    return this.records.issueStock(payload, request.user);
+  }
+
   @Get('records/:resource/:id')
   find(@Param('resource') resource: string, @Param('id') id: string, @Request() request: { user: AuthUser }) {
     return this.records.find(resource, id, request.user);

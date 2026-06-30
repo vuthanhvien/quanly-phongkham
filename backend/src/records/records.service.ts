@@ -409,6 +409,108 @@ export class RecordsService {
     };
   }
 
+  async stockBatchFormOptions(user?: AuthUser) {
+    await this.assertAnyActionPermission(user, 'stock-batches', ['create', 'update', 'view']);
+    const [products, branches, suppliers, batches] = await Promise.all([
+      this.products.find({ order: { createdAt: 'DESC' }, take: 500 }),
+      this.branches.find({ order: { createdAt: 'DESC' }, take: 200 }),
+      this.suppliers.find({ order: { createdAt: 'DESC' }, take: 300 }),
+      this.stockBatches.find({ order: { createdAt: 'DESC' }, take: 500 }),
+    ]);
+
+    return {
+      data: {
+        products: products.map((item) => this.protect('products', item as unknown as ConfigurableEntity)),
+        branches: branches.map((item) => this.protect('branches', item as unknown as ConfigurableEntity)),
+        suppliers: suppliers.map((item) => this.protect('suppliers', item as unknown as ConfigurableEntity)),
+        batches: batches.map((item) => this.protect('stock-batches', item as unknown as ConfigurableEntity)),
+      },
+    };
+  }
+
+  async receiptStock(payload: Record<string, unknown>, user: AuthUser) {
+    await this.assertAnyActionPermission(user, 'stock-batches', ['create', 'update']);
+    const branchId = String(payload.branchId || '');
+    if (!branchId) throw new BadRequestException('Phieu nhap kho phai co chi nhanh');
+    await this.assertPermission(user, 'stock-batches', 'create', branchId);
+
+    const items = await this.normalizeStockReceiptItems(payload.items, branchId, payload.supplierId ? String(payload.supplierId) : undefined);
+    const touched: StockBatch[] = [];
+
+    for (const item of items) {
+      const existing = await this.findMatchingStockBatch(item);
+      if (existing) {
+        existing.remainingQuantity = Number(existing.remainingQuantity || 0) + item.quantity;
+        existing.unit = item.unit;
+        existing.supplierId = item.supplierId;
+        existing.expiryDate = item.expiryDate;
+        touched.push(await this.stockBatches.save(existing));
+        continue;
+      }
+      touched.push(await this.stockBatches.save(this.stockBatches.create({
+        productId: item.productId,
+        branchId: item.branchId,
+        supplierId: item.supplierId,
+        batchNumber: item.batchNumber,
+        expiryDate: item.expiryDate,
+        remainingQuantity: item.quantity,
+        unit: item.unit,
+      })));
+    }
+
+    await this.audit(user, 'IMPORT_STOCK', 'stock-batches', touched[0]?.id || branchId, {
+      code: String(payload.code || ''),
+      movementDate: String(payload.movementDate || ''),
+      branchId,
+      supplierId: payload.supplierId ? String(payload.supplierId) : undefined,
+      note: payload.note ? String(payload.note) : undefined,
+      items: touched.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        batchNumber: item.batchNumber,
+        remainingQuantity: item.remainingQuantity,
+      })),
+    });
+
+    return {
+      data: touched.map((item) => this.protect('stock-batches', item as unknown as ConfigurableEntity)),
+    };
+  }
+
+  async issueStock(payload: Record<string, unknown>, user: AuthUser) {
+    await this.assertAnyActionPermission(user, 'stock-batches', ['create', 'update']);
+    const items = await this.normalizeStockIssueItems(payload.items);
+    const touched: StockBatch[] = [];
+
+    for (const item of items) {
+      const batch = await this.stockBatches.findOne({ where: { id: item.batchId } });
+      if (!batch) throw new NotFoundException('Khong tim thay lo hang de xuat kho');
+      await this.assertPermission(user, 'stock-batches', 'update', batch.branchId);
+      const nextQuantity = Number(batch.remainingQuantity || 0) - item.quantity;
+      if (nextQuantity < 0) {
+        throw new BadRequestException(`Lo ${batch.batchNumber} khong du ton de xuat`);
+      }
+      batch.remainingQuantity = nextQuantity;
+      touched.push(await this.stockBatches.save(batch));
+    }
+
+    await this.audit(user, 'ISSUE_STOCK', 'stock-batches', touched[0]?.id || String(payload.branchId || ''), {
+      code: String(payload.code || ''),
+      movementDate: String(payload.movementDate || ''),
+      note: payload.note ? String(payload.note) : undefined,
+      items: touched.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        batchNumber: item.batchNumber,
+        remainingQuantity: item.remainingQuantity,
+      })),
+    });
+
+    return {
+      data: touched.map((item) => this.protect('stock-batches', item as unknown as ConfigurableEntity)),
+    };
+  }
+
   private async storeUploadedFile(
     file: any,
     folder: FileFolder,
@@ -617,6 +719,73 @@ export class RecordsService {
         lineTotal: quantity * unitPrice,
       });
     });
+  }
+
+  private async normalizeStockReceiptItems(value: unknown, branchId: string, defaultSupplierId?: string) {
+    if (!Array.isArray(value) || value.length === 0) {
+      throw new BadRequestException('Phieu nhap kho phai co it nhat 1 san pham');
+    }
+    const productIds = Array.from(new Set(value.map((item) => String((item as Record<string, unknown>)?.productId || '')).filter(Boolean)));
+    const products = await this.products.find({ where: { id: In(productIds) } });
+    const productsById = new Map(products.map((item) => [item.id, item]));
+
+    return value.map((rawItem) => {
+      const item = rawItem as Record<string, unknown>;
+      const productId = String(item.productId || '');
+      const product = productsById.get(productId);
+      if (!product) throw new BadRequestException('San pham trong phieu nhap khong hop le');
+      const quantity = Number(item.quantity || 0);
+      if (quantity <= 0) throw new BadRequestException(`So luong nhap khong hop le cho ${product.name}`);
+      const batchNumber = String(item.batchNumber || '').trim();
+      if (!batchNumber) throw new BadRequestException(`Chua nhap so lo cho ${product.name}`);
+      return {
+        productId: product.id,
+        branchId,
+        supplierId: item.supplierId ? String(item.supplierId) : defaultSupplierId,
+        batchNumber,
+        expiryDate: item.expiryDate ? String(item.expiryDate) : undefined,
+        quantity,
+        unit: String(item.unit || product.usageUnit || product.purchaseUnit || 'cai'),
+      };
+    });
+  }
+
+  private async normalizeStockIssueItems(value: unknown) {
+    if (!Array.isArray(value) || value.length === 0) {
+      throw new BadRequestException('Phieu xuat kho phai co it nhat 1 lo san pham');
+    }
+    return value.map((rawItem) => {
+      const item = rawItem as Record<string, unknown>;
+      const batchId = String(item.batchId || '');
+      const quantity = Number(item.quantity || 0);
+      if (!batchId) throw new BadRequestException('Phieu xuat kho phai chon lo hang');
+      if (quantity <= 0) throw new BadRequestException('So luong xuat kho phai lon hon 0');
+      return { batchId, quantity };
+    });
+  }
+
+  private async findMatchingStockBatch(item: {
+    productId: string;
+    branchId: string;
+    supplierId?: string;
+    batchNumber: string;
+    expiryDate?: string;
+    unit: string;
+  }) {
+    const rows = await this.stockBatches.find({
+      where: {
+        productId: item.productId,
+        branchId: item.branchId,
+        batchNumber: item.batchNumber,
+      },
+      take: 20,
+      order: { createdAt: 'DESC' },
+    });
+    return rows.find((row) =>
+      String(row.supplierId || '') === String(item.supplierId || '')
+      && String(row.expiryDate || '') === String(item.expiryDate || '')
+      && String(row.unit || '') === String(item.unit || ''),
+    );
   }
 
   private async replaceServiceOrderItems(orderId: string, items: ServiceOrderItem[]) {

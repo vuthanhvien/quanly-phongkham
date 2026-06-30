@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { ChatbotWidget } from '../components/ChatbotWidget'
 import { SiteFooter } from '../components/SiteFooter'
 import { SiteHeader } from '../components/SiteHeader'
-import { getGlobalSettings } from '../lib/landing'
+import { getGlobalSettings, getMenuSettings } from '../lib/landing'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -14,7 +14,11 @@ export const metadata: Metadata = {
 const THEME_CSS_URL = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api'}/public/landing-theme/style.css`
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const globalSettings = await getGlobalSettings()
+  const [globalSettings, menuItems] = await Promise.all([
+    getGlobalSettings(),
+    getMenuSettings(),
+  ])
+  const siteSettings = { ...globalSettings, menuItems }
 
   return (
     <html lang="vi">
@@ -24,9 +28,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <link rel="stylesheet" href={THEME_CSS_URL} />
       </head>
       <body>
-        <SiteHeader settings={globalSettings} />
+        <SiteHeader settings={siteSettings} />
         {children}
-        <SiteFooter settings={globalSettings} />
+        <SiteFooter settings={siteSettings} />
         <ChatbotWidget />
       </body>
     </html>

@@ -1,5 +1,7 @@
 import { createContext, useContext } from 'react'
 
+const APP_UI_STORAGE_KEY = 'clinic-app-ui-settings'
+
 export interface AppUiSettings {
   id?: string
   appKey?: string
@@ -35,6 +37,33 @@ export const defaultAppUiSettings: AppUiSettings = {
   borderRadius: 14,
   size: 'medium',
   fontFamily: fontFamilyOptions[0].value,
+}
+
+export function normalizeAppUiSettings(payload?: Partial<AppUiSettings> | null): AppUiSettings {
+  return {
+    ...defaultAppUiSettings,
+    ...(payload || {}),
+  }
+}
+
+export function loadCachedAppUiSettings(): AppUiSettings {
+  if (typeof window === 'undefined') return defaultAppUiSettings
+  try {
+    const raw = localStorage.getItem(APP_UI_STORAGE_KEY)
+    if (!raw) return defaultAppUiSettings
+    return normalizeAppUiSettings(JSON.parse(raw) as Partial<AppUiSettings>)
+  } catch {
+    return defaultAppUiSettings
+  }
+}
+
+export function persistAppUiSettings(settings: AppUiSettings) {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(APP_UI_STORAGE_KEY, JSON.stringify(settings))
+  } catch {
+    // ignore storage errors
+  }
 }
 
 export function controlHeightBySize(size: AppUiSettings['size']) {

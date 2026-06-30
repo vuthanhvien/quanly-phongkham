@@ -31,6 +31,7 @@ import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
+import { StockBatchForm } from "../components/StockBatchForm"
 import { CustomField, entityLabels } from "../models"
 import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
 import {
@@ -311,7 +312,7 @@ export function RecordListPage() {
         open={creating || Boolean(editingId)}
         placement="right"
         title={editingId ? `Chỉnh sửa ${entityLabels[resource] || resource}` : `Thêm nhanh ${entityLabels[resource] || resource}`}
-        width={resource === "service-orders" ? 980 : 560}
+        width={["service-orders", "stock-batches"].includes(resource) ? 980 : 560}
         onClose={() => {
           setCreating(false)
           setEditingId(null)
@@ -331,6 +332,21 @@ export function RecordListPage() {
             compact
             id={editingId || undefined}
             initialValues={editingId ? undefined : duplicateValues}
+            onCancel={() => {
+              setCreating(false)
+              setEditingId(null)
+              setDuplicateValues(undefined)
+            }}
+            onSuccess={() => {
+              setCreating(false)
+              setEditingId(null)
+              setDuplicateValues(undefined)
+              refresh()
+            }}
+          />
+        ) : resource === "stock-batches" && !editingId ? (
+          <StockBatchForm
+            compact
             onCancel={() => {
               setCreating(false)
               setEditingId(null)

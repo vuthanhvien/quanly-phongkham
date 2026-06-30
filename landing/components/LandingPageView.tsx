@@ -1,7 +1,7 @@
 'use client'
 
 import { FormBlock } from './FormBlock'
-import { LandingPageData, embedVideoUrl, isVideoEmbed, sortBlocks } from '../lib/landing'
+import { LandingPageData, deriveLandingSections, embedVideoUrl, isVideoEmbed } from '../lib/landing'
 
 function headingTag(level?: number) {
   if (level === 1) return 'h1'
@@ -12,14 +12,14 @@ function headingTag(level?: number) {
 }
 
 export function LandingPageView({ page, editMode = false }: { page: LandingPageData; editMode?: boolean }) {
-  const blocks = sortBlocks(page.blocks || [])
+  const sections = deriveLandingSections(page.blocks || [])
 
   function selectBlock(blockId: string) {
     if (!editMode) return
     try {
       window.parent.postMessage({ type: 'cms-block-select', blockId }, '*')
     } catch {
-      // cross-origin or no parent — ignore
+      // cross-origin or no parent - ignore
     }
   }
 
@@ -42,68 +42,132 @@ export function LandingPageView({ page, editMode = false }: { page: LandingPageD
             pointerEvents: 'none',
           }}
         >
-          ✏️ Chế độ edit — click vào block để chọn trong CMS
+          Edit mode - click block to select in CMS
         </div>
       )}
       <div className="page-frame" style={editMode ? { marginTop: 26 } : undefined}>
         <section className="hero">
-          <div className="eyebrow">Thiện Chánh clinic landing</div>
-          <h1>{page.seoTitle || page.title}</h1>
-          {page.description || page.seoDescription ? <p>{page.description || page.seoDescription}</p> : null}
+          <div className="hero__content">
+            <div className="eyebrow">Thien Chanh clinic landing</div>
+            <h1>{page.seoTitle || page.title}</h1>
+            {page.description || page.seoDescription ? <p>{page.description || page.seoDescription}</p> : null}
+          </div>
+          <div className="hero__ambient" aria-hidden="true">
+            <div className="hero__orb hero__orb--one" />
+            <div className="hero__orb hero__orb--two" />
+          </div>
         </section>
 
-        <section className="landing-grid">
-          {blocks.map((block) => {
-            const Tag = headingTag(block.level)
-            const span = Math.max(1, Math.min(12, block.span || 12))
+        {sections.map((section, sectionIndex) => {
+          const rows = Array.from(
+            section.blocks.reduce((map, block) => {
+              const key = String(block.row || 0)
+              const list = map.get(key) || []
+              list.push(block)
+              map.set(key, list)
+              return map
+            }, new Map<string, typeof section.blocks>()),
+          )
 
-            return (
-              <article
-                className={`landing-block${editMode ? ' cms-editable' : ''}`}
-                key={block.id}
-                data-block-id={block.id}
-                style={{ ['--span' as string]: span, cursor: editMode ? 'pointer' : undefined }}
-                onClick={editMode ? () => selectBlock(block.id) : undefined}
-              >
-                {block.type === 'title' ? (
-                  <Tag className="landing-title" style={{ fontSize: 'clamp(1.8rem, 4vw, 3rem)', textAlign: block.align || 'left' }}>
-                    {block.title}
-                  </Tag>
-                ) : null}
+          return (
+            <section
+              className={`landing-section landing-section--${section.width}`}
+              key={section.id}
+            >
+              <div className="landing-section__inner">
+                {rows.map(([rowKey, rowBlocks], rowIndex) => (
+                  <div className="landing-row" key={`${section.id}-${rowKey}`}>
+                    <div className="landing-grid">
+                      {rowBlocks.map((block) => {
+                        const Tag = headingTag(block.level)
+                        const span = Math.max(1, Math.min(12, block.span || 12))
+                        const blockClass = [
+                          'landing-block',
+                          `landing-block--${block.type}`,
+                          span >= 8 ? 'landing-block--wide' : 'landing-block--narrow',
+                          block.type === 'form' ? 'landing-block--panel' : '',
+                          editMode ? 'cms-editable' : '',
+                        ].filter(Boolean).join(' ')
 
-                {block.type === 'text' ? (
-                  <p style={{ textAlign: block.align || 'left', whiteSpace: 'pre-wrap' }}>{block.text}</p>
-                ) : null}
+                        return (
+                          <article
+                            className={blockClass}
+                            key={block.id}
+                            data-block-id={block.id}
+                            style={{ ['--span' as string]: span, cursor: editMode ? 'pointer' : undefined }}
+                            onClick={editMode ? () => selectBlock(block.id) : undefined}
+                          >
+                            {block.type === 'title' ? (
+                              <Tag
+                                className="landing-title"
+                                style={{
+                                  fontSize: sectionIndex === 0 && rowIndex === 0 ? 'clamp(2.2rem, 4vw, 4.2rem)' : 'clamp(1.5rem, 3vw, 2.6rem)',
+                                  textAlign: block.align || 'left',
+                                }}
+                              >
+                                {block.title}
+                              </Tag>
+                            ) : null}
 
-                {block.type === 'image' ? (
-                  <div>
-                    <div className="landing-media">
-                      <img alt={block.alt || block.title || 'Landing image'} src={block.url || ''} />
+                            {block.type === 'text' ? (
+                              <div className="landing-copy">
+                                <p style={{ textAlign: block.align || 'left', whiteSpace: 'pre-wrap' }}>{block.text}</p>
+                              </div>
+                            ) : null}
+
+                            {block.type === 'image' ? (
+                              <div className="landing-visual">
+                                <div className="landing-media">
+                                  <img alt={block.alt || block.title || 'Landing image'} src={block.url || ''} />
+                                </div>
+                                {block.caption ? <div className="landing-caption">{block.caption}</div> : null}
+                              </div>
+                            ) : null}
+
+                            {block.type === 'video' ? (
+                              <div className="landing-visual">
+                                <div className="landing-media">
+                                  {isVideoEmbed(block.url || '') ? (
+                                    <iframe
+                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                      allowFullScreen
+                                      src={embedVideoUrl(block.url || '')}
+                                      title={block.title || 'Landing video'}
+                                    />
+                                  ) : (
+                                    <video controls src={block.url || ''} />
+                                  )}
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {block.type === 'slider' ? (
+                              <div className="landing-slider">
+                                {block.title ? <h3 className="landing-slider__title">{block.title}</h3> : null}
+                                <div className="landing-slider__track">
+                                  {(block.slides || []).map((slide) => (
+                                    <figure className="landing-slider__slide" key={slide.id}>
+                                      <div className="landing-media">
+                                        <img alt={slide.alt || slide.caption || block.title || 'Slider image'} src={slide.url || ''} />
+                                      </div>
+                                      {slide.caption ? <figcaption className="landing-caption">{slide.caption}</figcaption> : null}
+                                    </figure>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {block.type === 'form' ? <FormBlock block={block} pageSlug={page.slug} /> : null}
+                          </article>
+                        )
+                      })}
                     </div>
-                    {block.caption ? <div className="landing-caption">{block.caption}</div> : null}
                   </div>
-                ) : null}
-
-                {block.type === 'video' ? (
-                  <div className="landing-media">
-                    {isVideoEmbed(block.url || '') ? (
-                      <iframe
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        src={embedVideoUrl(block.url || '')}
-                        title={block.title || 'Landing video'}
-                      />
-                    ) : (
-                      <video controls src={block.url || ''} />
-                    )}
-                  </div>
-                ) : null}
-
-                {block.type === 'form' ? <FormBlock block={block} pageSlug={page.slug} /> : null}
-              </article>
-            )
-          })}
-        </section>
+                ))}
+              </div>
+            </section>
+          )
+        })}
       </div>
     </main>
   )
