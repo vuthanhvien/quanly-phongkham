@@ -17,8 +17,8 @@ docker compose up --build
 ```
 
 - Landing: [http://localhost:3001](http://localhost:3001)
-- CMS: [http://localhost:8080](http://localhost:8080)
-- API: nội bộ qua proxy
+- CMS: [http://localhost](http://localhost)
+- API: [http://localhost/api](http://localhost/api)
 - PostgreSQL: `localhost:5433`
 
 Tài khoản khởi tạo:
@@ -81,9 +81,10 @@ Nếu lần đầu khởi động thấy watcher chưa bắt thay đổi trên D
 ```text
 backend/                 NestJS REST API
 cms/                     Refine CMS
+proxy/                   Nginx reverse proxy cho CMS + /api
 docs/FEATURE_SCOPE.md    Phạm vi rút từ PDF
 docs/WORKLOG.md          Đã làm / cần làm tiếp
-docker-compose.yml       PostgreSQL + API + CMS
+docker-compose.yml       PostgreSQL + API + CMS + proxy
 ```
 
 ## API Chính
