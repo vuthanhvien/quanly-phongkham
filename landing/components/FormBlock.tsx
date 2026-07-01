@@ -3,7 +3,7 @@
 import { FormEvent, useState } from 'react'
 import type { LandingBlock } from '../lib/landing'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api'
 
 export function FormBlock({ block, pageSlug }: { block: LandingBlock; pageSlug: string }) {
   const [values, setValues] = useState<Record<string, string>>({})

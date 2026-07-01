@@ -7,12 +7,12 @@ import 'antd/dist/reset.css';
 import './styles.css';
 
 syncDocumentBranding(loadCachedAppUiSettings());
+const routerBase = import.meta.env.BASE_URL.replace(/\/+$/, '') || '/';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={routerBase}>
       <App />
     </BrowserRouter>
   </React.StrictMode>,
 );
-

@@ -35,6 +35,7 @@ echo "[2/6] Building cms..."
 docker build \
   --platform linux/amd64 \
   --build-arg VITE_API_URL=/api \
+  --build-arg VITE_BASE_PATH=/admin/ \
   -t "$CMS_IMAGE" \
   ./cms
 
@@ -43,6 +44,7 @@ echo ""
 echo "[3/6] Building landing..."
 docker build \
   --platform linux/amd64 \
+  --build-arg NEXT_PUBLIC_API_URL=/api \
   -t "$LANDING_IMAGE" \
   ./landing
 

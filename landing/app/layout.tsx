@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: 'Landing pages rendered from CMS blocks',
 }
 
-const THEME_CSS_URL = `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api'}/public/landing-theme/style.css`
+const THEME_CSS_URL = `${process.env.NEXT_PUBLIC_API_URL ?? '/api'}/public/landing-theme/style.css`
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const [globalSettings, menuItems] = await Promise.all([

@@ -1,7 +1,7 @@
 import type { AuthProvider, DataProvider } from '@refinedev/core';
 import axios from 'axios';
 
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+export const API_URL = import.meta.env.VITE_API_URL || '/api';
 export const api = axios.create({ baseURL: API_URL });
 
 // Resolves a relative backend path (e.g. /uploads/...) to an absolute URL.
@@ -71,4 +71,3 @@ export const dataProvider: DataProvider = {
     return response.data;
   },
 };
-
