@@ -57,10 +57,14 @@ docker compose -f docker-compose.dev.yml logs -f
 docker compose -f docker-compose.dev.yml down
 ```
 
-- CMS dev: [http://localhost:15173](http://localhost:15173)
-- API dev: [http://localhost:13000/api](http://localhost:13000/api)
-- Landing dev: [http://localhost:13001](http://localhost:13001)
+- Landing dev qua proxy: [http://localhost](http://localhost)
+- CMS dev qua proxy: [http://localhost/admin](http://localhost/admin)
+- API dev qua proxy: [http://localhost/api](http://localhost/api)
 - PostgreSQL: `localhost:5433`
+
+Trong dev mode, Nginx proxy được bật luôn để URL giống prod. CMS chạy Vite dưới base path `/admin/`, nên frontend gọi relative `/api` qua cùng host `localhost`.
+
+Nếu cần debug trực tiếp từng service, bạn có thể tạm publish lại port cho `backend`, `cms`, hoặc `landing` trong `docker-compose.dev.yml`.
 
 Nếu lần đầu khởi động thấy watcher chưa bắt thay đổi trên Docker Desktop, compose dev đã bật polling sẵn cho cả backend và cms.
 

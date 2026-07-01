@@ -71,6 +71,11 @@ function buildRoleChain(role?: string, mainRole?: string) {
 }
 
 type ResourceRepository = Repository<any>;
+type RequestContext = {
+  protocol?: string;
+  headers?: Record<string, string | string[] | undefined>;
+  get?: (name: string) => string | undefined;
+};
 
 @Injectable()
 export class RecordsService {
@@ -155,7 +160,7 @@ export class RecordsService {
     return repository;
   }
 
-  async list(resource: string, page = 1, pageSize = 20, search?: string, user?: AuthUser) {
+  async list(resource: string, page = 1, pageSize = 20, search?: string, user?: AuthUser, request?: RequestContext) {
     await this.assertPermission(user, resource, 'view');
     const repository = this.repository(resource);
     let where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[] = {};
@@ -189,7 +194,7 @@ export class RecordsService {
       order: { createdAt: 'DESC' },
     });
     const hydrated = await this.hydrateCustomFields(resource, rows);
-    return { data: hydrated.map((row) => this.protect(resource, row)), total };
+    return { data: hydrated.map((row) => this.protect(resource, row, request)), total };
   }
 
   async findRaw(resource: string, id: string) {
@@ -207,10 +212,10 @@ export class RecordsService {
     return record;
   }
 
-  async find(resource: string, id: string, user?: AuthUser) {
+  async find(resource: string, id: string, user?: AuthUser, request?: RequestContext) {
     const record = await this.findRaw(resource, id);
     await this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
-    return { data: this.protect(resource, record) };
+    return { data: this.protect(resource, record, request) };
   }
 
   async create(resource: string, payload: Record<string, unknown>, user: AuthUser) {
@@ -376,7 +381,7 @@ export class RecordsService {
     return labels[resource] || resource;
   }
 
-  async uploadFiles(files: any[], payload: { folderId?: string; title?: string; note?: string }, user: AuthUser) {
+  async uploadFiles(files: any[], payload: { folderId?: string; title?: string; note?: string }, user: AuthUser, request?: RequestContext) {
     await this.assertPermission(user, 'files', 'create');
     if (!payload.folderId) {
       throw new BadRequestException('Phai chon folder truoc khi upload file');
@@ -394,7 +399,7 @@ export class RecordsService {
       files.map((file, index) => this.storeUploadedFile(file, folder, payload, user, index === 0 && files.length === 1)),
     );
 
-    return { data: uploaded };
+    return { data: uploaded.map((item) => this.protect('files', item as unknown as ConfigurableEntity, request)) };
   }
 
   async serviceOrderProductOptions(user?: AuthUser) {
@@ -564,16 +569,53 @@ export class RecordsService {
     return { data, total };
   }
 
-  private protect(resource: string, record: ConfigurableEntity) {
+  private protect(resource: string, record: ConfigurableEntity, request?: RequestContext) {
     if (resource === 'user-accounts') {
       const user = { ...(record as unknown as Record<string, unknown>) };
       delete user.passwordHash;
       return user;
     }
+    if (resource === 'files') {
+      const file = { ...(record as unknown as ManagedFile) };
+      file.publicUrl = this.toAbsolutePublicUrl(file.publicUrl, request);
+      return file;
+    }
     if (resource !== 'customers') return record;
     const customer = { ...(record as Customer) };
     customer.phone = customer.phone.replace(/\d{3}$/, '***');
     return customer;
+  }
+
+  private toAbsolutePublicUrl(url: string | undefined, request?: RequestContext) {
+    if (!url) return '';
+    if (/^(https?:)?\/\//i.test(url)) return url;
+    const baseUrl = this.resolvePublicBaseUrl(request);
+    const normalizedPath = url.startsWith('/') ? url : `/${url}`;
+    return `${baseUrl}${normalizedPath}`;
+  }
+
+  private resolvePublicBaseUrl(request?: RequestContext) {
+    const envBaseUrl = (process.env.APP_PUBLIC_URL || process.env.PUBLIC_BASE_URL || '').trim();
+    if (envBaseUrl) return envBaseUrl.replace(/\/+$/, '');
+
+    const forwardedProto = this.requestHeader(request, 'x-forwarded-proto');
+    const forwardedHost = this.requestHeader(request, 'x-forwarded-host');
+    const host = forwardedHost || this.requestHeader(request, 'host');
+    if (host) {
+      const protocol = forwardedProto || request?.protocol || 'http';
+      return `${protocol}://${host}`;
+    }
+
+    return `http://localhost:${process.env.PORT || 3000}`;
+  }
+
+  private requestHeader(request: RequestContext | undefined, name: string) {
+    const direct = request?.get?.(name);
+    if (direct) return direct.split(',')[0].trim();
+    const raw = request?.headers?.[name];
+    if (Array.isArray(raw)) return raw[0]?.split(',')[0].trim();
+    if (typeof raw === 'string') return raw.split(',')[0].trim();
+    return '';
   }
 
   private normalize(resource: string, payload: Record<string, unknown>) {

@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Request, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import type { Request as ExpressRequest } from 'express';
 import { AuthUser } from '../common/auth';
 import { RecordsService } from './records.service';
 
@@ -13,9 +14,9 @@ export class RecordsController {
     @Query('page', new ParseIntPipe({ optional: true })) page = 1,
     @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize = 20,
     @Query('search') search?: string,
-    @Request() request?: { user: AuthUser },
+    @Request() request?: ExpressRequest & { user?: AuthUser },
   ) {
-    return this.records.list(resource, page, pageSize, search, request?.user);
+    return this.records.list(resource, page, pageSize, search, request?.user, request);
   }
 
   @Post('records/customers/:id/reveal-phone')
@@ -33,9 +34,9 @@ export class RecordsController {
   uploadFiles(
     @UploadedFiles() files: any[],
     @Body() payload: { folderId?: string; title?: string; note?: string },
-    @Request() request: { user: AuthUser },
+    @Request() request: ExpressRequest & { user: AuthUser },
   ) {
-    return this.records.uploadFiles(files, payload, request.user);
+    return this.records.uploadFiles(files, payload, request.user, request);
   }
 
   @Get('records/service-orders/product-options')
@@ -59,8 +60,8 @@ export class RecordsController {
   }
 
   @Get('records/:resource/:id')
-  find(@Param('resource') resource: string, @Param('id') id: string, @Request() request: { user: AuthUser }) {
-    return this.records.find(resource, id, request.user);
+  find(@Param('resource') resource: string, @Param('id') id: string, @Request() request: ExpressRequest & { user: AuthUser }) {
+    return this.records.find(resource, id, request.user, request);
   }
 
   @Post('records/:resource')

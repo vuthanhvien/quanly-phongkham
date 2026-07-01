@@ -1,14 +1,10 @@
-import { BgColorsOutlined, BorderOutlined, FontSizeOutlined, PictureOutlined } from '@ant-design/icons'
+import { BgColorsOutlined, BorderOutlined, FontSizeOutlined } from '@ant-design/icons'
 import { Button, Card, Col, Flex, Form, Input, InputNumber, Radio, Row, Select, Space, Typography, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { defaultAppUiSettings, fontFamilyOptions, useAppUi, type AppUiSettings } from '../app-ui'
+import { ImagePickerInput } from '../components/ImagePickerInput'
 
 type UiSettingsFormValues = AppUiSettings
-
-const themeOptions = [
-  { value: 'dark', label: 'Dark' },
-  { value: 'light', label: 'Light' },
-]
 
 const sizeOptions = [
   { value: 'small', label: 'Small' },
@@ -61,7 +57,7 @@ export function UiSettingsPage() {
                 </Col>
                 <Col md={12} xs={24}>
                   <Form.Item label="Icon app URL" name="appIconUrl">
-                    <Input placeholder="https://.../icon.png" prefix={<PictureOutlined />} />
+                    <ImagePickerInput placeholder="https://.../icon.png" />
                   </Form.Item>
                 </Col>
                 <Col span={24}>
@@ -105,8 +101,6 @@ export function UiSettingsPage() {
                     )}
                   </div>
                   <div>
-                    <Typography.Text>Theme: {watchedValues?.theme || settings.theme}</Typography.Text>
-                    <br />
                     <Typography.Text>Size: {watchedValues?.size || settings.size}</Typography.Text>
                   </div>
                 </Flex>
@@ -115,13 +109,8 @@ export function UiSettingsPage() {
           </Col>
 
           <Col lg={12} xs={24}>
-            <Card className="glass-card settings-card" title="Theme & màu sắc">
+            <Card className="glass-card settings-card" title="Màu sắc">
               <Row gutter={[16, 0]}>
-                <Col md={12} xs={24}>
-                  <Form.Item label="Theme app" name="theme" rules={[{ required: true }]}>
-                    <Radio.Group optionType="button" buttonStyle="solid" options={themeOptions} />
-                  </Form.Item>
-                </Col>
                 <Col md={12} xs={24}>
                   <Form.Item
                     label="Màu chính"

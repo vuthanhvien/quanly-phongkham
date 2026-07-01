@@ -107,12 +107,12 @@ export function App() {
     >
       <ConfigProvider
         theme={{
-          algorithm: appUiSettings.theme === 'light' ? theme.defaultAlgorithm : theme.darkAlgorithm,
+          algorithm: theme.defaultAlgorithm,
           token: {
             colorPrimary: appUiSettings.primaryColor,
             colorInfo: appUiSettings.primaryColor,
-            colorBgBase: appUiSettings.theme === 'light' ? '#f7f4ef' : '#08070b',
-            colorTextBase: appUiSettings.theme === 'light' ? '#22160f' : '#fff7fb',
+            colorBgBase: '#f5f6fa',
+            colorTextBase: '#1f2430',
             borderRadius: appUiSettings.borderRadius,
             fontFamily: appUiSettings.fontFamily,
           },
@@ -131,13 +131,13 @@ export function App() {
               subMenuItemBorderRadius: Math.max(0, appUiSettings.borderRadius - 2),
             },
             Table: {
-              borderColor: appUiSettings.theme === 'light' ? 'rgba(34, 22, 15, 0.08)' : 'rgba(255, 255, 255, 0.08)',
+              borderColor: 'rgba(15, 23, 42, 0.08)',
               cellPaddingBlock: tablePadding.block,
               cellPaddingInline: tablePadding.inline,
               cellPaddingBlockSM: Math.max(6, tablePadding.block - 2),
               cellPaddingInlineSM: Math.max(8, tablePadding.inline - 2),
-              headerBg: appUiSettings.theme === 'light' ? '#f0e8dd' : '#17101b',
-              headerColor: appUiSettings.theme === 'light' ? '#4d2b1f' : '#f7d9e6'
+              headerBg: '#f8f8fb',
+              headerColor: '#1f2430'
             },
           },
         }}

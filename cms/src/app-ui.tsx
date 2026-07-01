@@ -33,7 +33,7 @@ export const defaultAppUiSettings: AppUiSettings = {
   appDescription: 'CMS vận hành viện thẩm mỹ',
   appIconUrl: '',
   primaryColor: '#e889ae',
-  theme: 'dark',
+  theme: 'light',
   borderRadius: 14,
   size: 'medium',
   fontFamily: fontFamilyOptions[0].value,
@@ -43,6 +43,7 @@ export function normalizeAppUiSettings(payload?: Partial<AppUiSettings> | null):
   return {
     ...defaultAppUiSettings,
     ...(payload || {}),
+    theme: 'light',
   }
 }
 
@@ -90,18 +91,10 @@ export function tablePaddingBySize(size: AppUiSettings['size']) {
 
 export function syncDocumentBranding(settings: AppUiSettings) {
   document.title = settings.appName
-  document.documentElement.dataset.uiTheme = settings.theme
+  document.documentElement.dataset.uiTheme = 'light'
   document.documentElement.style.setProperty('--app-primary', settings.primaryColor)
   document.documentElement.style.setProperty('--app-font-family', settings.fontFamily)
   document.documentElement.style.setProperty('--app-radius', `${settings.borderRadius}px`)
-  document.documentElement.style.setProperty('--app-text', settings.theme === 'light' ? '#22160f' : '#fff7fb')
-  document.documentElement.style.setProperty('--app-text-soft', settings.theme === 'light' ? '#6f5849' : '#eab4ca')
-  document.documentElement.style.setProperty('--app-line', settings.theme === 'light' ? 'rgba(34, 22, 15, 0.08)' : 'rgba(255, 255, 255, 0.08)')
-  document.documentElement.style.setProperty('--app-sider-bg', settings.theme === 'light' ? 'linear-gradient(180deg, rgba(251, 246, 240, 0.98), rgba(242, 234, 223, 0.98))' : 'linear-gradient(180deg, rgba(22, 13, 26, 0.96), rgba(8, 7, 11, 0.98))')
-  document.documentElement.style.setProperty('--app-page-bg', settings.theme === 'light' ? '#f6efe6' : '#08070b')
-  document.documentElement.style.setProperty('--app-page-overlay', settings.theme === 'light'
-    ? 'radial-gradient(circle at 12% 12%, rgba(232, 137, 174, 0.1), transparent 34%), radial-gradient(circle at 82% 6%, rgba(215, 164, 91, 0.1), transparent 30%), linear-gradient(135deg, #fbf6f0 0%, #f3ebe0 46%, #eadccc 100%)'
-    : 'radial-gradient(circle at 12% 12%, rgba(232, 137, 174, 0.22), transparent 34%), radial-gradient(circle at 82% 6%, rgba(215, 164, 91, 0.16), transparent 30%), linear-gradient(135deg, #08070b 0%, #110914 46%, #170d16 100%)')
 
   let description = document.querySelector('meta[name="description"]')
   if (!description) {
