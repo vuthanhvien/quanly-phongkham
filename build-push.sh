@@ -44,6 +44,7 @@ echo ""
 echo "[3/6] Building landing..."
 docker build \
   --platform linux/amd64 \
+  --build-arg LANDING_API_URL=http://localhost:3000/api \
   --build-arg NEXT_PUBLIC_API_URL=/api \
   -t "$LANDING_IMAGE" \
   ./landing

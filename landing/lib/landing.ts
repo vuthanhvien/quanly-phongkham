@@ -119,11 +119,11 @@ export function normalizeMenuItems(items?: NavItem[]) {
   return (items ?? []).map((item) => normalizeNavItem(item, 1))
 }
 
-const API_URL = process.env.LANDING_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'
+const SERVER_API_URL = process.env.LANDING_API_URL || 'http://localhost:3000/api'
 
 export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
   try {
-    const res = await fetch(`${API_URL}/public/landing-pages/global`, { next: { revalidate: 60 } })
+    const res = await fetch(`${SERVER_API_URL}/public/landing-pages/global`, { next: { revalidate: 60 } })
     if (!res.ok) return {}
     const raw = await res.json() as LandingGlobalSetting & { data?: LandingGlobalSetting }
     const data = raw.data ?? raw
@@ -135,7 +135,7 @@ export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
 
 export async function getMenuSettings(): Promise<NavItem[]> {
   try {
-    const res = await fetch(`${API_URL}/public/landing-pages/menu`, { next: { revalidate: 60 } })
+    const res = await fetch(`${SERVER_API_URL}/public/landing-pages/menu`, { next: { revalidate: 60 } })
     if (!res.ok) {
       const globalSettings = await getGlobalSettings()
       return normalizeMenuItems(globalSettings.menuItems)
@@ -150,20 +150,28 @@ export async function getMenuSettings(): Promise<NavItem[]> {
 }
 
 export async function getLandingPage(pathname: string): Promise<LandingPageData | null> {
-  const response = await fetch(`${API_URL}/public/landing-pages/resolve?path=${encodeURIComponent(pathname)}`, {
-    next: { revalidate: 30 },
-  })
-
-  if (response.status === 404) {
+  if (!pathname || pathname.startsWith('/_')) {
     return null
   }
 
-  if (!response.ok) {
-    throw new Error('Không thể tải landing page')
-  }
+  try {
+    const response = await fetch(`${SERVER_API_URL}/public/landing-pages/resolve?path=${encodeURIComponent(pathname)}`, {
+      next: { revalidate: 30 },
+    })
 
-  const payload = await response.json()
-  return payload.data as LandingPageData
+    if (response.status === 404) {
+      return null
+    }
+
+    if (!response.ok) {
+      return null
+    }
+
+    const payload = await response.json()
+    return payload.data as LandingPageData
+  } catch {
+    return null
+  }
 }
 
 export function sortBlocks(blocks: LandingBlock[]) {

@@ -7,7 +7,9 @@ RUN npm install
 FROM node:22-alpine AS builder
 
 WORKDIR /app
+ARG LANDING_API_URL=http://localhost:3000/api
 ARG NEXT_PUBLIC_API_URL=/api
+ENV LANDING_API_URL=$LANDING_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
