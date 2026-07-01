@@ -111,17 +111,32 @@ export function App() {
           token: {
             colorPrimary: appUiSettings.primaryColor,
             colorInfo: appUiSettings.primaryColor,
-            colorBgBase: '#f5f6fa',
-            colorTextBase: '#1f2430',
+            colorBgBase: appUiSettings.pageBgColor,
+            colorBgContainer: appUiSettings.surfaceColor,
+            colorBgElevated: appUiSettings.surfaceColor,
+            colorBorder: appUiSettings.surfaceBorderColor,
+            colorTextBase: appUiSettings.textColor,
+            colorText: appUiSettings.textColor,
+            colorTextSecondary: appUiSettings.textMutedColor,
+            colorTextHeading: appUiSettings.titleColor,
             borderRadius: appUiSettings.borderRadius,
             fontFamily: appUiSettings.fontFamily,
           },
           components: {
-            Button: { controlHeight, borderRadius: appUiSettings.borderRadius, fontWeight: 700 },
+            Button: {
+              controlHeight,
+              borderRadius: appUiSettings.borderRadius,
+              fontWeight: 700,
+              primaryColor: appUiSettings.buttonPrimaryTextColor,
+              defaultBg: appUiSettings.buttonDefaultBgColor,
+              defaultColor: appUiSettings.buttonDefaultTextColor,
+              defaultBorderColor: appUiSettings.buttonDefaultBorderColor,
+            },
             Card: {
               borderRadius: appUiSettings.borderRadius,
               borderRadiusLG: appUiSettings.borderRadius,
               paddingLG: cardPadding,
+              boxShadowTertiary: 'var(--app-shadow-soft)',
             },
             Input: { controlHeight },
             InputNumber: { controlHeight },
@@ -131,13 +146,13 @@ export function App() {
               subMenuItemBorderRadius: Math.max(0, appUiSettings.borderRadius - 2),
             },
             Table: {
-              borderColor: 'rgba(15, 23, 42, 0.08)',
+              borderColor: appUiSettings.surfaceBorderColor,
               cellPaddingBlock: tablePadding.block,
               cellPaddingInline: tablePadding.inline,
               cellPaddingBlockSM: Math.max(6, tablePadding.block - 2),
               cellPaddingInlineSM: Math.max(8, tablePadding.inline - 2),
-              headerBg: '#f8f8fb',
-              headerColor: '#1f2430'
+              headerBg: appUiSettings.surfaceColor,
+              headerColor: appUiSettings.titleColor
             },
           },
         }}

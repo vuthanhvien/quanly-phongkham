@@ -25,6 +25,32 @@ const UI_FONT_FAMILIES = [
   '"Work Sans", Inter, Arial, sans-serif',
   '"Barlow", Inter, Arial, sans-serif',
 ];
+const DEFAULT_APP_UI_COLORS = {
+  primaryColor: '#e889ae',
+  pageBgColor: '#f5f6fa',
+  surfaceColor: '#ffffff',
+  surfaceBorderColor: '#dbe1ea',
+  headerBgColor: '#ffffff',
+  headerBorderColor: '#dbe1ea',
+  headerTextColor: '#1f2430',
+  menuBgColor: '#ffffff',
+  menuTextColor: '#4b5563',
+  menuGroupTextColor: '#1f2430',
+  menuHoverBgColor: '#f6d6e2',
+  menuActiveBgColor: '#f3c6d7',
+  menuActiveTextColor: '#c2517d',
+  textColor: '#1f2430',
+  textMutedColor: '#6b7280',
+  titleColor: '#111827',
+  buttonPrimaryTextColor: '#ffffff',
+  buttonDefaultBgColor: '#ffffff',
+  buttonDefaultTextColor: '#1f2430',
+  buttonDefaultBorderColor: '#dbe1ea',
+  shadowColor: '#0f172a',
+  shadowOpacity: 8,
+  shadowBlur: 18,
+  shadowOffsetY: 1,
+} as const;
 
 function slugify(input?: string) {
   return String(input || '')
@@ -664,7 +690,30 @@ export class SettingsService {
 
     const appDescription = String(payload.appDescription ?? fallback?.appDescription ?? '').trim() || undefined;
     const appIconUrl = String(payload.appIconUrl ?? fallback?.appIconUrl ?? '').trim() || undefined;
-    const primaryColor = this.normalizeHexColor(payload.primaryColor ?? fallback?.primaryColor ?? '#e889ae');
+    const primaryColor = this.normalizeHexColor(payload.primaryColor ?? fallback?.primaryColor ?? DEFAULT_APP_UI_COLORS.primaryColor, 'primaryColor');
+    const pageBgColor = this.normalizeHexColor(payload.pageBgColor ?? fallback?.pageBgColor ?? DEFAULT_APP_UI_COLORS.pageBgColor, 'pageBgColor');
+    const surfaceColor = this.normalizeHexColor(payload.surfaceColor ?? fallback?.surfaceColor ?? DEFAULT_APP_UI_COLORS.surfaceColor, 'surfaceColor');
+    const surfaceBorderColor = this.normalizeHexColor(payload.surfaceBorderColor ?? fallback?.surfaceBorderColor ?? DEFAULT_APP_UI_COLORS.surfaceBorderColor, 'surfaceBorderColor');
+    const headerBgColor = this.normalizeHexColor(payload.headerBgColor ?? fallback?.headerBgColor ?? DEFAULT_APP_UI_COLORS.headerBgColor, 'headerBgColor');
+    const headerBorderColor = this.normalizeHexColor(payload.headerBorderColor ?? fallback?.headerBorderColor ?? DEFAULT_APP_UI_COLORS.headerBorderColor, 'headerBorderColor');
+    const headerTextColor = this.normalizeHexColor(payload.headerTextColor ?? fallback?.headerTextColor ?? DEFAULT_APP_UI_COLORS.headerTextColor, 'headerTextColor');
+    const menuBgColor = this.normalizeHexColor(payload.menuBgColor ?? fallback?.menuBgColor ?? DEFAULT_APP_UI_COLORS.menuBgColor, 'menuBgColor');
+    const menuTextColor = this.normalizeHexColor(payload.menuTextColor ?? fallback?.menuTextColor ?? DEFAULT_APP_UI_COLORS.menuTextColor, 'menuTextColor');
+    const menuGroupTextColor = this.normalizeHexColor(payload.menuGroupTextColor ?? fallback?.menuGroupTextColor ?? DEFAULT_APP_UI_COLORS.menuGroupTextColor, 'menuGroupTextColor');
+    const menuHoverBgColor = this.normalizeHexColor(payload.menuHoverBgColor ?? fallback?.menuHoverBgColor ?? DEFAULT_APP_UI_COLORS.menuHoverBgColor, 'menuHoverBgColor');
+    const menuActiveBgColor = this.normalizeHexColor(payload.menuActiveBgColor ?? fallback?.menuActiveBgColor ?? DEFAULT_APP_UI_COLORS.menuActiveBgColor, 'menuActiveBgColor');
+    const menuActiveTextColor = this.normalizeHexColor(payload.menuActiveTextColor ?? fallback?.menuActiveTextColor ?? DEFAULT_APP_UI_COLORS.menuActiveTextColor, 'menuActiveTextColor');
+    const textColor = this.normalizeHexColor(payload.textColor ?? fallback?.textColor ?? DEFAULT_APP_UI_COLORS.textColor, 'textColor');
+    const textMutedColor = this.normalizeHexColor(payload.textMutedColor ?? fallback?.textMutedColor ?? DEFAULT_APP_UI_COLORS.textMutedColor, 'textMutedColor');
+    const titleColor = this.normalizeHexColor(payload.titleColor ?? fallback?.titleColor ?? DEFAULT_APP_UI_COLORS.titleColor, 'titleColor');
+    const buttonPrimaryTextColor = this.normalizeHexColor(payload.buttonPrimaryTextColor ?? fallback?.buttonPrimaryTextColor ?? DEFAULT_APP_UI_COLORS.buttonPrimaryTextColor, 'buttonPrimaryTextColor');
+    const buttonDefaultBgColor = this.normalizeHexColor(payload.buttonDefaultBgColor ?? fallback?.buttonDefaultBgColor ?? DEFAULT_APP_UI_COLORS.buttonDefaultBgColor, 'buttonDefaultBgColor');
+    const buttonDefaultTextColor = this.normalizeHexColor(payload.buttonDefaultTextColor ?? fallback?.buttonDefaultTextColor ?? DEFAULT_APP_UI_COLORS.buttonDefaultTextColor, 'buttonDefaultTextColor');
+    const buttonDefaultBorderColor = this.normalizeHexColor(payload.buttonDefaultBorderColor ?? fallback?.buttonDefaultBorderColor ?? DEFAULT_APP_UI_COLORS.buttonDefaultBorderColor, 'buttonDefaultBorderColor');
+    const shadowColor = this.normalizeHexColor(payload.shadowColor ?? fallback?.shadowColor ?? DEFAULT_APP_UI_COLORS.shadowColor, 'shadowColor');
+    const shadowOpacity = this.normalizeOpacity(payload.shadowOpacity ?? fallback?.shadowOpacity ?? DEFAULT_APP_UI_COLORS.shadowOpacity);
+    const shadowBlur = this.normalizeShadowBlur(payload.shadowBlur ?? fallback?.shadowBlur ?? DEFAULT_APP_UI_COLORS.shadowBlur);
+    const shadowOffsetY = this.normalizeShadowOffset(payload.shadowOffsetY ?? fallback?.shadowOffsetY ?? DEFAULT_APP_UI_COLORS.shadowOffsetY);
     const theme = this.normalizeUiTheme(payload.theme ?? fallback?.theme ?? 'dark');
     const borderRadius = this.normalizeBorderRadius(payload.borderRadius ?? fallback?.borderRadius ?? 14);
     const size = this.normalizeUiSize(payload.size ?? fallback?.size ?? 'medium');
@@ -676,6 +725,29 @@ export class SettingsService {
       appDescription,
       appIconUrl,
       primaryColor,
+      pageBgColor,
+      surfaceColor,
+      surfaceBorderColor,
+      headerBgColor,
+      headerBorderColor,
+      headerTextColor,
+      menuBgColor,
+      menuTextColor,
+      menuGroupTextColor,
+      menuHoverBgColor,
+      menuActiveBgColor,
+      menuActiveTextColor,
+      textColor,
+      textMutedColor,
+      titleColor,
+      buttonPrimaryTextColor,
+      buttonDefaultBgColor,
+      buttonDefaultTextColor,
+      buttonDefaultBorderColor,
+      shadowColor,
+      shadowOpacity,
+      shadowBlur,
+      shadowOffsetY,
       theme,
       borderRadius,
       size,
@@ -683,10 +755,10 @@ export class SettingsService {
     };
   }
 
-  private normalizeHexColor(value: unknown) {
+  private normalizeHexColor(value: unknown, fieldName = 'color') {
     const normalized = String(value || '').trim();
     if (!/^#([0-9a-fA-F]{6})$/.test(normalized)) {
-      throw new BadRequestException('primaryColor phai theo dinh dang #RRGGBB');
+      throw new BadRequestException(`${fieldName} phai theo dinh dang #RRGGBB`);
     }
     return normalized.toLowerCase();
   }
@@ -723,6 +795,30 @@ export class SettingsService {
     return Math.max(0, Math.min(32, Math.round(numeric)));
   }
 
+  private normalizeOpacity(value: unknown) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      throw new BadRequestException('shadowOpacity khong hop le');
+    }
+    return Math.max(0, Math.min(100, Math.round(numeric)));
+  }
+
+  private normalizeShadowBlur(value: unknown) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      throw new BadRequestException('shadowBlur khong hop le');
+    }
+    return Math.max(0, Math.min(60, Math.round(numeric)));
+  }
+
+  private normalizeShadowOffset(value: unknown) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      throw new BadRequestException('shadowOffsetY khong hop le');
+    }
+    return Math.max(0, Math.min(24, Math.round(numeric)));
+  }
+
   private hasAppUiDiff(current: AppUiSetting, next: ReturnType<SettingsService['normalizeAppUiPayload']>) {
     return (
       current.appKey !== next.appKey ||
@@ -730,6 +826,29 @@ export class SettingsService {
       current.appDescription !== next.appDescription ||
       current.appIconUrl !== next.appIconUrl ||
       current.primaryColor !== next.primaryColor ||
+      current.pageBgColor !== next.pageBgColor ||
+      current.surfaceColor !== next.surfaceColor ||
+      current.surfaceBorderColor !== next.surfaceBorderColor ||
+      current.headerBgColor !== next.headerBgColor ||
+      current.headerBorderColor !== next.headerBorderColor ||
+      current.headerTextColor !== next.headerTextColor ||
+      current.menuBgColor !== next.menuBgColor ||
+      current.menuTextColor !== next.menuTextColor ||
+      current.menuGroupTextColor !== next.menuGroupTextColor ||
+      current.menuHoverBgColor !== next.menuHoverBgColor ||
+      current.menuActiveBgColor !== next.menuActiveBgColor ||
+      current.menuActiveTextColor !== next.menuActiveTextColor ||
+      current.textColor !== next.textColor ||
+      current.textMutedColor !== next.textMutedColor ||
+      current.titleColor !== next.titleColor ||
+      current.buttonPrimaryTextColor !== next.buttonPrimaryTextColor ||
+      current.buttonDefaultBgColor !== next.buttonDefaultBgColor ||
+      current.buttonDefaultTextColor !== next.buttonDefaultTextColor ||
+      current.buttonDefaultBorderColor !== next.buttonDefaultBorderColor ||
+      current.shadowColor !== next.shadowColor ||
+      current.shadowOpacity !== next.shadowOpacity ||
+      current.shadowBlur !== next.shadowBlur ||
+      current.shadowOffsetY !== next.shadowOffsetY ||
       current.theme !== next.theme ||
       current.borderRadius !== next.borderRadius ||
       current.size !== next.size ||

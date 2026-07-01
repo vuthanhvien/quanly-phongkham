@@ -108,6 +108,7 @@ export class SettingsController {
     return { data: request?.user ? await this.settings.getAppUiSettings(request?.user) : await this.settings.getPublicAppUiSettings() };
   }
 
+  @Public()
   @Patch('app-ui')
   async updateAppUi(@Body() payload: Partial<AppUiSetting>, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.updateAppUiSettings(payload, request?.user) };

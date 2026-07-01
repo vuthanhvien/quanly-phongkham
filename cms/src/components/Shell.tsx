@@ -299,7 +299,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         className="app-sider"
         collapsed={collapsed}
         collapsedWidth={88}
-        theme="dark"
+        theme="light"
         trigger={null}
         width={282}
         onBreakpoint={(broken) => {
@@ -324,7 +324,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             items={items}
             selectedKeys={[selected]}
             mode="inline"
-            theme="dark"
+            theme="light"
           />
         </div>
       </Sider>

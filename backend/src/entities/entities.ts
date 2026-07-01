@@ -1036,6 +1036,75 @@ export class AppUiSetting {
   @Column({ default: '#e889ae' })
   primaryColor: string;
 
+  @Column({ default: '#f5f6fa' })
+  pageBgColor: string;
+
+  @Column({ default: '#ffffff' })
+  surfaceColor: string;
+
+  @Column({ default: '#dbe1ea' })
+  surfaceBorderColor: string;
+
+  @Column({ default: '#ffffff' })
+  headerBgColor: string;
+
+  @Column({ default: '#dbe1ea' })
+  headerBorderColor: string;
+
+  @Column({ default: '#1f2430' })
+  headerTextColor: string;
+
+  @Column({ default: '#ffffff' })
+  menuBgColor: string;
+
+  @Column({ default: '#4b5563' })
+  menuTextColor: string;
+
+  @Column({ default: '#1f2430' })
+  menuGroupTextColor: string;
+
+  @Column({ default: '#f6d6e2' })
+  menuHoverBgColor: string;
+
+  @Column({ default: '#f3c6d7' })
+  menuActiveBgColor: string;
+
+  @Column({ default: '#c2517d' })
+  menuActiveTextColor: string;
+
+  @Column({ default: '#1f2430' })
+  textColor: string;
+
+  @Column({ default: '#6b7280' })
+  textMutedColor: string;
+
+  @Column({ default: '#111827' })
+  titleColor: string;
+
+  @Column({ default: '#ffffff' })
+  buttonPrimaryTextColor: string;
+
+  @Column({ default: '#ffffff' })
+  buttonDefaultBgColor: string;
+
+  @Column({ default: '#1f2430' })
+  buttonDefaultTextColor: string;
+
+  @Column({ default: '#dbe1ea' })
+  buttonDefaultBorderColor: string;
+
+  @Column({ default: '#0f172a' })
+  shadowColor: string;
+
+  @Column({ default: 8 })
+  shadowOpacity: number;
+
+  @Column({ default: 18 })
+  shadowBlur: number;
+
+  @Column({ default: 1 })
+  shadowOffsetY: number;
+
   @Column({ default: 'dark' })
   theme: string;
 
