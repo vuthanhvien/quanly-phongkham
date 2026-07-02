@@ -6,7 +6,7 @@
 
 - CMS: React + Refine + Ant Design + Vite
 - Backend: NestJS + TypeORM + JWT
-- Database: PostgreSQL
+- Database: MySQL server ben ngoai Docker
 - Runtime: Docker Compose
 
 ## Chạy Bằng Docker
@@ -19,9 +19,15 @@ docker compose up --build
 - Landing: [http://localhost](http://localhost)
 - CMS: [http://localhost/admin](http://localhost/admin)
 - API: [http://localhost/api](http://localhost/api)
-- PostgreSQL: `localhost:5433`
 
 Production compose đã kèm `watchtower` để tự kiểm tra image mới và auto pull/restart các service app (`backend`, `cms`, `landing`, `proxy`). Mặc định watch mỗi `300` giây và không đụng `postgres`.
+
+Can cau hinh `DATABASE_URL` tro den MySQL cua server truoc khi `docker compose up`.
+Vi du:
+
+```env
+DATABASE_URL=mysql://clinic_user:strong_password@127.0.0.1:3306/clinic
+```
 
 Tài khoản khởi tạo:
 
@@ -62,7 +68,6 @@ docker compose -f docker-compose.dev.yml down
 - Landing dev qua proxy: [http://localhost](http://localhost)
 - CMS dev qua proxy: [http://localhost/admin](http://localhost/admin)
 - API dev qua proxy: [http://localhost/api](http://localhost/api)
-- PostgreSQL: `localhost:5433`
 
 Trong dev mode, Nginx proxy được bật luôn để URL giống prod. CMS chạy Vite dưới base path `/admin/`, nên frontend gọi relative `/api` qua cùng host `localhost`.
 
@@ -114,9 +119,32 @@ GET    /api/audit-logs
 Khởi động riêng PostgreSQL trước, sau đó:
 
 ```bash
-cd backend && npm install && DATABASE_URL=postgresql://clinic:clinic_password@localhost:5432/clinic npm run start:dev
+cd backend && npm install && DATABASE_URL=mysql://clinic_user:strong_password@127.0.0.1:3306/clinic npm run start:dev
 cd cms && npm install && npm run dev
 ```
+
+## Deploy voi MySQL cua Server
+
+1. Tao database va user MySQL tren server.
+2. Cap quyen cho user do vao database ung dung.
+3. Sua file `.env` tren server:
+
+```env
+DATABASE_URL=mysql://clinic_user:strong_password@127.0.0.1:3306/clinic
+JWT_SECRET=mot-secret-rat-dai
+ADMIN_EMAIL=admin@yourdomain.com
+ADMIN_PASSWORD=mot-mat-khau-manh
+```
+
+4. Pull image va restart app:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Neu MySQL chay tren may host cung server Docker, `127.0.0.1` se dung khi app chay native.
+Neu backend chay trong Docker va MySQL chay tren host, hay dung IP that cua host hoac `host.docker.internal` neu server ho tro ten nay.
 
 sh build-push.sh
 

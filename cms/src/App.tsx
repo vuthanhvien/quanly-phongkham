@@ -11,6 +11,7 @@ import { entityLabels } from './models';
 import { AuditPage } from './pages/AuditPage';
 import { CustomFieldsPage } from './pages/CustomFieldsPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { CalendarPage } from './pages/CalendarPage';
 import { FileFoldersPage } from './pages/FileFoldersPage';
 import { LoginPage } from './pages/LoginPage';
 import { LandingPagesPage } from './pages/LandingPagesPage';
@@ -165,6 +166,7 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedLayout />}>
               <Route index element={<DashboardPage />} />
+              <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route element={<ScreenGuard screen="zalo-inbox" />}>
                 <Route path="/zalo-inbox" element={<ZaloInboxPage />} />

@@ -58,6 +58,7 @@ const menuIcons: Record<string, React.ReactNode> = {
   "zalo-inbox": <MessageOutlined />,
   "medical-episodes": <MedicineBoxOutlined />,
   appointments: <CalendarOutlined />,
+  calendar: <CalendarOutlined />,
   "work-schedules": <CalendarOutlined />,
   consultations: <MedicineBoxOutlined />,
   "service-orders": <FileDoneOutlined />,
@@ -175,6 +176,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
       icon: <DashboardOutlined />,
       label: <Link to="/">Tổng quan</Link>,
     },
+    {
+      key: "/calendar",
+      icon: menuIcons.calendar,
+      label: <Link to="/calendar">Calendar</Link>,
+    },
     ...visibleGroups.map((group) => ({
       key: group.key,
       icon: group.icon,
@@ -258,6 +264,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const selected =
     location.pathname === "/"
       ? "/"
+      : location.pathname.startsWith("/calendar")
+        ? "/calendar"
       : location.pathname.startsWith("/zalo-inbox")
         ? "/zalo-inbox"
         : `/${currentResource}`

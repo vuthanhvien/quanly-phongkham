@@ -49,9 +49,6 @@ export function LoginPage() {
             Đăng nhập CMS
           </Button>
         </Form>
-        <div className="login-footnote">
-          Dark beauty theme · Custom field ready · Dynamic print template
-        </div>
       </Card>
     </div>
   )

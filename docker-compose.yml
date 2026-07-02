@@ -1,33 +1,14 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-clinic}
-      POSTGRES_USER: ${POSTGRES_USER:-clinic}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clinic_password}
-    ports:
-      - "${POSTGRES_PORT:-5433}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clinic} -d ${POSTGRES_DB:-clinic}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   backend:
     image: vienvu/quanly-phongkham-backend:${TAG:-latest}
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://clinic:clinic_password@postgres:5432/clinic}
+      DATABASE_URL: ${DATABASE_URL:-mysql://clinic:clinic_password@host.docker.internal:3306/clinic}
       JWT_SECRET: ${JWT_SECRET:-development-only-secret}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@thienchanh.local}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@123}
       PORT: 3000
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   cms:
     image: vienvu/quanly-phongkham-cms:${TAG:-latest}
@@ -78,6 +59,3 @@ services:
       - cms
       - landing
       - proxy
-
-volumes:
-  postgres_data:

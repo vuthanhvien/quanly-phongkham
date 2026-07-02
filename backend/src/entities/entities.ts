@@ -221,7 +221,7 @@ export class BranchRoleAssignment extends ConfigurableEntity {
   @Column({ nullable: true })
   roleName: string;
 
-  @Column({ type: 'jsonb', default: [] })
+  @Column({ type: 'json', default: [] })
   roleKeys: string[];
 
   @Column({ default: true })
@@ -299,7 +299,7 @@ export class Lead extends ConfigurableEntity {
   @Column({ nullable: true })
   convertedCustomerId?: string;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   convertedAt?: Date;
 
   @Column({ type: 'text', nullable: true })
@@ -317,7 +317,7 @@ export class LeadActivity extends ConfigurableEntity {
   @Column({ default: 'CALL' })
   activityType: string;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   scheduledAt?: Date;
 
   @Column({ nullable: true })
@@ -359,13 +359,13 @@ export class ZaloAccount extends ConfigurableEntity {
   @Column({ default: false })
   listenerActive: boolean;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   sessionData?: Record<string, unknown>;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   lastConnectedAt?: Date;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   lastMessageAt?: Date;
 
   @Column({ type: 'text', nullable: true })
@@ -408,7 +408,7 @@ export class ZaloConversation extends ConfigurableEntity {
   @Column({ type: 'text', nullable: true })
   lastMessageText?: string;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   lastMessageAt?: Date;
 
   @Column({ default: 0 })
@@ -448,10 +448,10 @@ export class ZaloMessage extends ConfigurableEntity {
   @Column({ type: 'text', nullable: true })
   contentText?: string;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'json', default: {} })
   contentJson: Record<string, unknown>;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'timestamp' })
   sentAt: Date;
 
   @Column({ default: false })
@@ -565,10 +565,10 @@ export class Appointment extends ConfigurableEntity {
   @Column({ default: 'CONSULTATION' })
   type: string;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'timestamp' })
   startTime: Date;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'timestamp' })
   endTime: Date;
 
   @Column({ default: 'SCHEDULED' })
@@ -601,10 +601,10 @@ export class WorkSchedule extends ConfigurableEntity {
   @Column({ default: 'CA SANG' })
   shiftLabel: string;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   startTime?: Date;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   endTime?: Date;
 
   @Column({ nullable: true })
@@ -625,7 +625,7 @@ export class Consultation extends ConfigurableEntity {
   @Column()
   branchId: string;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ type: 'timestamp' })
   consultedAt: Date;
 
   @Column({ nullable: true })
@@ -730,7 +730,7 @@ export class CustomerImage extends ConfigurableEntity {
   @Column()
   imageUrl: string;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   capturedAt?: Date;
 
   @Column({ type: 'text', nullable: true })
@@ -919,7 +919,7 @@ export class CustomFieldDefinition {
   @Column({ default: false })
   required: boolean;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   options?: string[];
 
   @Column({ nullable: true })
@@ -949,7 +949,7 @@ export class ViewSetting {
   @Column({ default: 'ALL' })
   role: string;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'json', default: {} })
   config: Record<string, unknown>;
 
   @UpdateDateColumn()
@@ -1003,7 +1003,7 @@ export class LandingPage {
   @Column({ type: 'text', nullable: true })
   seoDescription?: string;
 
-  @Column({ type: 'jsonb', default: [] })
+  @Column({ type: 'json', default: [] })
   blocks: Record<string, unknown>[];
 
   @Column({ default: false })
@@ -1141,7 +1141,7 @@ export class LandingFormSubmission {
   @Column({ nullable: true })
   formName?: string;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'json', default: {} })
   payload: Record<string, unknown>;
 
   @CreateDateColumn()
@@ -1593,7 +1593,7 @@ export class LandingGlobalSetting {
   headerCtaHref?: string;
 
   // Menu
-  @Column({ type: 'jsonb', default: [] })
+  @Column({ type: 'json', default: [] })
   menuItems: Record<string, unknown>[];
 
   // Footer
@@ -1606,10 +1606,10 @@ export class LandingGlobalSetting {
   @Column({ type: 'text', nullable: true })
   footerCopyright?: string;
 
-  @Column({ type: 'jsonb', default: [] })
+  @Column({ type: 'json', default: [] })
   footerColumns: Record<string, unknown>[];
 
-  @Column({ type: 'jsonb', default: [] })
+  @Column({ type: 'json', default: [] })
   footerSocialLinks: Record<string, unknown>[];
 
   @UpdateDateColumn()
@@ -1636,7 +1636,7 @@ export class AuditLog {
   @Column({ nullable: true })
   targetId?: string;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'json', nullable: true })
   payload?: Record<string, unknown>;
 
   @CreateDateColumn()

@@ -12,17 +12,30 @@ import { ZaloModule } from './zalo/zalo.module';
 import { CategoriesModule } from './categories/categories.module';
 import { PayrollModule } from './payroll/payroll.module';
 
+function resolveDatabaseType(databaseUrl: string) {
+  if (databaseUrl.startsWith('mysql://') || databaseUrl.startsWith('mysql2://')) {
+    return 'mysql' as const;
+  }
+  if (databaseUrl.startsWith('postgres://') || databaseUrl.startsWith('postgresql://')) {
+    return 'postgres' as const;
+  }
+  throw new Error('Unsupported DATABASE_URL. Use mysql:// or postgresql://');
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        url: config.getOrThrow<string>('DATABASE_URL'),
-        entities: ENTITIES,
-        synchronize: true,
-      }),
+      useFactory: (config: ConfigService) => {
+        const databaseUrl = config.getOrThrow<string>('DATABASE_URL');
+        return {
+          type: resolveDatabaseType(databaseUrl),
+          url: databaseUrl,
+          entities: ENTITIES,
+          synchronize: true,
+        };
+      },
     }),
     AuthModule,
     RecordsModule,

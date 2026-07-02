@@ -1744,6 +1744,194 @@ textarea.ant-input {
   margin-top: 14px;
 }
 
+.calendar-planner-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+}
+
+.calendar-planner-main {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.calendar-planner-sidebar {
+  min-width: 0;
+}
+
+.calendar-planner-sticky {
+  display: grid;
+  gap: 16px;
+  position: sticky;
+  top: 82px;
+}
+
+.calendar-planner-filters {
+  overflow: hidden;
+}
+
+.calendar-planner-select {
+  min-width: 180px;
+}
+
+.calendar-planner-types {
+  min-width: 240px;
+}
+
+.calendar-kpi-card .ant-card-body {
+  display: grid;
+  gap: 4px;
+}
+
+.calendar-kpi-card h3 {
+  color: var(--app-title) !important;
+  margin: 0 !important;
+}
+
+.calendar-week-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.calendar-week-column {
+  background: color-mix(in srgb, var(--app-surface) 96%, var(--app-primary));
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  box-shadow: var(--app-shadow-soft);
+  color: var(--app-text);
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  min-height: 220px;
+  padding: 12px;
+  text-align: left;
+}
+
+.calendar-week-column.is-selected {
+  border-color: color-mix(in srgb, var(--app-primary) 42%, var(--app-line));
+  box-shadow: var(--app-shadow-strong);
+}
+
+.calendar-week-column-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.calendar-week-column-head strong {
+  color: var(--app-title);
+}
+
+.calendar-week-column-head span {
+  color: var(--app-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.calendar-week-column-body {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.calendar-month-cell {
+  display: grid;
+  gap: 6px;
+  min-height: 112px;
+  padding: 6px;
+}
+
+.calendar-month-cell-events {
+  display: grid;
+  gap: 4px;
+}
+
+.calendar-cell-pill,
+.calendar-event-chip {
+  border-radius: calc(var(--app-radius) - 4px);
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+}
+
+.calendar-cell-pill strong,
+.calendar-event-chip strong {
+  font-size: 11px;
+}
+
+.calendar-cell-pill span,
+.calendar-event-chip span {
+  color: var(--app-text-soft);
+  font-size: 11px;
+}
+
+.calendar-cell-pill.tone-appointment,
+.calendar-event-chip.tone-appointment {
+  background: color-mix(in srgb, #ff4d94 12%, var(--app-surface));
+  border: 1px solid color-mix(in srgb, #ff4d94 20%, transparent);
+}
+
+.calendar-cell-pill.tone-schedule,
+.calendar-event-chip.tone-schedule {
+  background: color-mix(in srgb, #13c2c2 12%, var(--app-surface));
+  border: 1px solid color-mix(in srgb, #13c2c2 20%, transparent);
+}
+
+.calendar-cell-pill.tone-leave,
+.calendar-event-chip.tone-leave {
+  background: color-mix(in srgb, #fa8c16 12%, var(--app-surface));
+  border: 1px solid color-mix(in srgb, #fa8c16 20%, transparent);
+}
+
+.calendar-cell-pill.tone-attendance,
+.calendar-event-chip.tone-attendance {
+  background: color-mix(in srgb, #52c41a 12%, var(--app-surface));
+  border: 1px solid color-mix(in srgb, #52c41a 20%, transparent);
+}
+
+.calendar-event-meta {
+  color: var(--app-text-soft);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.calendar-insight-list {
+  display: grid;
+  gap: 12px;
+}
+
+.calendar-insight-item {
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--app-surface) 96%, var(--app-primary));
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  padding: 12px;
+}
+
+.calendar-insight-item .anticon {
+  color: var(--app-primary);
+  font-size: 16px;
+  margin-top: 2px;
+}
+
+.calendar-insight-item strong {
+  color: var(--app-title);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.calendar-insight-item span {
+  color: var(--app-text-soft);
+  display: block;
+  font-size: 12px;
+}
+
 @media (max-width: 900px) {
   .app-sider {
     display: none;
@@ -1800,6 +1988,18 @@ textarea.ant-input {
 
   .dashboard-mini-grid,
   .dashboard-week-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-planner-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-planner-sticky {
+    position: static;
+  }
+
+  .calendar-week-grid {
     grid-template-columns: 1fr;
   }
 
