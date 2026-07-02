@@ -21,6 +21,8 @@ docker compose up --build
 - API: [http://localhost/api](http://localhost/api)
 - PostgreSQL: `localhost:5433`
 
+Production compose đã kèm `watchtower` để tự kiểm tra image mới và auto pull/restart các service app (`backend`, `cms`, `landing`, `proxy`). Mặc định watch mỗi `300` giây và không đụng `postgres`.
+
 Tài khoản khởi tạo:
 
 ```text
@@ -123,3 +125,9 @@ con server này
 Root/QG5oZjRSn1OH793Q0x53H
 
 cd phongkham && docker compose pull && docker compose up -d
+
+Nếu muốn đổi chu kỳ auto update:
+
+```bash
+WATCHTOWER_POLL_INTERVAL=300
+```

@@ -17,6 +17,8 @@ services:
 
   backend:
     image: vienvu/quanly-phongkham-backend:${TAG:-latest}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://clinic:clinic_password@postgres:5432/clinic}
       JWT_SECRET: ${JWT_SECRET:-development-only-secret}
@@ -29,6 +31,8 @@ services:
 
   cms:
     image: vienvu/quanly-phongkham-cms:${TAG:-latest}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     depends_on:
       - backend
     expose:
@@ -36,6 +40,8 @@ services:
 
   landing:
     image: vienvu/quanly-phongkham-landing:${TAG:-latest}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     environment:
       LANDING_API_URL: ${LANDING_API_URL:-http://backend:3000/api}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
@@ -46,12 +52,32 @@ services:
 
   proxy:
     image: vienvu/quanly-phongkham-proxy:${TAG:-latest}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     depends_on:
       - backend
       - cms
       - landing
     ports:
       - "${APP_PORT:-80}:80"
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    command:
+      - --label-enable
+      - --cleanup
+      - --interval
+      - "${WATCHTOWER_POLL_INTERVAL:-300}"
+    environment:
+      WATCHTOWER_NO_STARTUP_MESSAGE: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - backend
+      - cms
+      - landing
+      - proxy
 
 volumes:
   postgres_data:
