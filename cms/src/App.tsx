@@ -154,6 +154,9 @@ export function App() {
               headerBg: appUiSettings.surfaceColor,
               headerColor: appUiSettings.titleColor
             },
+            Tag: {
+              borderRadiusSM: Math.max(6, appUiSettings.borderRadius - 4),
+            },
           },
         }}
       >

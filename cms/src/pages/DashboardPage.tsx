@@ -152,7 +152,7 @@ export function DashboardPage() {
 
   return (
     <>
-      <DashboardHero revenueToday={revenueToday} />
+      {/* <DashboardHero revenueToday={revenueToday} /> */}
       <DashboardMetricGrid metrics={metrics} />
       <DashboardOperationsSection pipeline={pipeline} quickStats={quickStats} />
       <DashboardScheduleSection

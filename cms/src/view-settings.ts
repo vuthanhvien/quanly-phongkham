@@ -1,10 +1,11 @@
-import { baseFields, CustomField, DynamicRole, FieldSpec, getResourceActionOptions, systemRoleOptions } from './models'
+import { baseFields, CustomField, DynamicRole, FieldSpec, getResourceActionOptions, normalizeSelectOption, systemRoleOptions } from './models'
 
 export const DEFAULT_ROLE_SCOPE = 'ALL'
 export const DEFAULT_ROLE_GROUPS = [DEFAULT_ROLE_SCOPE, ...systemRoleOptions]
 export const VIEW_TYPES = ['TABLE', 'FORM', 'DETAIL'] as const
 
 export type ViewType = (typeof VIEW_TYPES)[number]
+type FieldOption = NonNullable<FieldSpec['options']>[number]
 
 export interface ViewSettingRecord {
   id?: string
@@ -312,7 +313,14 @@ export function buildFieldLayoutConfigs(
       required: base.required,
       options:
         Array.isArray(entry.options)
-          ? entry.options.map(String)
+          ? entry.options
+              .map((value: unknown) => {
+                if (typeof value === 'string') return value
+                if (value && typeof value === 'object' && 'value' in value) {
+                  return normalizeSelectOption(value as FieldOption)
+                }
+                return String(value)
+              })
           : base.options,
       disabled:
         typeof entry.disabled === 'boolean'

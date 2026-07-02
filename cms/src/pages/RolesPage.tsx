@@ -6,6 +6,7 @@ import {
 } from "@ant-design/icons"
 import {
   Button,
+  Card,
   Checkbox,
   Empty,
   Flex,
@@ -251,7 +252,11 @@ export function RolesPage() {
       <div style={{ display: "flex", gap: 16, height: "calc(100vh - 120px)", minHeight: 0 }}>
 
         {/* ── Left: role list ───────────────────────── */}
-        <div style={{ width: 260, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+        <Card
+          className="glass-card"
+          style={{ width: 280, flexShrink: 0, display: "flex", flexDirection: "column" }}
+          bodyStyle={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0, height: "100%" }}
+        >
           <Flex justify="space-between" align="center">
             <Typography.Text strong>Vai trò</Typography.Text>
             <Button size="small" icon={<PlusOutlined />} onClick={openCreateRole}>Thêm</Button>
@@ -267,12 +272,12 @@ export function RolesPage() {
                   onClick={() => setSelectedRoleKey(role.key)}
                   style={{
                     padding: "10px 12px",
-                    borderRadius: 10,
+                    borderRadius: "calc(var(--app-radius) - 4px)",
                     cursor: "pointer",
-                    border: `1px solid ${active ? "var(--app-primary)" : "rgba(255,255,255,0.08)"}`,
+                    border: `1px solid ${active ? "var(--app-primary)" : "var(--app-line)"}`,
                     background: active
-                      ? "color-mix(in srgb, var(--app-primary) 12%, transparent)"
-                      : "rgba(255,255,255,0.03)",
+                      ? "color-mix(in srgb, var(--app-primary) 12%, var(--app-surface))"
+                      : "color-mix(in srgb, var(--app-surface) 96%, var(--app-primary))",
                     transition: "all .15s",
                   }}
                 >
@@ -328,18 +333,22 @@ export function RolesPage() {
               )
             })}
           </div>
-        </div>
+        </Card>
 
         {/* ── Right: assignments for selected role ─── */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+        <Card
+          className="glass-card"
+          style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}
+          bodyStyle={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0, height: "100%" }}
+        >
           {!selectedRole ? (
             <div style={{
               flex: 1,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 12,
+              border: "1px solid var(--app-line)",
+              borderRadius: "var(--app-radius)",
             }}>
               <Empty description="Chọn một vai trò bên trái" />
             </div>
@@ -348,9 +357,9 @@ export function RolesPage() {
               {/* Role info header */}
               <div style={{
                 padding: "14px 18px",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,0.08)",
-                background: "rgba(255,255,255,0.03)",
+                borderRadius: "var(--app-radius)",
+                border: "1px solid var(--app-line)",
+                background: "color-mix(in srgb, var(--app-surface) 96%, var(--app-primary))",
               }}>
                 <Flex align="center" justify="space-between">
                   <Flex align="center" gap={10}>
@@ -384,8 +393,8 @@ export function RolesPage() {
                     alignItems: "center",
                     justifyContent: "center",
                     height: 200,
-                    border: "1px dashed rgba(255,255,255,0.12)",
-                    borderRadius: 12,
+                    border: "1px dashed var(--app-line)",
+                    borderRadius: "var(--app-radius)",
                     gap: 12,
                   }}>
                     <Empty description={`Chưa có ai được gán vai trò "${selectedRole.name}"`} />
@@ -397,16 +406,18 @@ export function RolesPage() {
                       <div
                         key={branchId}
                         style={{
-                          border: "1px solid rgba(255,255,255,0.08)",
-                          borderRadius: 12,
+                          border: "1px solid var(--app-line)",
+                          borderRadius: "var(--app-radius)",
                           overflow: "hidden",
+                          background: "var(--app-surface)",
+                          boxShadow: "var(--app-shadow-soft)",
                         }}
                       >
                         {/* Branch header */}
                         <div style={{
                           padding: "8px 14px",
-                          background: "rgba(255,255,255,0.04)",
-                          borderBottom: "1px solid rgba(255,255,255,0.06)",
+                          background: "color-mix(in srgb, var(--app-surface) 92%, var(--app-primary))",
+                          borderBottom: "1px solid var(--app-line)",
                         }}>
                           <Flex align="center" gap={8}>
                             <Typography.Text strong style={{ fontSize: 13 }}>
@@ -425,7 +436,7 @@ export function RolesPage() {
                               key={assign.id}
                               style={{
                                 padding: "10px 14px",
-                                borderBottom: "1px solid rgba(255,255,255,0.04)",
+                                borderBottom: "1px solid color-mix(in srgb, var(--app-line) 70%, transparent)",
                                 display: "flex",
                                 alignItems: "center",
                                 gap: 12,
@@ -436,8 +447,8 @@ export function RolesPage() {
                                   width: 32,
                                   height: 32,
                                   borderRadius: "50%",
-                                  background: "color-mix(in srgb, var(--app-primary) 20%, transparent)",
-                                  border: "1px solid color-mix(in srgb, var(--app-primary) 30%, transparent)",
+                                  background: "color-mix(in srgb, var(--app-primary) 20%, var(--app-surface))",
+                                  border: "1px solid color-mix(in srgb, var(--app-primary) 30%, var(--app-surface))",
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
@@ -504,7 +515,7 @@ export function RolesPage() {
               </div>
             </>
           )}
-        </div>
+        </Card>
       </div>
 
       {/* Role Modal */}

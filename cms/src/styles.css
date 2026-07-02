@@ -198,8 +198,14 @@ body {
 }
 
 .side-menu .ant-menu-item-icon {
-  color: var(--app-primary) !important;
+  color: currentColor !important;
   font-size: 17px !important;
+}
+
+.side-menu .ant-menu-submenu-title .ant-menu-item-icon,
+.side-menu .ant-menu-item:hover .ant-menu-item-icon,
+.side-menu .ant-menu-item-selected .ant-menu-item-icon {
+  color: currentColor !important;
 }
 
 .side-menu .ant-menu-item:hover {
@@ -340,7 +346,7 @@ body {
   align-items: center;
   background: color-mix(in srgb, var(--app-primary) 10%, white);
   border: 1px solid var(--app-line);
-  border-radius: 22px;
+  border-radius: calc(var(--app-radius) + 8px);
   display: flex;
   gap: 12px;
   padding: 14px;
@@ -355,7 +361,7 @@ body {
 .hero-revenue > span {
   align-items: center;
   background: #ffffff;
-  border-radius: 14px;
+  border-radius: calc(var(--app-radius) - 2px);
   color: var(--app-primary);
   display: flex;
   font-size: 24px;
@@ -409,7 +415,7 @@ body {
 
 .metric-icon {
   align-items: center;
-  border-radius: 14px;
+  border-radius: var(--app-radius);
   display: flex;
   font-size: 20px;
   height: 44px;
@@ -469,7 +475,7 @@ body {
 .dashboard-mini-card {
   background: rgba(15, 23, 42, 0.04);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
+  border-radius: calc(var(--app-radius) + 2px);
   display: grid;
   gap: 4px;
   padding: 14px;
@@ -488,7 +494,7 @@ body {
 .dashboard-week-card {
   background: rgba(15, 23, 42, 0.04);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
+  border-radius: calc(var(--app-radius) + 2px);
   display: grid;
   gap: 10px;
   min-height: 180px;
@@ -503,7 +509,7 @@ body {
 .dashboard-week-event {
   background: color-mix(in srgb, var(--app-primary) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--app-primary) 18%, transparent);
-  border-radius: 12px;
+  border-radius: calc(var(--app-radius) - 2px);
   color: var(--app-text);
   cursor: pointer;
   display: grid;
@@ -626,13 +632,13 @@ body {
 }
 
 .detail-grid-stacked .detail-item {
-  border-radius: 10px;
+  border-radius: calc(var(--app-radius) - 4px);
 }
 
 .detail-item {
   background: rgba(15, 23, 42, 0.03);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 14px;
+  border-radius: var(--app-radius);
   height: 100%;
   overflow: hidden;
 }
@@ -659,7 +665,7 @@ body {
 
 .tab-count {
   background: color-mix(in srgb, var(--app-primary) 18%, transparent);
-  border-radius: 20px;
+  border-radius: calc(var(--app-radius) + 6px);
   color: var(--app-primary);
   font-size: 11px;
   font-weight: 700;
@@ -693,7 +699,7 @@ body {
 .profile-summary > div {
   background: rgba(15, 23, 42, 0.045);
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 14px;
+  border-radius: var(--app-radius);
   display: grid;
   gap: 8px;
   padding: 12px;
@@ -713,6 +719,23 @@ body {
 
 .settings-card .ant-card-body {
   padding-top: 14px;
+}
+
+.settings-options-editor {
+  display: grid;
+  gap: 8px;
+  min-width: 280px;
+}
+
+.settings-option-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(110px, 1fr) minmax(130px, 1.2fr) 32px;
+  align-items: center;
+}
+
+.settings-option-input .ant-input {
+  border-radius: calc(var(--app-radius) - 4px);
 }
 
 .settings-tabs > .ant-tabs-nav {

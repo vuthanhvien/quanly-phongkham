@@ -1,6 +1,8 @@
 import {
+  DeleteOutlined,
   HolderOutlined,
   FileTextOutlined,
+  PlusOutlined,
   SettingOutlined,
 } from "@ant-design/icons"
 import {
@@ -24,7 +26,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { api } from "../api"
-import { CustomField, DynamicRole, entityLabels, getResourceActionOptions } from "../models"
+import { CustomField, DynamicRole, entityLabels, getResourceActionOptions, normalizeSelectOption, type SelectOption } from "../models"
 import {
   buildFieldLayoutConfigs,
   DEFAULT_ROLE_SCOPE,
@@ -372,6 +374,64 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
 </section>`,
   },
 ]
+
+function formatSelectOptions(options?: SelectOption[]) {
+  if (!Array.isArray(options) || options.length === 0) return ""
+  return options
+    .map((option) => {
+      const normalized = normalizeSelectOption(option)
+      return normalized.label === normalized.value
+        ? normalized.value
+        : `${normalized.value} | ${normalized.label}`
+    })
+    .join(", ")
+}
+
+function parseSelectOptions(raw: string): SelectOption[] {
+  return raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((value) => {
+      const [optionValue, ...labelParts] = value.split("|").map((item) => item.trim())
+      const optionLabel = labelParts.join(" | ").trim()
+      if (!optionLabel || optionLabel === optionValue) return optionValue
+      return { value: optionValue, label: optionLabel }
+    })
+}
+
+function normalizeEditableOptions(options?: SelectOption[]) {
+  if (!Array.isArray(options)) return []
+  return options.map((option) => normalizeSelectOption(option))
+}
+
+function buildNextOptionValue(options?: SelectOption[]) {
+  return `OPTION_${(options?.length || 0) + 1}`
+}
+
+function updateSelectOptionAt(
+  options: SelectOption[] | undefined,
+  index: number,
+  patch: Partial<{ value: string; label: string }>,
+): SelectOption[] {
+  return normalizeEditableOptions(options).map((option, optionIndex) => {
+    if (optionIndex !== index) return option
+    const next = {
+      value: patch.value ?? option.value,
+      label: patch.label ?? option.label,
+    }
+    return next.label.trim() && next.label !== next.value ? next : next.value
+  })
+}
+
+function appendSelectOption(options?: SelectOption[]) {
+  const nextValue = buildNextOptionValue(options)
+  return [...normalizeEditableOptions(options), nextValue]
+}
+
+function removeSelectOptionAt(options: SelectOption[] | undefined, index: number) {
+  return normalizeEditableOptions(options).filter((_, optionIndex) => optionIndex !== index)
+}
 
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -1085,20 +1145,66 @@ function ViewConfigTable({
           if (row.type !== "select" && row.type !== "multi-select") {
             return <Typography.Text type="secondary">-</Typography.Text>
           }
+          const editableOptions = normalizeEditableOptions(row.options)
           return (
-            <Input.TextArea
-              autoSize={{ minRows: 1, maxRows: 3 }}
-              value={(row.options || []).join(", ")}
-              onChange={(event) =>
-                onChange(viewType, row.key, {
-                  options: event.target.value
-                    .split(",")
-                    .map((value) => value.trim())
-                    .filter(Boolean),
-                })
-              }
-              placeholder="Nhập options, ngăn cách bằng dấu phẩy"
-            />
+            <div className="settings-options-editor">
+              {editableOptions.length === 0 ? (
+                <Typography.Text type="secondary">Chưa có option</Typography.Text>
+              ) : (
+                editableOptions.map((option, optionIndex) => (
+                  <div className="settings-option-row" key={`${row.key}-${optionIndex}`}>
+                    <Input
+                      className="settings-option-input"
+                      value={option.value}
+                      onChange={(event) =>
+                        onChange(viewType, row.key, {
+                          options: updateSelectOptionAt(row.options, optionIndex, { value: event.target.value }),
+                        })
+                      }
+                      placeholder="Value"
+                    />
+                    <Input
+                      className="settings-option-input"
+                      value={option.label}
+                      onChange={(event) =>
+                        onChange(viewType, row.key, {
+                          options: updateSelectOptionAt(row.options, optionIndex, { label: event.target.value }),
+                        })
+                      }
+                      placeholder="Label hiển thị"
+                    />
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() =>
+                        onChange(viewType, row.key, {
+                          options: removeSelectOptionAt(row.options, optionIndex),
+                        })
+                      }
+                    />
+                  </div>
+                ))
+              )}
+              <Space size={8} wrap>
+                <Button
+                  size="small"
+                  icon={<PlusOutlined />}
+                  onClick={() =>
+                    onChange(viewType, row.key, {
+                      options: appendSelectOption(row.options),
+                    })
+                  }
+                >
+                  Thêm option
+                </Button>
+                {editableOptions.length > 0 ? (
+                  <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                    Gợi ý: nếu `label` trùng `value`, hệ thống sẽ lưu dạng ngắn gọn.
+                  </Typography.Text>
+                ) : null}
+              </Space>
+            </div>
           )
         },
       },
