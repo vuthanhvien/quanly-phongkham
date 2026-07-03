@@ -5,25 +5,17 @@ import {
   TeamOutlined,
 } from "@ant-design/icons"
 import dayjs from "dayjs"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { api } from "../api"
-import { DashboardDayScheduleCard } from "../components/dashboard/DashboardDayScheduleCard"
-import { DashboardHero } from "../components/dashboard/DashboardHero"
 import { DashboardMetricGrid } from "../components/dashboard/DashboardMetricGrid"
 import { DashboardOperationsSection } from "../components/dashboard/DashboardOperationsSection"
-import { DashboardScheduleSection } from "../components/dashboard/DashboardScheduleSection"
 import type {
-  ActivityItem,
-  CalendarMode,
-  DashboardEvent,
   DashboardMetric,
   DashboardPipeline,
   ListPayload,
   QuickStat,
 } from "../components/dashboard/types"
-import { EMPTY_LIST, formatCompactCurrency, formatCurrency, formatEventTime, isSameDay, parseAmount } from "../components/dashboard/utils"
-import { getFieldLabel } from "../models"
-import { loadRelationOptions, type LookupMap } from "../relations"
+import { EMPTY_LIST, formatCompactCurrency, formatCurrency, isSameDay, parseAmount } from "../components/dashboard/utils"
 
 async function fetchList<T>(resource: string, pageSize = 10000) {
   const response = await api.get(`/records/${resource}`, { params: { pageSize } })
@@ -39,14 +31,9 @@ async function fetchListSafe<T>(resource: string, pageSize = 10000) {
 }
 
 export function DashboardPage() {
-  const [selectedDate, setSelectedDate] = useState(dayjs())
-  const [calendarMode, setCalendarMode] = useState<CalendarMode>("month")
-  const [events, setEvents] = useState<DashboardEvent[]>([])
   const [metrics, setMetrics] = useState<DashboardMetric[]>([])
   const [pipeline, setPipeline] = useState<DashboardPipeline[]>([])
-  const [revenueToday, setRevenueToday] = useState(0)
   const [quickStats, setQuickStats] = useState<QuickStat[]>([])
-  const [recentActivities, setRecentActivities] = useState<ActivityItem[]>([])
 
   useEffect(() => {
     void loadDashboard()
@@ -64,7 +51,6 @@ export function DashboardPage() {
       serviceOrders,
       invoices,
       expenses,
-      relationLookups,
     ] = await Promise.all([
       fetchListSafe<Record<string, any>>("appointments", 500),
       fetchListSafe<Record<string, any>>("work-schedules", 500),
@@ -76,7 +62,6 @@ export function DashboardPage() {
       fetchListSafe<Record<string, any>>("service-orders"),
       fetchListSafe<Record<string, any>>("invoices"),
       fetchListSafe<Record<string, any>>("expenses"),
-      loadRelationOptions(["customerId", "staffId"]).catch(() => ({} as LookupMap)),
     ])
 
     const today = dayjs()
@@ -91,124 +76,17 @@ export function DashboardPage() {
     const invoiceRows = invoices.data || []
     const expenseRows = expenses.data || []
 
-    setEvents(buildEvents(appointmentRows, workScheduleRows, relationLookups))
-    setRevenueToday(
-      invoiceRows
-        .filter((item) => isSameDay(item.createdAt, today))
-        .reduce((sum, item) => sum + parseAmount(item.paidAmount), 0),
-    )
     setMetrics(buildMetrics(customerRows, leadRows, treatmentRows, medicalEpisodeRows, today))
     setPipeline(buildPipeline(consultationRows, serviceOrderRows, appointmentRows, invoiceRows, today))
     setQuickStats(buildQuickStats(invoiceRows, expenseRows, appointmentRows, workScheduleRows, today))
-    setRecentActivities(buildRecentActivities(appointmentRows, invoiceRows, relationLookups, today))
   }
-
-  const selectedEvents = useMemo(
-    () =>
-      events
-        .filter((item) => dayjs(item.start).isSame(selectedDate, "day"))
-        .sort((left, right) => dayjs(left.start).valueOf() - dayjs(right.start).valueOf()),
-    [events, selectedDate],
-  )
-
-  const weekDays = useMemo(() => {
-    const weekStart = selectedDate.startOf("week")
-    return Array.from({ length: 7 }, (_, index) => weekStart.add(index, "day"))
-  }, [selectedDate])
-
-  const weekEvents = useMemo(
-    () =>
-      events
-        .filter((item) => dayjs(item.start).isSame(selectedDate, "week"))
-        .sort((left, right) => dayjs(left.start).valueOf() - dayjs(right.start).valueOf()),
-    [events, selectedDate],
-  )
-
-  const appointmentCount = events.filter((item) => item.type === "appointment").length
-  const scheduleCount = events.filter((item) => item.type === "schedule").length
-
-  function shiftCalendar(offset: number) {
-    if (calendarMode === "day") {
-      setSelectedDate((current) => current.add(offset, "day"))
-      return
-    }
-    if (calendarMode === "week") {
-      setSelectedDate((current) => current.add(offset, "week"))
-      return
-    }
-    setSelectedDate((current) => current.add(offset, "month"))
-  }
-
-  function jumpToToday() {
-    setSelectedDate(dayjs())
-  }
-
-  const calendarRangeLabel =
-    calendarMode === "day"
-      ? selectedDate.format("DD/MM/YYYY")
-      : calendarMode === "week"
-        ? `${selectedDate.startOf("week").format("DD/MM")} - ${selectedDate.endOf("week").format("DD/MM/YYYY")}`
-        : selectedDate.format("MM/YYYY")
 
   return (
     <>
-      {/* <DashboardHero revenueToday={revenueToday} /> */}
       <DashboardMetricGrid metrics={metrics} />
       <DashboardOperationsSection pipeline={pipeline} quickStats={quickStats} />
-      <DashboardScheduleSection
-        allEvents={events}
-        appointmentCount={appointmentCount}
-        calendarMode={calendarMode}
-        calendarRangeLabel={calendarRangeLabel}
-        recentActivities={recentActivities}
-        scheduleCount={scheduleCount}
-        selectedDate={selectedDate}
-        selectedEvents={selectedEvents}
-        setCalendarMode={setCalendarMode}
-        setSelectedDate={setSelectedDate}
-        shiftCalendar={shiftCalendar}
-        jumpToToday={jumpToToday}
-        weekDays={weekDays}
-        weekEvents={weekEvents}
-      />
-      <DashboardDayScheduleCard
-        selectedDateLabel={selectedDate.format("DD/MM/YYYY")}
-        selectedEvents={selectedEvents}
-      />
     </>
   )
-}
-
-function buildEvents(
-  appointmentRows: Record<string, any>[],
-  workScheduleRows: Record<string, any>[],
-  relationLookups: LookupMap,
-) {
-  const appointmentEvents = appointmentRows.map(
-    (item: Record<string, any>) => ({
-      id: item.id,
-      type: "appointment" as const,
-      title: `${getFieldLabel("appointments", "type", item.type) || "Lịch hẹn"} - ${relationLookups.customers?.[item.customerId] || item.customerId || "Khách hàng"}`,
-      start: String(item.startTime || item.createdAt || ""),
-      end: item.endTime ? String(item.endTime) : undefined,
-      tone: "magenta",
-      meta: [item.status ? getFieldLabel("appointments", "status", String(item.status)) : null, item.doctorName, item.room].filter(Boolean).join(" | "),
-    }),
-  )
-
-  const scheduleEvents = workScheduleRows.map(
-    (item: Record<string, any>) => ({
-      id: item.id,
-      type: "schedule" as const,
-      title: `${item.shiftLabel || "Ca làm"} - ${relationLookups.staff?.[item.staffId] || item.staffId || "Nhân sự"}`,
-      start: String(item.startTime || item.workDate || item.createdAt || ""),
-      end: item.endTime ? String(item.endTime) : undefined,
-      tone: "cyan",
-      meta: [item.status ? getFieldLabel("work-schedules", "status", String(item.status)) : null, item.room, item.note].filter(Boolean).join(" | "),
-    }),
-  )
-
-  return [...appointmentEvents, ...scheduleEvents]
 }
 
 function buildMetrics(
@@ -321,32 +199,4 @@ function buildQuickStats(
       hint: `${workScheduleRows.filter((item) => isSameDay(item.workDate || item.startTime, today)).length} ca làm việc`,
     },
   ]
-}
-
-function buildRecentActivities(
-  appointmentRows: Record<string, any>[],
-  invoiceRows: Record<string, any>[],
-  relationLookups: LookupMap,
-  today: dayjs.Dayjs,
-): ActivityItem[] {
-  return [
-    ...appointmentRows
-      .filter((item) => isSameDay(item.startTime, today))
-      .slice(0, 3)
-      .map((item) => ({
-        id: `appointment-${item.id}`,
-        title: `${getFieldLabel("appointments", "type", item.type) || "Lịch hẹn"} - ${relationLookups.customers?.[item.customerId] || item.customerId || "Khách hàng"}`,
-        meta: [formatEventTime(String(item.startTime || ""), item.endTime), item.status ? getFieldLabel("appointments", "status", String(item.status)) : null, item.room].filter(Boolean).join(" | "),
-        tone: "magenta",
-      })),
-    ...invoiceRows
-      .filter((item) => isSameDay(item.createdAt, today))
-      .slice(0, 3)
-      .map((item) => ({
-        id: `invoice-${item.id}`,
-        title: `Hóa đơn ${item.code || item.id}`,
-        meta: `${formatCurrency(parseAmount(item.totalAmount))} đ | ${getFieldLabel("invoices", "status", String(item.status || "UNPAID"))}`,
-        tone: "cyan",
-      })),
-  ].slice(0, 6)
 }

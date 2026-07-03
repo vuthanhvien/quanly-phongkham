@@ -3,13 +3,16 @@ import {
   EyeOutlined,
   FieldTimeOutlined,
   FileDoneOutlined,
+  PlusOutlined,
   TeamOutlined,
 } from "@ant-design/icons"
 import dayjs, { type Dayjs } from "dayjs"
-import { Button, Calendar, Card, Col, Empty, List, Row, Segmented, Select, Space, Tag, Typography } from "antd"
+import { Button, Calendar, Card, Col, Drawer, Empty, List, Row, Segmented, Select, Space, Tag, Typography } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { hasActionAccess } from "../access"
 import { api } from "../api"
+import { RecordFormContent } from "../components/RecordFormContent"
 import { getFieldLabel } from "../models"
 import { loadRelationOptions, type LookupMap } from "../relations"
 import { formatEventTime } from "../components/dashboard/utils"
@@ -30,6 +33,14 @@ interface PlannerEvent {
   tone: string
   statusLabel: string
   summary: string
+}
+
+type QuickCreateResource = "appointments" | "work-schedules" | "leave-requests" | "attendances"
+
+interface QuickActionItem {
+  key: QuickCreateResource
+  title: string
+  description: string
 }
 
 const EVENT_TYPE_OPTIONS: Array<{ label: string; value: PlannerEventType }> = [
@@ -53,6 +64,29 @@ const EVENT_TYPE_COLOR: Record<PlannerEventType, string> = {
   attendance: "green",
 }
 
+const QUICK_ACTIONS: QuickActionItem[] = [
+  {
+    key: "appointments",
+    title: "Thêm booking",
+    description: "Tạo lịch hẹn mới theo ngày đang chọn.",
+  },
+  {
+    key: "work-schedules",
+    title: "Thêm ca làm",
+    description: "Phân ca nhanh cho nhân sự trong ngày.",
+  },
+  {
+    key: "leave-requests",
+    title: "Thêm nghỉ phép",
+    description: "Ghi nhận đơn nghỉ ngay trên lịch.",
+  },
+  {
+    key: "attendances",
+    title: "Thêm chấm công",
+    description: "Tạo bản ghi check-in cho ngày đang xem.",
+  },
+]
+
 async function fetchListSafe<T>(resource: string, pageSize = 500) {
   try {
     const response = await api.get(`/records/${resource}`, { params: { pageSize } })
@@ -71,6 +105,7 @@ export function CalendarPage() {
   const [selectedTypes, setSelectedTypes] = useState<PlannerEventType[]>(["appointment", "schedule", "leave", "attendance"])
   const [branchFilter, setBranchFilter] = useState<string | undefined>(undefined)
   const [staffFilter, setStaffFilter] = useState<string | undefined>(undefined)
+  const [quickCreateResource, setQuickCreateResource] = useState<QuickCreateResource | null>(null)
 
   useEffect(() => {
     void loadCalendar()
@@ -165,6 +200,11 @@ export function CalendarPage() {
     setSelectedDate((current) => current.add(offset, "month"))
   }
 
+  const visibleQuickActions = useMemo(
+    () => QUICK_ACTIONS.filter((item) => hasActionAccess(item.key, "create")),
+    [],
+  )
+
   return (
     <>
       <div className="page-header">
@@ -175,6 +215,16 @@ export function CalendarPage() {
           </Typography.Text>
         </div>
         <Space wrap>
+          {visibleQuickActions.slice(0, 2).map((item) => (
+            <Button
+              key={item.key}
+              icon={<PlusOutlined />}
+              type="primary"
+              onClick={() => setQuickCreateResource(item.key)}
+            >
+              {item.title}
+            </Button>
+          ))}
           <Button onClick={() => navigate("/appointments")}>Mở booking</Button>
           <Button onClick={() => navigate("/work-schedules")}>Mở lịch làm việc</Button>
           <Button onClick={() => navigate("/leave-requests")}>Mở nghỉ phép</Button>
@@ -313,6 +363,21 @@ export function CalendarPage() {
         <div className="calendar-planner-sidebar">
           <div className="calendar-planner-sticky">
             <Card className="glass-card spacious-card" title={`Chi tiết ngày ${selectedDate.format("DD/MM/YYYY")}`}>
+              {visibleQuickActions.length > 0 ? (
+                <div className="calendar-quick-actions">
+                  {visibleQuickActions.map((item) => (
+                    <button
+                      key={item.key}
+                      className="calendar-quick-action"
+                      type="button"
+                      onClick={() => setQuickCreateResource(item.key)}
+                    >
+                      <strong>{item.title}</strong>
+                      <span>{item.description}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <Space wrap size={[8, 8]} style={{ marginBottom: 12 }}>
                 {EVENT_TYPE_OPTIONS.map((option) => (
                   <Tag color={EVENT_TYPE_COLOR[option.value]} key={option.value}>
@@ -383,6 +448,30 @@ export function CalendarPage() {
           </div>
         </div>
       </div>
+
+      <Drawer
+        className="quick-drawer"
+        destroyOnClose
+        maskClosable={false}
+        open={Boolean(quickCreateResource)}
+        placement="right"
+        title={quickCreateResource ? `Thêm nhanh ${resolveQuickCreateTitle(quickCreateResource)}` : "Thêm nhanh"}
+        width={620}
+        onClose={() => setQuickCreateResource(null)}
+      >
+        {quickCreateResource ? (
+          <RecordFormContent
+            compact
+            initialValues={buildQuickCreateInitialValues(quickCreateResource, selectedDate)}
+            resource={quickCreateResource}
+            onCancel={() => setQuickCreateResource(null)}
+            onSuccess={() => {
+              setQuickCreateResource(null)
+              void loadCalendar()
+            }}
+          />
+        ) : null}
+      </Drawer>
     </>
   )
 }
@@ -450,6 +539,54 @@ function resolveEventIcon(type: PlannerEventType) {
       return <FileDoneOutlined />
     default:
       return <TeamOutlined />
+  }
+}
+
+function resolveQuickCreateTitle(resource: QuickCreateResource) {
+  switch (resource) {
+    case "appointments":
+      return "Booking"
+    case "work-schedules":
+      return "Ca làm"
+    case "leave-requests":
+      return "Nghỉ phép"
+    default:
+      return "Chấm công"
+  }
+}
+
+function buildQuickCreateInitialValues(resource: QuickCreateResource, selectedDate: Dayjs) {
+  const selectedDay = selectedDate.format("YYYY-MM-DD")
+
+  switch (resource) {
+    case "appointments":
+      return {
+        type: "CONSULTATION",
+        status: "SCHEDULED",
+        startTime: selectedDate.hour(9).minute(0).format("YYYY-MM-DDTHH:mm"),
+        endTime: selectedDate.hour(10).minute(0).format("YYYY-MM-DDTHH:mm"),
+      }
+    case "work-schedules":
+      return {
+        workDate: selectedDay,
+        shiftLabel: "Ca sáng",
+        status: "PLANNED",
+        startTime: selectedDate.hour(8).minute(0).format("YYYY-MM-DDTHH:mm"),
+        endTime: selectedDate.hour(17).minute(0).format("YYYY-MM-DDTHH:mm"),
+      }
+    case "leave-requests":
+      return {
+        startDate: selectedDay,
+        endDate: selectedDay,
+        leaveType: "annual",
+        status: "pending",
+      }
+    default:
+      return {
+        date: selectedDay,
+        checkIn: "08:00",
+        status: "present",
+      }
   }
 }
 

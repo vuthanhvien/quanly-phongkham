@@ -12,6 +12,48 @@ import { displayValue, loadRelationOptions, LookupMap } from "../relations"
 import { getFieldCatalog } from "../view-settings"
 
 const UNSUPPORTED_RESOURCES = new Set(["files", "service-orders"])
+const BUNDLE_RESOURCES = new Set(["customers", "leads", "staff"])
+
+interface BundleSheetDefinition {
+  sheetName: string
+  resource: string
+  columns: string[]
+  parentCodeColumn?: string
+}
+
+const BUNDLE_IMPORT_CONFIGS: Record<string, { related: BundleSheetDefinition[] }> = {
+  customers: {
+    related: [
+      { sheetName: "appointments", resource: "appointments", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "type", "startTime", "endTime", "doctorName", "room", "equipment", "status", "note"] },
+      { sheetName: "medical-episodes", resource: "medical-episodes", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "serviceName", "doctorName", "status", "chiefComplaint", "allergyWarning", "diagnosis", "operationDate"] },
+      { sheetName: "treatments", resource: "treatments", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "name", "totalSessions", "completedSessions", "intervalDays", "status"] },
+      { sheetName: "consultations", resource: "consultations", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "consultedAt", "consultantStaffId", "doctorStaffId", "status", "summary", "diagnosis", "nextAction"] },
+      { sheetName: "customer-images", resource: "customer-images", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "mediaType", "title", "imageUrl", "capturedAt", "diagnosisNote"] },
+      { sheetName: "invoices", resource: "invoices", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "code", "branchId", "totalAmount", "paidAmount", "method", "status"] },
+    ],
+  },
+  leads: {
+    related: [
+      { sheetName: "lead-activities", resource: "lead-activities", parentCodeColumn: "leadCode", columns: ["recordId", "leadCode", "branchId", "activityType", "scheduledAt", "ownerStaffId", "status", "content"] },
+    ],
+  },
+  staff: {
+    related: [
+      { sheetName: "work-contracts", resource: "work-contracts", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "contractType", "startDate", "endDate", "baseSalary", "position", "workingHoursPerDay", "workingDaysPerMonth", "status", "note"] },
+      { sheetName: "staff-insurances", resource: "staff-insurances", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "insuranceType", "employeeRate", "employerRate", "salaryBase", "startDate", "endDate", "isActive", "note"] },
+      { sheetName: "attendances", resource: "attendances", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "date", "checkIn", "checkOut", "status", "note"] },
+      { sheetName: "leave-requests", resource: "leave-requests", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "startDate", "endDate", "leaveType", "status", "reason", "approvedById"] },
+      { sheetName: "payrolls", resource: "payrolls", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "month", "year", "baseSalary", "workingDays", "actualDays", "overtimeHours", "bonus", "deduction", "netSalary", "status", "note"] },
+      { sheetName: "work-schedules", resource: "work-schedules", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "workDate", "shiftLabel", "startTime", "endTime", "room", "status", "note"] },
+      { sheetName: "staff-rewards", resource: "staff-rewards", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "type", "title", "description", "date", "issuedBy", "amount", "note"] },
+      { sheetName: "staff-trainings", resource: "staff-trainings", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "trainingName", "provider", "startDate", "endDate", "certificateNumber", "expiryDate", "status", "note"] },
+      { sheetName: "performance-reviews", resource: "performance-reviews", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "reviewMonth", "reviewYear", "reviewerId", "score", "status", "strengths", "improvements", "goals", "note"] },
+      { sheetName: "position-histories", resource: "position-histories", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "fromPosition", "toPosition", "fromDepartmentId", "toDepartmentId", "effectiveDate", "reason", "note"] },
+      { sheetName: "branch-role-assignments", resource: "branch-role-assignments", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "userId", "branchId", "roleName", "roleKeys", "isActive"] },
+      { sheetName: "user-accounts", resource: "user-accounts", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "email", "password", "fullName", "role", "branchId"] },
+    ],
+  },
+}
 
 interface ImportDraftRow {
   __rowKey: string
@@ -28,10 +70,13 @@ export function RecordImportPage() {
   const [fields, setFields] = useState<FieldSpec[]>([])
   const [lookups, setLookups] = useState<LookupMap>({})
   const [draftRows, setDraftRows] = useState<ImportDraftRow[]>([])
+  const [bundleSheets, setBundleSheets] = useState<Record<string, Array<Record<string, unknown>>>>({})
+  const [bundleSheetStats, setBundleSheetStats] = useState<Array<{ name: string; count: number }>>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   const unsupported = UNSUPPORTED_RESOURCES.has(resource)
+  const bundleMode = BUNDLE_RESOURCES.has(resource)
   const baseKeySet = useMemo(
     () => new Set((baseFields[resource] || []).map((field) => field.key)),
     [resource],
@@ -46,6 +91,8 @@ export function RecordImportPage() {
 
   useEffect(() => {
     setDraftRows([])
+    setBundleSheets({})
+    setBundleSheetStats([])
     if (unsupported) {
       setFields([])
       setLookups({})
@@ -76,6 +123,19 @@ export function RecordImportPage() {
     accept: ".xlsx,.xls",
     beforeUpload: async (file) => {
       try {
+        if (bundleMode) {
+          const definitions = buildBundleSheetDefinitions(resource, importableFields)
+          const parsed = await parseBundleImportFile(file, definitions, baseKeySet)
+          if (parsed.previewRows.length === 0 && parsed.stats.every((item) => item.count === 0)) {
+            message.warning("File import chưa có dữ liệu hợp lệ")
+            return false
+          }
+          setBundleSheets(parsed.sheets)
+          setBundleSheetStats(parsed.stats)
+          setDraftRows(parsed.previewRows)
+          message.success(`Đã đọc ${parsed.stats.reduce((sum, item) => sum + item.count, 0)} dòng từ file Excel`)
+          return false
+        }
         const rows = await parseImportFile(file, importableFields, baseKeySet, resolvers)
         if (rows.length === 0) {
           message.warning("File import chưa có dòng dữ liệu hợp lệ")
@@ -145,11 +205,25 @@ export function RecordImportPage() {
       return
     }
 
+    if (bundleMode) {
+      const response = await api.get(`/records/${resource}/import-bundle`, { params: { template: 1 } })
+      const workbook = buildBundleWorkbookFromApi(response.data.data.sheets || [])
+      XLSX.writeFile(workbook, `${resource}-import-template.xlsx`)
+      return
+    }
+
     const workbook = buildImportWorkbook(importableFields, lookups)
     XLSX.writeFile(workbook, `${resource}-import-template.xlsx`)
   }
 
-  async function downloadFakeTemplate() {
+  async function downloadExportData() {
+    if (bundleMode) {
+      const response = await api.get(`/records/${resource}/import-bundle`)
+      const workbook = buildBundleWorkbookFromApi(response.data.data.sheets || [])
+      XLSX.writeFile(workbook, `${resource}-export.xlsx`)
+      return
+    }
+
     if (importableFields.length === 0) {
       message.warning("Chưa có cấu hình field để tạo file test")
       return
@@ -163,6 +237,34 @@ export function RecordImportPage() {
   }
 
   async function saveRows() {
+    if (bundleMode) {
+      if (draftRows.some((row) => row.errors.length > 0)) {
+        message.warning("Vẫn còn lỗi ở sheet chính, vui lòng sửa file rồi upload lại")
+        return
+      }
+      const totalRows = Object.values(bundleSheets).reduce((sum, rows) => sum + rows.length, 0)
+      if (totalRows === 0) {
+        message.warning("Chưa có dòng nào để import")
+        return
+      }
+      setSaving(true)
+      try {
+        const response = await api.post(`/records/${resource}/import-bundle`, { sheets: bundleSheets })
+        const importedSheets = response.data?.data?.importedSheets || []
+        message.success(
+          importedSheets.length > 0
+            ? `Đã import ${importedSheets.reduce((sum: number, item: { count: number }) => sum + Number(item.count || 0), 0)} dòng`
+            : "Đã import dữ liệu",
+        )
+        setTimeout(() => navigate(`/${resource}`), 400)
+      } catch (error: any) {
+        message.error(String(error?.response?.data?.message || error?.message || "Import dữ liệu thất bại"))
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
     if (readyRows.length === 0) {
       message.warning("Chưa có dòng nào sẵn sàng để lưu")
       return
@@ -214,15 +316,15 @@ export function RecordImportPage() {
           <Button icon={<DownloadOutlined />} onClick={() => void downloadTemplate()}>
             Tải file mẫu
           </Button>
-          <Button icon={<ImportOutlined />} onClick={() => void downloadFakeTemplate()}>
-            Tải data test
+          <Button icon={<ImportOutlined />} onClick={() => void downloadExportData()}>
+            {bundleMode ? "Export data hiện có" : "Tải data test"}
           </Button>
           <Upload {...uploadProps}>
             <Button icon={<UploadOutlined />}>Upload file</Button>
           </Upload>
           <Button
             className="primary-glow"
-            disabled={readyRows.length === 0}
+            disabled={bundleMode ? Object.values(bundleSheets).every((rows) => rows.length === 0) : readyRows.length === 0}
             icon={<SaveOutlined />}
             loading={saving}
             type="primary"
@@ -275,6 +377,15 @@ export function RecordImportPage() {
       </div> */}
 
       <Card className="table-card">
+        {bundleMode && bundleSheetStats.length > 0 ? (
+          <Space wrap style={{ marginBottom: 16 }}>
+            {bundleSheetStats.map((item) => (
+              <Tag color="processing" key={item.name}>
+                {item.name}: {item.count} dòng
+              </Tag>
+            ))}
+          </Space>
+        ) : null}
         {draftRows.length === 0 ? (
           <Alert
             message="Chưa có dữ liệu preview"
@@ -355,6 +466,64 @@ function buildImportWorkbook(
   XLSX.utils.book_append_sheet(workbook, dataSheet, "ImportData")
   XLSX.utils.book_append_sheet(workbook, guideSheet, "HuongDan")
   return workbook
+}
+
+function buildBundleSheetDefinitions(resource: string, mainFields: FieldSpec[]): BundleSheetDefinition[] {
+  const mainColumns = mainFields.map((field) => field.key)
+  const related = BUNDLE_IMPORT_CONFIGS[resource]?.related || []
+  return [
+    {
+      sheetName: resource,
+      resource,
+      columns: mainColumns,
+    },
+    ...related,
+  ]
+}
+
+function buildBundleWorkbookFromApi(
+  sheets: Array<{ name: string; columns: string[]; rows: Array<Record<string, unknown>> }>,
+) {
+  const workbook = XLSX.utils.book_new()
+  const guideRows: Array<Array<string>> = [["sheet", "field", "guide"]]
+
+  sheets.forEach((sheet) => {
+    const sheetRows = [
+      sheet.columns,
+      ...(sheet.rows || []).map((row) => sheet.columns.map((column) => serializeWorkbookCell(row[column]))),
+    ]
+    const worksheet = XLSX.utils.aoa_to_sheet(sheetRows)
+    worksheet["!cols"] = sheet.columns.map((column) => ({ wch: Math.max(14, Math.min(36, column.length + 6)) }))
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name)
+
+    sheet.columns.forEach((column) => {
+      guideRows.push([sheet.name, column, buildBundleFieldGuide(sheet.name, column)])
+    })
+  })
+
+  const guideSheet = XLSX.utils.aoa_to_sheet(guideRows)
+  guideSheet["!cols"] = [{ wch: 24 }, { wch: 24 }, { wch: 72 }]
+  XLSX.utils.book_append_sheet(workbook, guideSheet, "HuongDan")
+  return workbook
+}
+
+function serializeWorkbookCell(value: unknown) {
+  if (Array.isArray(value)) return value.join(", ")
+  if (value === undefined || value === null) return ""
+  return value
+}
+
+function buildBundleFieldGuide(sheetName: string, column: string) {
+  if (column === "recordId") return "Giữ nguyên để update dòng liên kết đã export. Để trống để tạo mới."
+  if (column.endsWith("Code")) return "Nhập code của bản ghi cha để map liên kết."
+  if (column === "branchId" || column === "defaultBranchId") return "Nhập slug chi nhánh."
+  if (column === "userId") return "Nhập email tài khoản."
+  if (column.toLowerCase().includes("staffid")) return "Nhập mã nhân viên."
+  if (column.toLowerCase().includes("customerid")) return "Nhập mã khách hàng."
+  if (column.toLowerCase().includes("leadid")) return "Nhập mã lead."
+  if (column.toLowerCase().includes("departmentid")) return "Nhập mã phòng ban."
+  if (column.toLowerCase().includes("invoiceid")) return "Nhập mã hóa đơn."
+  return "Điền theo đúng dữ liệu đang export từ hệ thống."
 }
 
 function generateFakeImportRow(
@@ -544,6 +713,152 @@ async function parseImportFile(
   return rows
     .map((rawRow, index) => normalizeImportRow(rawRow, index, fields, baseKeySet, resolvers))
     .filter(Boolean) as ImportDraftRow[]
+}
+
+async function parseBundleImportFile(
+  file: File,
+  definitions: BundleSheetDefinition[],
+  baseKeySet: Set<string>,
+) {
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: "array", cellDates: false })
+  const sheets: Record<string, Array<Record<string, unknown>>> = {}
+  let previewRows: ImportDraftRow[] = []
+
+  for (const definition of definitions) {
+    const sheet = workbook.Sheets[definition.sheetName]
+    const rows = sheet
+      ? XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "", raw: false })
+      : []
+
+    if (definition.resource === definitions[0].resource) {
+      const mainFields = definition.columns
+        .map((key) => (baseFields[definition.resource] || []).find((field) => field.key === key))
+        .filter(Boolean) as FieldSpec[]
+      previewRows = rows
+        .map((rawRow, index) => normalizeBundlePreviewRow(rawRow, index, mainFields, baseKeySet))
+        .filter(Boolean) as ImportDraftRow[]
+    }
+
+    const sheetFields = buildBundleSheetFields(definition)
+    sheets[definition.sheetName] = rows
+      .map((row) => normalizeBundleSheetRow(row, sheetFields))
+      .filter((row) => Object.values(row).some((value) => !isEmptyValue(value)))
+  }
+
+  return {
+    sheets,
+    previewRows,
+    stats: definitions.map((definition) => ({
+      name: definition.sheetName,
+      count: sheets[definition.sheetName]?.length || 0,
+    })),
+  }
+}
+
+function normalizeBundlePreviewRow(
+  rawRow: Record<string, unknown>,
+  index: number,
+  fields: FieldSpec[],
+  baseKeySet: Set<string>,
+) {
+  const normalizedSource = Object.fromEntries(
+    Object.entries(rawRow).map(([key, value]) => [String(key).trim(), value]),
+  )
+  const hasContent = Object.values(normalizedSource).some((value) => !isEmptyValue(value))
+  if (!hasContent) return null
+
+  const payload: Record<string, unknown> = { customFields: {} }
+  const preview: Record<string, unknown> = {}
+  const errors: string[] = []
+
+  fields.forEach((field) => {
+    const rawValue = normalizedSource[field.key]
+    if (isEmptyValue(rawValue)) {
+      if (field.required) errors.push(`Thiếu ${field.label}`)
+      return
+    }
+    const parsed = parseBundleFieldValue(field, rawValue)
+    preview[field.key] = parsed
+    if (baseKeySet.has(field.key)) {
+      payload[field.key] = parsed
+    } else {
+      ;(payload.customFields as Record<string, unknown>)[field.key] = parsed
+    }
+  })
+
+  if (Object.keys(payload.customFields as Record<string, unknown>).length === 0) {
+    delete payload.customFields
+  }
+
+  return {
+    __rowKey: `${index}-${Date.now()}`,
+    __lineNumber: index + 2,
+    payload,
+    preview,
+    errors,
+  }
+}
+
+function buildBundleSheetFields(definition: BundleSheetDefinition) {
+  const availableFields = baseFields[definition.resource] || []
+  return definition.columns.map((column) => {
+    if (column === "recordId" || column === definition.parentCodeColumn) {
+      return { key: column, label: column }
+    }
+    return availableFields.find((field) => field.key === column) || { key: column, label: column }
+  })
+}
+
+function normalizeBundleSheetRow(
+  rawRow: Record<string, unknown>,
+  fields: Array<Pick<FieldSpec, "key" | "label" | "type">>,
+) {
+  const normalizedSource = Object.fromEntries(
+    Object.entries(rawRow).map(([key, value]) => [String(key).trim(), value]),
+  )
+  const row: Record<string, unknown> = {}
+  fields.forEach((field) => {
+    const rawValue = normalizedSource[field.key]
+    if (isEmptyValue(rawValue)) return
+    const parsed = parseBundleFieldValue(field, rawValue)
+    row[field.key] = parsed
+  })
+  return row
+}
+
+function parseBundleFieldValue(
+  field: Pick<FieldSpec, "key" | "label" | "type">,
+  rawValue: unknown,
+) {
+  if (field.key === "isActive") {
+    const value = normalizeBooleanValue(rawValue)
+    return value === undefined ? String(rawValue).trim() : value
+  }
+
+  if (field.type === "number") {
+    const value = Number(String(rawValue).replace(/,/g, "").trim())
+    return Number.isFinite(value) ? value : rawValue
+  }
+
+  if (field.type === "multi-select") {
+    return splitMultiValue(rawValue)
+  }
+
+  if (field.type === "date") {
+    return normalizeDateValue(rawValue) || String(rawValue).trim()
+  }
+
+  if (field.type === "datetime") {
+    return normalizeDateTimeValue(rawValue) || String(rawValue).trim()
+  }
+
+  if (String(field.type || "") === "boolean") {
+    const value = normalizeBooleanValue(rawValue)
+    return value === undefined ? String(rawValue).trim() : value
+  }
+
+  return String(rawValue).trim()
 }
 
 function normalizeImportRow(

@@ -77,6 +77,225 @@ type RequestContext = {
   get?: (name: string) => string | undefined;
 };
 
+type BundleRootResource = 'customers' | 'leads' | 'staff';
+
+type ImportBundleSheetConfig = {
+  sheetName: string;
+  resource: string;
+  columns: string[];
+  parentField?: string;
+  parentCodeColumn?: string;
+  matchField?: string;
+};
+
+const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
+  main: ImportBundleSheetConfig;
+  related: ImportBundleSheetConfig[];
+}> = {
+  customers: {
+    main: {
+      sheetName: 'customers',
+      resource: 'customers',
+      columns: ['code', 'fullName', 'phone', 'email', 'gender', 'idNumber', 'address', 'status', 'totalSpent', 'branchId', 'note'],
+    },
+    related: [
+      {
+        sheetName: 'appointments',
+        resource: 'appointments',
+        parentField: 'customerId',
+        parentCodeColumn: 'customerCode',
+        columns: ['recordId', 'customerCode', 'branchId', 'type', 'startTime', 'endTime', 'doctorName', 'room', 'equipment', 'status', 'note'],
+      },
+      {
+        sheetName: 'medical-episodes',
+        resource: 'medical-episodes',
+        parentField: 'customerId',
+        parentCodeColumn: 'customerCode',
+        columns: ['recordId', 'customerCode', 'branchId', 'serviceName', 'doctorName', 'status', 'chiefComplaint', 'allergyWarning', 'diagnosis', 'operationDate'],
+      },
+      {
+        sheetName: 'treatments',
+        resource: 'treatments',
+        parentField: 'customerId',
+        parentCodeColumn: 'customerCode',
+        columns: ['recordId', 'customerCode', 'branchId', 'name', 'totalSessions', 'completedSessions', 'intervalDays', 'status'],
+      },
+      {
+        sheetName: 'consultations',
+        resource: 'consultations',
+        parentField: 'customerId',
+        parentCodeColumn: 'customerCode',
+        columns: ['recordId', 'customerCode', 'branchId', 'consultedAt', 'consultantStaffId', 'doctorStaffId', 'status', 'summary', 'diagnosis', 'nextAction'],
+      },
+      {
+        sheetName: 'customer-images',
+        resource: 'customer-images',
+        parentField: 'customerId',
+        parentCodeColumn: 'customerCode',
+        columns: ['recordId', 'customerCode', 'branchId', 'mediaType', 'title', 'imageUrl', 'capturedAt', 'diagnosisNote'],
+      },
+      {
+        sheetName: 'invoices',
+        resource: 'invoices',
+        parentField: 'customerId',
+        parentCodeColumn: 'customerCode',
+        matchField: 'code',
+        columns: ['recordId', 'customerCode', 'code', 'branchId', 'totalAmount', 'paidAmount', 'method', 'status'],
+      },
+    ],
+  },
+  leads: {
+    main: {
+      sheetName: 'leads',
+      resource: 'leads',
+      columns: ['code', 'fullName', 'phone', 'email', 'source', 'status', 'assignedStaffId', 'branchId', 'note'],
+    },
+    related: [
+      {
+        sheetName: 'lead-activities',
+        resource: 'lead-activities',
+        parentField: 'leadId',
+        parentCodeColumn: 'leadCode',
+        columns: ['recordId', 'leadCode', 'branchId', 'activityType', 'scheduledAt', 'ownerStaffId', 'status', 'content'],
+      },
+    ],
+  },
+  staff: {
+    main: {
+      sheetName: 'staff',
+      resource: 'staff',
+      columns: [
+        'code', 'fullName', 'phone', 'email', 'position', 'departmentId', 'defaultBranchId', 'userId', 'status', 'joinedAt',
+        'dateOfBirth', 'gender', 'idCardNumber', 'idCardIssuedDate', 'idCardIssuedPlace', 'address', 'avatarUrl',
+        'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelation',
+        'bankAccountNumber', 'bankAccountName', 'bankName', 'bankBranch', 'taxCode', 'dependants', 'note',
+      ],
+    },
+    related: [
+      {
+        sheetName: 'work-contracts',
+        resource: 'work-contracts',
+        parentField: 'staffId',
+        parentCodeColumn: 'staffCode',
+        columns: ['recordId', 'staffCode', 'branchId', 'contractType', 'startDate', 'endDate', 'baseSalary', 'position', 'workingHoursPerDay', 'workingDaysPerMonth', 'status', 'note'],
+      },
+      {
+        sheetName: 'staff-insurances',
+        resource: 'staff-insurances',
+        parentField: 'staffId',
+        parentCodeColumn: 'staffCode',
+        columns: ['recordId', 'staffCode', 'branchId', 'insuranceType', 'employeeRate', 'employerRate', 'salaryBase', 'startDate', 'endDate', 'isActive', 'note'],
+      },
+      {
+        sheetName: 'attendances',
+        resource: 'attendances',
+        parentField: 'staffId',
+        parentCodeColumn: 'staffCode',
+        columns: ['recordId', 'staffCode', 'branchId', 'date', 'checkIn', 'checkOut', 'status', 'note'],
+      },
+      {
+        sheetName: 'leave-requests',
+        resource: 'leave-requests',
+        parentField: 'staffId',
+        parentCodeColumn: 'staffCode',
+        columns: ['recordId', 'staffCode', 'branchId', 'startDate', 'endDate', 'leaveType', 'status', 'reason', 'approvedById'],
+      },
+      {
+        sheetName: 'payrolls',
+        resource: 'payrolls',
+        parentField: 'staffId',
+        parentCodeColumn: 'staffCode',
+        columns: ['recordId', 'staffCode', 'branchId', 'month', 'year', 'baseSalary', 'workingDays', 'actualDays', 'overtimeHours', 'bonus', 'deduction', 'netSalary', 'status', 'note'],
+      },
+      {
+        sheetName: 'work-schedules',
+        resource: 'work-schedules',
+        parentField: 'staffId',
+        parentCodeColumn: 'staffCode',
+        columns: ['recordId', 'staffCode', 'branchId', 'workDate', 'shiftLabel', 'startTime', 'endTime', 'room', 'status', 'note'],
+      },
+      {
+        sheetName: 'staff-rewards',
+        resource: 'staff-rewards',
+        parentField: 'staffId',
+        parentCodeColumn: 'staffCode',
+        columns: ['recordId', 'staffCode', 'branchId', 'type', 'title', 'description', 'date', 'issuedBy', 'amount', 'note'],
+      },
+      {
+        sheetName: 'staff-trainings',
+        resource: 'staff-trainings',
+        parentField: 'staffId',
+        parentCodeColumn: 'staffCode',
+        columns: ['recordId', 'staffCode', 'branchId', 'trainingName', 'provider', 'startDate', 'endDate', 'certificateNumber', 'expiryDate', 'status', 'note'],
+      },
+      {
+        sheetName: 'performance-reviews',
+        resource: 'performance-reviews',
+        parentField: 'staffId',
+        parentCodeColumn: 'staffCode',
+        columns: ['recordId', 'staffCode', 'branchId', 'reviewMonth', 'reviewYear', 'reviewerId', 'score', 'status', 'strengths', 'improvements', 'goals', 'note'],
+      },
+      {
+        sheetName: 'position-histories',
+        resource: 'position-histories',
+        parentField: 'staffId',
+        parentCodeColumn: 'staffCode',
+        columns: ['recordId', 'staffCode', 'branchId', 'fromPosition', 'toPosition', 'fromDepartmentId', 'toDepartmentId', 'effectiveDate', 'reason', 'note'],
+      },
+      {
+        sheetName: 'branch-role-assignments',
+        resource: 'branch-role-assignments',
+        parentField: 'staffId',
+        parentCodeColumn: 'staffCode',
+        columns: ['recordId', 'staffCode', 'userId', 'branchId', 'roleName', 'roleKeys', 'isActive'],
+      },
+      {
+        sheetName: 'user-accounts',
+        resource: 'user-accounts',
+        parentField: 'staffId',
+        parentCodeColumn: 'staffCode',
+        matchField: 'email',
+        columns: ['recordId', 'staffCode', 'email', 'password', 'fullName', 'role', 'branchId'],
+      },
+    ],
+  },
+};
+
+const FIELD_RELATION_RESOURCES: Record<string, string> = {
+  branchId: 'branches',
+  defaultBranchId: 'branches',
+  departmentId: 'departments',
+  fromDepartmentId: 'departments',
+  toDepartmentId: 'departments',
+  managerStaffId: 'staff',
+  assignedStaff: 'staff',
+  staffId: 'staff',
+  assignedStaffId: 'staff',
+  ownerStaffId: 'staff',
+  consultantStaffId: 'staff',
+  doctorStaffId: 'staff',
+  performerStaffId: 'staff',
+  approvedById: 'staff',
+  reviewerId: 'staff',
+  customerId: 'customers',
+  convertedCustomerId: 'customers',
+  leadId: 'leads',
+  userId: 'user-accounts',
+  invoiceId: 'invoices',
+};
+
+const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
+  branches: 'slug',
+  departments: 'code',
+  staff: 'code',
+  customers: 'code',
+  leads: 'code',
+  suppliers: 'code',
+  products: 'code',
+  invoices: 'code',
+  'user-accounts': 'email',
+};
+
 @Injectable()
 export class RecordsService {
   constructor(
@@ -216,6 +435,75 @@ export class RecordsService {
     const record = await this.findRaw(resource, id);
     await this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
     return { data: this.protect(resource, record, request) };
+  }
+
+  async exportImportBundle(resource: string, template = false, user?: AuthUser, request?: RequestContext) {
+    const config = this.bundleConfig(resource);
+    await this.assertPermission(user, config.main.resource, 'view');
+
+    const mainRows = template ? [] : await this.listBundleRows(config.main.resource, user);
+    const mainCodeById = new Map(mainRows.map((row) => [String(row.id), String(row.code || '')]));
+    const sheets = [
+      {
+        name: config.main.sheetName,
+        resource: config.main.resource,
+        columns: config.main.columns,
+        rows: await this.mapBundleExportRows(config.main, mainRows, mainCodeById, request),
+      },
+    ];
+
+    for (const sheetConfig of config.related) {
+      const relatedRows = template || mainRows.length === 0
+        ? []
+        : await this.listRelatedBundleRows(sheetConfig, mainRows.map((row) => String(row.id)), user);
+      sheets.push({
+        name: sheetConfig.sheetName,
+        resource: sheetConfig.resource,
+        columns: sheetConfig.columns,
+        rows: await this.mapBundleExportRows(sheetConfig, relatedRows, mainCodeById, request),
+      });
+    }
+
+    return {
+      data: {
+        resource,
+        template,
+        sheets,
+      },
+    };
+  }
+
+  async importBundle(resource: string, sheets: Record<string, Array<Record<string, unknown>>>, user: AuthUser) {
+    const config = this.bundleConfig(resource);
+    const mainSheetRows = Array.isArray(sheets?.[config.main.sheetName]) ? sheets[config.main.sheetName] : [];
+    const parentCache = new Map<string, ConfigurableEntity>();
+
+    for (const row of mainSheetRows) {
+      const saved = await this.upsertBundleMainRow(config.main, row, user);
+      parentCache.set(String((saved as unknown as Record<string, unknown>).code || ''), saved as ConfigurableEntity);
+    }
+
+    for (const sheetConfig of config.related) {
+      const rows = Array.isArray(sheets?.[sheetConfig.sheetName]) ? sheets[sheetConfig.sheetName] : [];
+      for (const row of rows) {
+        if (this.bundleRowIsEmpty(row, sheetConfig.columns)) continue;
+        await this.upsertBundleRelatedRow(resource as BundleRootResource, sheetConfig, row, parentCache, user);
+      }
+    }
+
+    return {
+      data: {
+        resource,
+        importedSheets: [
+          { name: config.main.sheetName, count: mainSheetRows.filter((row) => !this.bundleRowIsEmpty(row, config.main.columns)).length },
+          ...config.related.map((sheetConfig) => ({
+            name: sheetConfig.sheetName,
+            count: (Array.isArray(sheets?.[sheetConfig.sheetName]) ? sheets[sheetConfig.sheetName] : [])
+              .filter((row) => !this.bundleRowIsEmpty(row, sheetConfig.columns)).length,
+          })),
+        ],
+      },
+    };
   }
 
   async create(resource: string, payload: Record<string, unknown>, user: AuthUser) {
@@ -379,6 +667,237 @@ export class RecordsService {
       'file-folders': 'folder',
     };
     return labels[resource] || resource;
+  }
+
+  private bundleConfig(resource: string) {
+    const config = IMPORT_BUNDLE_CONFIGS[resource as BundleRootResource];
+    if (!config) throw new BadRequestException('Module nay chua ho tro import/export bundle');
+    return config;
+  }
+
+  private async listBundleRows(resource: string, user?: AuthUser) {
+    const where = this.applyBranchScope(resource, {}, user) as FindOptionsWhere<ConfigurableEntity>;
+    return this.repository(resource).find({
+      where,
+      order: { createdAt: 'ASC' },
+      take: 5000,
+    });
+  }
+
+  private async listRelatedBundleRows(sheetConfig: ImportBundleSheetConfig, parentIds: string[], user?: AuthUser) {
+    if (parentIds.length === 0 || !sheetConfig.parentField) return [];
+    const scopedWhere = this.applyBranchScope(
+      sheetConfig.resource,
+      { [sheetConfig.parentField]: In(parentIds) } as FindOptionsWhere<ConfigurableEntity>,
+      user,
+    ) as FindOptionsWhere<ConfigurableEntity>;
+    return this.repository(sheetConfig.resource).find({
+      where: scopedWhere,
+      order: { createdAt: 'ASC' },
+      take: 10000,
+    });
+  }
+
+  private async mapBundleExportRows(
+    sheetConfig: ImportBundleSheetConfig,
+    rows: Array<Record<string, unknown>>,
+    parentCodeById: Map<string, string>,
+    request?: RequestContext,
+  ) {
+    const relatedValueCache = new Map<string, string>();
+    return Promise.all(
+      rows.map(async (row) => {
+        const exported: Record<string, unknown> = {};
+        for (const column of sheetConfig.columns) {
+          if (column === 'recordId') {
+            exported[column] = row.id || '';
+            continue;
+          }
+          if (sheetConfig.parentField && sheetConfig.parentCodeColumn && column === sheetConfig.parentCodeColumn) {
+            exported[column] = parentCodeById.get(String(row[sheetConfig.parentField] || '')) || '';
+            continue;
+          }
+          exported[column] = await this.exportBundleColumnValue(
+            sheetConfig.resource,
+            column,
+            row[column],
+            relatedValueCache,
+            request,
+          );
+        }
+        return exported;
+      }),
+    );
+  }
+
+  private async exportBundleColumnValue(
+    resource: string,
+    column: string,
+    value: unknown,
+    cache: Map<string, string>,
+    request?: RequestContext,
+  ) {
+    if (value === undefined || value === null || value === '') return '';
+    const relationResource = FIELD_RELATION_RESOURCES[column];
+    if (relationResource && typeof value === 'string') {
+      const external = await this.resolveExternalKeyForRecord(relationResource, value, cache, request);
+      return external || value;
+    }
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+    if (value instanceof Date) {
+      return this.formatBundleDateValue(resource, column, value);
+    }
+    return value;
+  }
+
+  private formatBundleDateValue(resource: string, column: string, value: Date) {
+    const iso = value.toISOString();
+    const dateColumns = new Set([
+      'joinedAt', 'dateOfBirth', 'idCardIssuedDate', 'orderDate', 'operationDate', 'workDate', 'date', 'startDate', 'endDate',
+      'effectiveDate', 'expiryDate',
+    ]);
+    const datetimeColumns = new Set(['startTime', 'endTime', 'consultedAt', 'capturedAt', 'scheduledAt']);
+    if (dateColumns.has(column)) return iso.slice(0, 10);
+    if (datetimeColumns.has(column)) return iso.slice(0, 16);
+    if (resource === 'lead-activities' && column === 'scheduledAt') return iso.slice(0, 16);
+    return iso;
+  }
+
+  private async resolveExternalKeyForRecord(resource: string, id: string, cache: Map<string, string>, request?: RequestContext) {
+    const cacheKey = `${resource}:${id}`;
+    if (cache.has(cacheKey)) return cache.get(cacheKey) || '';
+    const field = RESOURCE_EXTERNAL_KEYS[resource];
+    if (!field) return id;
+    const record = await this.repository(resource).findOne({ where: { id } });
+    if (!record) return id;
+    const protectedRecord = this.protect(resource, record as ConfigurableEntity, request) as Record<string, unknown>;
+    const value = String(protectedRecord[field] || (record as Record<string, unknown>)[field] || '');
+    cache.set(cacheKey, value);
+    return value;
+  }
+
+  private bundleRowIsEmpty(row: Record<string, unknown>, columns: string[]) {
+    return columns.every((column) => {
+      const value = row?.[column];
+      if (Array.isArray(value)) return value.length === 0;
+      return value === undefined || value === null || String(value).trim() === '';
+    });
+  }
+
+  private async upsertBundleMainRow(sheetConfig: ImportBundleSheetConfig, row: Record<string, unknown>, user: AuthUser) {
+    const code = String(row.code || '').trim();
+    if (!code) {
+      throw new BadRequestException(`Sheet ${sheetConfig.sheetName} bat buoc co cot code`);
+    }
+    const existing = await this.repository(sheetConfig.resource).findOne({ where: { code } });
+    const payload = await this.buildBundlePayload(sheetConfig, row);
+    if (existing) {
+      const response = await this.update(sheetConfig.resource, String(existing.id), payload, user);
+      return response.data as ConfigurableEntity;
+    }
+    const response = await this.create(sheetConfig.resource, payload, user);
+    return response.data as ConfigurableEntity;
+  }
+
+  private async upsertBundleRelatedRow(
+    rootResource: BundleRootResource,
+    sheetConfig: ImportBundleSheetConfig,
+    row: Record<string, unknown>,
+    parentCache: Map<string, ConfigurableEntity>,
+    user: AuthUser,
+  ) {
+    const parentCodeColumn = sheetConfig.parentCodeColumn || 'parentCode';
+    const parentCode = String(row[parentCodeColumn] || '').trim();
+    if (!parentCode) {
+      throw new BadRequestException(`Sheet ${sheetConfig.sheetName} bat buoc co cot ${parentCodeColumn}`);
+    }
+
+    const parentRecord = await this.findBundleParentByCode(rootResource, parentCode, parentCache);
+    if (!parentRecord) {
+      throw new NotFoundException(`Khong tim thay ${this.resourceLabel(rootResource)} voi code ${parentCode}`);
+    }
+
+    const payload = await this.buildBundlePayload(sheetConfig, row, parentRecord);
+    const recordId = String(row.recordId || '').trim();
+    if (recordId) {
+      const response = await this.update(sheetConfig.resource, recordId, payload, user);
+      return response.data;
+    }
+
+    if (sheetConfig.matchField) {
+      const matchValue = payload[sheetConfig.matchField];
+      if (matchValue !== undefined && matchValue !== null && String(matchValue).trim() !== '') {
+        const where: Record<string, unknown> = {
+          [sheetConfig.matchField]: matchValue,
+        };
+        if (sheetConfig.parentField) {
+          where[sheetConfig.parentField] = String((parentRecord as unknown as Record<string, unknown>).id);
+        }
+        const existing = await this.repository(sheetConfig.resource).findOne({ where });
+        if (existing) {
+          const response = await this.update(sheetConfig.resource, String(existing.id), payload, user);
+          return response.data;
+        }
+      }
+    }
+
+    const response = await this.create(sheetConfig.resource, payload, user);
+    return response.data;
+  }
+
+  private async findBundleParentByCode(
+    rootResource: BundleRootResource,
+    code: string,
+    parentCache: Map<string, ConfigurableEntity>,
+  ) {
+    const cached = parentCache.get(code);
+    if (cached) return cached;
+    const record = await this.repository(rootResource).findOne({ where: { code } });
+    if (record) parentCache.set(code, record as ConfigurableEntity);
+    return record as ConfigurableEntity | null;
+  }
+
+  private async buildBundlePayload(
+    sheetConfig: ImportBundleSheetConfig,
+    row: Record<string, unknown>,
+    parentRecord?: ConfigurableEntity,
+  ) {
+    const payload: Record<string, unknown> = {};
+    for (const column of sheetConfig.columns) {
+      if (column === 'recordId') continue;
+      if (sheetConfig.parentCodeColumn && column === sheetConfig.parentCodeColumn) continue;
+      const rawValue = row[column];
+      if (rawValue === undefined || rawValue === null || (typeof rawValue === 'string' && rawValue.trim() === '')) continue;
+      payload[column] = await this.resolveBundleImportValue(column, rawValue);
+    }
+    if (sheetConfig.parentField && parentRecord) {
+      payload[sheetConfig.parentField] = String(parentRecord.id);
+    }
+    return payload;
+  }
+
+  private async resolveBundleImportValue(column: string, rawValue: unknown) {
+    const relationResource = FIELD_RELATION_RESOURCES[column];
+    if (!relationResource) return rawValue;
+    if (Array.isArray(rawValue)) {
+      return Promise.all(rawValue.map((value) => this.resolveBundleRelationValue(relationResource, value)));
+    }
+    return this.resolveBundleRelationValue(relationResource, rawValue);
+  }
+
+  private async resolveBundleRelationValue(resource: string, rawValue: unknown) {
+    const normalized = String(rawValue || '').trim();
+    if (!normalized) return undefined;
+    const field = RESOURCE_EXTERNAL_KEYS[resource];
+    if (!field) return normalized;
+    const repository = this.repository(resource);
+    const record = await repository.findOne({ where: { [field]: normalized } as Record<string, unknown> });
+    if (!record) {
+      throw new NotFoundException(`Khong tim thay lien ket ${resource} voi gia tri ${normalized}`);
+    }
+    return String((record as Record<string, unknown>).id);
   }
 
   async uploadFiles(files: any[], payload: { folderId?: string; title?: string; note?: string }, user: AuthUser, request?: RequestContext) {

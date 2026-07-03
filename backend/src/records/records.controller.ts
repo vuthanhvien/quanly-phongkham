@@ -64,6 +64,24 @@ export class RecordsController {
     return this.records.find(resource, id, request.user, request);
   }
 
+  @Get('records/:resource/import-bundle')
+  exportImportBundle(
+    @Param('resource') resource: string,
+    @Query('template') template?: string,
+    @Request() request?: ExpressRequest & { user?: AuthUser },
+  ) {
+    return this.records.exportImportBundle(resource, template === '1', request?.user, request);
+  }
+
+  @Post('records/:resource/import-bundle')
+  importBundle(
+    @Param('resource') resource: string,
+    @Body() payload: { sheets?: Record<string, Array<Record<string, unknown>>> },
+    @Request() request: { user: AuthUser },
+  ) {
+    return this.records.importBundle(resource, payload?.sheets || {}, request.user);
+  }
+
   @Post('records/:resource')
   create(
     @Param('resource') resource: string,

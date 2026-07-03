@@ -221,8 +221,8 @@ export class BranchRoleAssignment extends ConfigurableEntity {
   @Column({ nullable: true })
   roleName: string;
 
-  @Column({ type: 'json', default: [] })
-  roleKeys: string[];
+  @Column({ type: 'simple-json', nullable: true })
+  roleKeys: string[] = [];
 
   @Column({ default: true })
   isActive: boolean;
@@ -359,7 +359,7 @@ export class ZaloAccount extends ConfigurableEntity {
   @Column({ default: false })
   listenerActive: boolean;
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   sessionData?: Record<string, unknown>;
 
   @Column({ type: 'timestamp', nullable: true })
@@ -448,8 +448,8 @@ export class ZaloMessage extends ConfigurableEntity {
   @Column({ type: 'text', nullable: true })
   contentText?: string;
 
-  @Column({ type: 'json', default: {} })
-  contentJson: Record<string, unknown>;
+  @Column({ type: 'simple-json', nullable: true })
+  contentJson: Record<string, unknown> = {};
 
   @Column({ type: 'timestamp' })
   sentAt: Date;
@@ -919,7 +919,7 @@ export class CustomFieldDefinition {
   @Column({ default: false })
   required: boolean;
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   options?: string[];
 
   @Column({ nullable: true })
@@ -949,8 +949,8 @@ export class ViewSetting {
   @Column({ default: 'ALL' })
   role: string;
 
-  @Column({ type: 'json', default: {} })
-  config: Record<string, unknown>;
+  @Column({ type: 'simple-json', nullable: true })
+  config: Record<string, unknown> = {};
 
   @UpdateDateColumn()
   updatedAt: Date;
@@ -1003,8 +1003,8 @@ export class LandingPage {
   @Column({ type: 'text', nullable: true })
   seoDescription?: string;
 
-  @Column({ type: 'json', default: [] })
-  blocks: Record<string, unknown>[];
+  @Column({ type: 'simple-json', nullable: true })
+  blocks: Record<string, unknown>[] = [];
 
   @Column({ default: false })
   isPublished: boolean;
@@ -1141,8 +1141,8 @@ export class LandingFormSubmission {
   @Column({ nullable: true })
   formName?: string;
 
-  @Column({ type: 'json', default: {} })
-  payload: Record<string, unknown>;
+  @Column({ type: 'simple-json', nullable: true })
+  payload: Record<string, unknown> = {};
 
   @CreateDateColumn()
   createdAt: Date;
@@ -1593,8 +1593,8 @@ export class LandingGlobalSetting {
   headerCtaHref?: string;
 
   // Menu
-  @Column({ type: 'json', default: [] })
-  menuItems: Record<string, unknown>[];
+  @Column({ type: 'simple-json', nullable: true })
+  menuItems: Record<string, unknown>[] = [];
 
   // Footer
   @Column({ nullable: true })
@@ -1606,11 +1606,11 @@ export class LandingGlobalSetting {
   @Column({ type: 'text', nullable: true })
   footerCopyright?: string;
 
-  @Column({ type: 'json', default: [] })
-  footerColumns: Record<string, unknown>[];
+  @Column({ type: 'simple-json', nullable: true })
+  footerColumns: Record<string, unknown>[] = [];
 
-  @Column({ type: 'json', default: [] })
-  footerSocialLinks: Record<string, unknown>[];
+  @Column({ type: 'simple-json', nullable: true })
+  footerSocialLinks: Record<string, unknown>[] = [];
 
   @UpdateDateColumn()
   updatedAt: Date;
@@ -1636,7 +1636,7 @@ export class AuditLog {
   @Column({ nullable: true })
   targetId?: string;
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   payload?: Record<string, unknown>;
 
   @CreateDateColumn()

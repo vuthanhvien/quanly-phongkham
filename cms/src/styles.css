@@ -1779,6 +1779,41 @@ textarea.ant-input {
   min-width: 240px;
 }
 
+.calendar-quick-actions {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.calendar-quick-action {
+  background: color-mix(in srgb, var(--app-surface) 95%, var(--app-primary));
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  color: var(--app-text);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  text-align: left;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.calendar-quick-action:hover {
+  border-color: color-mix(in srgb, var(--app-primary) 36%, var(--app-line));
+  box-shadow: var(--app-shadow-soft);
+  transform: translateY(-1px);
+}
+
+.calendar-quick-action strong {
+  color: var(--app-title);
+}
+
+.calendar-quick-action span {
+  color: var(--app-text-soft);
+  font-size: 12px;
+}
+
 .calendar-kpi-card .ant-card-body {
   display: grid;
   gap: 4px;
@@ -2000,6 +2035,10 @@ textarea.ant-input {
   }
 
   .calendar-week-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-quick-actions {
     grid-template-columns: 1fr;
   }
 
