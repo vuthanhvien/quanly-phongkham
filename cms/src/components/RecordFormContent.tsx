@@ -28,6 +28,7 @@ import { FileUploadPanel } from "./FileUploadPanel"
 import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
 import { loadRelationOptions, LookupMap } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
+import { currentLocalDate, currentLocalDateTime, normalizeDateTimeValueForInput, normalizeDateValueForInput } from "../utils/datetime"
 import { buildFolderPathMap, buildFolderTree, FolderTreeNode, normalizeFileFolderRows } from "../utils/fileFolders"
 import {
   getFieldCatalog,
@@ -92,12 +93,21 @@ export function RecordFormContent({
       recordQuery.query?.data?.data ||
       recordQuery.data?.data?.data
     if (data) {
-      form.setFieldsValue({ ...data, ...(data.customFields || {}) })
+      const normalizedData = { ...data, ...(data.customFields || {}) } as Record<string, unknown>
+      fields.forEach((field) => {
+        if (field.type === "date" && normalizedData[field.key]) {
+          normalizedData[field.key] = normalizeDateValueForInput(normalizedData[field.key])
+        }
+        if (field.type === "datetime" && normalizedData[field.key]) {
+          normalizedData[field.key] = normalizeDateTimeValueForInput(normalizedData[field.key])
+        }
+      })
+      form.setFieldsValue(normalizedData)
       return
     }
     if (!editing && fields.length > 0) {
-      const todayDate = new Date().toISOString().slice(0, 10)
-      const todayDatetime = new Date().toISOString().slice(0, 16)
+      const todayDate = currentLocalDate()
+      const todayDatetime = currentLocalDateTime()
       form.setFieldsValue(
         {
           ...Object.fromEntries(

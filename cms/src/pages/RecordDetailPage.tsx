@@ -55,6 +55,11 @@ interface RelatedRecordDrawerState {
   record: Record<string, any> | null
 }
 
+interface RelatedRecordEditState {
+  block: RelatedBlock
+  recordId: string
+}
+
 export function RecordDetailPage() {
   const { resource = "customers", id = "" } = useParams()
   const navigate = useNavigate()
@@ -66,6 +71,7 @@ export function RecordDetailPage() {
   const [loading, setLoading] = useState(true)
   const [relatedDetail, setRelatedDetail] = useState<RelatedRecordDrawerState | null>(null)
   const [relatedDetailLoading, setRelatedDetailLoading] = useState(false)
+  const [relatedEdit, setRelatedEdit] = useState<RelatedRecordEditState | null>(null)
   const [quickCreateBlock, setQuickCreateBlock] = useState<RelatedBlock | null>(null)
   const { mutate: deleteRecord } = useDelete()
 
@@ -112,7 +118,10 @@ export function RecordDetailPage() {
           "ownerStaffId",
           "consultantStaffId",
           "doctorStaffId",
+          "picStaffId",
           "performerStaffId",
+          "roomId",
+          "equipmentId",
           "userId",
           "invoiceId",
           "convertedCustomerId",
@@ -271,9 +280,12 @@ export function RecordDetailPage() {
                             )}
                             {hasActionAccess(block.resource, "update") && (
                               <Tooltip title="Chỉnh sửa">
-                                <Link to={`/${block.resource}/${row.id}/edit`}>
-                                  <Button icon={<EditOutlined />} size="small" type="text" />
-                                </Link>
+                                <Button
+                                  icon={<EditOutlined />}
+                                  size="small"
+                                  type="text"
+                                  onClick={() => setRelatedEdit({ block, recordId: String(row.id) })}
+                                />
                               </Tooltip>
                             )}
                             {block.resource === "customers" && hasActionAccess(block.resource, "reveal-phone") && (
@@ -473,6 +485,47 @@ export function RecordDetailPage() {
           )
         )}
       </Drawer>
+
+      <Drawer
+        destroyOnClose
+        maskClosable={false}
+        open={Boolean(relatedEdit)}
+        placement="right"
+        title={relatedEdit ? `Chỉnh sửa ${entityLabels[relatedEdit.block.resource] || relatedEdit.block.resource}` : "Chỉnh sửa"}
+        width={relatedEdit?.block.resource === "service-orders" ? 980 : 620}
+        onClose={() => setRelatedEdit(null)}
+      >
+        {relatedEdit && (
+          relatedEdit.block.resource === "service-orders" ? (
+            <ServiceOrderForm
+              compact
+              id={relatedEdit.recordId}
+              onCancel={() => setRelatedEdit(null)}
+              onSuccess={() => {
+                setRelatedEdit(null)
+                void reloadRelatedBlocks()
+                if (relatedDetail?.record?.id === relatedEdit.recordId) {
+                  void openRelatedDetail(relatedEdit.block, relatedEdit.recordId)
+                }
+              }}
+            />
+          ) : (
+            <RecordFormContent
+              compact
+              id={relatedEdit.recordId}
+              resource={relatedEdit.block.resource}
+              onCancel={() => setRelatedEdit(null)}
+              onSuccess={() => {
+                setRelatedEdit(null)
+                void reloadRelatedBlocks()
+                if (relatedDetail?.record?.id === relatedEdit.recordId) {
+                  void openRelatedDetail(relatedEdit.block, relatedEdit.recordId)
+                }
+              }}
+            />
+          )
+        )}
+      </Drawer>
     </>
   )
 
@@ -502,7 +555,10 @@ export function RecordDetailPage() {
       "ownerStaffId",
       "consultantStaffId",
       "doctorStaffId",
+      "picStaffId",
       "performerStaffId",
+      "roomId",
+      "equipmentId",
       "userId",
       "invoiceId",
       "convertedCustomerId",

@@ -19,6 +19,7 @@ import {
   CustomerImage,
   Customer,
   Department,
+  Equipment,
   Expense,
   FileFolder,
   ManagedFile,
@@ -31,6 +32,7 @@ import {
   PerformanceReview,
   PositionHistory,
   Product,
+  Room,
   ServiceOrder,
   ServiceOrderItem,
   Staff,
@@ -104,7 +106,7 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
         resource: 'appointments',
         parentField: 'customerId',
         parentCodeColumn: 'customerCode',
-        columns: ['recordId', 'customerCode', 'branchId', 'type', 'startTime', 'endTime', 'doctorName', 'room', 'equipment', 'status', 'note'],
+        columns: ['recordId', 'customerCode', 'branchId', 'type', 'startTime', 'endTime', 'doctorStaffId', 'roomId', 'equipmentId', 'picStaffId', 'status', 'note'],
       },
       {
         sheetName: 'medical-episodes',
@@ -212,7 +214,7 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
         resource: 'work-schedules',
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
-        columns: ['recordId', 'staffCode', 'branchId', 'workDate', 'shiftLabel', 'startTime', 'endTime', 'room', 'status', 'note'],
+        columns: ['recordId', 'staffCode', 'branchId', 'workDate', 'shiftLabel', 'startTime', 'endTime', 'roomId', 'status', 'note'],
       },
       {
         sheetName: 'staff-rewards',
@@ -267,6 +269,8 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   departmentId: 'departments',
   fromDepartmentId: 'departments',
   toDepartmentId: 'departments',
+  roomId: 'rooms',
+  equipmentId: 'equipments',
   managerStaffId: 'staff',
   assignedStaff: 'staff',
   staffId: 'staff',
@@ -274,6 +278,7 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   ownerStaffId: 'staff',
   consultantStaffId: 'staff',
   doctorStaffId: 'staff',
+  picStaffId: 'staff',
   performerStaffId: 'staff',
   approvedById: 'staff',
   reviewerId: 'staff',
@@ -287,6 +292,8 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
 const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
   branches: 'slug',
   departments: 'code',
+  rooms: 'code',
+  equipments: 'code',
   staff: 'code',
   customers: 'code',
   leads: 'code',
@@ -299,6 +306,8 @@ const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
 const RESOURCE_IMPORT_KEYS: Record<string, string> = {
   branches: 'slug',
   departments: 'code',
+  rooms: 'code',
+  equipments: 'code',
   staff: 'code',
   'branch-role-assignments': 'id',
   'branch-permissions': 'id',
@@ -336,6 +345,8 @@ export class RecordsService {
   constructor(
     @InjectRepository(Branch) private readonly branches: Repository<Branch>,
     @InjectRepository(Department) private readonly departments: Repository<Department>,
+    @InjectRepository(Room) private readonly rooms: Repository<Room>,
+    @InjectRepository(Equipment) private readonly equipments: Repository<Equipment>,
     @InjectRepository(Staff) private readonly staff: Repository<Staff>,
     @InjectRepository(BranchRoleAssignment) private readonly branchPermissions: Repository<BranchRoleAssignment>,
     @InjectRepository(User) private readonly users: Repository<User>,
@@ -377,6 +388,8 @@ export class RecordsService {
     const map: Record<string, ResourceRepository> = {
       branches: this.branches,
       departments: this.departments,
+      rooms: this.rooms,
+      equipments: this.equipments,
       staff: this.staff,
       'branch-role-assignments': this.branchPermissions,
       'branch-permissions': this.branchPermissions,
@@ -414,7 +427,15 @@ export class RecordsService {
     return repository;
   }
 
-  async list(resource: string, page = 1, pageSize = 20, search?: string, user?: AuthUser, request?: RequestContext) {
+  async list(
+    resource: string,
+    page = 1,
+    pageSize = 20,
+    search?: string,
+    filters: Record<string, string> = {},
+    user?: AuthUser,
+    request?: RequestContext,
+  ) {
     await this.assertPermission(user, resource, 'view');
     const repository = this.repository(resource);
     let where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[] = {};
@@ -427,19 +448,22 @@ export class RecordsService {
         products: ['code', 'name'],
         branches: ['name', 'slug'],
         departments: ['code', 'name'],
+        rooms: ['code', 'name'],
+        equipments: ['code', 'name'],
         staff: ['code', 'fullName', 'email', 'phone'],
         consultations: ['summary', 'diagnosis', 'status'],
         'service-orders': ['code', 'serviceName', 'status'],
         'customer-images': ['title', 'mediaType', 'diagnosisNote'],
         'file-folders': ['name', 'description'],
         files: ['title', 'originalName', 'mimeType', 'extension'],
-        'work-schedules': ['shiftLabel', 'room', 'status'],
+        'work-schedules': ['shiftLabel', 'status'],
         'branch-role-assignments': ['roleName'],
         'branch-permissions': ['roleName'],
         'user-accounts': ['email', 'fullName', 'role'],
       };
       where = (searchable[resource] || []).map((field) => ({ [field]: ILike(`%${search}%`) })) as FindOptionsWhere<ConfigurableEntity>[];
     }
+    where = await this.applyResourceFilters(resource, where, filters);
     where = this.applyBranchScope(resource, where, user);
     const [rows, total] = await repository.findAndCount({
       where,
@@ -723,6 +747,8 @@ export class RecordsService {
     const labels: Record<string, string> = {
       branches: 'chi nhánh',
       departments: 'phòng ban',
+      rooms: 'phòng',
+      equipments: 'máy móc',
       staff: 'nhân viên',
       customers: 'khách hàng',
       leads: 'lead',
@@ -939,7 +965,7 @@ export class RecordsService {
     }
     if (column === 'title') return `Tieu de mau ${context.index + 1}`;
     if (column === 'serviceName' || column === 'name' || column === 'trainingName') return `Mau ${column} ${context.index + 1}`;
-    if (column === 'doctorName' || column === 'issuedBy' || column === 'provider' || column === 'position' || column === 'toPosition' || column === 'fromPosition') {
+    if (column === 'issuedBy' || column === 'provider' || column === 'position' || column === 'toPosition' || column === 'fromPosition') {
       return `Gia tri mau ${context.index + 1}`;
     }
     if (column === 'source') return ['Facebook', 'Zalo', 'Website'][context.index % 3];
@@ -953,7 +979,6 @@ export class RecordsService {
     if (column === 'method') return ['CASH', 'TRANSFER', 'CARD'][context.index % 3];
     if (column === 'mediaType') return ['BEFORE', 'AFTER', 'PROGRESS'][context.index % 3];
     if (column === 'shiftLabel') return ['Ca sáng', 'Ca chiều'][context.index % 2];
-    if (column === 'room') return `P${(context.index % 8) + 1}`;
     if (column === 'imageUrl' || column === 'avatarUrl') return `https://picsum.photos/seed/${context.code.toLowerCase()}/1200/900`;
     if (column === 'checkIn') return '08:00';
     if (column === 'checkOut') return '17:00';
@@ -1467,6 +1492,46 @@ export class RecordsService {
     return value;
   }
 
+  private async applyResourceFilters(
+    resource: string,
+    where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
+    filters: Record<string, string>,
+  ) {
+    const entries = Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '');
+    if (entries.length === 0) return where;
+
+    if (resource === 'staff' && filters.type) {
+      const staffIds = await this.resolveStaffIdsByUserRole(filters.type);
+      const scoped = staffIds.length > 0
+        ? ({ id: In(staffIds) } as FindOptionsWhere<ConfigurableEntity>)
+        : ({ id: In(['__no_match__']) } as FindOptionsWhere<ConfigurableEntity>);
+      where = this.mergeWhere(where, scoped);
+    }
+
+    const directFilters = entries.filter(([key]) => !(resource === 'staff' && key === 'type'));
+    if (directFilters.length === 0) return where;
+
+    const scoped = Object.fromEntries(directFilters.map(([key, value]) => [key, value])) as FindOptionsWhere<ConfigurableEntity>;
+    return this.mergeWhere(where, scoped);
+  }
+
+  private mergeWhere(
+    where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
+    scoped: FindOptionsWhere<ConfigurableEntity>,
+  ) {
+    if (Array.isArray(where)) return where.length ? where.map((item) => ({ ...item, ...scoped })) : scoped;
+    return { ...where, ...scoped };
+  }
+
+  private async resolveStaffIdsByUserRole(role: string) {
+    const users = await this.users.find({
+      where: { role: String(role).trim().toUpperCase() },
+      select: ['staffId'],
+      take: 1000,
+    });
+    return users.map((item) => item.staffId).filter(Boolean) as string[];
+  }
+
   private async normalizeInput(resource: string, payload: Record<string, unknown>, creating = false) {
     if (resource !== 'user-accounts') return this.normalize(resource, payload);
     const value = { ...payload };
@@ -1747,7 +1812,7 @@ export class RecordsService {
   }
 
   private async ensureAppointmentAvailable(payload: Record<string, unknown>, ignoredId?: string) {
-    if (!payload.startTime || !payload.endTime || (!payload.doctorName && !payload.room)) return;
+    if (!payload.startTime || !payload.endTime || (!payload.doctorStaffId && !payload.roomId)) return;
     const existing = await this.appointments.find({
       where: {
         startTime: LessThan(new Date(String(payload.endTime))),
@@ -1755,7 +1820,12 @@ export class RecordsService {
       },
     });
     const conflict = existing.find(
-      (item) => item.id !== ignoredId && (item.doctorName === payload.doctorName || item.room === payload.room),
+      (item) =>
+        item.id !== ignoredId &&
+        (
+          (payload.doctorStaffId && item.doctorStaffId === payload.doctorStaffId) ||
+          (payload.roomId && item.roomId === payload.roomId)
+        ),
     );
     if (conflict) throw new BadRequestException('Bac si hoac phong da co lich trong khung gio nay');
   }
@@ -1825,6 +1895,8 @@ export class RecordsService {
     const map: Record<string, string> = {
       branches: 'id',
       departments: 'branchId',
+      rooms: 'branchId',
+      equipments: 'branchId',
       staff: 'defaultBranchId',
       'branch-role-assignments': 'branchId',
       'branch-permissions': 'branchId',

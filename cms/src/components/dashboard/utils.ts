@@ -1,4 +1,5 @@
 import dayjs from "dayjs"
+import { parseClinicDateTime } from "../../utils/datetime"
 
 export const EMPTY_LIST = { data: [], total: 0 }
 
@@ -20,16 +21,14 @@ export function parseAmount(value: unknown) {
 
 export function isSameDay(value: unknown, selectedDate = dayjs()) {
   if (!value) return false
-  const parsed = dayjs(
-    typeof value === "string" || typeof value === "number" || value instanceof Date
-      ? value
-      : String(value),
-  )
+  const parsed = parseClinicDateTime(value)
   return parsed.isValid() && parsed.isSame(selectedDate, "day")
 }
 
 export function formatEventTime(value: string, end?: string) {
-  const startTime = dayjs(value).isValid() ? dayjs(value).format("HH:mm") : "--:--"
-  if (!end || !dayjs(end).isValid()) return startTime
-  return `${startTime} - ${dayjs(end).format("HH:mm")}`
+  const start = parseClinicDateTime(value)
+  const finish = end ? parseClinicDateTime(end) : null
+  const startTime = start.isValid() ? start.format("HH:mm") : "--:--"
+  if (!finish?.isValid()) return startTime
+  return `${startTime} - ${finish.format("HH:mm")}`
 }

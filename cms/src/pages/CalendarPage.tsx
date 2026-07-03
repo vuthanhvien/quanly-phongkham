@@ -16,6 +16,7 @@ import { RecordFormContent } from "../components/RecordFormContent"
 import { getFieldLabel } from "../models"
 import { loadRelationOptions, type LookupMap } from "../relations"
 import { formatEventTime } from "../components/dashboard/utils"
+import { buildLocalDateTime, parseClinicDateTime } from "../utils/datetime"
 
 type CalendarMode = "day" | "week" | "month"
 type PlannerEventType = "appointment" | "schedule" | "leave" | "attendance"
@@ -117,7 +118,7 @@ export function CalendarPage() {
       fetchListSafe<Record<string, any>>("work-schedules"),
       fetchListSafe<Record<string, any>>("leave-requests"),
       fetchListSafe<Record<string, any>>("attendances"),
-      loadRelationOptions(["branchId", "staffId", "customerId"]).catch(() => ({} as LookupMap)),
+      loadRelationOptions(["branchId", "staffId", "customerId", "doctorStaffId", "picStaffId", "roomId", "equipmentId"]).catch(() => ({} as LookupMap)),
     ])
 
     setLookups(relationLookups)
@@ -138,8 +139,8 @@ export function CalendarPage() {
   const selectedEvents = useMemo(
     () =>
       filteredEvents
-        .filter((item) => dayjs(item.start).isSame(selectedDate, "day"))
-        .sort((left, right) => dayjs(left.start).valueOf() - dayjs(right.start).valueOf()),
+        .filter((item) => parseClinicDateTime(item.start).isSame(selectedDate, "day"))
+        .sort((left, right) => parseClinicDateTime(left.start).valueOf() - parseClinicDateTime(right.start).valueOf()),
     [filteredEvents, selectedDate],
   )
 
@@ -149,7 +150,7 @@ export function CalendarPage() {
   }, [selectedDate])
 
   const weekEvents = useMemo(
-    () => filteredEvents.filter((item) => dayjs(item.start).isSame(selectedDate, "week")),
+    () => filteredEvents.filter((item) => parseClinicDateTime(item.start).isSame(selectedDate, "week")),
     [filteredEvents, selectedDate],
   )
 
@@ -214,21 +215,6 @@ export function CalendarPage() {
             Quản lý booking với khách, ca làm, nghỉ phép và chấm công trên cùng một màn hình.
           </Typography.Text>
         </div>
-        <Space wrap>
-          {visibleQuickActions.slice(0, 2).map((item) => (
-            <Button
-              key={item.key}
-              icon={<PlusOutlined />}
-              type="primary"
-              onClick={() => setQuickCreateResource(item.key)}
-            >
-              {item.title}
-            </Button>
-          ))}
-          <Button onClick={() => navigate("/appointments")}>Mở booking</Button>
-          <Button onClick={() => navigate("/work-schedules")}>Mở lịch làm việc</Button>
-          <Button onClick={() => navigate("/leave-requests")}>Mở nghỉ phép</Button>
-        </Space>
       </div>
 
       <div className="calendar-planner-layout">
@@ -320,8 +306,8 @@ export function CalendarPage() {
               <div className="calendar-week-grid">
                 {weekDays.map((date) => {
                   const dayEvents = weekEvents
-                    .filter((item) => dayjs(item.start).isSame(date, "day"))
-                    .sort((left, right) => dayjs(left.start).valueOf() - dayjs(right.start).valueOf())
+                    .filter((item) => parseClinicDateTime(item.start).isSame(date, "day"))
+                    .sort((left, right) => parseClinicDateTime(left.start).valueOf() - parseClinicDateTime(right.start).valueOf())
                   return (
                     <button
                       key={date.format("YYYY-MM-DD")}
@@ -477,7 +463,7 @@ export function CalendarPage() {
 }
 
 function renderMonthCell(value: Dayjs, events: PlannerEvent[]) {
-  const dayEvents = events.filter((item) => dayjs(item.start).isSame(value, "day"))
+  const dayEvents = events.filter((item) => parseClinicDateTime(item.start).isSame(value, "day"))
   return (
     <div className="calendar-month-cell">
       <Typography.Text strong>{value.date()}</Typography.Text>
@@ -563,16 +549,16 @@ function buildQuickCreateInitialValues(resource: QuickCreateResource, selectedDa
       return {
         type: "CONSULTATION",
         status: "SCHEDULED",
-        startTime: selectedDate.hour(9).minute(0).format("YYYY-MM-DDTHH:mm"),
-        endTime: selectedDate.hour(10).minute(0).format("YYYY-MM-DDTHH:mm"),
+        startTime: buildLocalDateTime(selectedDate, 9, 0),
+        endTime: buildLocalDateTime(selectedDate, 10, 0),
       }
     case "work-schedules":
       return {
         workDate: selectedDay,
         shiftLabel: "Ca sáng",
         status: "PLANNED",
-        startTime: selectedDate.hour(8).minute(0).format("YYYY-MM-DDTHH:mm"),
-        endTime: selectedDate.hour(17).minute(0).format("YYYY-MM-DDTHH:mm"),
+        startTime: buildLocalDateTime(selectedDate, 8, 0),
+        endTime: buildLocalDateTime(selectedDate, 17, 0),
       }
     case "leave-requests":
       return {
@@ -607,14 +593,20 @@ function buildPlannerEvents({
     id: String(item.id),
     resource: "appointments",
     type: "appointment",
-    title: `${lookups.customers?.[item.customerId] || item.customerId || "Khách hàng"}${item.doctorName ? ` · ${item.doctorName}` : ""}`,
+    title: `${lookups.customers?.[item.customerId] || item.customerId || "Khách hàng"}${item.doctorStaffId ? ` · ${lookups["staff-doctor"]?.[item.doctorStaffId] || lookups.staff?.[item.doctorStaffId] || item.doctorStaffId}` : ""}`,
     start: String(item.startTime || item.createdAt || ""),
     end: item.endTime ? String(item.endTime) : undefined,
     branchId: item.branchId ? String(item.branchId) : undefined,
     customerId: item.customerId ? String(item.customerId) : undefined,
+    staffId: item.picStaffId ? String(item.picStaffId) : item.doctorStaffId ? String(item.doctorStaffId) : undefined,
     tone: EVENT_TYPE_COLOR.appointment,
     statusLabel: getFieldLabel("appointments", "status", String(item.status || "SCHEDULED")),
-    summary: [getFieldLabel("appointments", "type", String(item.type || "CONSULTATION")), item.room, item.equipment].filter(Boolean).join(" | "),
+    summary: [
+      getFieldLabel("appointments", "type", String(item.type || "CONSULTATION")),
+      item.roomId ? lookups.rooms?.[item.roomId] || item.roomId : null,
+      item.equipmentId ? lookups.equipments?.[item.equipmentId] || item.equipmentId : null,
+      item.picStaffId ? `PIC: ${lookups["staff-staff"]?.[item.picStaffId] || lookups.staff?.[item.picStaffId] || item.picStaffId}` : null,
+    ].filter(Boolean).join(" | "),
   }))
 
   const scheduleEvents: PlannerEvent[] = workSchedules.map((item) => ({
@@ -628,7 +620,7 @@ function buildPlannerEvents({
     staffId: item.staffId ? String(item.staffId) : undefined,
     tone: EVENT_TYPE_COLOR.schedule,
     statusLabel: getFieldLabel("work-schedules", "status", String(item.status || "PLANNED")),
-    summary: [item.room, item.note].filter(Boolean).join(" | "),
+    summary: [item.roomId ? lookups.rooms?.[item.roomId] || item.roomId : null, item.note].filter(Boolean).join(" | "),
   }))
 
   const leaveEvents: PlannerEvent[] = leaveRequests.map((item) => ({
@@ -636,8 +628,8 @@ function buildPlannerEvents({
     resource: "leave-requests",
     type: "leave",
     title: `${lookups.staff?.[item.staffId] || item.staffId || "Nhân sự"} xin nghỉ`,
-    start: item.startDate ? dayjs(String(item.startDate)).startOf("day").toISOString() : String(item.createdAt || ""),
-    end: item.endDate ? dayjs(String(item.endDate)).endOf("day").toISOString() : undefined,
+    start: item.startDate ? `${String(item.startDate)}T00:00` : String(item.createdAt || ""),
+    end: item.endDate ? `${String(item.endDate)}T23:59` : undefined,
     branchId: item.branchId ? String(item.branchId) : undefined,
     staffId: item.staffId ? String(item.staffId) : undefined,
     tone: EVENT_TYPE_COLOR.leave,
@@ -661,13 +653,13 @@ function buildPlannerEvents({
 
   return [...appointmentEvents, ...scheduleEvents, ...leaveEvents, ...attendanceEvents]
     .filter((item) => item.start)
-    .sort((left, right) => dayjs(left.start).valueOf() - dayjs(right.start).valueOf())
+    .sort((left, right) => parseClinicDateTime(left.start).valueOf() - parseClinicDateTime(right.start).valueOf())
 }
 
 function buildAttendanceStart(item: Record<string, any>) {
   const dateValue = String(item.date || item.createdAt || "")
   if (!dateValue) return ""
-  if (!item.checkIn) return dayjs(dateValue).startOf("day").toISOString()
+  if (!item.checkIn) return `${dateValue}T00:00`
   const normalizedCheckIn = String(item.checkIn).slice(0, 5)
-  return dayjs(`${dateValue} ${normalizedCheckIn}`).toISOString()
+  return `${dateValue}T${normalizedCheckIn}`
 }

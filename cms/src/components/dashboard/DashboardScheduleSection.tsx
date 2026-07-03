@@ -8,6 +8,7 @@ import { Button, Calendar, Card, Col, List, Row, Segmented, Space, Tag, Typograp
 import dayjs, { type Dayjs } from "dayjs"
 import type { ActivityItem, CalendarMode, DashboardEvent } from "./types"
 import { formatEventTime } from "./utils"
+import { parseClinicDateTime } from "../../utils/datetime"
 
 export function DashboardScheduleSection({
   allEvents,
@@ -77,7 +78,7 @@ export function DashboardScheduleSection({
                     <div style={{ marginTop: 6, display: "grid", gap: 4 }}>
                       {dayEvents.slice(0, 3).map((event) => (
                         <Tag key={event.id} color={event.tone} style={{ marginInlineEnd: 0 }}>
-                          {dayjs(event.start).format("HH:mm")} {event.type === "appointment" ? "Hẹn" : "Ca"}
+                          {parseClinicDateTime(event.start).format("HH:mm")} {event.type === "appointment" ? "Hẹn" : "Ca"}
                         </Tag>
                       ))}
                       {dayEvents.length > 3 && (
@@ -91,7 +92,7 @@ export function DashboardScheduleSection({
           ) : calendarMode === "week" ? (
             <div className="dashboard-week-grid">
               {weekDays.map((date) => {
-                const dayEvents = weekEvents.filter((item) => dayjs(item.start).isSame(date, "day"))
+                const dayEvents = weekEvents.filter((item) => parseClinicDateTime(item.start).isSame(date, "day"))
                 return (
                   <div className="dashboard-week-card" key={date.format("YYYY-MM-DD")}>
                     <Typography.Text strong>{date.format("ddd DD/MM")}</Typography.Text>
@@ -143,7 +144,7 @@ export function DashboardScheduleSection({
               {selectedEvents.slice(0, 4).map((event) => (
                 <div key={event.id} className="pipeline-row">
                   <div>
-                    <Typography.Text strong>{dayjs(event.start).format("HH:mm")}</Typography.Text>
+                    <Typography.Text strong>{parseClinicDateTime(event.start).format("HH:mm")}</Typography.Text>
                     <Typography.Text type="secondary">{event.title}</Typography.Text>
                   </div>
                   <Tag className="soft-tag">{event.type === "appointment" ? "Lịch hẹn" : "Ca làm"}</Tag>
@@ -176,5 +177,5 @@ export function DashboardScheduleSection({
 }
 
 function selectedEventsForDate(events: DashboardEvent[], date: Dayjs) {
-  return events.filter((item) => dayjs(item.start).isSame(date, "day"))
+  return events.filter((item) => parseClinicDateTime(item.start).isSame(date, "day"))
 }

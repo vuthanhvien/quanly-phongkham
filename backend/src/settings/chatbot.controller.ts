@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { Public } from '../common/auth';
-import { Appointment, Customer, Treatment, WorkSchedule } from '../entities/entities';
+import { Appointment, Customer, Staff, Treatment, User, WorkSchedule } from '../entities/entities';
 import { SettingsService } from './settings.service';
 
 interface ChatMessage {
@@ -81,6 +81,8 @@ export class ChatbotController {
     @InjectRepository(Appointment) private readonly appointments: Repository<Appointment>,
     @InjectRepository(WorkSchedule) private readonly workSchedules: Repository<WorkSchedule>,
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
+    @InjectRepository(Staff) private readonly staff: Repository<Staff>,
+    @InjectRepository(User) private readonly users: Repository<User>,
   ) {}
 
   @Public()
@@ -188,6 +190,7 @@ export class ChatbotController {
     if (name === 'create_appointment') {
       const startTime = new Date(input.startTime);
       const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+      const doctorStaffId = input.doctorName ? await this.findDoctorStaffIdByName(input.doctorName) : undefined;
       const appointment = this.appointments.create({
         customerId: 'pending',
         branchId: 'default',
@@ -195,8 +198,8 @@ export class ChatbotController {
         startTime,
         endTime,
         status: 'SCHEDULED',
-        doctorName: input.doctorName,
-        note: `[Đặt qua chatbot] Tên: ${input.customerName}, SĐT: ${input.customerPhone}${input.note ? '. ' + input.note : ''}`,
+        doctorStaffId,
+        note: `[Đặt qua chatbot] Tên: ${input.customerName}, SĐT: ${input.customerPhone}${input.doctorName ? `. Bác sĩ mong muốn: ${input.doctorName}` : ''}${input.note ? '. ' + input.note : ''}`,
       });
       await this.appointments.save(appointment);
       return {
@@ -208,15 +211,14 @@ export class ChatbotController {
 
     if (name === 'check_doctor_schedule') {
       const date = input.date;
+      const doctorStaffId = input.doctorName ? await this.findDoctorStaffIdByName(input.doctorName) : undefined;
       const schedules = await this.workSchedules.find({
-        where: input.doctorName
-          ? { workDate: date, staffId: ILike(`%${input.doctorName}%`) }
-          : { workDate: date },
+        where: doctorStaffId ? { workDate: date, staffId: doctorStaffId } : { workDate: date },
         take: 10,
       });
 
       const bookedAppointments = await this.appointments.find({
-        where: input.doctorName ? { doctorName: ILike(`%${input.doctorName}%`) } : {},
+        where: doctorStaffId ? { doctorStaffId } : {},
         take: 20,
         order: { startTime: 'ASC' },
       });
@@ -236,7 +238,7 @@ export class ChatbotController {
         })),
         appointments: dayAppointments.map((a) => ({
           id: a.id,
-          doctor: a.doctorName,
+          doctor: a.doctorStaffId,
           start: a.startTime,
           end: a.endTime,
           status: a.status,
@@ -287,7 +289,7 @@ export class ChatbotController {
             endTime: a.endTime,
             status: a.status,
             type: a.type,
-            doctor: a.doctorName,
+            doctor: a.doctorStaffId,
             note: a.note,
           })),
         };
@@ -311,12 +313,29 @@ export class ChatbotController {
           endTime: a.endTime,
           status: a.status,
           type: a.type,
-          doctor: a.doctorName,
+          doctor: a.doctorStaffId,
           note: a.note,
         })),
       };
     }
 
     return { error: 'Unknown tool' };
+  }
+
+  private async findDoctorStaffIdByName(doctorName: string) {
+    const normalized = doctorName.trim();
+    if (!normalized) return undefined;
+
+    const doctorUsers = await this.users.find({
+      where: { role: 'DOCTOR' },
+      select: ['staffId'],
+      take: 500,
+    });
+    const staffIds = doctorUsers.map((item) => item.staffId).filter(Boolean) as string[];
+    if (!staffIds.length) return undefined;
+
+    const doctors = await this.staff.find({ where: staffIds.map((id) => ({ id })) });
+    const match = doctors.find((item) => item.fullName.toLowerCase().includes(normalized.toLowerCase()));
+    return match?.id;
   }
 }

@@ -1,6 +1,6 @@
 import { ArrowLeftOutlined, DownloadOutlined, ImportOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons"
 import { faker } from "@faker-js/faker"
-import { Alert, Button, Card, Space, Table, Tag, Typography, Upload, message } from "antd"
+import { Alert, Button, Card, Space, Table, Tabs, Tag, Typography, Upload, message } from "antd"
 import type { UploadProps } from "antd"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
@@ -24,7 +24,7 @@ interface BundleSheetDefinition {
 const BUNDLE_IMPORT_CONFIGS: Record<string, { related: BundleSheetDefinition[] }> = {
   customers: {
     related: [
-      { sheetName: "appointments", resource: "appointments", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "type", "startTime", "endTime", "doctorName", "room", "equipment", "status", "note"] },
+      { sheetName: "appointments", resource: "appointments", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "type", "startTime", "endTime", "doctorStaffId", "roomId", "equipmentId", "picStaffId", "status", "note"] },
       { sheetName: "medical-episodes", resource: "medical-episodes", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "serviceName", "doctorName", "status", "chiefComplaint", "allergyWarning", "diagnosis", "operationDate"] },
       { sheetName: "treatments", resource: "treatments", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "name", "totalSessions", "completedSessions", "intervalDays", "status"] },
       { sheetName: "consultations", resource: "consultations", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "consultedAt", "consultantStaffId", "doctorStaffId", "status", "summary", "diagnosis", "nextAction"] },
@@ -44,7 +44,7 @@ const BUNDLE_IMPORT_CONFIGS: Record<string, { related: BundleSheetDefinition[] }
       { sheetName: "attendances", resource: "attendances", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "date", "checkIn", "checkOut", "status", "note"] },
       { sheetName: "leave-requests", resource: "leave-requests", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "startDate", "endDate", "leaveType", "status", "reason", "approvedById"] },
       { sheetName: "payrolls", resource: "payrolls", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "month", "year", "baseSalary", "workingDays", "actualDays", "overtimeHours", "bonus", "deduction", "netSalary", "status", "note"] },
-      { sheetName: "work-schedules", resource: "work-schedules", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "workDate", "shiftLabel", "startTime", "endTime", "room", "status", "note"] },
+      { sheetName: "work-schedules", resource: "work-schedules", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "workDate", "shiftLabel", "startTime", "endTime", "roomId", "status", "note"] },
       { sheetName: "staff-rewards", resource: "staff-rewards", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "type", "title", "description", "date", "issuedBy", "amount", "note"] },
       { sheetName: "staff-trainings", resource: "staff-trainings", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "trainingName", "provider", "startDate", "endDate", "certificateNumber", "expiryDate", "status", "note"] },
       { sheetName: "performance-reviews", resource: "performance-reviews", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "reviewMonth", "reviewYear", "reviewerId", "score", "status", "strengths", "improvements", "goals", "note"] },
@@ -88,6 +88,10 @@ export function RecordImportPage() {
   )
   const readyRows = draftRows.filter((row) => row.errors.length === 0 && !row.__saved)
   const invalidRows = draftRows.filter((row) => row.errors.length > 0)
+  const bundleDefinitions = useMemo(
+    () => (bundleMode ? buildBundleSheetDefinitions(resource, importableFields) : []),
+    [bundleMode, importableFields, resource],
+  )
 
   useEffect(() => {
     setDraftRows([])
@@ -197,6 +201,29 @@ export function RecordImportPage() {
       })),
     ],
     [importableFields, lookups],
+  )
+
+  const bundleTabItems = useMemo(
+    () =>
+      bundleDefinitions.map((definition) => {
+        const rows = bundleSheets[definition.sheetName] || []
+        return {
+          key: definition.sheetName,
+          label: `${definition.sheetName} (${rows.length})`,
+          children: (
+            <Table
+              columns={buildBundlePreviewColumns(definition)}
+              dataSource={rows.map((row, index) => ({ __rowKey: `${definition.sheetName}-${index}`, ...row }))}
+              locale={{ emptyText: "Sheet này chưa có dữ liệu" }}
+              pagination={{ pageSize: 20, showSizeChanger: true }}
+              rowKey="__rowKey"
+              scroll={{ x: "max-content" }}
+              size="small"
+            />
+          ),
+        }
+      }),
+    [bundleDefinitions, bundleSheets],
   )
 
   async function downloadTemplate() {
@@ -394,17 +421,46 @@ export function RecordImportPage() {
             type="info"
           />
         ) : (
-          <Table
-            columns={columns}
-            dataSource={draftRows}
-            pagination={{ pageSize: 20, showSizeChanger: true }}
-            rowKey="__rowKey"
-            scroll={{ x: "max-content" }}
-          />
+          <>
+            <Table
+              columns={columns}
+              dataSource={draftRows}
+              pagination={{ pageSize: 20, showSizeChanger: true }}
+              rowKey="__rowKey"
+              scroll={{ x: "max-content" }}
+            />
+            {bundleMode && bundleTabItems.length > 0 ? (
+              <div style={{ marginTop: 20 }}>
+                <Typography.Title level={5} style={{ marginTop: 0 }}>
+                  Xem toàn bộ sheet bundle
+                </Typography.Title>
+                <Tabs items={bundleTabItems} />
+              </div>
+            ) : null}
+          </>
         )}
       </Card>
     </>
   )
+}
+
+function buildBundlePreviewColumns(definition: BundleSheetDefinition): ColumnsType<Record<string, unknown>> {
+  return definition.columns.map((column) => ({
+    title: column,
+    dataIndex: column,
+    key: column,
+    width: Math.max(140, Math.min(260, column.length * 12)),
+    render: (value: unknown) => formatBundlePreviewValue(value),
+  }))
+}
+
+function formatBundlePreviewValue(value: unknown) {
+  if (Array.isArray(value)) return value.join(", ")
+  if (value === undefined || value === null || value === "") {
+    return <Typography.Text type="secondary">-</Typography.Text>
+  }
+  if (typeof value === "boolean") return value ? "true" : "false"
+  return String(value)
 }
 
 function buildFieldGuide(field: FieldSpec, lookups: LookupMap) {
@@ -545,7 +601,7 @@ function generateFakeFieldValue(
 ) {
   const relation = field.relation || relationFields[field.key]
   if (relation) {
-    const ids = Object.keys(lookups[relation.resource] || {})
+    const ids = Object.keys(lookups[relation.lookupKey || relation.resource] || lookups[relation.resource] || {})
     return ids[index % ids.length] || ""
   }
 
@@ -605,13 +661,10 @@ function fakeTextByKey(resource: string, key: string, index: number) {
     case "chiefComplaint":
     case "allergyWarning":
       return faker.lorem.sentence()
-    case "doctorName":
     case "staffName":
       return faker.person.fullName()
     case "serviceName":
       return `Dich vu ${faker.commerce.productName()}`
-    case "room":
-      return `P${faker.number.int({ min: 1, max: 20 })}`
     case "position":
       return faker.person.jobTitle()
     case "source":

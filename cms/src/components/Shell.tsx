@@ -49,6 +49,8 @@ const menuIcons: Record<string, React.ReactNode> = {
   "branch-role-assignments": <DeploymentUnitOutlined />,
   "landing-pages": <GlobalOutlined />,
   departments: <SolutionOutlined />,
+  rooms: <BankOutlined />,
+  equipments: <ExperimentOutlined />,
   staff: <TeamOutlined />,
   "branch-permissions": <AuditOutlined />,
   "user-accounts": <SettingOutlined />,
@@ -95,7 +97,7 @@ const menuGroups = [
     key: "clinical",
     label: "Chuyên môn điều trị",
     icon: <MedicineBoxOutlined />,
-    resources: ["medical-episodes", "consultations", "service-orders", "customer-images", "treatments"],
+    resources: ["medical-episodes", "consultations", "service-orders", "customer-images", "treatments", "rooms", "equipments"],
   },
   {
     key: "inventory",

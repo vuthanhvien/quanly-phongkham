@@ -1,6 +1,7 @@
 import dayjs from 'dayjs';
 import { api } from './api';
 import { FieldSpec, relationFields, RelationSpec } from './models';
+import { formatClinicDateTime, normalizeDateValueForInput } from './utils/datetime';
 import { buildFolderPathMap, normalizeFileFolderRows } from './utils/fileFolders';
 
 export type LookupMap = Record<string, Record<string, string>>;
@@ -97,12 +98,12 @@ export function displayValue(field: string | FieldSpec, value: unknown, lookups:
   const fieldType = typeof field === 'string' ? undefined : field.type;
   const fieldKey = typeof field === 'string' ? field : field.key;
   if (fieldType === 'date') {
-    const parsed = dayjs(String(value));
+    const normalized = normalizeDateValueForInput(value)
+    const parsed = normalized ? dayjs(normalized) : dayjs(String(value))
     if (parsed.isValid()) return parsed.format('DD/MM/YYYY');
   }
   if (fieldType === 'datetime' || DATETIME_KEYS.has(fieldKey)) {
-    const parsed = dayjs(String(value));
-    if (parsed.isValid()) return parsed.format('DD/MM/YYYY HH:mm');
+    return formatClinicDateTime(value);
   }
 
   const relation = resolveRelationSpec(field);

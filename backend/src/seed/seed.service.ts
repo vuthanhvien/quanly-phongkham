@@ -14,6 +14,7 @@ import {
   CustomFieldDefinition,
   Department,
   DynamicRoleDefinition,
+  Equipment,
   Expense,
   FileFolder,
   Invoice,
@@ -23,6 +24,7 @@ import {
   MedicalEpisode,
   PrintTemplate,
   Product,
+  Room,
   ServiceOrder,
   ServiceOrderItem,
   Staff,
@@ -138,6 +140,8 @@ export class SeedService implements OnApplicationBootstrap {
     @InjectRepository(Branch) private readonly branches: Repository<Branch>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Department) private readonly departments: Repository<Department>,
+    @InjectRepository(Room) private readonly rooms: Repository<Room>,
+    @InjectRepository(Equipment) private readonly equipments: Repository<Equipment>,
     @InjectRepository(Staff) private readonly staff: Repository<Staff>,
     @InjectRepository(BranchRoleAssignment) private readonly branchPermissions: Repository<BranchRoleAssignment>,
     @InjectRepository(DynamicRoleDefinition) private readonly roles: Repository<DynamicRoleDefinition>,
@@ -220,6 +224,8 @@ export class SeedService implements OnApplicationBootstrap {
       await this.users.save(admin);
     }
 
+    await this.ensureSchedulingResources(branch);
+
     if (!(await this.branchPermissions.findOne({ where: { staffId: adminStaff.id, branchId: branch.id } }))) {
       let adminRole = await this.roles.findOne({ where: { key: 'ADMIN_OWNER' } });
       if (!adminRole) {
@@ -245,6 +251,38 @@ export class SeedService implements OnApplicationBootstrap {
     }
 
     return { branch, admin, adminDepartment, adminStaff };
+  }
+
+  private async ensureSchedulingResources(branch: Branch) {
+    const roomCount = await this.rooms.count();
+    if (roomCount === 0) {
+      await this.rooms.save(
+        ['P01', 'P02', 'P03', 'P04', 'P05'].map((code, index) =>
+          this.rooms.create({
+            code,
+            name: `Phong ${index + 1}`,
+            branchId: branch.id,
+            note: `Phong dieu tri ${index + 1}`,
+            isActive: true,
+          }),
+        ),
+      );
+    }
+
+    const equipmentCount = await this.equipments.count();
+    if (equipmentCount === 0) {
+      await this.equipments.save(
+        ['MM01', 'MM02', 'MM03', 'MM04', 'MM05'].map((code, index) =>
+          this.equipments.create({
+            code,
+            name: `May moc ${index + 1}`,
+            branchId: branch.id,
+            note: `Thiet bi dieu tri ${index + 1}`,
+            isActive: true,
+          }),
+        ),
+      );
+    }
   }
 
   private async ensureBaseSettings() {
@@ -299,8 +337,12 @@ export class SeedService implements OnApplicationBootstrap {
 
     if (selectedModules.has('staff')) await this.seedStaff(target, branches, departments, bulkUsers);
     const bulkStaff = await this.loadBulkStaff();
+    const doctorStaff = bulkStaff.filter((item) => item.position === 'Bac si');
 
     if (selectedModules.has('branch-role-assignments')) await this.seedBranchRoleAssignments(target, branches, bulkUsers, bulkStaff);
+
+    const rooms = await this.rooms.find({ order: { createdAt: 'ASC' } });
+    const equipments = await this.equipments.find({ order: { createdAt: 'ASC' } });
 
     if (selectedModules.has('customers')) await this.seedCustomers(target, branches, bulkStaff);
     const customers = await this.customers.find({ order: { createdAt: 'ASC' } });
@@ -317,8 +359,8 @@ export class SeedService implements OnApplicationBootstrap {
     const products = await this.products.find({ order: { createdAt: 'ASC' } });
 
     if (selectedModules.has('medical-episodes')) await this.seedMedicalEpisodes(target, customers, branches);
-    if (selectedModules.has('appointments')) await this.seedAppointments(target, customers, branches);
-    if (selectedModules.has('work-schedules')) await this.seedWorkSchedules(target, bulkStaff, branches);
+    if (selectedModules.has('appointments')) await this.seedAppointments(target, customers, branches, doctorStaff, bulkStaff, rooms, equipments);
+    if (selectedModules.has('work-schedules')) await this.seedWorkSchedules(target, bulkStaff, branches, rooms);
     if (selectedModules.has('consultations')) await this.seedConsultations(target, customers, branches, bulkStaff);
 
     if (selectedModules.has('service-orders')) await this.seedServiceOrders(target, customers, branches, bulkStaff, products);
@@ -599,13 +641,25 @@ export class SeedService implements OnApplicationBootstrap {
     }, 'medical-episodes');
   }
 
-  private async seedAppointments(target: number, customers: Customer[], branches: Branch[]) {
+  private async seedAppointments(
+    target: number,
+    customers: Customer[],
+    branches: Branch[],
+    doctors: Staff[],
+    staff: Staff[],
+    rooms: Room[],
+    equipments: Equipment[],
+  ) {
     const current = await this.appointments.count();
     if (current >= target) return;
 
     await this.insertGenerated(this.appointments, current + 1, target, (index) => {
       const customer = customers[(index - 1) % customers.length];
       const branch = branches[(index - 1) % branches.length];
+      const doctor = doctors[(index - 1) % Math.max(doctors.length, 1)];
+      const pic = staff[(index - 1) % staff.length];
+      const room = rooms[(index - 1) % Math.max(rooms.length, 1)];
+      const equipment = equipments[(index - 1) % Math.max(equipments.length, 1)];
       const start = timeValue(index % 10, (index * 5) % 60);
       const end = new Date(start.getTime() + 45 * 60 * 1000);
       return {
@@ -615,21 +669,23 @@ export class SeedService implements OnApplicationBootstrap {
         startTime: start,
         endTime: end,
         status: ['SCHEDULED', 'CONFIRMED', 'COMPLETED'][index % 3],
-        doctorName: `Bac si ${((index - 1) % 60) + 1}`,
-        room: `P${((index - 1) % 20) + 1}`,
-        equipment: `Machine ${((index - 1) % 12) + 1}`,
+        doctorStaffId: doctor?.id,
+        roomId: room?.id,
+        equipmentId: equipment?.id,
+        picStaffId: pic?.id,
         note: `Lich hen bulk ${index}`,
       };
     }, 'appointments');
   }
 
-  private async seedWorkSchedules(target: number, staff: Staff[], branches: Branch[]) {
+  private async seedWorkSchedules(target: number, staff: Staff[], branches: Branch[], rooms: Room[]) {
     const current = await this.workSchedules.count();
     if (current >= target) return;
 
     await this.insertGenerated(this.workSchedules, current + 1, target, (index) => {
       const staffMember = staff[(index - 1) % staff.length];
       const branch = branches[(index - 1) % branches.length];
+      const room = rooms[(index - 1) % Math.max(rooms.length, 1)];
       const start = timeValue(index % 3 === 0 ? 5 : 0, 0);
       const end = new Date(start.getTime() + 8 * 60 * 60 * 1000);
       return {
@@ -639,7 +695,7 @@ export class SeedService implements OnApplicationBootstrap {
         shiftLabel: ['CA SANG', 'CA CHIEU', 'CA TOI'][index % 3],
         startTime: start,
         endTime: end,
-        room: `Room ${((index - 1) % 18) + 1}`,
+        roomId: room?.id,
         status: ['PLANNED', 'CONFIRMED', 'DONE'][index % 3],
         note: `Lich lam bulk ${index}`,
       };

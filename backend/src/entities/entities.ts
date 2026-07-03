@@ -119,6 +119,42 @@ export class Department extends ConfigurableEntity {
   isActive: boolean;
 }
 
+@Entity('rooms')
+export class Room extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  name: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+}
+
+@Entity('equipments')
+export class Equipment extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  name: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+}
+
 @Entity('staff')
 export class Staff extends ConfigurableEntity {
   @Column({ unique: true })
@@ -575,13 +611,16 @@ export class Appointment extends ConfigurableEntity {
   status: string;
 
   @Column({ nullable: true })
-  doctorName?: string;
+  doctorStaffId?: string;
 
   @Column({ nullable: true })
-  room?: string;
+  roomId?: string;
 
   @Column({ nullable: true })
-  equipment?: string;
+  equipmentId?: string;
+
+  @Column({ nullable: true })
+  picStaffId?: string;
 
   @Column({ type: 'text', nullable: true })
   note?: string;
@@ -608,7 +647,7 @@ export class WorkSchedule extends ConfigurableEntity {
   endTime?: Date;
 
   @Column({ nullable: true })
-  room?: string;
+  roomId?: string;
 
   @Column({ default: 'PLANNED' })
   status: string;
@@ -1648,6 +1687,8 @@ export const ENTITIES = [
   User,
   DynamicRoleDefinition,
   Department,
+  Room,
+  Equipment,
   Staff,
   BranchRoleAssignment,
   Customer,
