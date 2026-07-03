@@ -3,7 +3,6 @@ import {
   EyeOutlined,
   FieldTimeOutlined,
   FileDoneOutlined,
-  PlusOutlined,
   TeamOutlined,
 } from "@ant-design/icons"
 import dayjs, { type Dayjs } from "dayjs"
@@ -12,11 +11,13 @@ import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { hasActionAccess } from "../access"
 import { api } from "../api"
+import { RecordValueView } from "../components/RecordValueView"
 import { RecordFormContent } from "../components/RecordFormContent"
-import { getFieldLabel } from "../models"
-import { loadRelationOptions, type LookupMap } from "../relations"
+import { CustomField, getFieldLabel } from "../models"
+import { loadFileLookupMap, loadRelationOptions, type FileLookupMap, type LookupMap } from "../relations"
 import { formatEventTime } from "../components/dashboard/utils"
 import { buildLocalDateTime, parseClinicDateTime } from "../utils/datetime"
+import { getFieldCatalog, getStoredUserRole, getVisibleFieldConfigs, type FieldLayoutConfig, type ViewSettingRecord } from "../view-settings"
 
 type CalendarMode = "day" | "week" | "month"
 type PlannerEventType = "appointment" | "schedule" | "leave" | "attendance"
@@ -34,6 +35,15 @@ interface PlannerEvent {
   tone: string
   statusLabel: string
   summary: string
+}
+
+interface CalendarQuickDetailState {
+  resource: PlannerEvent["resource"]
+  eventId: string
+  record: Record<string, any> | null
+  fields: FieldLayoutConfig[]
+  lookups: LookupMap
+  fileLookups: FileLookupMap
 }
 
 type QuickCreateResource = "appointments" | "work-schedules" | "leave-requests" | "attendances"
@@ -107,6 +117,8 @@ export function CalendarPage() {
   const [branchFilter, setBranchFilter] = useState<string | undefined>(undefined)
   const [staffFilter, setStaffFilter] = useState<string | undefined>(undefined)
   const [quickCreateResource, setQuickCreateResource] = useState<QuickCreateResource | null>(null)
+  const [quickDetail, setQuickDetail] = useState<CalendarQuickDetailState | null>(null)
+  const [quickDetailLoading, setQuickDetailLoading] = useState(false)
 
   useEffect(() => {
     void loadCalendar()
@@ -206,6 +218,10 @@ export function CalendarPage() {
     [],
   )
 
+  const quickDetailTitle = quickDetail?.record
+    ? resolveQuickDetailTitle(quickDetail.resource, quickDetail.record)
+    : "Xem nhanh lịch"
+
   return (
     <>
       <div className="page-header">
@@ -215,74 +231,44 @@ export function CalendarPage() {
             Quản lý booking với khách, ca làm, nghỉ phép và chấm công trên cùng một màn hình.
           </Typography.Text>
         </div>
+        <div className="calendar-header-controls">
+          <Segmented<CalendarMode>
+            options={[
+              { label: "Ngày", value: "day" },
+              { label: "Tuần", value: "week" },
+              { label: "Tháng", value: "month" },
+            ]}
+            value={calendarMode}
+            onChange={(value) => setCalendarMode(value)}
+          />
+          <Select
+            allowClear
+            className="calendar-planner-select"
+            placeholder="Lọc chi nhánh"
+            options={branchOptions}
+            value={branchFilter}
+            onChange={(value) => setBranchFilter(value)}
+          />
+          <Select
+            allowClear
+            className="calendar-planner-select"
+            placeholder="Lọc nhân sự"
+            options={staffOptions}
+            value={staffFilter}
+            onChange={(value) => setStaffFilter(value)}
+          />
+          <Select
+            className="calendar-planner-types"
+            mode="multiple"
+            options={EVENT_TYPE_OPTIONS}
+            value={selectedTypes}
+            onChange={(value) => setSelectedTypes(value as PlannerEventType[])}
+          />
+        </div>
       </div>
 
       <div className="calendar-planner-layout">
         <div className="calendar-planner-main">
-          <Card className="glass-card spacious-card calendar-planner-filters">
-            <Space wrap size={12}>
-              <Segmented<CalendarMode>
-                options={[
-                  { label: "Ngày", value: "day" },
-                  { label: "Tuần", value: "week" },
-                  { label: "Tháng", value: "month" },
-                ]}
-                value={calendarMode}
-                onChange={(value) => setCalendarMode(value)}
-              />
-              <Select
-                allowClear
-                className="calendar-planner-select"
-                placeholder="Lọc chi nhánh"
-                options={branchOptions}
-                value={branchFilter}
-                onChange={(value) => setBranchFilter(value)}
-              />
-              <Select
-                allowClear
-                className="calendar-planner-select"
-                placeholder="Lọc nhân sự"
-                options={staffOptions}
-                value={staffFilter}
-                onChange={(value) => setStaffFilter(value)}
-              />
-              <Select
-                className="calendar-planner-types"
-                mode="multiple"
-                options={EVENT_TYPE_OPTIONS}
-                value={selectedTypes}
-                onChange={(value) => setSelectedTypes(value as PlannerEventType[])}
-              />
-            </Space>
-          </Card>
-
-          <Row gutter={[16, 16]}>
-            <Col xs={24} md={12} xl={6}>
-              <Card className="glass-card calendar-kpi-card">
-                <Typography.Text type="secondary">Booking trong ngày</Typography.Text>
-                <Typography.Title level={3}>{countsForSelectedDay.appointment}</Typography.Title>
-              </Card>
-            </Col>
-            <Col xs={24} md={12} xl={6}>
-              <Card className="glass-card calendar-kpi-card">
-                <Typography.Text type="secondary">Ca làm trong ngày</Typography.Text>
-                <Typography.Title level={3}>{countsForSelectedDay.schedule}</Typography.Title>
-              </Card>
-            </Col>
-            <Col xs={24} md={12} xl={6}>
-              <Card className="glass-card calendar-kpi-card">
-                <Typography.Text type="secondary">Nhân sự xin nghỉ</Typography.Text>
-                <Typography.Title level={3}>{countsForSelectedDay.leave}</Typography.Title>
-              </Card>
-            </Col>
-            <Col xs={24} md={12} xl={6}>
-              <Card className="glass-card calendar-kpi-card">
-                <Typography.Text type="secondary">Bản ghi chấm công</Typography.Text>
-                <Typography.Title level={3}>{countsForSelectedDay.attendance}</Typography.Title>
-              </Card>
-            </Col>
-          </Row>
-
           <Card
             className="glass-card spacious-card"
             title="Lịch tổng hợp"
@@ -300,7 +286,7 @@ export function CalendarPage() {
                 fullscreen={false}
                 value={selectedDate}
                 onSelect={setSelectedDate}
-                fullCellRender={(value) => renderMonthCell(value, filteredEvents)}
+                fullCellRender={(value) => renderMonthCell(value, filteredEvents, openQuickDetail)}
               />
             ) : calendarMode === "week" ? (
               <div className="calendar-week-grid">
@@ -309,11 +295,18 @@ export function CalendarPage() {
                     .filter((item) => parseClinicDateTime(item.start).isSame(date, "day"))
                     .sort((left, right) => parseClinicDateTime(left.start).valueOf() - parseClinicDateTime(right.start).valueOf())
                   return (
-                    <button
+                    <div
                       key={date.format("YYYY-MM-DD")}
                       className={`calendar-week-column${date.isSame(selectedDate, "day") ? " is-selected" : ""}`}
-                      type="button"
                       onClick={() => setSelectedDate(date)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault()
+                          setSelectedDate(date)
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
                     >
                       <div className="calendar-week-column-head">
                         <strong>{date.format("DD/MM")}</strong>
@@ -324,15 +317,23 @@ export function CalendarPage() {
                           <Typography.Text type="secondary">Trống</Typography.Text>
                         ) : (
                           dayEvents.slice(0, 5).map((event) => (
-                            <div className={`calendar-event-chip tone-${event.type}`} key={event.id}>
+                            <button
+                              key={event.id}
+                              className={`calendar-event-chip tone-${event.type}`}
+                              type="button"
+                              onClick={(clickEvent) => {
+                                clickEvent.stopPropagation()
+                                void openQuickDetail(event)
+                              }}
+                            >
                               <strong>{formatEventTime(event.start, event.end)}</strong>
                               <span>{event.title}</span>
-                            </div>
+                            </button>
                           ))
                         )}
                         {dayEvents.length > 5 ? <Typography.Text type="secondary">+{dayEvents.length - 5} mục khác</Typography.Text> : null}
                       </div>
-                    </button>
+                    </div>
                   )
                 })}
               </div>
@@ -348,6 +349,27 @@ export function CalendarPage() {
 
         <div className="calendar-planner-sidebar">
           <div className="calendar-planner-sticky">
+            <Card className="glass-card spacious-card" title={`Tổng quan ngày ${selectedDate.format("DD/MM/YYYY")}`}>
+              <div className="calendar-summary-grid">
+                <div className="calendar-summary-card">
+                  <Typography.Text type="secondary">Booking trong ngày</Typography.Text>
+                  <Typography.Title level={3}>{countsForSelectedDay.appointment}</Typography.Title>
+                </div>
+                <div className="calendar-summary-card">
+                  <Typography.Text type="secondary">Ca làm trong ngày</Typography.Text>
+                  <Typography.Title level={3}>{countsForSelectedDay.schedule}</Typography.Title>
+                </div>
+                <div className="calendar-summary-card">
+                  <Typography.Text type="secondary">Nhân sự xin nghỉ</Typography.Text>
+                  <Typography.Title level={3}>{countsForSelectedDay.leave}</Typography.Title>
+                </div>
+                <div className="calendar-summary-card">
+                  <Typography.Text type="secondary">Bản ghi chấm công</Typography.Text>
+                  <Typography.Title level={3}>{countsForSelectedDay.attendance}</Typography.Title>
+                </div>
+              </div>
+            </Card>
+
             <Card className="glass-card spacious-card" title={`Chi tiết ngày ${selectedDate.format("DD/MM/YYYY")}`}>
               {visibleQuickActions.length > 0 ? (
                 <div className="calendar-quick-actions">
@@ -390,7 +412,9 @@ export function CalendarPage() {
                       title={(
                         <Space size={8} wrap>
                           <Tag color={item.tone}>{EVENT_TYPE_LABEL[item.type]}</Tag>
-                          <span>{item.title}</span>
+                          <button className="calendar-event-link" type="button" onClick={() => void openQuickDetail(item)}>
+                            {item.title}
+                          </button>
                         </Space>
                       )}
                       description={(
@@ -458,21 +482,120 @@ export function CalendarPage() {
           />
         ) : null}
       </Drawer>
+
+      <Drawer
+        className="quick-drawer"
+        destroyOnClose
+        maskClosable={false}
+        open={Boolean(quickDetail || quickDetailLoading)}
+        placement="right"
+        title={quickDetail ? quickDetailTitle : "Đang tải nhanh"}
+        width={760}
+        extra={
+          quickDetail ? (
+            <Button icon={<EyeOutlined />} onClick={() => navigate(`/${quickDetail.resource}/${quickDetail.eventId}`)}>
+              Mở chi tiết
+            </Button>
+          ) : null
+        }
+        onClose={() => {
+          setQuickDetail(null)
+          setQuickDetailLoading(false)
+        }}
+      >
+        {quickDetail ? (
+          <div className="detail-grid">
+            <Row gutter={[16, 16]}>
+              {quickDetail.fields.map((field) => (
+                <Col key={field.key} span={detailWidthToSpan(field.width)} xs={24}>
+                  <div className="detail-item">
+                    <div className="detail-item-label">
+                      {field.description ? (
+                        <Space direction="vertical" size={0}>
+                          <span>{field.label}</span>
+                          <Typography.Text type="secondary">{field.description}</Typography.Text>
+                        </Space>
+                      ) : (
+                        field.label
+                      )}
+                    </div>
+                    <div className="detail-item-content">
+                      <RecordValueView
+                        field={field}
+                        fileLookups={quickDetail.fileLookups}
+                        lookups={quickDetail.lookups}
+                        value={quickDetail.record?.[field.key] ?? quickDetail.record?.customFields?.[field.key]}
+                      />
+                    </div>
+                  </div>
+                </Col>
+              ))}
+            </Row>
+          </div>
+        ) : null}
+      </Drawer>
     </>
   )
+
+  async function openQuickDetail(event: PlannerEvent) {
+    setQuickDetailLoading(true)
+    try {
+      const activeRole = getStoredUserRole()
+      const [recordResponse, fieldResponse, viewResponse] = await Promise.all([
+        api.get(`/records/${event.resource}/${event.id}`),
+        api.get("/settings/custom-fields", { params: { entityType: event.resource } }).catch(() => ({ data: { data: [] } })),
+        api.get("/settings/views", { params: { entityType: event.resource } }).catch(() => ({ data: { data: [] } })),
+      ])
+      const record = recordResponse.data.data as Record<string, any>
+      const customFields = fieldResponse.data.data.filter((field: CustomField) => field.isActive)
+      const catalog = getFieldCatalog(event.resource, customFields)
+      Object.keys(record?.customFields || {}).forEach((key) => {
+        if (catalog.some((field) => field.key === key)) return
+        catalog.push({ key, label: key })
+      })
+      const detailFields = getVisibleFieldConfigs(
+        catalog,
+        viewResponse.data.data as ViewSettingRecord[],
+        "DETAIL",
+        activeRole,
+      )
+      const [detailLookups, nextFileLookups] = await Promise.all([
+        loadRelationOptions(detailFields),
+        loadFileLookupMap(),
+      ])
+      setQuickDetail({
+        resource: event.resource,
+        eventId: event.id,
+        record,
+        fields: detailFields,
+        lookups: detailLookups,
+        fileLookups: nextFileLookups,
+      })
+    } finally {
+      setQuickDetailLoading(false)
+    }
+  }
 }
 
-function renderMonthCell(value: Dayjs, events: PlannerEvent[]) {
+function renderMonthCell(value: Dayjs, events: PlannerEvent[], onOpen: (event: PlannerEvent) => void) {
   const dayEvents = events.filter((item) => parseClinicDateTime(item.start).isSame(value, "day"))
   return (
     <div className="calendar-month-cell">
       <Typography.Text strong>{value.date()}</Typography.Text>
       <div className="calendar-month-cell-events">
         {dayEvents.slice(0, 3).map((event) => (
-          <div className={`calendar-cell-pill tone-${event.type}`} key={event.id}>
+          <button
+            className={`calendar-cell-pill tone-${event.type}`}
+            key={event.id}
+            type="button"
+            onClick={(clickEvent) => {
+              clickEvent.stopPropagation()
+              void onOpen(event)
+            }}
+          >
             <strong>{formatEventTime(event.start, event.end)}</strong>
             <span>{EVENT_TYPE_LABEL[event.type]}</span>
-          </div>
+          </button>
         ))}
         {dayEvents.length > 3 ? <Typography.Text type="secondary">+{dayEvents.length - 3} mục</Typography.Text> : null}
       </div>
@@ -538,6 +661,46 @@ function resolveQuickCreateTitle(resource: QuickCreateResource) {
       return "Nghỉ phép"
     default:
       return "Chấm công"
+  }
+}
+
+function resolveQuickDetailTitle(resource: PlannerEvent["resource"], record: Record<string, any>) {
+  return (
+    record.fullName ||
+    record.name ||
+    record.title ||
+    record.code ||
+    record.email ||
+    entityLabelByResource(resource)
+  )
+}
+
+function entityLabelByResource(resource: PlannerEvent["resource"]) {
+  switch (resource) {
+    case "appointments":
+      return "Booking"
+    case "work-schedules":
+      return "Ca làm"
+    case "leave-requests":
+      return "Nghỉ phép"
+    default:
+      return "Chấm công"
+  }
+}
+
+function detailWidthToSpan(width?: FieldLayoutConfig["width"]) {
+  switch (width) {
+    case "25":
+      return 6
+    case "33":
+      return 8
+    case "50":
+      return 12
+    case "66":
+      return 16
+    case "100":
+    default:
+      return 24
   }
 }
 

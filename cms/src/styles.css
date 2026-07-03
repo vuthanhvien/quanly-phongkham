@@ -1693,14 +1693,21 @@ textarea.ant-input {
 }
 
 .record-media-stack.compact {
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 6px;
+}
+
+.record-media-stack.compact .record-media-card {
+  flex: 0 1 min(280px, 100%);
+  padding: 6px 8px;
 }
 
 .record-media-card {
   align-items: center;
   background: rgba(15, 23, 42, 0.05);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 14px;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
   color: var(--app-text);
   display: flex;
   gap: 10px;
@@ -1708,11 +1715,20 @@ textarea.ant-input {
   overflow: hidden;
   padding: 8px;
   text-decoration: none;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.record-media-card:hover,
+.record-media-card:focus-visible {
+  background: color-mix(in srgb, var(--app-primary) 8%, rgba(15, 23, 42, 0.04));
+  border-color: color-mix(in srgb, var(--app-primary) 45%, transparent);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
 }
 
 .record-media-card img,
 .record-file-fallback {
-  border-radius: 12px;
+  border-radius: var(--app-radius);
   flex: 0 0 52px;
   height: 52px;
   width: 52px;
@@ -1741,6 +1757,7 @@ textarea.ant-input {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
   min-width: 0;
 }
 
@@ -1758,6 +1775,15 @@ textarea.ant-input {
 .record-media-copy span {
   color: var(--app-text-soft);
   font-size: 12px;
+}
+
+.record-media-open {
+  align-items: center;
+  color: var(--app-primary);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 14px;
+  justify-content: center;
 }
 
 .service-order-grid {
@@ -1782,6 +1808,14 @@ textarea.ant-input {
   display: grid;
   gap: 16px;
   grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+}
+
+.calendar-header-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
 }
 
 .calendar-planner-main {
@@ -1810,7 +1844,27 @@ textarea.ant-input {
 }
 
 .calendar-planner-types {
-  min-width: 240px;
+  min-width: 280px;
+}
+
+.calendar-summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.calendar-summary-card {
+  background: color-mix(in srgb, var(--app-surface) 96%, var(--app-primary));
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.calendar-summary-card h3 {
+  color: var(--app-title) !important;
+  margin: 0 !important;
 }
 
 .calendar-quick-actions {
@@ -1919,21 +1973,44 @@ textarea.ant-input {
 
 .calendar-cell-pill,
 .calendar-event-chip {
+  appearance: none;
+  cursor: pointer;
   border-radius: calc(var(--app-radius) - 4px);
   display: grid;
   gap: 2px;
-  padding: 7px 8px;
+  padding: 5px 7px;
+  text-align: left;
+  width: 100%;
 }
 
 .calendar-cell-pill strong,
 .calendar-event-chip strong {
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1.2;
 }
 
 .calendar-cell-pill span,
 .calendar-event-chip span {
   color: var(--app-text-soft);
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.calendar-event-chip:hover,
+.calendar-cell-pill:hover {
+  border-color: color-mix(in srgb, var(--app-primary) 44%, transparent);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
+}
+
+.calendar-event-link {
+  background: transparent;
+  border: 0;
+  color: var(--app-title);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  text-align: left;
 }
 
 .calendar-cell-pill.tone-appointment,
@@ -2068,6 +2145,11 @@ textarea.ant-input {
     grid-template-columns: 1fr;
   }
 
+  .calendar-header-controls {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
   .calendar-planner-sticky {
     position: static;
   }
@@ -2077,6 +2159,10 @@ textarea.ant-input {
   }
 
   .calendar-quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-summary-grid {
     grid-template-columns: 1fr;
   }
 

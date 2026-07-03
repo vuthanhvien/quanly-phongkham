@@ -3,8 +3,8 @@ import {
   FileOutlined,
   FilePdfOutlined,
   FileTextOutlined,
+  LinkOutlined,
 } from "@ant-design/icons"
-import { Image, Space, Typography } from "antd"
 import { resolveFileUrl } from "../api"
 import { displayValue, FileLookupMap, LookupMap } from "../relations"
 import { FieldSpec } from "../models"
@@ -36,19 +36,27 @@ function renderImageUrlValue(value: unknown, compact?: boolean) {
   if (items.length === 0) return <span>-</span>
   return (
     <div className={`record-media-stack${compact ? " compact" : ""}`}>
-      {items.map((item) => (
-        <a key={item} className="record-media-card" href={item} rel="noreferrer" target="_blank">
-          {isImageUrl(item) ? (
-            <img alt="preview" src={item} />
-          ) : (
-            <div className="record-file-fallback">{renderFileIcon({ extension: extractExtension(item) }, true)}</div>
-          )}
-          <div className="record-media-copy">
-            <strong>{compact ? "Mở file" : item}</strong>
-            <span>{isImageUrl(item) ? "Hình ảnh" : "Tệp đính kèm"}</span>
-          </div>
-        </a>
-      ))}
+      {items.map((item, index) => {
+        const href = resolveFileUrl(item)
+        const image = isImageUrl(item)
+        const label = compact ? `Tệp ${index + 1}` : extractFileName(item) || `Tệp ${index + 1}`
+        return (
+          <a key={`${item}-${index}`} className="record-media-card" href={href} rel="noreferrer" target="_blank" title={label}>
+            {image ? (
+              <img alt={label} src={href} />
+            ) : (
+              <div className="record-file-fallback">{renderFileIcon({ extension: extractExtension(item) }, true)}</div>
+            )}
+            <div className="record-media-copy">
+              <strong>{label}</strong>
+              <span>{image ? "Hình ảnh" : formatFileKind(extractExtension(item))}</span>
+            </div>
+            <span className="record-media-open">
+              <LinkOutlined />
+            </span>
+          </a>
+        )
+      })}
     </div>
   )
 }
@@ -56,13 +64,20 @@ function renderImageUrlValue(value: unknown, compact?: boolean) {
 function renderFileValue(value: unknown, lookups: LookupMap, fileLookups: FileLookupMap, compact?: boolean) {
   const items = normalizeStringArray(value)
   if (items.length === 0) return <span>-</span>
-  const resolved = items.map((item) => fileLookups[item]).filter(Boolean)
+  const resolved = items.map((item) => fileLookups[item] || buildFallbackFileLookup(item))
   if (resolved.length === 0) return <>{displayValue({ key: "", label: "", type: "file" }, value, lookups)}</>
 
   return (
     <div className={`record-media-stack${compact ? " compact" : ""}`}>
       {resolved.map((file) => (
-        <a key={file.id} className="record-media-card" href={resolveFileUrl(file.publicUrl)} rel="noreferrer" target="_blank">
+        <a
+          key={file.id}
+          className="record-media-card"
+          href={resolveFileUrl(file.publicUrl)}
+          rel="noreferrer"
+          target="_blank"
+          title={file.title}
+        >
           {isImageFile(file) ? (
             <img alt={file.title} src={resolveFileUrl(file.publicUrl)} />
           ) : (
@@ -70,8 +85,11 @@ function renderFileValue(value: unknown, lookups: LookupMap, fileLookups: FileLo
           )}
           <div className="record-media-copy">
             <strong>{file.title}</strong>
-            <span>{file.originalName || file.extension || "Tệp đính kèm"}</span>
+            <span>{file.originalName || formatFileKind(file.extension) || "Tệp đính kèm"}</span>
           </div>
+          <span className="record-media-open">
+            <LinkOutlined />
+          </span>
         </a>
       ))}
     </div>
@@ -107,6 +125,29 @@ function extractExtension(value: string) {
   const cleaned = value.split("?")[0]
   const parts = cleaned.split(".")
   return parts.length > 1 ? parts[parts.length - 1] : ""
+}
+
+function extractFileName(value: string) {
+  const cleaned = value.split("?")[0]
+  const parts = cleaned.split("/")
+  return parts[parts.length - 1] || value
+}
+
+function formatFileKind(extension?: string) {
+  const normalized = String(extension || "").toLowerCase()
+  if (!normalized) return "Tệp đính kèm"
+  return normalized.toUpperCase()
+}
+
+function buildFallbackFileLookup(value: string) {
+  const href = resolveFileUrl(value)
+  return {
+    id: value,
+    title: extractFileName(value) || "Tệp đính kèm",
+    originalName: extractFileName(value) || undefined,
+    publicUrl: href,
+    extension: extractExtension(value) || undefined,
+  }
 }
 
 function renderFileIcon(file: { mimeType?: string; extension?: string }, large = false) {

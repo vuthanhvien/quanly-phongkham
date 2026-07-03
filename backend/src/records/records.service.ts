@@ -951,6 +951,9 @@ export class RecordsService {
       referencePools: Record<string, string[]>;
     },
   ) {
+    const staffSpecificValue = this.fakeStaffBundleValue(resource, column, context);
+    if (staffSpecificValue !== undefined) return staffSpecificValue;
+
     const relationResource = FIELD_RELATION_RESOURCES[column];
     if (relationResource) {
       const pool = context.referencePools[relationResource] || [];
@@ -1007,6 +1010,104 @@ export class RecordsService {
     return `Mau ${column} ${context.index + 1}`;
   }
 
+  private fakeStaffBundleValue(
+    resource: string,
+    column: string,
+    context: {
+      resource: BundleRootResource;
+      index: number;
+      code: string;
+      parentCode: string;
+      referencePools: Record<string, string[]>;
+    },
+  ) {
+    if (context.resource !== 'staff') return undefined;
+
+    const roster = this.fakeStaffRoster(context.index);
+    const payroll = this.fakeStaffPayrollMetrics(context.index);
+
+    if (resource === 'staff') {
+      if (column === 'fullName') return `Mau nhân viên ${context.index + 1}`;
+      if (column === 'position') return ['Điều dưỡng', 'Lễ tân', 'Kỹ thuật viên', 'Bác sĩ'][context.index % 4];
+      if (column === 'status') return ['ACTIVE', 'ACTIVE', 'ON_LEAVE', 'ACTIVE'][context.index % 4];
+      if (column === 'joinedAt') return this.fakeFixedDate(2025, 0, 6 + context.index * 9);
+      if (column === 'dateOfBirth') return this.fakeFixedDate(1992, context.index % 8, 8 + (context.index % 18));
+      if (column === 'gender') return ['female', 'male', 'female', 'male'][context.index % 4];
+      if (column === 'idCardIssuedDate') return this.fakeFixedDate(2016, context.index % 6, 10 + (context.index % 12));
+      if (column === 'idCardIssuedPlace') return ['TP HCM', 'Ha Noi', 'Da Nang', 'Can Tho'][context.index % 4];
+      if (column === 'emergencyContactName') return `Nguoi nha ${context.index + 1}`;
+      if (column === 'emergencyContactRelation') return ['Me', 'Vo', 'Chong', 'Anh chi em'][context.index % 4];
+      if (column === 'bankAccountName') return `MAU NHAN VIEN ${context.index + 1}`;
+      if (column === 'bankName') return ['Vietcombank', 'ACB', 'Techcombank', 'MB Bank'][context.index % 4];
+      if (column === 'bankBranch') return ['CN Quan 1', 'CN Phu Nhuan', 'CN Binh Thanh', 'CN Thu Duc'][context.index % 4];
+      if (column === 'note') return ['Nhan su full-time', 'Nhan su co OT cuoi tuan', 'Dang theo doi nghi phep', 'Nhan su on dinh'][context.index % 4];
+    }
+
+    if (resource === 'work-contracts') {
+      if (column === 'contractType') return ['full_time', 'full_time', 'probation', 'part_time'][context.index % 4];
+      if (column === 'startDate') return this.fakeFixedDate(2026, 0, 1 + context.index * 2);
+      if (column === 'endDate') return context.index % 4 === 2 ? this.fakeFixedDate(2026, 2, 31) : this.fakeFixedDate(2026, 11, 31);
+      if (column === 'baseSalary') return payroll.baseSalary;
+      if (column === 'position') return ['Điều dưỡng', 'Lễ tân', 'Kỹ thuật viên', 'Bác sĩ'][context.index % 4];
+      if (column === 'workingHoursPerDay') return roster.workingHoursPerDay;
+      if (column === 'workingDaysPerMonth') return payroll.workingDays;
+      if (column === 'status') return context.index % 4 === 2 ? 'draft' : 'active';
+      if (column === 'note') return `Hop dong ${context.index % 4 === 2 ? 'thu viec' : 'chinh thuc'} - lich ${roster.label.toLowerCase()}`;
+    }
+
+    if (resource === 'staff-insurances') {
+      if (column === 'insuranceType') return ['BHXH', 'BHYT', 'BHTN'][context.index % 3];
+      if (column === 'employeeRate') return [8, 1.5, 1][context.index % 3];
+      if (column === 'employerRate') return [17.5, 3, 1][context.index % 3];
+      if (column === 'salaryBase') return payroll.insuranceSalaryBase;
+      if (column === 'startDate') return this.fakeFixedDate(2026, 0, 1);
+      if (column === 'endDate') return '';
+      if (column === 'isActive') return true;
+      if (column === 'note') return 'Dong bao hiem theo muc luong hop dong';
+    }
+
+    if (resource === 'attendances') {
+      if (column === 'date') return this.fakeFixedDate(2026, 5, 2 + context.index);
+      if (column === 'checkIn') return roster.checkIn;
+      if (column === 'checkOut') return roster.checkOut;
+      if (column === 'status') return roster.attendanceStatus;
+      if (column === 'note') return roster.attendanceNote;
+    }
+
+    if (resource === 'leave-requests') {
+      if (column === 'startDate') return this.fakeFixedDate(2026, 5, 10 + context.index * 2);
+      if (column === 'endDate') return this.fakeFixedDate(2026, 5, 10 + context.index * 2 + (context.index % 2));
+      if (column === 'leaveType') return ['annual', 'sick', 'personal', 'other'][context.index % 4];
+      if (column === 'status') return ['approved', 'pending', 'approved', 'cancelled'][context.index % 4];
+      if (column === 'reason') return ['Nghi phep nam', 'Nghi om', 'Viec gia dinh', 'Dieu chinh lich ca'][context.index % 4];
+    }
+
+    if (resource === 'payrolls') {
+      if (column === 'month') return 6 + (context.index % 2);
+      if (column === 'year') return 2026;
+      if (column === 'baseSalary') return payroll.baseSalary;
+      if (column === 'workingDays') return payroll.workingDays;
+      if (column === 'actualDays') return payroll.actualDays;
+      if (column === 'overtimeHours') return payroll.overtimeHours;
+      if (column === 'bonus') return payroll.bonus;
+      if (column === 'deduction') return payroll.deduction;
+      if (column === 'netSalary') return payroll.netSalary;
+      if (column === 'status') return context.index % 3 === 2 ? 'paid' : ['draft', 'confirmed'][context.index % 2];
+      if (column === 'note') return `Bang luong thang ${6 + (context.index % 2)} da tong hop OT va phu cap`;
+    }
+
+    if (resource === 'work-schedules') {
+      if (column === 'workDate') return this.fakeFixedDate(2026, 5, 2 + context.index);
+      if (column === 'shiftLabel') return roster.label;
+      if (column === 'startTime') return this.fakeFixedDateTime(2026, 5, 2 + context.index, roster.startHour, roster.startMinute);
+      if (column === 'endTime') return this.fakeFixedDateTime(2026, 5, 2 + context.index, roster.endHour, roster.endMinute);
+      if (column === 'status') return roster.scheduleStatus;
+      if (column === 'note') return roster.scheduleNote;
+    }
+
+    return undefined;
+  }
+
   private fakeStatusValue(resource: string, index: number) {
     const options: Record<string, string[]> = {
       customers: ['CONSULTING', 'IN_TREATMENT', 'COMPLETED'],
@@ -1041,6 +1142,103 @@ export class RecordsService {
   private fakeDateTime(index: number, extraHours = 0) {
     const date = new Date(Date.UTC(2026, 0, 1 + index, 8 + extraHours, 0, 0));
     return date.toISOString().slice(0, 16);
+  }
+
+  private fakeFixedDate(year: number, monthIndex: number, day: number) {
+    const date = new Date(Date.UTC(year, monthIndex, day));
+    return date.toISOString().slice(0, 10);
+  }
+
+  private fakeFixedDateTime(year: number, monthIndex: number, day: number, hour: number, minute: number) {
+    const date = new Date(Date.UTC(year, monthIndex, day, hour, minute, 0));
+    return date.toISOString().slice(0, 16);
+  }
+
+  private fakeStaffRoster(index: number) {
+    const patterns = [
+      {
+        label: 'Ca sáng',
+        startHour: 8,
+        startMinute: 0,
+        endHour: 12,
+        endMinute: 0,
+        checkIn: '07:56',
+        checkOut: '12:03',
+        attendanceStatus: 'present',
+        scheduleStatus: 'CONFIRMED',
+        workingHoursPerDay: 4,
+        attendanceNote: 'Check-in dung gio ca sang',
+        scheduleNote: 'Phu quay tiep don buoi sang',
+      },
+      {
+        label: 'Ca chiều',
+        startHour: 13,
+        startMinute: 0,
+        endHour: 17,
+        endMinute: 15,
+        checkIn: '13:02',
+        checkOut: '17:18',
+        attendanceStatus: 'present',
+        scheduleStatus: 'CONFIRMED',
+        workingHoursPerDay: 4,
+        attendanceNote: 'Ho tro khach khung gio chieu',
+        scheduleNote: 'Truc phong dieu tri buoi chieu',
+      },
+      {
+        label: 'Ca hành chính',
+        startHour: 8,
+        startMinute: 0,
+        endHour: 17,
+        endMinute: 0,
+        checkIn: '08:11',
+        checkOut: '17:06',
+        attendanceStatus: 'late',
+        scheduleStatus: 'PLANNED',
+        workingHoursPerDay: 8,
+        attendanceNote: 'Di tre 11 phut do hop dau gio',
+        scheduleNote: 'Ca hanh chinh co hop giao ban',
+      },
+      {
+        label: 'Ca linh hoạt',
+        startHour: 9,
+        startMinute: 0,
+        endHour: 16,
+        endMinute: 30,
+        checkIn: '09:01',
+        checkOut: '12:00',
+        attendanceStatus: 'half_day',
+        scheduleStatus: 'CONFIRMED',
+        workingHoursPerDay: 7,
+        attendanceNote: 'Lam nua ngay do xin ve som',
+        scheduleNote: 'Sap xep theo lich bac si va may moc',
+      },
+    ] as const;
+
+    return patterns[index % patterns.length];
+  }
+
+  private fakeStaffPayrollMetrics(index: number) {
+    const baseSalary = 8_500_000 + (index % 5) * 1_500_000;
+    const workingDays = 26;
+    const actualDays = 22 + (index % 4);
+    const overtimeHours = [0, 4, 6, 2, 8][index % 5];
+    const bonus = [300_000, 500_000, 0, 750_000, 1_000_000][index % 5];
+    const deduction = [0, 150_000, 200_000, 0, 350_000][index % 5];
+    const dailyRate = baseSalary / workingDays;
+    const overtimeRate = Math.round((baseSalary / 208) * 1.5);
+    const netSalary = Math.round(dailyRate * actualDays + overtimeRate * overtimeHours + bonus - deduction);
+    const insuranceSalaryBase = Math.round(baseSalary * 0.9);
+
+    return {
+      baseSalary,
+      workingDays,
+      actualDays,
+      overtimeHours,
+      bonus,
+      deduction,
+      netSalary,
+      insuranceSalaryBase,
+    };
   }
 
   private fakeNumber(column: string, index: number) {
@@ -1755,19 +1953,25 @@ export class RecordsService {
   private async replaceCustomFieldValues(resource: string, recordId: string, values: Record<string, unknown>) {
     await this.customFieldValues.delete({ entityType: resource, recordId });
 
-    const rows = Object.entries(values)
-      .flatMap(([fieldKey, value]) => {
-        if (this.isEmptyCustomFieldValue(value)) return [];
-        const valueItems = Array.isArray(value) ? value : [value];
-        return valueItems
-          .filter((item) => !this.isEmptyCustomFieldValue(item))
-          .map((item) => this.customFieldValues.create({
-            entityType: resource,
-            recordId,
-            fieldKey,
-            valueText: String(item),
-          }));
-      });
+    const rows = Object.entries(values).flatMap(([fieldKey, value]) => {
+      if (this.isEmptyCustomFieldValue(value)) return [];
+      const valueItems = Array.isArray(value) ? value : [value];
+      const uniqueItems = Array.from(
+        new Set(
+          valueItems
+            .filter((item) => !this.isEmptyCustomFieldValue(item))
+            .map((item) => String(item)),
+        ),
+      );
+      return uniqueItems.map((item) =>
+        this.customFieldValues.create({
+          entityType: resource,
+          recordId,
+          fieldKey,
+          valueText: item,
+        }),
+      );
+    });
 
     if (rows.length > 0) {
       await this.customFieldValues.save(rows);

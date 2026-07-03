@@ -1191,7 +1191,7 @@ export class LandingFormSubmission {
 }
 
 @Entity('custom_field_values')
-@Index(['entityType', 'recordId', 'fieldKey'], { unique: true })
+@Index(['entityType', 'recordId', 'fieldKey'])
 export class CustomFieldValue {
   @PrimaryGeneratedColumn('uuid')
   id: string;
