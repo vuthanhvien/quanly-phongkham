@@ -1,10 +1,10 @@
 export type SelectOption = string | { value: string; label: string };
 
-export function normalizeSelectOption(opt: SelectOption): { value: string; label: string } {
+export function normalizeSelectOption (opt: SelectOption): { value: string; label: string } {
   return typeof opt === 'string' ? { value: opt, label: opt } : opt;
 }
 
-export function getFieldLabel(resource: string, fieldKey: string, value: string): string {
+export function getFieldLabel (resource: string, fieldKey: string, value: string): string {
   const fields = (baseFields as Record<string, FieldSpec[]>)[resource] || [];
   const field = fields.find((f) => f.key === fieldKey);
   if (!field?.options) return value;
@@ -17,6 +17,7 @@ export interface FieldSpec {
   key: string;
   label: string;
   type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative' | 'file';
+  displayFormat?: 'currency' | 'number' | 'percent';
   required?: boolean;
   options?: SelectOption[];
   defaultValue?: unknown;
@@ -162,7 +163,7 @@ export const resourceActionOptions: Record<string, ResourceActionOption[]> = {
   leads: [...DEFAULT_RESOURCE_ACTIONS, { key: 'convert-to-customer', label: 'Chuyển thành khách hàng' }],
 };
 
-export function getResourceActionOptions(resource: string) {
+export function getResourceActionOptions (resource: string) {
   return resourceActionOptions[resource] || DEFAULT_RESOURCE_ACTIONS;
 }
 
@@ -206,8 +207,8 @@ export const entityLabels: Record<string, string> = {
 };
 
 export const relationFields: Record<string, RelationSpec> = {
-  folderId: { resource: 'file-folders', labelFields: ['name'] },
-  parentId: { resource: 'file-folders', labelFields: ['name'] },
+  folderId: { resource: 'file-folders', labelFields: ['code', 'name'] },
+  parentId: { resource: 'file-folders', labelFields: ['code', 'name'] },
   branchId: { resource: 'branches', labelFields: ['slug', 'name'] },
   defaultBranchId: { resource: 'branches', labelFields: ['slug', 'name'] },
   customerId: { resource: 'customers', labelFields: ['code', 'fullName'] },
@@ -242,6 +243,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'phone', label: 'Điện thoại', width: '50', tableWidth: 170 },
   ],
   'file-folders': [
+    { key: 'code', label: 'Mã folder', required: true, width: '33', tableWidth: 160 },
     { key: 'name', label: 'Tên folder', required: true, width: '66', tableWidth: 220 },
     { key: 'parentId', label: 'Folder cha', width: '66', tableWidth: 220 },
     { key: 'description', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },

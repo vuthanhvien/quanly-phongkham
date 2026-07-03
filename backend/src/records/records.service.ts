@@ -292,6 +292,7 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
 const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
   branches: 'slug',
   departments: 'code',
+  'file-folders': 'code',
   rooms: 'code',
   equipments: 'code',
   staff: 'code',
@@ -306,6 +307,7 @@ const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
 const RESOURCE_IMPORT_KEYS: Record<string, string> = {
   branches: 'slug',
   departments: 'code',
+  'file-folders': 'code',
   rooms: 'code',
   equipments: 'code',
   staff: 'code',
@@ -454,7 +456,7 @@ export class RecordsService {
         consultations: ['summary', 'diagnosis', 'status'],
         'service-orders': ['code', 'serviceName', 'status'],
         'customer-images': ['title', 'mediaType', 'diagnosisNote'],
-        'file-folders': ['name', 'description'],
+        'file-folders': ['code', 'name', 'description'],
         files: ['title', 'originalName', 'mimeType', 'extension'],
         'work-schedules': ['shiftLabel', 'status'],
         'branch-role-assignments': ['roleName'],

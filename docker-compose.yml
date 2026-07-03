@@ -40,7 +40,7 @@ services:
       - cms
       - landing
     ports:
-      - "${APP_PORT:-80}:80"
+      - "${APP_PORT:-9999}:80"
 
   watchtower:
     image: containrrr/watchtower:latest

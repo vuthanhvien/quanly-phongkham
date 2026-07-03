@@ -1077,6 +1077,28 @@ function ViewConfigTable({
   if (viewType !== "TABLE") {
     columns.push(
       {
+        title: "Format",
+        key: "displayFormat",
+        width: 170,
+        render: (_, row) => (
+          <Select
+            allowClear
+            placeholder="Mặc định"
+            value={row.displayFormat}
+            onChange={(value) =>
+              onChange(viewType, row.key, {
+                displayFormat: value as FieldLayoutConfig["displayFormat"] | undefined,
+              })
+            }
+            options={[
+              { value: "currency", label: "Tiền tệ" },
+              { value: "number", label: "Số" },
+              { value: "percent", label: "Phần trăm" },
+            ]}
+          />
+        ),
+      },
+      {
         title: "Mô tả / hướng dẫn",
         key: "description",
         render: (_, row) => (
@@ -1116,24 +1138,48 @@ function ViewConfigTable({
   }
 
   if (viewType === "TABLE") {
-    columns.push({
-      title: "Width cột (px)",
-      key: "tableWidth",
-      width: 160,
-      render: (_, row) => (
-        <Input
-          inputMode="numeric"
-          value={row.tableWidth === undefined ? "" : String(row.tableWidth)}
-          onChange={(event) => {
-            const nextValue = event.target.value.replace(/[^\d]/g, "")
-            onChange(viewType, row.key, {
-              tableWidth: nextValue ? Number(nextValue) : undefined,
-            })
-          }}
-          placeholder="Ví dụ 180"
-        />
-      ),
-    })
+    columns.push(
+      {
+        title: "Format",
+        key: "displayFormat",
+        width: 170,
+        render: (_, row) => (
+          <Select
+            allowClear
+            placeholder="Mặc định"
+            value={row.displayFormat}
+            onChange={(value) =>
+              onChange(viewType, row.key, {
+                displayFormat: value as FieldLayoutConfig["displayFormat"] | undefined,
+              })
+            }
+            options={[
+              { value: "currency", label: "Tiền tệ" },
+              { value: "number", label: "Số" },
+              { value: "percent", label: "Phần trăm" },
+            ]}
+          />
+        ),
+      },
+      {
+        title: "Width cột (px)",
+        key: "tableWidth",
+        width: 160,
+        render: (_, row) => (
+          <Input
+            inputMode="numeric"
+            value={row.tableWidth === undefined ? "" : String(row.tableWidth)}
+            onChange={(event) => {
+              const nextValue = event.target.value.replace(/[^\d]/g, "")
+              onChange(viewType, row.key, {
+                tableWidth: nextValue ? Number(nextValue) : undefined,
+              })
+            }}
+            placeholder="Ví dụ 180"
+          />
+        ),
+      },
+    )
   }
 
   if (viewType === "FORM") {

@@ -387,7 +387,7 @@ export function RecordDetailPage() {
                       </div>
                       <div>
                         <Typography.Text type="secondary">Tổng chi tiêu</Typography.Text>
-                        <Typography.Title level={4}>{formatValue(record?.totalSpent)}</Typography.Title>
+                        <Typography.Title level={4}>{formatCurrencyValue(record?.totalSpent)}</Typography.Title>
                       </div>
                     </>
                   )}
@@ -819,4 +819,10 @@ function formatValue(value: unknown) {
   if (value === null || value === undefined || value === "") return "-"
   if (typeof value === "object") return JSON.stringify(value)
   return String(value)
+}
+
+function formatCurrencyValue(value: unknown) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return formatValue(value)
+  return `${new Intl.NumberFormat("vi-VN").format(numeric)} đ`
 }

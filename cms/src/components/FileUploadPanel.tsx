@@ -1,4 +1,4 @@
-import { InboxOutlined, UploadOutlined } from "@ant-design/icons"
+import { FolderAddOutlined, InboxOutlined, UploadOutlined } from "@ant-design/icons"
 import { Button, Form, Input, Space, TreeSelect, Typography, Upload, message } from "antd"
 import type { UploadFile, UploadProps } from "antd"
 import { useEffect, useState } from "react"
@@ -29,9 +29,12 @@ export function FileUploadPanel({
   onSuccess,
 }: FileUploadPanelProps) {
   const [form] = Form.useForm()
+  const [createFolderForm] = Form.useForm()
   const [folders, setFolders] = useState<FolderTreeNode[]>([])
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [fileList, setFileList] = useState<UploadFile[]>([])
+  const [showCreateFolder, setShowCreateFolder] = useState(false)
+  const [creatingFolder, setCreatingFolder] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -40,7 +43,8 @@ export function FileUploadPanel({
 
   useEffect(() => {
     form.setFieldsValue({ folderId: defaultFolderId })
-  }, [defaultFolderId, form])
+    createFolderForm.setFieldsValue({ parentId: defaultFolderId })
+  }, [createFolderForm, defaultFolderId, form])
 
   async function loadFolders() {
     const response = await api.get("/records/file-folders", { params: { pageSize: 200 } })
@@ -95,6 +99,28 @@ export function FileUploadPanel({
     }
   }
 
+  async function createFolder(values: { code: string; name: string; parentId?: string; description?: string }) {
+    setCreatingFolder(true)
+    try {
+      const response = await api.post("/records/file-folders", {
+        code: values.code.trim(),
+        name: values.name.trim(),
+        parentId: values.parentId || null,
+        description: values.description?.trim() || undefined,
+        isActive: true,
+      })
+      const createdFolder = response.data.data as { id: string }
+      await loadFolders()
+      form.setFieldValue("folderId", createdFolder.id)
+      createFolderForm.resetFields()
+      createFolderForm.setFieldValue("parentId", createdFolder.id)
+      setShowCreateFolder(false)
+      message.success("Đã tạo folder mới")
+    } finally {
+      setCreatingFolder(false)
+    }
+  }
+
   return (
     <Form form={form} layout="vertical" onFinish={(values) => void submit(values)}>
       <Typography.Paragraph type="secondary">
@@ -105,16 +131,95 @@ export function FileUploadPanel({
           Có thể kéo nhiều file cùng lúc. Tất cả file sẽ được lưu vào cùng folder đang chọn.
         </Typography.Paragraph>
       )}
-      <Form.Item name="folderId" label="Folder" rules={[{ required: true, message: "Chọn folder upload" }]}>
-        <TreeSelect
-          allowClear
-          placeholder="Chọn folder"
-          showSearch
-          treeData={folders}
-          treeDefaultExpandAll
-          treeNodeFilterProp="title"
-        />
-      </Form.Item>
+      <div className="upload-folder-block">
+        <div className="upload-folder-block-head">
+          <Typography.Text strong>Folder upload</Typography.Text>
+          <Button
+            icon={<FolderAddOutlined />}
+            type={showCreateFolder ? "default" : "dashed"}
+            onClick={() => {
+              const nextOpen = !showCreateFolder
+              setShowCreateFolder(nextOpen)
+              if (nextOpen) {
+                createFolderForm.setFieldsValue({ parentId: form.getFieldValue("folderId") || defaultFolderId })
+              }
+            }}
+          >
+            {showCreateFolder ? "Ẩn tạo folder" : "Tạo folder mới"}
+          </Button>
+        </div>
+        <Form.Item name="folderId" rules={[{ required: true, message: "Chọn folder upload" }]}>
+          <TreeSelect
+            allowClear
+            placeholder="Chọn folder"
+            showSearch
+            treeData={folders}
+            treeDefaultExpandAll
+            treeNodeFilterProp="title"
+          />
+        </Form.Item>
+        {showCreateFolder ? (
+          <div className="upload-folder-create-panel">
+            <Form
+              component={false}
+              form={createFolderForm}
+              layout="vertical"
+            >
+              <div className="upload-folder-create-grid">
+                <Form.Item
+                  label="Mã folder"
+                  name="code"
+                  rules={[{ required: true, message: "Nhập mã folder" }]}
+                >
+                  <Input placeholder="VD: HSKH-2026" />
+                </Form.Item>
+                <Form.Item
+                  label="Tên folder"
+                  name="name"
+                  rules={[{ required: true, message: "Nhập tên folder" }]}
+                >
+                  <Input placeholder="Tên folder mới" />
+                </Form.Item>
+              </div>
+              <Form.Item label="Folder cha" name="parentId">
+                <TreeSelect
+                  allowClear
+                  placeholder="Tạo ở folder gốc"
+                  showSearch
+                  treeData={folders}
+                  treeDefaultExpandAll
+                  treeNodeFilterProp="title"
+                />
+              </Form.Item>
+              <Form.Item label="Mô tả" name="description">
+                <Input.TextArea autoSize={{ minRows: 2, maxRows: 3 }} />
+              </Form.Item>
+              <Space>
+                <Button
+                  loading={creatingFolder}
+                  type="primary"
+                  onClick={() => {
+                    void createFolderForm
+                      .validateFields()
+                      .then((values) => createFolder(values))
+                  }}
+                >
+                  Tạo folder
+                </Button>
+                <Button
+                  onClick={() => {
+                    createFolderForm.resetFields()
+                    createFolderForm.setFieldValue("parentId", form.getFieldValue("folderId") || defaultFolderId)
+                    setShowCreateFolder(false)
+                  }}
+                >
+                  Hủy
+                </Button>
+              </Space>
+            </Form>
+          </div>
+        ) : null}
+      </div>
       <Form.Item name="title" label="Tên hiển thị">
         <Input disabled={selectedFiles.length > 1} placeholder="Mặc định lấy theo tên file" />
       </Form.Item>

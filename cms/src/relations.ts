@@ -16,6 +16,24 @@ export interface FileLookupItem {
 
 export type FileLookupMap = Record<string, FileLookupItem>;
 
+function formatDisplayNumber(value: unknown) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return String(value)
+  return new Intl.NumberFormat('vi-VN').format(numeric)
+}
+
+function formatDisplayCurrency(value: unknown) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return String(value)
+  return `${new Intl.NumberFormat('vi-VN').format(numeric)} đ`
+}
+
+function formatDisplayPercent(value: unknown) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return String(value)
+  return `${new Intl.NumberFormat('vi-VN').format(numeric)}%`
+}
+
 function resolveRelationSpec(field: string | FieldSpec) {
   if (typeof field === 'string') return relationFields[field];
   if (field.type === 'file') {
@@ -112,6 +130,11 @@ export function displayValue(field: string | FieldSpec, value: unknown, lookups:
     return value.join(', ');
   }
   if (relation) return lookups[relation.lookupKey || relation.resource]?.[String(value)] || lookups[relation.resource]?.[String(value)] || String(value);
+  if (typeof field !== 'string') {
+    if (field.displayFormat === 'currency') return formatDisplayCurrency(value);
+    if (field.displayFormat === 'number') return formatDisplayNumber(value);
+    if (field.displayFormat === 'percent') return formatDisplayPercent(value);
+  }
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }

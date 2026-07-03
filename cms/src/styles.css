@@ -1048,8 +1048,8 @@ textarea.ant-input {
 .image-library-preview,
 .image-library-card {
   background: rgba(15, 23, 42, 0.05);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 18px;
+  border: 1px solid var(--app-line);
+  border-radius: calc(var(--app-radius) + 4px);
 }
 
 .image-library-sidebar {
@@ -1271,7 +1271,8 @@ textarea.ant-input {
 
 .image-library-tree {
   background: rgba(15, 23, 42, 0.02);
-  border-radius: 14px;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -1279,7 +1280,7 @@ textarea.ant-input {
 }
 
 .image-library-tree .ant-tree-node-content-wrapper {
-  border-radius: 10px;
+  border-radius: var(--app-radius);
   min-height: 32px;
   padding: 4px 8px;
 }
@@ -1299,7 +1300,8 @@ textarea.ant-input {
 
 .image-library-current-folder {
   background: rgba(15, 23, 42, 0.04);
-  border-radius: 12px;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
   padding: 10px 12px;
 }
 
@@ -1412,8 +1414,8 @@ textarea.ant-input {
 .file-selection-pill {
   align-items: center;
   background: rgba(15, 23, 42, 0.05);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 14px;
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
   display: flex;
   gap: 12px;
 }
@@ -1424,7 +1426,7 @@ textarea.ant-input {
 
 .file-preview-image,
 .file-preview-fallback {
-  border-radius: 12px;
+  border-radius: var(--app-radius);
   flex: 0 0 56px;
   height: 56px;
   width: 56px;
@@ -1474,6 +1476,38 @@ textarea.ant-input {
 .file-selection-pill-icon {
   color: var(--app-primary);
   display: inline-flex;
+}
+
+.upload-folder-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.upload-folder-block .ant-form-item {
+  margin-bottom: 0;
+}
+
+.upload-folder-block-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.upload-folder-create-panel {
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--app-line);
+  border-radius: calc(var(--app-radius) + 2px);
+  padding: 14px;
+}
+
+.upload-folder-create-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 18px;
 }
 
 .document-workspace {
@@ -2019,6 +2053,10 @@ textarea.ant-input {
   .image-library-preview,
   .image-library-tree {
     max-height: none;
+  }
+
+  .upload-folder-create-grid {
+    grid-template-columns: 1fr;
   }
 
   .dashboard-mini-grid,

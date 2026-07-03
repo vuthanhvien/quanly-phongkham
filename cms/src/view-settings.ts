@@ -150,9 +150,36 @@ function resolveDefaultTableWidth(field: FieldSpec) {
   return 200
 }
 
+function resolveDefaultDisplayFormat(field: FieldSpec): FieldLayoutConfig['displayFormat'] {
+  if (field.displayFormat) return field.displayFormat
+
+  const normalizedKey = field.key.toLowerCase()
+  const currencyKeys = new Set([
+    'totalspent',
+    'sellingprice',
+    'totalamount',
+    'paidamount',
+    'amount',
+    'unitprice',
+    'debtlimit',
+    'basesalary',
+    'salarybase',
+    'netsalary',
+    'bonus',
+    'deduction',
+  ])
+  const percentKeys = new Set(['employeerate', 'employerrate'])
+
+  if (currencyKeys.has(normalizedKey)) return 'currency'
+  if (percentKeys.has(normalizedKey)) return 'percent'
+  if (field.type === 'number') return 'number'
+  return undefined
+}
+
 export function applyDefaultFieldLayout<T extends FieldSpec>(field: T): T {
   return {
     ...field,
+    displayFormat: resolveDefaultDisplayFormat(field),
     width: field.width || resolveDefaultFieldWidth(field),
     tableWidth: resolveDefaultTableWidth(field),
   }
@@ -338,6 +365,10 @@ export function buildFieldLayoutConfigs(
         entry.defaultValue !== undefined
           ? entry.defaultValue
           : base.defaultValue,
+      displayFormat:
+        ['currency', 'number', 'percent'].includes(String(entry.displayFormat))
+          ? String(entry.displayFormat) as FieldLayoutConfig['displayFormat']
+          : base.displayFormat,
       width:
         ['25', '33', '50', '66', '100'].includes(String(entry.width))
           ? String(entry.width) as FieldLayoutConfig['width']
@@ -396,6 +427,7 @@ export function serializeViewConfig(
     if (field.defaultValue !== undefined && field.defaultValue !== '') {
       next.defaultValue = field.defaultValue
     }
+    if (field.displayFormat) next.displayFormat = field.displayFormat
     if (field.width) next.width = field.width
     if (typeof field.tableWidth === 'number' && Number.isFinite(field.tableWidth) && field.tableWidth > 0) {
       next.tableWidth = field.tableWidth

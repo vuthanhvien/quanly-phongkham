@@ -631,6 +631,7 @@ function FileSelectInput({
         onCancel={() => setOpenUpload(false)}
       >
         <FileUploadPanel
+          defaultFolderId={selectedFolderId}
           multiple
           onCancel={() => setOpenUpload(false)}
           onSuccess={(files) => {
@@ -758,11 +759,18 @@ function ImageLibrarySelectInput({
   return (
     <Space direction="vertical" size={10} style={{ width: "100%" }}>
       {typeof value === "string" && value ? (
-        <div style={{ border: "1px solid rgba(15, 23, 42, 0.08)", borderRadius: 12, padding: 12, background: "rgba(255,255,255,0.8)" }}>
+        <div
+          style={{
+            border: "1px solid var(--app-line)",
+            borderRadius: "var(--app-radius)",
+            padding: 12,
+            background: "rgba(255,255,255,0.8)",
+          }}
+        >
           <Image
             alt={selected?.title || "Hình ảnh đã chọn"}
             src={value}
-            style={{ width: "100%", maxHeight: 240, objectFit: "contain", borderRadius: 10 }}
+            style={{ width: "100%", maxHeight: 240, objectFit: "contain", borderRadius: "var(--app-radius)" }}
           />
           <Typography.Text style={{ display: "block", marginTop: 8 }}>
             {selected?.title || value}
@@ -877,7 +885,16 @@ function ImageLibrarySelectInput({
               <div className="image-library-preview">
                 {selectedDraft ? (
                   <>
-                    <Image alt={selectedDraft.title} src={selectedDraft.previewUrl} style={{ width: "100%", maxHeight: 360, objectFit: "contain", borderRadius: 12 }} />
+                    <Image
+                      alt={selectedDraft.title}
+                      src={selectedDraft.previewUrl}
+                      style={{
+                        width: "100%",
+                        maxHeight: 360,
+                        objectFit: "contain",
+                        borderRadius: "var(--app-radius)",
+                      }}
+                    />
                     <Typography.Title level={5}>{selectedDraft.title.replace(` ${selectedDraft.folderLabel || ""}`, "")}</Typography.Title>
                     <Typography.Text type="secondary">{selectedDraft.folderLabel || "Không có folder"}</Typography.Text>
                   </>
@@ -899,6 +916,7 @@ function ImageLibrarySelectInput({
         onCancel={() => setOpenUpload(false)}
       >
         <FileUploadPanel
+          defaultFolderId={selectedFolderId}
           accept="image/*"
           multiple={false}
           onCancel={() => setOpenUpload(false)}

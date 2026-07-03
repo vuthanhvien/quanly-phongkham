@@ -778,6 +778,9 @@ export class CustomerImage extends ConfigurableEntity {
 
 @Entity('file_folders')
 export class FileFolder extends ConfigurableEntity {
+  @Column({ unique: true, nullable: true })
+  code?: string;
+
   @Column()
   name: string;
 
