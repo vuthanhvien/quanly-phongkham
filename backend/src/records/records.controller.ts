@@ -59,18 +59,14 @@ export class RecordsController {
     return this.records.issueStock(payload, request.user);
   }
 
-  @Get('records/:resource/:id')
-  find(@Param('resource') resource: string, @Param('id') id: string, @Request() request: ExpressRequest & { user: AuthUser }) {
-    return this.records.find(resource, id, request.user, request);
-  }
-
   @Get('records/:resource/import-bundle')
   exportImportBundle(
     @Param('resource') resource: string,
     @Query('template') template?: string,
+    @Query('fake') fake?: string,
     @Request() request?: ExpressRequest & { user?: AuthUser },
   ) {
-    return this.records.exportImportBundle(resource, template === '1', request?.user, request);
+    return this.records.exportImportBundle(resource, template === '1', fake === '1', request?.user, request);
   }
 
   @Post('records/:resource/import-bundle')
@@ -80,6 +76,20 @@ export class RecordsController {
     @Request() request: { user: AuthUser },
   ) {
     return this.records.importBundle(resource, payload?.sheets || {}, request.user);
+  }
+
+  @Post('records/:resource/import-upsert')
+  importUpsert(
+    @Param('resource') resource: string,
+    @Body() payload: Record<string, unknown>,
+    @Request() request: { user: AuthUser },
+  ) {
+    return this.records.importUpsert(resource, payload, request.user);
+  }
+
+  @Get('records/:resource/:id')
+  find(@Param('resource') resource: string, @Param('id') id: string, @Request() request: ExpressRequest & { user: AuthUser }) {
+    return this.records.find(resource, id, request.user, request);
   }
 
   @Post('records/:resource')

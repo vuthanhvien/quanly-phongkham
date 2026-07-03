@@ -4,6 +4,17 @@ import axios from 'axios';
 export const API_URL = import.meta.env.VITE_API_URL || '/api';
 export const api = axios.create({ baseURL: API_URL });
 
+function clearAuthSession() {
+  localStorage.removeItem('clinic-token');
+  localStorage.removeItem('clinic-user');
+}
+
+function redirectToLogin() {
+  if (typeof window === 'undefined') return;
+  if (window.location.pathname === '/login') return;
+  window.location.assign('/login');
+}
+
 // Resolves a relative backend path (e.g. /uploads/...) to an absolute URL.
 // publicUrl values stored in DB are root-relative; the backend serves them
 // on the same host as the API but without the /api prefix.
@@ -20,6 +31,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      clearAuthSession();
+      redirectToLogin();
+    }
+    return Promise.reject(error);
+  },
+);
+
 export const authProvider: AuthProvider = {
   login: async ({ email, password }) => {
     try {
@@ -32,8 +54,7 @@ export const authProvider: AuthProvider = {
     }
   },
   logout: async () => {
-    localStorage.removeItem('clinic-token');
-    localStorage.removeItem('clinic-user');
+    clearAuthSession();
     return { success: true, redirectTo: '/login' };
   },
   check: async () =>

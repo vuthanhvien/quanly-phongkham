@@ -206,7 +206,7 @@ export function RecordImportPage() {
     }
 
     if (bundleMode) {
-      const response = await api.get(`/records/${resource}/import-bundle`, { params: { template: 1 } })
+      const response = await api.get(`/records/${resource}/import-bundle`, { params: { template: 1, fake: 1 } })
       const workbook = buildBundleWorkbookFromApi(response.data.data.sheets || [])
       XLSX.writeFile(workbook, `${resource}-import-template.xlsx`)
       return
@@ -278,7 +278,7 @@ export function RecordImportPage() {
       if (row.errors.length > 0 || row.__saved) continue
       const index = nextRows.findIndex((item) => item.__rowKey === row.__rowKey)
       try {
-        await api.post(`/records/${resource}`, row.payload)
+        await api.post(`/records/${resource}/import-upsert`, row.payload)
         successCount += 1
         nextRows[index] = { ...row, __saved: true }
       } catch (error: any) {

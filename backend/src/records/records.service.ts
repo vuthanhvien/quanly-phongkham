@@ -296,6 +296,41 @@ const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
   'user-accounts': 'email',
 };
 
+const RESOURCE_IMPORT_KEYS: Record<string, string> = {
+  branches: 'slug',
+  departments: 'code',
+  staff: 'code',
+  'branch-role-assignments': 'id',
+  'branch-permissions': 'id',
+  'user-accounts': 'email',
+  customers: 'code',
+  leads: 'code',
+  'lead-activities': 'id',
+  suppliers: 'code',
+  products: 'code',
+  'medical-episodes': 'id',
+  appointments: 'id',
+  'work-schedules': 'id',
+  'stock-batches': 'id',
+  consultations: 'id',
+  'service-orders': 'code',
+  'customer-images': 'id',
+  files: 'id',
+  invoices: 'code',
+  expenses: 'id',
+  treatments: 'id',
+  commissions: 'id',
+  'work-contracts': 'id',
+  'staff-insurances': 'id',
+  attendances: 'id',
+  'leave-requests': 'id',
+  payrolls: 'id',
+  'staff-rewards': 'id',
+  'staff-trainings': 'id',
+  'performance-reviews': 'id',
+  'position-histories': 'id',
+};
+
 @Injectable()
 export class RecordsService {
   constructor(
@@ -437,9 +472,20 @@ export class RecordsService {
     return { data: this.protect(resource, record, request) };
   }
 
-  async exportImportBundle(resource: string, template = false, user?: AuthUser, request?: RequestContext) {
+  async exportImportBundle(resource: string, template = false, fake = false, user?: AuthUser, request?: RequestContext) {
     const config = this.bundleConfig(resource);
     await this.assertPermission(user, config.main.resource, 'view');
+
+    if (template && fake) {
+      return {
+        data: {
+          resource,
+          template,
+          fake,
+          sheets: await this.buildFakeBundleSheets(resource as BundleRootResource, request),
+        },
+      };
+    }
 
     const mainRows = template ? [] : await this.listBundleRows(config.main.resource, user);
     const mainCodeById = new Map(mainRows.map((row) => [String(row.id), String(row.code || '')]));
@@ -468,6 +514,7 @@ export class RecordsService {
       data: {
         resource,
         template,
+        fake,
         sheets,
       },
     };
@@ -504,6 +551,30 @@ export class RecordsService {
         ],
       },
     };
+  }
+
+  async importUpsert(resource: string, payload: Record<string, unknown>, user: AuthUser) {
+    const keyField = this.importKeyField(resource);
+    if (!keyField) {
+      throw new BadRequestException('Module nay chua ho tro import upsert theo code');
+    }
+
+    const rawKey = payload[keyField];
+    const keyValue = typeof rawKey === 'string' ? rawKey.trim() : rawKey;
+    if (keyValue === undefined || keyValue === null || String(keyValue).trim() === '') {
+      throw new BadRequestException(`Import ${this.resourceLabel(resource)} bat buoc co truong ${keyField}`);
+    }
+
+    const repository = this.repository(resource);
+    const existing = await repository.findOne({
+      where: { [keyField]: keyValue } as Record<string, unknown>,
+    });
+
+    if (existing) {
+      return this.update(resource, String(existing.id), payload, user);
+    }
+
+    return this.create(resource, payload, user);
   }
 
   async create(resource: string, payload: Record<string, unknown>, user: AuthUser) {
@@ -669,6 +740,10 @@ export class RecordsService {
     return labels[resource] || resource;
   }
 
+  private importKeyField(resource: string) {
+    return RESOURCE_IMPORT_KEYS[resource];
+  }
+
   private bundleConfig(resource: string) {
     const config = IMPORT_BUNDLE_CONFIGS[resource as BundleRootResource];
     if (!config) throw new BadRequestException('Module nay chua ho tro import/export bundle');
@@ -728,6 +803,249 @@ export class RecordsService {
         return exported;
       }),
     );
+  }
+
+  private async buildFakeBundleSheets(resource: BundleRootResource, request?: RequestContext) {
+    const config = this.bundleConfig(resource);
+    const sampleSize = 5;
+    const referencePools = await this.loadBundleReferencePools(config);
+    const parentCodes = Array.from({ length: sampleSize }, (_, index) => this.generateBundleCode(resource, index));
+
+    const mainRows = parentCodes.map((code, index) =>
+      this.buildFakeBundleRow(config.main, {
+        resource,
+        index,
+        code,
+        parentCode: code,
+        referencePools,
+      }),
+    );
+
+    const sheets = [
+      {
+        name: config.main.sheetName,
+        resource: config.main.resource,
+        columns: config.main.columns,
+        rows: mainRows,
+      },
+    ];
+
+    for (const sheetConfig of config.related) {
+      const rows = parentCodes.flatMap((parentCode, parentIndex) =>
+        Array.from({ length: 2 }, (_, offset) =>
+          this.buildFakeBundleRow(sheetConfig, {
+            resource,
+            index: parentIndex * 2 + offset,
+            code: `${parentCode}-${sheetConfig.sheetName}-${offset + 1}`.toUpperCase(),
+            parentCode,
+            referencePools,
+          }),
+        ),
+      );
+
+      sheets.push({
+        name: sheetConfig.sheetName,
+        resource: sheetConfig.resource,
+        columns: sheetConfig.columns,
+        rows,
+      });
+    }
+
+    return sheets.map((sheet) => ({
+      ...sheet,
+      rows: sheet.rows.map((row) =>
+        Object.fromEntries(
+          Object.entries(row).map(([key, value]) => [key, this.serializeFakeBundleCellValue(key, value, request)]),
+        ),
+      ),
+    }));
+  }
+
+  private async loadBundleReferencePools(config: { main: ImportBundleSheetConfig; related: ImportBundleSheetConfig[] }) {
+    const relationResources = new Set<string>();
+    [config.main, ...config.related].forEach((sheet) => {
+      sheet.columns.forEach((column) => {
+        const resource = FIELD_RELATION_RESOURCES[column];
+        if (resource) relationResources.add(resource);
+      });
+    });
+
+    const entries = await Promise.all(
+      Array.from(relationResources).map(async (resource) => {
+        const field = RESOURCE_EXTERNAL_KEYS[resource];
+        if (!field) return [resource, []] as const;
+        const rows = await this.repository(resource).find({
+          order: { createdAt: 'ASC' },
+          take: 50,
+        });
+        return [
+          resource,
+          rows
+            .map((row) => String((row as Record<string, unknown>)[field] || ''))
+            .filter(Boolean),
+        ] as const;
+      }),
+    );
+
+    return Object.fromEntries(entries) as Record<string, string[]>;
+  }
+
+  private buildFakeBundleRow(
+    sheetConfig: ImportBundleSheetConfig,
+    context: {
+      resource: BundleRootResource;
+      index: number;
+      code: string;
+      parentCode: string;
+      referencePools: Record<string, string[]>;
+    },
+  ) {
+    const row: Record<string, unknown> = {};
+    for (const column of sheetConfig.columns) {
+      if (column === 'recordId') continue;
+      if (sheetConfig.parentCodeColumn && column === sheetConfig.parentCodeColumn) {
+        row[column] = context.parentCode;
+        continue;
+      }
+      row[column] = this.fakeBundleValue(sheetConfig.resource, column, context);
+    }
+    return row;
+  }
+
+  private fakeBundleValue(
+    resource: string,
+    column: string,
+    context: {
+      resource: BundleRootResource;
+      index: number;
+      code: string;
+      parentCode: string;
+      referencePools: Record<string, string[]>;
+    },
+  ) {
+    const relationResource = FIELD_RELATION_RESOURCES[column];
+    if (relationResource) {
+      const pool = context.referencePools[relationResource] || [];
+      return pool.length > 0 ? pool[context.index % pool.length] : '';
+    }
+
+    if (column === 'code') return context.code;
+    if (column === 'fullName') return `Mau ${this.resourceLabel(resource)} ${context.index + 1}`;
+    if (column === 'phone' || column === 'emergencyContactPhone') return `09${String(10000000 + context.index).padStart(8, '0')}`;
+    if (column === 'email') return `${context.code.toLowerCase()}@example.com`;
+    if (column === 'address') return `Dia chi mau ${context.index + 1}`;
+    if (column === 'note' || column === 'content' || column === 'summary' || column === 'diagnosis' || column === 'nextAction' || column === 'reason' || column === 'description') {
+      return `Du lieu mau cho ${column} ${context.index + 1}`;
+    }
+    if (column === 'title') return `Tieu de mau ${context.index + 1}`;
+    if (column === 'serviceName' || column === 'name' || column === 'trainingName') return `Mau ${column} ${context.index + 1}`;
+    if (column === 'doctorName' || column === 'issuedBy' || column === 'provider' || column === 'position' || column === 'toPosition' || column === 'fromPosition') {
+      return `Gia tri mau ${context.index + 1}`;
+    }
+    if (column === 'source') return ['Facebook', 'Zalo', 'Website'][context.index % 3];
+    if (column === 'gender') return resource === 'customers' ? ['NAM', 'NỮ', 'KHÁC'][context.index % 3] : ['male', 'female', 'other'][context.index % 3];
+    if (column === 'status') return this.fakeStatusValue(resource, context.index);
+    if (column === 'type') return resource === 'staff-rewards' ? (context.index % 2 === 0 ? 'reward' : 'discipline') : 'CONSULTATION';
+    if (column === 'activityType') return ['CALL', 'MESSAGE', 'MEETING', 'FOLLOW_UP'][context.index % 4];
+    if (column === 'contractType') return ['full_time', 'probation', 'part_time'][context.index % 3];
+    if (column === 'insuranceType') return ['BHXH', 'BHYT', 'BHTN'][context.index % 3];
+    if (column === 'leaveType') return ['annual', 'sick', 'personal'][context.index % 3];
+    if (column === 'method') return ['CASH', 'TRANSFER', 'CARD'][context.index % 3];
+    if (column === 'mediaType') return ['BEFORE', 'AFTER', 'PROGRESS'][context.index % 3];
+    if (column === 'shiftLabel') return ['Ca sáng', 'Ca chiều'][context.index % 2];
+    if (column === 'room') return `P${(context.index % 8) + 1}`;
+    if (column === 'imageUrl' || column === 'avatarUrl') return `https://picsum.photos/seed/${context.code.toLowerCase()}/1200/900`;
+    if (column === 'checkIn') return '08:00';
+    if (column === 'checkOut') return '17:00';
+    if (column === 'role') return ['STAFF', 'DOCTOR', 'ADMIN'][context.index % 3];
+    if (column === 'roleName') return 'STAFF';
+    if (column === 'roleKeys') return ['VIEW', 'CREATE'];
+    if (column === 'isActive') return true;
+    if (column === 'password') return '123456';
+    if (column === 'date' || column.endsWith('Date') || column === 'joinedAt' || column === 'dateOfBirth' || column === 'effectiveDate' || column === 'expiryDate') {
+      return this.fakeDate(context.index);
+    }
+    if (column.endsWith('At') || column === 'startTime' || column === 'endTime' || column === 'scheduledAt' || column === 'consultedAt' || column === 'capturedAt') {
+      return this.fakeDateTime(context.index, column === 'endTime' ? 1 : 0);
+    }
+    if (['totalSpent', 'totalAmount', 'paidAmount', 'amount', 'baseSalary', 'salaryBase', 'netSalary', 'bonus', 'deduction', 'unitPrice', 'employeeRate', 'employerRate', 'score'].includes(column)) {
+      return (context.index + 1) * 100000;
+    }
+    if (['quantity', 'totalSessions', 'completedSessions', 'intervalDays', 'workingHoursPerDay', 'workingDaysPerMonth', 'workingDays', 'actualDays', 'overtimeHours', 'reviewMonth', 'reviewYear', 'dependants', 'month', 'year'].includes(column)) {
+      return this.fakeNumber(column, context.index);
+    }
+    if (column === 'idNumber' || column === 'idCardNumber' || column === 'certificateNumber' || column === 'taxCode' || column === 'bankAccountNumber') {
+      return `${context.index + 1}`.padStart(10, '0');
+    }
+    return `Mau ${column} ${context.index + 1}`;
+  }
+
+  private fakeStatusValue(resource: string, index: number) {
+    const options: Record<string, string[]> = {
+      customers: ['CONSULTING', 'IN_TREATMENT', 'COMPLETED'],
+      leads: ['NEW', 'CONTACTING', 'QUALIFIED'],
+      staff: ['ACTIVE', 'ON_LEAVE', 'INACTIVE'],
+      appointments: ['SCHEDULED', 'WAITING', 'COMPLETED'],
+      consultations: ['OPEN', 'FOLLOW_UP', 'COMPLETED'],
+      'medical-episodes': ['ACTIVE', 'COMPLETED'],
+      treatments: ['ACTIVE', 'COMPLETED'],
+      invoices: ['UNPAID', 'PARTIAL', 'PAID'],
+      'lead-activities': ['OPEN', 'DONE'],
+      'work-contracts': ['active', 'draft'],
+      'staff-trainings': ['planned', 'completed'],
+      'performance-reviews': ['draft', 'submitted'],
+      attendances: ['present', 'late'],
+      'leave-requests': ['pending', 'approved'],
+      payrolls: ['draft', 'confirmed'],
+      'work-schedules': ['PLANNED', 'CONFIRMED'],
+      'staff-rewards': ['reward', 'discipline'],
+      'staff-insurances': ['active'],
+      'position-histories': ['active'],
+    };
+    const list = options[resource] || ['ACTIVE'];
+    return list[index % list.length];
+  }
+
+  private fakeDate(index: number) {
+    const date = new Date(Date.UTC(2026, 0, 1 + index));
+    return date.toISOString().slice(0, 10);
+  }
+
+  private fakeDateTime(index: number, extraHours = 0) {
+    const date = new Date(Date.UTC(2026, 0, 1 + index, 8 + extraHours, 0, 0));
+    return date.toISOString().slice(0, 16);
+  }
+
+  private fakeNumber(column: string, index: number) {
+    if (column === 'reviewYear' || column === 'year') return 2026;
+    if (column === 'reviewMonth' || column === 'month') return (index % 12) + 1;
+    if (column === 'dependants') return index % 3;
+    if (column === 'completedSessions') return Math.min(2, index + 1);
+    if (column === 'totalSessions') return 6;
+    if (column === 'intervalDays') return 7;
+    if (column === 'workingHoursPerDay') return 8;
+    if (column === 'workingDaysPerMonth' || column === 'workingDays') return 26;
+    if (column === 'actualDays') return 24;
+    if (column === 'overtimeHours') return 4;
+    return index + 1;
+  }
+
+  private serializeFakeBundleCellValue(_column: string, value: unknown, request?: RequestContext) {
+    if (value instanceof Date) return value.toISOString();
+    if (Array.isArray(value)) return value.join(', ');
+    if (typeof value === 'string' && value.startsWith('/uploads/')) {
+      return this.toAbsolutePublicUrl(value, request);
+    }
+    return value;
+  }
+
+  private generateBundleCode(resource: BundleRootResource, index: number) {
+    const prefix: Record<BundleRootResource, string> = {
+      customers: 'KH',
+      leads: 'LD',
+      staff: 'NV',
+    };
+    return `${prefix[resource]}-IMPORT-${String(index + 1).padStart(3, '0')}`;
   }
 
   private async exportBundleColumnValue(
@@ -791,13 +1109,8 @@ export class RecordsService {
     if (!code) {
       throw new BadRequestException(`Sheet ${sheetConfig.sheetName} bat buoc co cot code`);
     }
-    const existing = await this.repository(sheetConfig.resource).findOne({ where: { code } });
     const payload = await this.buildBundlePayload(sheetConfig, row);
-    if (existing) {
-      const response = await this.update(sheetConfig.resource, String(existing.id), payload, user);
-      return response.data as ConfigurableEntity;
-    }
-    const response = await this.create(sheetConfig.resource, payload, user);
+    const response = await this.importUpsert(sheetConfig.resource, payload, user);
     return response.data as ConfigurableEntity;
   }
 
