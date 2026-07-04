@@ -3,6 +3,13 @@ import axios from 'axios';
 
 export const API_URL = import.meta.env.VITE_API_URL || '/api';
 export const api = axios.create({ baseURL: API_URL });
+const APP_BASE_PATH = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '') || '/';
+
+function resolveAppPath(path: string) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  if (APP_BASE_PATH === '/') return normalizedPath;
+  return `${APP_BASE_PATH}${normalizedPath}`;
+}
 
 function clearAuthSession() {
   localStorage.removeItem('clinic-token');
@@ -11,8 +18,9 @@ function clearAuthSession() {
 
 function redirectToLogin() {
   if (typeof window === 'undefined') return;
-  if (window.location.pathname === '/login') return;
-  window.location.assign('/login');
+  const loginPath = resolveAppPath('/login');
+  if (window.location.pathname === loginPath) return;
+  window.location.assign(loginPath);
 }
 
 // Resolves a relative backend path (e.g. /uploads/...) to an absolute URL.
@@ -48,21 +56,21 @@ export const authProvider: AuthProvider = {
       const { data } = await api.post('/auth/login', { email, password });
       localStorage.setItem('clinic-token', data.accessToken);
       localStorage.setItem('clinic-user', JSON.stringify(data.user));
-      return { success: true, redirectTo: '/' };
+      return { success: true, redirectTo: resolveAppPath('/') };
     } catch {
       return { success: false, error: { name: 'LoginError', message: 'Email hoặc mật khẩu không đúng' } };
     }
   },
   logout: async () => {
     clearAuthSession();
-    return { success: true, redirectTo: '/login' };
+    return { success: true, redirectTo: resolveAppPath('/login') };
   },
   check: async () =>
     localStorage.getItem('clinic-token')
       ? { authenticated: true }
-      : { authenticated: false, redirectTo: '/login' },
+      : { authenticated: false, redirectTo: resolveAppPath('/login') },
   onError: async (error) =>
-    error?.status === 401 ? { logout: true, redirectTo: '/login', error } : { error },
+    error?.status === 401 ? { logout: true, redirectTo: resolveAppPath('/login'), error } : { error },
   getIdentity: async () => JSON.parse(localStorage.getItem('clinic-user') || 'null'),
 };
 

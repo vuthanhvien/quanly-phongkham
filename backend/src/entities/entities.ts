@@ -601,11 +601,11 @@ export class Appointment extends ConfigurableEntity {
   @Column({ default: 'CONSULTATION' })
   type: string;
 
-  @Column({ type: 'timestamp' })
-  startTime: Date;
+  @Column({ type: 'datetime', nullable: true })
+  startTime?: Date;
 
-  @Column({ type: 'timestamp' })
-  endTime: Date;
+  @Column({ type: 'datetime', nullable: true })
+  endTime?: Date;
 
   @Column({ default: 'SCHEDULED' })
   status: string;
@@ -640,10 +640,10 @@ export class WorkSchedule extends ConfigurableEntity {
   @Column({ default: 'CA SANG' })
   shiftLabel: string;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   startTime?: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   endTime?: Date;
 
   @Column({ nullable: true })
@@ -1066,7 +1066,7 @@ export class AppUiSetting {
   @Column({ default: 'cms' })
   appKey: string;
 
-  @Column({ default: 'Thiện Chánh CMS' })
+  @Column({ default: 'Thien Chanh CMS' })
   appName: string;
 
   @Column({ type: 'text', nullable: true })

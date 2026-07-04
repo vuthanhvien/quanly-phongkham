@@ -14,6 +14,7 @@ import {
   Button,
   Card,
   Drawer,
+  Grid,
   Input,
   Popconfirm,
   Space,
@@ -43,6 +44,7 @@ import {
 } from "../view-settings"
 
 export function RecordListPage() {
+  const screens = Grid.useBreakpoint()
   const { resource = "customers" } = useParams()
   const navigate = useNavigate()
   const [search, setSearch] = useState("")
@@ -251,9 +253,10 @@ export function RecordListPage() {
             {entityLabels[resource] || resource}
           </Typography.Title>
         </div>
-        <Space>
+        <Space wrap className="page-header-actions">
           <Input.Search
             allowClear
+            className="page-search"
             placeholder="Tìm kiếm"
             onSearch={(value) => {
               setCurrentPage(1)
@@ -312,7 +315,7 @@ export function RecordListPage() {
         open={creating || Boolean(editingId)}
         placement="right"
         title={editingId ? `Chỉnh sửa ${entityLabels[resource] || resource}` : `Thêm nhanh ${entityLabels[resource] || resource}`}
-        width={["service-orders", "stock-batches"].includes(resource) ? 980 : 560}
+        width={screens.md ? (["service-orders", "stock-batches"].includes(resource) ? 980 : 560) : "100%"}
         onClose={() => {
           setCreating(false)
           setEditingId(null)

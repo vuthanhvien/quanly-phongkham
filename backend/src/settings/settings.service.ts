@@ -683,7 +683,7 @@ export class SettingsService {
   }
 
   private normalizeAppUiPayload(payload: Partial<AppUiSetting>, fallback?: Partial<AppUiSetting>) {
-    const appName = String(payload.appName ?? fallback?.appName ?? 'Thiện Chánh CMS').trim();
+    const appName = String(payload.appName ?? fallback?.appName ?? 'Thien Chanh CMS').trim();
     if (!appName) {
       throw new BadRequestException('appName la bat buoc');
     }

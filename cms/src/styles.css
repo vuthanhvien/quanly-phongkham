@@ -276,12 +276,36 @@ body {
   padding: 18px;
 }
 
+.mobile-menu-drawer .ant-drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px !important;
+}
+
+.mobile-menu-brand {
+  margin-bottom: 4px;
+}
+
+.mobile-menu-scroll {
+  min-height: 0;
+  overflow: auto;
+}
+
 .page-header {
   align-items: center;
   display: flex;
   gap: 12px;
   justify-content: space-between;
   margin-bottom: 14px;
+}
+
+.page-header-actions {
+  justify-content: flex-end;
+}
+
+.page-search {
+  min-width: min(320px, 100vw - 48px);
 }
 
 .page-header h2 {
@@ -2094,6 +2118,10 @@ textarea.ant-input {
     padding: 14px;
   }
 
+  .mobile-menu-drawer {
+    display: block;
+  }
+
   .template-layout,
   .template-editor-layout {
     grid-template-columns: 1fr;
@@ -2164,6 +2192,36 @@ textarea.ant-input {
 
   .calendar-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .page-header-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .page-header-actions .ant-space-item,
+  .page-search,
+  .page-search .ant-input-search,
+  .page-search .ant-input-affix-wrapper,
+  .page-search .ant-input-group-wrapper {
+    width: 100%;
+  }
+
+  .quick-drawer .ant-drawer-content-wrapper {
+    width: 100% !important;
+    max-width: 100vw;
+  }
+
+  .quick-drawer .ant-drawer-body {
+    padding: 14px 12px !important;
+  }
+
+  .quick-drawer .ant-drawer-header {
+    padding-inline: 12px !important;
+  }
+
+  .quick-drawer .ant-drawer-title {
+    font-size: 15px;
   }
 
   .zalo-message-bubble {

@@ -31,7 +31,7 @@ import {
   UserOutlined,
 } from "@ant-design/icons"
 import { useGetIdentity, useLogout } from "@refinedev/core"
-import { Avatar, Button, Dropdown, Layout, Menu, Space, Typography } from "antd"
+import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typography } from "antd"
 import type { MenuProps } from "antd"
 import { useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
@@ -153,6 +153,7 @@ const resourceToGroup = Object.fromEntries(
 )
 
 export function Shell({ children }: { children: React.ReactNode }) {
+  const screens = Grid.useBreakpoint()
   const location = useLocation()
   const navigate = useNavigate()
   const { mutate: logout } = useLogout()
@@ -165,6 +166,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       return false
     }
   })
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const currentResource = location.pathname.split("/")[1]
   const visibleGroups = menuGroups
     .map((group) => ({
@@ -291,6 +293,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
   ].filter(Boolean) as string[]
 
   function toggleCollapsed() {
+    if (!screens.lg) {
+      setMobileMenuOpen(true)
+      return
+    }
     setCollapsed((current) => {
       const next = !current
       try {
@@ -301,6 +307,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
       return next
     })
   }
+
+  const menuNode = (
+    <Menu
+      className="side-menu"
+      defaultOpenKeys={defaultOpenKeys}
+      items={items}
+      selectedKeys={[selected]}
+      mode="inline"
+      theme="light"
+      onClick={() => {
+        if (!screens.lg) setMobileMenuOpen(false)
+      }}
+    />
+  )
 
   return (
     <Layout className="app-shell">
@@ -328,14 +348,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <div className="side-menu-scroll">
-          <Menu
-            className="side-menu"
-            defaultOpenKeys={defaultOpenKeys}
-            items={items}
-            selectedKeys={[selected]}
-            mode="inline"
-            theme="light"
-          />
+          {menuNode}
         </div>
       </Sider>
       <Layout>
@@ -384,6 +397,27 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </Header>
         <Content className="app-content">{children}</Content>
       </Layout>
+      <Drawer
+        className="mobile-menu-drawer"
+        open={mobileMenuOpen}
+        placement="left"
+        title={settings.appName}
+        width={320}
+        onClose={() => setMobileMenuOpen(false)}
+      >
+        <div className="brand-card mobile-menu-brand">
+          <div className="brand-mark">
+            {settings.appIconUrl ? <img alt={settings.appName} src={settings.appIconUrl} /> : settings.appName.slice(0, 2).toUpperCase()}
+          </div>
+          <div className="brand-copy">
+            <Typography.Text className="brand-kicker">
+              {settings.appDescription || "Aesthetic Clinic"}
+            </Typography.Text>
+            <Typography.Title level={4}>{settings.appName}</Typography.Title>
+          </div>
+        </div>
+        <div className="mobile-menu-scroll">{menuNode}</div>
+      </Drawer>
     </Layout>
   )
 }

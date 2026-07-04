@@ -9,6 +9,7 @@ import {
   Button,
   Empty,
   Form,
+  Grid,
   Image,
   Input,
   InputNumber,
@@ -401,6 +402,7 @@ function FileSelectInput({
   disabled?: boolean
   placeholder?: string
 }) {
+  const screens = Grid.useBreakpoint()
   const [openPicker, setOpenPicker] = useState(false)
   const [openUpload, setOpenUpload] = useState(false)
   const [options, setOptions] = useState<FileLibraryOption[]>([])
@@ -498,7 +500,7 @@ function FileSelectInput({
         maskClosable={false}
         open={openPicker}
         title="Thư viện file"
-        width={1080}
+        width={screens.lg ? 1080 : "calc(100vw - 16px)"}
         onCancel={() => setOpenPicker(false)}
         footer={[
           <Button key="clear" onClick={() => { setDraftValues([]); onChange?.(undefined) }}>
@@ -627,7 +629,7 @@ function FileSelectInput({
         maskClosable={false}
         open={openUpload}
         title="Upload file vào folder"
-        width={620}
+        width={screens.md ? 620 : "calc(100vw - 16px)"}
         onCancel={() => setOpenUpload(false)}
       >
         <FileUploadPanel
@@ -695,6 +697,7 @@ function ImageLibrarySelectInput({
   disabled?: boolean
   placeholder?: string
 }) {
+  const screens = Grid.useBreakpoint()
   const [openPicker, setOpenPicker] = useState(false)
   const [openUpload, setOpenUpload] = useState(false)
   const [options, setOptions] = useState<LibraryImageOption[]>([])
@@ -793,7 +796,7 @@ function ImageLibrarySelectInput({
         maskClosable={false}
         open={openPicker}
         title="Thư viện hình ảnh"
-        width={1080}
+        width={screens.lg ? 1080 : "calc(100vw - 16px)"}
         onCancel={() => setOpenPicker(false)}
         footer={[
           <Button key="clear" onClick={() => { setDraftValue(undefined); onChange?.(undefined) }}>
@@ -912,7 +915,7 @@ function ImageLibrarySelectInput({
         maskClosable={false}
         open={openUpload}
         title="Upload ảnh vào thư viện"
-        width={620}
+        width={screens.md ? 620 : "calc(100vw - 16px)"}
         onCancel={() => setOpenUpload(false)}
       >
         <FileUploadPanel
