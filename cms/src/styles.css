@@ -2107,11 +2107,17 @@ textarea.ant-input {
     display: none;
   }
 
-  .app-header,
   .page-header,
   .hero-panel {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .app-header {
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 0 14px;
   }
 
   .app-content {
