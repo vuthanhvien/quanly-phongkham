@@ -53,7 +53,6 @@ export const fontFamilyOptions = [
 
 export const defaultAppUiSettings: AppUiSettings = {
   appName: 'Thiện Chánh CMS',
-  appDescription: 'CMS vận hành viện thẩm mỹ',
   appIconUrl: '',
   primaryColor: '#e889ae',
   pageBgColor: '#f5f6fa',
@@ -86,11 +85,16 @@ export const defaultAppUiSettings: AppUiSettings = {
 }
 
 export function normalizeAppUiSettings(payload?: Partial<AppUiSettings> | null): AppUiSettings {
-  return {
+  const normalized: AppUiSettings = {
     ...defaultAppUiSettings,
     ...(payload || {}),
     theme: 'light',
   }
+
+  normalized.appDescription = normalized.appDescription?.trim() || undefined
+  normalized.appIconUrl = normalized.appIconUrl?.trim() || undefined
+
+  return normalized
 }
 
 export function loadCachedAppUiSettings(): AppUiSettings {

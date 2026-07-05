@@ -1748,6 +1748,12 @@ export class RecordsService {
     delete value.password;
     if (creating && !value.passwordHash) throw new BadRequestException('Mat khau tai khoan la bat buoc');
     if (!value.passwordHash) delete value.passwordHash;
+    if (typeof value.fullName !== 'string' || !value.fullName.trim()) {
+      value.fullName = typeof value.email === 'string' ? value.email.trim() : '';
+    }
+    if (!value.fullName) {
+      throw new BadRequestException('Email tai khoan la bat buoc');
+    }
     return value;
   }
 

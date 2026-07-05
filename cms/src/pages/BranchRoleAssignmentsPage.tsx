@@ -52,7 +52,7 @@ export function BranchRoleAssignmentsPage() {
     setUserOptions(
       usersResponse.data.data.map((row: Record<string, unknown>) => ({
         value: String(row.id),
-        label: `${row.fullName || row.email} (${row.email})`,
+        label: String(row.email || row.fullName || row.id),
       })),
     )
     setBranchOptions(

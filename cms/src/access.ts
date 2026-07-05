@@ -1,10 +1,12 @@
 export interface StoredUserAccess {
   id: string
   email: string
-  fullName: string
+  fullName?: string
   role: string
   activeRole?: string
   roleMain?: string
+  branchId?: string
+  staffId?: string
   disabledModules?: string[]
   actionPermissions?: Record<string, string[]>
 }

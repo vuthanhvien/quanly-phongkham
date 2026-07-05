@@ -123,7 +123,10 @@ export function UiSettingsPage() {
   async function handleSubmit(values: UiSettingsFormValues) {
     setSaving(true)
     try {
-      await save(values)
+      await save({
+        ...values,
+        appDescription: values.appDescription?.trim() || undefined,
+      })
       message.success('Đã cập nhật giao diện CMS')
     } finally {
       setSaving(false)
@@ -286,7 +289,9 @@ export function UiSettingsPage() {
                     </div>
                     <div>
                       <div style={{ color: preview.titleColor, fontSize: 14, fontWeight: 800 }}>{preview.appName}</div>
-                      <div style={{ color: preview.textMutedColor, fontSize: 11 }}>{preview.appDescription || 'CMS vận hành viện thẩm mỹ'}</div>
+                      {preview.appDescription ? (
+                        <div style={{ color: preview.textMutedColor, fontSize: 10 }}>{preview.appDescription}</div>
+                      ) : null}
                     </div>
                   </Flex>
                   <Button

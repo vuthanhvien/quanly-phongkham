@@ -106,10 +106,10 @@ const ALL_BULK_MODULES: BulkModuleName[] = [
 ];
 
 type CoreSeedContext = {
-  branch: Branch;
-  admin: User;
-  adminDepartment: Department;
-  adminStaff: Staff;
+  branch?: Branch;
+  admin?: User;
+  adminDepartment?: Department;
+  adminStaff?: Staff;
 };
 
 function padSerial(value: number, width = 6) {
@@ -178,6 +178,25 @@ export class SeedService implements OnApplicationBootstrap {
   }
 
   private async ensureCoreSeed(): Promise<CoreSeedContext> {
+    const [branchCount, userCount, departmentCount, staffCount, assignmentCount] = await Promise.all([
+      this.branches.count(),
+      this.users.count(),
+      this.departments.count(),
+      this.staff.count(),
+      this.branchPermissions.count(),
+    ]);
+    const hasExistingCoreData = branchCount > 0 || userCount > 0 || departmentCount > 0 || staffCount > 0 || assignmentCount > 0;
+
+    if (hasExistingCoreData) {
+      const [branch, admin, adminDepartment, adminStaff] = await Promise.all([
+        this.branches.findOne({ order: { createdAt: 'ASC' } }),
+        this.users.findOne({ order: { createdAt: 'ASC' } }),
+        this.departments.findOne({ order: { createdAt: 'ASC' } }),
+        this.staff.findOne({ order: { createdAt: 'ASC' } }),
+      ]);
+      return { branch: branch ?? undefined, admin: admin ?? undefined, adminDepartment: adminDepartment ?? undefined, adminStaff: adminStaff ?? undefined };
+    }
+
     let branch = await this.branches.findOne({ where: { slug: 'thien-chanh' } });
     if (!branch) {
       branch = await this.branches.save(

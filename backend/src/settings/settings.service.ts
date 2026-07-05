@@ -688,7 +688,9 @@ export class SettingsService {
       throw new BadRequestException('appName la bat buoc');
     }
 
-    const appDescription = String(payload.appDescription ?? fallback?.appDescription ?? '').trim() || undefined;
+    const appDescription = payload.appDescription !== undefined
+      ? String(payload.appDescription || '').trim() || undefined
+      : fallback?.appDescription;
     const appIconUrl = String(payload.appIconUrl ?? fallback?.appIconUrl ?? '').trim() || undefined;
     const primaryColor = this.normalizeHexColor(payload.primaryColor ?? fallback?.primaryColor ?? DEFAULT_APP_UI_COLORS.primaryColor, 'primaryColor');
     const pageBgColor = this.normalizeHexColor(payload.pageBgColor ?? fallback?.pageBgColor ?? DEFAULT_APP_UI_COLORS.pageBgColor, 'pageBgColor');

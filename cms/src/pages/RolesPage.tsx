@@ -82,7 +82,7 @@ export function RolesPage() {
       setUserOptions(
         usersRes.data.data.map((r: Record<string, unknown>) => ({
           value: String(r.id),
-          label: String(r.fullName || r.email),
+          label: String(r.email || r.fullName || ""),
           email: String(r.email || ""),
           role: String(r.role || ""),
         })),

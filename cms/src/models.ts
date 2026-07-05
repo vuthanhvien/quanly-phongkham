@@ -227,7 +227,7 @@ export const relationFields: Record<string, RelationSpec> = {
   doctorStaffId: { resource: 'staff', labelFields: ['code', 'fullName'], params: { type: 'DOCTOR' }, lookupKey: 'staff-doctor' },
   picStaffId: { resource: 'staff', labelFields: ['code', 'fullName'], params: { type: 'STAFF' }, lookupKey: 'staff-staff' },
   performerStaffId: { resource: 'staff', labelFields: ['code', 'fullName'] },
-  userId: { resource: 'user-accounts', labelFields: ['email', 'fullName'] },
+  userId: { resource: 'user-accounts', labelFields: ['email'] },
   convertedCustomerId: { resource: 'customers', labelFields: ['code', 'fullName'] },
   approvedById: { resource: 'staff', labelFields: ['code', 'fullName'] },
   reviewerId: { resource: 'staff', labelFields: ['code', 'fullName'] },
@@ -324,7 +324,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
   'user-accounts': [
     { key: 'email', label: 'Email đăng nhập', required: true, width: '66', tableWidth: 240 },
     { key: 'password', label: 'Mật khẩu mới', width: '50', tableWidth: 180 },
-    { key: 'fullName', label: 'Tên hiển thị', required: true, width: '66', tableWidth: 220 },
+    { key: 'fullName', label: 'Tên nội bộ (tuỳ chọn)', width: '66', tableWidth: 220 },
     { key: 'role', label: 'Vai trò hệ thống', type: 'select', options: systemRoleSelectOptions, required: true, width: '33', tableWidth: 140 },
     { key: 'branchId', label: 'Chi nhánh mặc định', width: '50', tableWidth: 200 },
     { key: 'staffId', label: 'Nhân viên', width: '50', tableWidth: 220 },

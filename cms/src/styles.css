@@ -1025,8 +1025,18 @@ body {
   border-bottom-color: rgba(15, 23, 42, 0.06) !important;
 }
 
+.ant-table-wrapper .ant-table-cell-fix-left,
+.ant-table-wrapper .ant-table-cell-fix-right {
+  background: var(--app-surface) !important;
+}
+
 .ant-table-tbody > tr:hover > td {
   background: color-mix(in srgb, var(--app-primary) 8%, transparent) !important;
+}
+
+.ant-table-tbody > tr:hover > .ant-table-cell-fix-left,
+.ant-table-tbody > tr:hover > .ant-table-cell-fix-right {
+  background: color-mix(in srgb, var(--app-primary) 8%, var(--app-surface)) !important;
 }
 
 .ant-input,

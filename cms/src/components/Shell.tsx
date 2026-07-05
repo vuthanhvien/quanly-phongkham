@@ -157,7 +157,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { mutate: logout } = useLogout()
-  const { data: identity } = useGetIdentity<{ name?: string; email?: string }>()
+  const { data: identity } = useGetIdentity<{ email?: string }>()
   const { settings } = useAppUi()
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -341,10 +341,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
             {settings.appIconUrl ? <img alt={settings.appName} src={settings.appIconUrl} /> : settings.appName.slice(0, 2).toUpperCase()}
           </div>
           <div className="brand-copy">
-            <Typography.Text className="brand-kicker">
-              {settings.appDescription || "Aesthetic Clinic"}
-            </Typography.Text>
             <Typography.Title level={4}>{settings.appName}</Typography.Title>
+            {settings.appDescription ? (
+              <Typography.Text className="brand-kicker" style={{fontSize: 12}}>
+                {settings.appDescription}
+              </Typography.Text>
+            ) : null}
           </div>
         </div>
         <div className="side-menu-scroll">
@@ -389,8 +391,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 size={32}
                 style={{ background: "var(--app-primary)", color: "#180c12", cursor: "pointer", flexShrink: 0 }}
               />
-              {identity?.name && (
-                <Typography.Text className="profile-name">{identity.name}</Typography.Text>
+              {identity?.email && (
+                <Typography.Text className="profile-name">{identity.email}</Typography.Text>
               )}
             </button>
           </Dropdown>
@@ -410,10 +412,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
             {settings.appIconUrl ? <img alt={settings.appName} src={settings.appIconUrl} /> : settings.appName.slice(0, 2).toUpperCase()}
           </div>
           <div className="brand-copy">
-            <Typography.Text className="brand-kicker">
-              {settings.appDescription || "Aesthetic Clinic"}
-            </Typography.Text>
             <Typography.Title level={4}>{settings.appName}</Typography.Title>
+            {settings.appDescription ? (
+              <Typography.Text className="brand-kicker" style={{fontSize: 12}}>
+                {settings.appDescription}
+              </Typography.Text>
+            ) : null}
           </div>
         </div>
         <div className="mobile-menu-scroll">{menuNode}</div>
