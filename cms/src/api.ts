@@ -51,14 +51,14 @@ api.interceptors.response.use(
 );
 
 export const authProvider: AuthProvider = {
-  login: async ({ email, password }) => {
+  login: async ({ email, identifier, password }) => {
     try {
-      const { data } = await api.post('/auth/login', { email, password });
+      const { data } = await api.post('/auth/login', { identifier: identifier || email, password });
       localStorage.setItem('clinic-token', data.accessToken);
       localStorage.setItem('clinic-user', JSON.stringify(data.user));
       return { success: true, redirectTo: resolveAppPath('/') };
     } catch {
-      return { success: false, error: { name: 'LoginError', message: 'Email hoặc mật khẩu không đúng' } };
+      return { success: false, error: { name: 'LoginError', message: 'Thông tin đăng nhập hoặc mật khẩu không đúng' } };
     }
   },
   logout: async () => {

@@ -107,13 +107,13 @@ export function BranchRoleAssignmentsPage() {
   return (
     <>
       <div className="page-header">
-        <Typography.Title level={3}>Role theo chi nhánh</Typography.Title>
-        <Button onClick={openCreateAssignment}>Thêm gán role</Button>
+        <Typography.Title level={3}>Phân quyền theo chi nhánh</Typography.Title>
+        <Button onClick={openCreateAssignment}>Thêm phân quyền</Button>
       </div>
       <Card className="glass-card settings-card">
         <Typography.Paragraph type="secondary">
-          Mỗi user có thể thuộc nhiều chi nhánh. Ở mỗi chi nhánh, user có thể
-          được gán một hoặc nhiều role khác nhau.
+          Mỗi tài khoản có thể thuộc nhiều chi nhánh. Ở mỗi chi nhánh, tài khoản có thể
+          được gán một hoặc nhiều quyền khác nhau.
         </Typography.Paragraph>
         <Table
           size="small"
@@ -123,7 +123,7 @@ export function BranchRoleAssignmentsPage() {
           scroll={{ x: "max-content" }}
           columns={[
             {
-              title: "User",
+              title: "Tài khoản",
               render: (_, row) =>
                 userOptions.find((item) => item.value === row.userId)?.label ||
                 row.userId,
@@ -135,7 +135,7 @@ export function BranchRoleAssignmentsPage() {
                   ?.label || row.branchId,
             },
             {
-              title: "Role",
+              title: "Quyền",
               render: (_, row) =>
                 (row.roleKeys || [])
                   .map(
@@ -172,8 +172,8 @@ export function BranchRoleAssignmentsPage() {
       <Modal
         title={
           editingAssignment
-            ? "Cập nhật role theo chi nhánh"
-            : "Thêm role theo chi nhánh"
+            ? "Cập nhật phân quyền theo chi nhánh"
+            : "Thêm phân quyền theo chi nhánh"
         }
         open={assignmentModal}
         footer={null}
@@ -184,7 +184,7 @@ export function BranchRoleAssignmentsPage() {
         }}
       >
         <Form form={assignmentForm} layout="vertical" onFinish={saveAssignment}>
-          <Form.Item name="userId" label="User" rules={[{ required: true }]}>
+          <Form.Item name="userId" label="Tài khoản" rules={[{ required: true }]}>
             <Select options={userOptions} showSearch optionFilterProp="label" />
           </Form.Item>
           <Form.Item
@@ -198,7 +198,7 @@ export function BranchRoleAssignmentsPage() {
               optionFilterProp="label"
             />
           </Form.Item>
-          <Form.Item name="roleKeys" label="Role" rules={[{ required: true }]}>
+          <Form.Item name="roleKeys" label="Quyền" rules={[{ required: true }]}>
             <Select
               mode="multiple"
               options={dynamicRoles
@@ -213,7 +213,7 @@ export function BranchRoleAssignmentsPage() {
             <Checkbox>Cho phép sử dụng</Checkbox>
           </Form.Item>
           <Button className="primary-glow" htmlType="submit" type="primary">
-            {editingAssignment ? "Cập nhật gán role" : "Lưu gán role"}
+            {editingAssignment ? "Cập nhật phân quyền" : "Lưu phân quyền"}
           </Button>
         </Form>
       </Modal>

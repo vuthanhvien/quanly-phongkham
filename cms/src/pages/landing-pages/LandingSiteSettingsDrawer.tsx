@@ -64,22 +64,22 @@ function NavEditorTree({
           <Space direction="vertical" size={10} style={{ width: '100%' }}>
             <Flex align="center" justify="space-between" gap={12} wrap="wrap">
               <Space size={8} wrap>
-                <Tag bordered={false} color="gold">Cap {depth}</Tag>
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>Muc {idx + 1}</Typography.Text>
+                <Tag bordered={false} color="gold">Cấp {depth}</Tag>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>Mục {idx + 1}</Typography.Text>
               </Space>
               <Space size={6} wrap>
                 {depth < 3 && (
                   <Button size="small" icon={<PlusOutlined />} onClick={() => onAddTreeNavChild(item.id, depth)}>
-                    Them cap {depth + 1}
+                    Thêm cấp {depth + 1}
                   </Button>
                 )}
-                <Button size="small" danger onClick={() => onRemoveTreeNavItem(item.id)}>Xoa</Button>
+                <Button size="small" danger onClick={() => onRemoveTreeNavItem(item.id)}>Xoá</Button>
               </Space>
             </Flex>
 
             <Row gutter={[8, 8]} align="middle">
               <Col xs={24} md={8}>
-                <Input size="small" value={item.label} placeholder="Label" onChange={(e) => onPatchTreeNavItem(item.id, { label: e.target.value })} />
+                <Input size="small" value={item.label} placeholder="Nhãn hiển thị" onChange={(e) => onPatchTreeNavItem(item.id, { label: e.target.value })} />
               </Col>
               <Col xs={24} md={9}>
                 <Input size="small" value={item.href} placeholder="/duong-dan" onChange={(e) => onPatchTreeNavItem(item.id, { href: e.target.value })} />
@@ -90,7 +90,7 @@ function NavEditorTree({
                   style={{ width: '100%' }}
                   value={item.target ?? '_self'}
                   onChange={(value) => onPatchTreeNavItem(item.id, { target: value as NavItem['target'] })}
-                  options={[{ value: '_self', label: 'Cung tab' }, { value: '_blank', label: 'Tab moi' }]}
+                  options={[{ value: '_self', label: 'Cùng tab' }, { value: '_blank', label: 'Tab mới' }]}
                 />
               </Col>
             </Row>
@@ -131,14 +131,14 @@ export function LandingSiteSettingsDrawer() {
 
   return (
     <Drawer
-      title="Cai dat site"
+      title="Cài đặt site"
       width={860}
       open={open}
       onClose={onClose}
       rootClassName="quick-drawer"
       extra={
         <Button type="primary" loading={globalSaving} onClick={onSaveGlobal}>
-          Luu cai dat
+          Lưu cài đặt
         </Button>
       }
     >
@@ -148,16 +148,16 @@ export function LandingSiteSettingsDrawer() {
         items={[
           {
             key: 'logo',
-            label: 'Logo',
+            label: 'Biểu trưng',
             children: (
               <Form layout="vertical" size="small">
-                <Form.Item label="URL Logo">
+                <Form.Item label="URL biểu trưng">
                   <ImagePickerInput value={settings.logoUrl} onChange={(url) => onUpdate({ logoUrl: url })} />
                 </Form.Item>
-                <Form.Item label="Alt text">
-                  <Input value={settings.logoAlt} onChange={(e) => onUpdate({ logoAlt: e.target.value })} placeholder="Ten thuong hieu" />
+                <Form.Item label="Mô tả ảnh">
+                  <Input value={settings.logoAlt} onChange={(e) => onUpdate({ logoAlt: e.target.value })} placeholder="Tên thương hiệu" />
                 </Form.Item>
-                <Form.Item label="Chieu rong (px)">
+                <Form.Item label="Chiều rộng (px)">
                   <InputNumber min={40} max={600} value={settings.logoWidth} onChange={(v) => onUpdate({ logoWidth: Number(v ?? 160) })} style={{ width: '100%' }} />
                 </Form.Item>
               </Form>
@@ -165,34 +165,34 @@ export function LandingSiteSettingsDrawer() {
           },
           {
             key: 'menu',
-            label: 'Menu',
+            label: 'Thanh menu',
             children: (
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
                 <Typography.Text type="secondary">
-                  Ho tro toi da 3 cap menu. Tu cap 1 ban co the them cap 2, va tu cap 2 co the them cap 3.
+                  Hỗ trợ tối đa 3 cấp menu. Từ cấp 1 bạn có thể thêm cấp 2, và từ cấp 2 có thể thêm cấp 3.
                 </Typography.Text>
                 <Flex justify="space-between" align="center" gap={12} wrap="wrap">
                   <Typography.Text type="secondary">
-                    Menu nay luu rieng va dung chung cho toan bo web, bao gom ca landing page.
+                    Menu này lưu riêng và dùng chung cho toàn bộ website, bao gồm cả landing page.
                   </Typography.Text>
                   <Button type="primary" loading={menuSaving} onClick={onSaveMenu}>
-                    Luu menu
+                    Lưu menu
                   </Button>
                 </Flex>
                 <NavEditorTree items={settings.menuItems ?? []} />
-                <Button size="small" icon={<PlusOutlined />} onClick={onAddRootNavItem}>Them muc menu</Button>
+                <Button size="small" icon={<PlusOutlined />} onClick={onAddRootNavItem}>Thêm mục menu</Button>
               </Space>
             ),
           },
           {
             key: 'header',
-            label: 'Header',
+            label: 'Đầu trang',
             children: (
               <Form layout="vertical" size="small">
-                <Form.Item label="Dinh khi cuon (sticky)">
+                <Form.Item label="Cố định khi cuộn">
                   <Switch checked={settings.headerSticky} onChange={(v) => onUpdate({ headerSticky: v })} />
                 </Form.Item>
-                <Form.Item label="Mau nen header (hex)">
+                <Form.Item label="Màu nền đầu trang (hex)">
                   <Input
                     value={settings.headerBgColor}
                     onChange={(e) => onUpdate({ headerBgColor: e.target.value })}
@@ -211,10 +211,10 @@ export function LandingSiteSettingsDrawer() {
                     }
                   />
                 </Form.Item>
-                <Form.Item label="Nut CTA - Label">
-                  <Input value={settings.headerCtaLabel} onChange={(e) => onUpdate({ headerCtaLabel: e.target.value })} placeholder="Dat lich ngay" />
+                <Form.Item label="Nút CTA - Nhãn">
+                  <Input value={settings.headerCtaLabel} onChange={(e) => onUpdate({ headerCtaLabel: e.target.value })} placeholder="Đặt lịch ngay" />
                 </Form.Item>
-                <Form.Item label="Nut CTA - Link">
+                <Form.Item label="Nút CTA - Liên kết">
                   <Input value={settings.headerCtaHref} onChange={(e) => onUpdate({ headerCtaHref: e.target.value })} placeholder="/dat-lich" />
                 </Form.Item>
               </Form>
@@ -222,16 +222,16 @@ export function LandingSiteSettingsDrawer() {
           },
           {
             key: 'footer',
-            label: 'Footer',
+            label: 'Chân trang',
             children: (
               <Space direction="vertical" size={12} style={{ width: '100%' }}>
                 <Form layout="vertical" size="small">
-                  <Form.Item label="Copyright">
-                    <Input value={settings.footerCopyright} onChange={(e) => onUpdate({ footerCopyright: e.target.value })} placeholder="(c) 2025 Clinic. All rights reserved." />
+                  <Form.Item label="Bản quyền">
+                    <Input value={settings.footerCopyright} onChange={(e) => onUpdate({ footerCopyright: e.target.value })} placeholder="(c) 2025 Clinic. Bảo lưu mọi quyền." />
                   </Form.Item>
                 </Form>
 
-                <Typography.Text strong style={{ fontSize: 13 }}>Cac cot footer</Typography.Text>
+                <Typography.Text strong style={{ fontSize: 13 }}>Các cột chân trang</Typography.Text>
                 {(settings.footerColumns ?? []).map((col) => (
                   <Card
                     key={col.id}
@@ -242,33 +242,33 @@ export function LandingSiteSettingsDrawer() {
                         size="small"
                         value={col.title}
                         onChange={(e) => onUpdateFooterColumn(col.id, { title: e.target.value })}
-                        placeholder="Tieu de cot"
+                        placeholder="Tiêu đề cột"
                         style={{ fontWeight: 600 }}
                       />
                     }
-                    extra={<Button size="small" danger onClick={() => onRemoveFooterColumn(col.id)}>Xoa</Button>}
+                    extra={<Button size="small" danger onClick={() => onRemoveFooterColumn(col.id)}>Xoá</Button>}
                   >
                     <Space direction="vertical" size={4} style={{ width: '100%' }}>
                       {col.links.map((link) => (
                         <Row key={link.id} gutter={4} align="middle">
                           <Col span={10}>
-                            <Input size="small" value={link.label} placeholder="Label" onChange={(e) => onUpdateFooterLink(col.id, link.id, { label: e.target.value })} />
+                            <Input size="small" value={link.label} placeholder="Nhãn" onChange={(e) => onUpdateFooterLink(col.id, link.id, { label: e.target.value })} />
                           </Col>
                           <Col span={11}>
                             <Input size="small" value={link.href} placeholder="/duong-dan" onChange={(e) => onUpdateFooterLink(col.id, link.id, { href: e.target.value })} />
                           </Col>
                           <Col span={3}>
-                            <Button size="small" danger block onClick={() => onRemoveFooterLink(col.id, link.id)}>Xoa</Button>
+                            <Button size="small" danger block onClick={() => onRemoveFooterLink(col.id, link.id)}>Xoá</Button>
                           </Col>
                         </Row>
                       ))}
-                      <Button size="small" icon={<PlusOutlined />} onClick={() => onAddFooterLink(col.id)}>Them link</Button>
+                      <Button size="small" icon={<PlusOutlined />} onClick={() => onAddFooterLink(col.id)}>Thêm liên kết</Button>
                     </Space>
                   </Card>
                 ))}
-                <Button size="small" icon={<PlusOutlined />} onClick={onAddFooterColumn}>Them cot</Button>
+                <Button size="small" icon={<PlusOutlined />} onClick={onAddFooterColumn}>Thêm cột</Button>
 
-                <Typography.Text strong style={{ fontSize: 13 }}>Mang xa hoi</Typography.Text>
+                <Typography.Text strong style={{ fontSize: 13 }}>Mạng xã hội</Typography.Text>
                 {(settings.footerSocialLinks ?? []).map((s) => (
                   <Row key={s.id} gutter={8} align="middle">
                     <Col span={7}>
@@ -278,11 +278,11 @@ export function LandingSiteSettingsDrawer() {
                       <Input size="small" value={s.url} placeholder="https://facebook.com/..." onChange={(e) => onUpdateSocialLink(s.id, { url: e.target.value })} />
                     </Col>
                     <Col span={3}>
-                      <Button size="small" danger block onClick={() => onRemoveSocialLink(s.id)}>Xoa</Button>
+                      <Button size="small" danger block onClick={() => onRemoveSocialLink(s.id)}>Xoá</Button>
                     </Col>
                   </Row>
                 ))}
-                <Button size="small" icon={<PlusOutlined />} onClick={onAddSocialLink}>Them mang xa hoi</Button>
+                <Button size="small" icon={<PlusOutlined />} onClick={onAddSocialLink}>Thêm mạng xã hội</Button>
               </Space>
             ),
           },

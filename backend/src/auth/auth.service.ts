@@ -41,10 +41,37 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async login(email: string, password: string) {
-    const user = await this.users.findOne({ where: { email, isActive: true } });
+  async login(identifier: string, password: string) {
+    const normalizedIdentifier = String(identifier || '').trim();
+    const normalizedEmail = normalizedIdentifier.toLowerCase();
+    let user =
+      await this.users.findOne({
+        where: [
+          { email: normalizedEmail, isActive: true },
+          { username: normalizedIdentifier, isActive: true },
+        ],
+      });
+
+    if (!user && normalizedIdentifier) {
+      const matchedStaff = await this.staff.findOne({
+        where: [
+          { code: normalizedIdentifier },
+          { phone: normalizedIdentifier },
+          { email: normalizedEmail },
+        ],
+      });
+
+      if (matchedStaff?.userId) {
+        user = await this.users.findOne({ where: { id: matchedStaff.userId, isActive: true } });
+      }
+
+      if (!user && matchedStaff?.id) {
+        user = await this.users.findOne({ where: { staffId: matchedStaff.id, isActive: true } });
+      }
+    }
+
     if (!user || !(await compare(password, user.passwordHash))) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new UnauthorizedException('Thông tin đăng nhập hoặc mật khẩu không đúng');
     }
     const staff = user.staffId ? await this.staff.findOne({ where: { id: user.staffId } }) : await this.staff.findOne({ where: { userId: user.id } });
     const branchPermissions = await this.branchPermissions.find({ where: { userId: user.id, isActive: true } });
@@ -62,6 +89,7 @@ export class AuthService {
     const profile = {
       id: user.id,
       email: user.email,
+      username: user.username,
       fullName: user.fullName,
       role: user.role,
       activeRole,

@@ -61,6 +61,11 @@ function ResourceGuard() {
   return hasResourceAccess(resource) ? <Outlet /> : <Navigate to="/" replace />;
 }
 
+function RecordDetailRedirect() {
+  const { resource = "", id = "" } = useParams()
+  return <Navigate replace to={`/${resource}?detail=${id}`} />
+}
+
 export function App() {
   const [appUiSettings, setAppUiSettings] = useState<AppUiSettings>(() => loadCachedAppUiSettings());
   const [uiLoading, setUiLoading] = useState(false);
@@ -192,7 +197,8 @@ export function App() {
                 <Route path="/:resource" element={<RecordListPage />} />
                 <Route path="/:resource/import" element={<RecordImportPage />} />
                 <Route path="/:resource/:id/edit" element={<RecordFormPage />} />
-                <Route path="/:resource/:id" element={<RecordDetailPage />} />
+                <Route path="/:resource/:id/full" element={<RecordDetailPage />} />
+                <Route path="/:resource/:id" element={<RecordDetailRedirect />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

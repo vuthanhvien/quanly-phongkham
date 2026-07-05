@@ -104,9 +104,9 @@ export function SiteHeader({ settings }: { settings: LandingGlobalSetting }) {
       <div className="site-header__inner">
         <a href="/" className="site-header__logo">
           {logoUrl ? (
-            <img src={logoUrl} alt={logoAlt || 'Logo'} style={{ width: logoWidth, height: 'auto' }} />
+            <img src={logoUrl} alt={logoAlt || 'Biểu trưng'} style={{ width: logoWidth, height: 'auto' }} />
           ) : (
-            <span className="site-header__logo-text">{logoAlt || 'Logo'}</span>
+            <span className="site-header__logo-text">{logoAlt || 'Biểu trưng'}</span>
           )}
         </a>
 

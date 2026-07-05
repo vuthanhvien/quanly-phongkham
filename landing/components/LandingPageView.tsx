@@ -42,13 +42,13 @@ export function LandingPageView({ page, editMode = false }: { page: LandingPageD
             pointerEvents: 'none',
           }}
         >
-          Edit mode - click block to select in CMS
+          Chế độ chỉnh sửa - bấm vào block để chọn trong CMS
         </div>
       )}
       <div className="page-frame" style={editMode ? { marginTop: 26 } : undefined}>
         <section className="hero">
           <div className="hero__content">
-            <div className="eyebrow">Thien Chanh clinic landing</div>
+            <div className="eyebrow">Landing page Thiện Chánh</div>
             <h1>{page.seoTitle || page.title}</h1>
             {page.description || page.seoDescription ? <p>{page.description || page.seoDescription}</p> : null}
           </div>
@@ -118,7 +118,7 @@ export function LandingPageView({ page, editMode = false }: { page: LandingPageD
                             {block.type === 'image' ? (
                               <div className="landing-visual">
                                 <div className="landing-media">
-                                  <img alt={block.alt || block.title || 'Landing image'} src={block.url || ''} />
+                                  <img alt={block.alt || block.title || 'Hình ảnh landing'} src={block.url || ''} />
                                 </div>
                                 {block.caption ? <div className="landing-caption">{block.caption}</div> : null}
                               </div>
@@ -132,7 +132,7 @@ export function LandingPageView({ page, editMode = false }: { page: LandingPageD
                                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                       allowFullScreen
                                       src={embedVideoUrl(block.url || '')}
-                                      title={block.title || 'Landing video'}
+                                      title={block.title || 'Video landing'}
                                     />
                                   ) : (
                                     <video controls src={block.url || ''} />
@@ -148,7 +148,7 @@ export function LandingPageView({ page, editMode = false }: { page: LandingPageD
                                   {(block.slides || []).map((slide) => (
                                     <figure className="landing-slider__slide" key={slide.id}>
                                       <div className="landing-media">
-                                        <img alt={slide.alt || slide.caption || block.title || 'Slider image'} src={slide.url || ''} />
+                                        <img alt={slide.alt || slide.caption || block.title || 'Ảnh trình chiếu'} src={slide.url || ''} />
                                       </div>
                                       {slide.caption ? <figcaption className="landing-caption">{slide.caption}</figcaption> : null}
                                     </figure>

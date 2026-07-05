@@ -6,6 +6,7 @@ export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 export interface AuthUser {
   id: string;
   email: string;
+  username?: string;
   fullName: string;
   role: string;
   activeRole?: string;

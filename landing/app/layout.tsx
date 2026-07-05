@@ -8,7 +8,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Thiện Chánh Landing',
-  description: 'Landing pages rendered from CMS blocks',
+  description: 'Trang landing được dựng từ các block quản trị trong CMS',
 }
 
 const THEME_CSS_URL = `${process.env.NEXT_PUBLIC_API_URL ?? '/api'}/public/landing-theme/style.css`

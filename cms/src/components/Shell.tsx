@@ -33,9 +33,10 @@ import {
 import { useGetIdentity, useLogout } from "@refinedev/core"
 import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typography } from "antd"
 import type { MenuProps } from "antd"
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { hasResourceAccess, hasScreenAccess } from "../access"
+import { api } from "../api"
 import { useAppUi } from "../app-ui"
 import { entityLabels } from "../models"
 
@@ -157,8 +158,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { mutate: logout } = useLogout()
-  const { data: identity } = useGetIdentity<{ email?: string }>()
+  const { data: identity } = useGetIdentity<{
+    email?: string
+    username?: string
+    fullName?: string
+    staffId?: string
+  }>()
   const { settings } = useAppUi()
+  const [staffDisplayName, setStaffDisplayName] = useState<string>()
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDER_COLLAPSE_KEY) === "1"
@@ -167,6 +174,39 @@ export function Shell({ children }: { children: React.ReactNode }) {
     }
   })
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  useEffect(() => {
+    let active = true
+
+    async function loadStaffDisplayName() {
+      if (!identity?.staffId) {
+        setStaffDisplayName(undefined)
+        return
+      }
+
+      try {
+        const response = await api.get(`/records/staff/${identity.staffId}`)
+        if (!active) return
+        const row = response.data?.data as { fullName?: string; code?: string } | undefined
+        setStaffDisplayName(row?.fullName || row?.code || undefined)
+      } catch {
+        if (!active) return
+        setStaffDisplayName(undefined)
+      }
+    }
+
+    void loadStaffDisplayName()
+
+    return () => {
+      active = false
+    }
+  }, [identity?.staffId])
+
+  const profileDisplayName = useMemo(
+    () => staffDisplayName || identity?.fullName || identity?.username || identity?.email || "",
+    [identity?.email, identity?.fullName, identity?.username, staffDisplayName],
+  )
+
   const currentResource = location.pathname.split("/")[1]
   const visibleGroups = menuGroups
     .map((group) => ({
@@ -183,7 +223,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     {
       key: "/calendar",
       icon: menuIcons.calendar,
-      label: <Link to="/calendar">Calendar</Link>,
+      label: <Link to="/calendar">Lịch tổng</Link>,
     },
     ...visibleGroups.map((group) => ({
       key: group.key,
@@ -200,7 +240,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               {
                 key: "/zalo-inbox",
                 icon: menuIcons["zalo-inbox"],
-                label: <Link to="/zalo-inbox">Zalo Inbox</Link>,
+                label: <Link to="/zalo-inbox">Hộp thư Zalo</Link>,
               },
             ]
           : []),
@@ -224,28 +264,28 @@ export function Shell({ children }: { children: React.ReactNode }) {
           ? {
               key: "/ui-settings",
               icon: <SettingOutlined />,
-              label: <Link to="/ui-settings">UI settings</Link>,
+              label: <Link to="/ui-settings">Giao diện CMS</Link>,
             }
           : null,
         hasScreenAccess("settings")
           ? {
               key: "/landing-pages",
               icon: menuIcons["landing-pages"],
-              label: <Link to="/landing-pages">Landing pages</Link>,
+              label: <Link to="/landing-pages">Trang landing</Link>,
             }
           : null,
         hasScreenAccess("settings")
           ? {
               key: "/chatbot-settings",
               icon: <RobotOutlined />,
-              label: <Link to="/chatbot-settings">Chatbot</Link>,
+              label: <Link to="/chatbot-settings">Trợ lý chat</Link>,
             }
           : null,
         hasScreenAccess("settings")
           ? {
               key: "/custom-fields",
               icon: menuIcons["custom-fields"],
-              label: <Link to="/custom-fields">Custom fields</Link>,
+              label: <Link to="/custom-fields">Trường tuỳ biến</Link>,
             }
           : null,
         hasScreenAccess("settings")
@@ -259,7 +299,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           ? {
               key: "/audit-logs",
               icon: <AuditOutlined />,
-              label: <Link to="/audit-logs">Audit log</Link>,
+              label: <Link to="/audit-logs">Nhật ký hệ thống</Link>,
             }
           : null,
       ].filter(Boolean),
@@ -391,8 +431,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 size={32}
                 style={{ background: "var(--app-primary)", color: "#180c12", cursor: "pointer", flexShrink: 0 }}
               />
-              {identity?.email && (
-                <Typography.Text className="profile-name">{identity.email}</Typography.Text>
+              {profileDisplayName && (
+                <Typography.Text className="profile-name">{profileDisplayName}</Typography.Text>
               )}
             </button>
           </Dropdown>

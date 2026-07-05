@@ -10,7 +10,7 @@ export function AuditPage() {
   return (
     <>
       <div className="page-header">
-          <Typography.Title level={3}>Audit log</Typography.Title>
+          <Typography.Title level={3}>Nhật ký hệ thống</Typography.Title>
       </div>
       <Card className="table-card">
         <Table

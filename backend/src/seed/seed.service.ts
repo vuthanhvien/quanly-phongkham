@@ -188,12 +188,16 @@ export class SeedService implements OnApplicationBootstrap {
     const hasExistingCoreData = branchCount > 0 || userCount > 0 || departmentCount > 0 || staffCount > 0 || assignmentCount > 0;
 
     if (hasExistingCoreData) {
-      const [branch, admin, adminDepartment, adminStaff] = await Promise.all([
-        this.branches.findOne({ order: { createdAt: 'ASC' } }),
-        this.users.findOne({ order: { createdAt: 'ASC' } }),
-        this.departments.findOne({ order: { createdAt: 'ASC' } }),
-        this.staff.findOne({ order: { createdAt: 'ASC' } }),
+      const [branchRows, adminRows, departmentRows, staffRows] = await Promise.all([
+        this.branches.find({ order: { createdAt: 'ASC' }, take: 1 }),
+        this.users.find({ order: { createdAt: 'ASC' }, take: 1 }),
+        this.departments.find({ order: { createdAt: 'ASC' }, take: 1 }),
+        this.staff.find({ order: { createdAt: 'ASC' }, take: 1 }),
       ]);
+      const branch = branchRows[0];
+      const admin = adminRows[0];
+      const adminDepartment = departmentRows[0];
+      const adminStaff = staffRows[0];
       return { branch: branch ?? undefined, admin: admin ?? undefined, adminDepartment: adminDepartment ?? undefined, adminStaff: adminStaff ?? undefined };
     }
 
@@ -210,6 +214,7 @@ export class SeedService implements OnApplicationBootstrap {
       admin = await this.users.save(
         this.users.create({
           email,
+          username: 'admin',
           fullName: 'Quan tri he thong',
           passwordHash: await hash(this.config.get('ADMIN_PASSWORD', 'Admin@123'), 10),
           role: 'ADMIN',
@@ -468,6 +473,7 @@ export class SeedService implements OnApplicationBootstrap {
       const branch = branches[(index - 1) % branches.length];
       return {
         email: `${LARGE_SEED_PREFIXES.userEmail}${padSerial(index)}@thienchanh.local`,
+        username: `${LARGE_SEED_PREFIXES.userEmail}${padSerial(index)}`,
         fullName: `Bulk User ${index}`,
         passwordHash: defaultPasswordHash,
         role: index % 6 === 0 ? 'DOCTOR' : 'STAFF',

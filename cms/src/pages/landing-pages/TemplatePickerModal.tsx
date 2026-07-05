@@ -11,7 +11,7 @@ type Props = {
 
 export function TemplatePickerModal({ open, saving, templates, onCancel, onApply }: Props) {
   return (
-    <Modal footer={null} onCancel={onCancel} open={open} title="Chon template cho page moi" width={780}>
+    <Modal footer={null} onCancel={onCancel} open={open} title="Chọn mẫu cho trang mới" width={780}>
       <Tabs
         style={{ marginTop: 4 }}
         items={[...new Set(templates.map((t) => t.category))].map((category) => ({
@@ -32,7 +32,7 @@ export function TemplatePickerModal({ open, saving, templates, onCancel, onApply
                       <Flex align="center" gap={8} style={{ marginBottom: 4 }}>
                         <Typography.Text strong>{template.label}</Typography.Text>
                         {template.page.blocks.length > 0 && (
-                          <Tag color="blue">{template.page.blocks.length} blocks</Tag>
+                          <Tag color="blue">{template.page.blocks.length} block</Tag>
                         )}
                       </Flex>
                       <Typography.Text type="secondary" style={{ fontSize: 13 }}>
@@ -52,7 +52,7 @@ export function TemplatePickerModal({ open, saving, templates, onCancel, onApply
                       type="primary"
                       onClick={(e) => { e.stopPropagation(); void onApply(template) }}
                     >
-                      {template.page.title ? 'Ap dung & Luu' : 'Chon'}
+                      {template.page.title ? 'Áp dụng & lưu' : 'Chọn'}
                     </Button>
                   </Flex>
                 </Card>

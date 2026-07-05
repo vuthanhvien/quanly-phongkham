@@ -50,7 +50,7 @@ const BUNDLE_IMPORT_CONFIGS: Record<string, { related: BundleSheetDefinition[] }
       { sheetName: "performance-reviews", resource: "performance-reviews", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "reviewMonth", "reviewYear", "reviewerId", "score", "status", "strengths", "improvements", "goals", "note"] },
       { sheetName: "position-histories", resource: "position-histories", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "fromPosition", "toPosition", "fromDepartmentId", "toDepartmentId", "effectiveDate", "reason", "note"] },
       { sheetName: "branch-role-assignments", resource: "branch-role-assignments", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "userId", "branchId", "roleName", "roleKeys", "isActive"] },
-      { sheetName: "user-accounts", resource: "user-accounts", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "email", "password", "fullName", "role", "branchId"] },
+      { sheetName: "user-accounts", resource: "user-accounts", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "email", "username", "password", "fullName", "role", "branchId"] },
     ],
   },
 }
@@ -574,6 +574,7 @@ function buildBundleFieldGuide(sheetName: string, column: string) {
   if (column.endsWith("Code")) return "Nhập code của bản ghi cha để map liên kết."
   if (column === "branchId" || column === "defaultBranchId") return "Nhập slug chi nhánh."
   if (column === "userId") return "Nhập email tài khoản."
+  if (column === "username") return "Nhập username đăng nhập nếu muốn dùng thay cho email."
   if (column.toLowerCase().includes("staffid")) return "Nhập mã nhân viên."
   if (column.toLowerCase().includes("customerid")) return "Nhập mã khách hàng."
   if (column.toLowerCase().includes("leadid")) return "Nhập mã lead."
@@ -650,6 +651,8 @@ function fakeTextByKey(resource: string, key: string, index: number) {
       return `0${faker.string.numeric(9)}`
     case "email":
       return faker.internet.email().toLowerCase()
+    case "username":
+      return `user_${index + 1}`
     case "address":
       return faker.location.streetAddress()
     case "description":

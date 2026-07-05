@@ -246,7 +246,7 @@ export function CustomFieldsPage() {
   return (
     <>
       <div className="page-header">
-        <Typography.Title level={3}>Custom fields</Typography.Title>
+        <Typography.Title level={3}>Trường tuỳ biến</Typography.Title>
         <Space wrap>
           <Select
             value={entityType}
@@ -275,7 +275,7 @@ export function CustomFieldsPage() {
             Export
           </Button>
           <Upload {...uploadProps}>
-            <Button icon={<ImportOutlined />}>Import</Button>
+            <Button icon={<ImportOutlined />}>Nhập file</Button>
           </Upload>
         </Space>
       </div>
@@ -433,7 +433,7 @@ export function CustomFieldsPage() {
         />
       </Modal>
       <Modal
-        title="Import custom fields"
+        title="Nhập trường tuỳ biến từ file"
         open={importModal}
         maskClosable={false}
         onCancel={() => setImportModal(false)}

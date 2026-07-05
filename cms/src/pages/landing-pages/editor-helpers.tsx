@@ -9,12 +9,12 @@ import type { LandingBlock, LandingBlockType, LandingFormField, LandingPage, Lan
 import { createId } from '../../utils/createId'
 
 export const blockTypeOptions: Array<{ value: LandingBlockType; label: string }> = [
-  { value: 'title', label: 'Title' },
-  { value: 'text', label: 'Text' },
-  { value: 'image', label: 'Hinh anh' },
-  { value: 'slider', label: 'Slider' },
+  { value: 'title', label: 'Tiêu đề' },
+  { value: 'text', label: 'Đoạn văn' },
+  { value: 'image', label: 'Hình ảnh' },
+  { value: 'slider', label: 'Trình chiếu' },
   { value: 'video', label: 'Video' },
-  { value: 'form', label: 'Form custom' },
+  { value: 'form', label: 'Biểu mẫu tuỳ chỉnh' },
 ]
 
 export const blockTypeIcons: Record<LandingBlockType, React.ReactNode> = {
@@ -45,7 +45,7 @@ export function createField(): LandingFormField {
   return {
     id: createId(),
     name: 'full_name',
-    label: 'Ho ten',
+    label: 'Họ tên',
     type: 'text',
     placeholder: '',
     required: true,

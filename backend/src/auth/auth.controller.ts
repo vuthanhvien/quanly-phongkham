@@ -1,11 +1,16 @@
 import { Body, Controller, Get, Post, Request } from '@nestjs/common';
-import { IsEmail, IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 import { Public, AuthUser } from '../common/auth';
 import { AuthService } from './auth.service';
 
 class LoginDto {
-  @IsEmail()
-  email: string;
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  identifier?: string;
 
   @IsString()
   password: string;
@@ -18,7 +23,7 @@ export class AuthController {
   @Public()
   @Post('login')
   login(@Body() payload: LoginDto) {
-    return this.authService.login(payload.email, payload.password);
+    return this.authService.login(payload.identifier || payload.email || '', payload.password);
   }
 
   @Get('me')
@@ -26,4 +31,3 @@ export class AuthController {
     return { data: request.user };
   }
 }
-

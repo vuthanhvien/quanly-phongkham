@@ -323,6 +323,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
   ],
   'user-accounts': [
     { key: 'email', label: 'Email đăng nhập', required: true, width: '66', tableWidth: 240 },
+    { key: 'username', label: 'Username', width: '50', tableWidth: 180 },
     { key: 'password', label: 'Mật khẩu mới', width: '50', tableWidth: 180 },
     { key: 'fullName', label: 'Tên nội bộ (tuỳ chọn)', width: '66', tableWidth: 220 },
     { key: 'role', label: 'Vai trò hệ thống', type: 'select', options: systemRoleSelectOptions, required: true, width: '33', tableWidth: 140 },

@@ -7,9 +7,9 @@ import { ImagePickerInput } from '../components/ImagePickerInput'
 type UiSettingsFormValues = AppUiSettings
 
 const sizeOptions = [
-  { value: 'small', label: 'Small' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'large', label: 'Large' },
+  { value: 'small', label: 'Nhỏ' },
+  { value: 'medium', label: 'Vừa' },
+  { value: 'large', label: 'Lớn' },
 ]
 
 const colorRules = [
@@ -25,45 +25,45 @@ const colorSections: Array<{
     title: 'Nền & surface',
     fields: [
       { name: 'primaryColor', label: 'Màu chính' },
-      { name: 'pageBgColor', label: 'Background trang' },
-      { name: 'surfaceColor', label: 'Surface/card' },
-      { name: 'surfaceBorderColor', label: 'Viền surface' },
+      { name: 'pageBgColor', label: 'Nền trang' },
+      { name: 'surfaceColor', label: 'Nền card / surface' },
+      { name: 'surfaceBorderColor', label: 'Viền card / surface' },
     ],
   },
   {
-    title: 'Header',
+    title: 'Đầu trang',
     fields: [
-      { name: 'headerBgColor', label: 'Nền header' },
-      { name: 'headerBorderColor', label: 'Viền header' },
-      { name: 'headerTextColor', label: 'Text header' },
+      { name: 'headerBgColor', label: 'Nền đầu trang' },
+      { name: 'headerBorderColor', label: 'Viền đầu trang' },
+      { name: 'headerTextColor', label: 'Chữ đầu trang' },
     ],
   },
   {
-    title: 'Menu',
+    title: 'Thanh menu',
     fields: [
       { name: 'menuBgColor', label: 'Nền menu' },
-      { name: 'menuTextColor', label: 'Text item' },
-      { name: 'menuGroupTextColor', label: 'Text group' },
-      { name: 'menuHoverBgColor', label: 'Hover item' },
-      { name: 'menuActiveBgColor', label: 'Active bg' },
-      { name: 'menuActiveTextColor', label: 'Active text' },
+      { name: 'menuTextColor', label: 'Chữ mục menu' },
+      { name: 'menuGroupTextColor', label: 'Chữ nhóm menu' },
+      { name: 'menuHoverBgColor', label: 'Nền khi rê chuột' },
+      { name: 'menuActiveBgColor', label: 'Nền mục đang chọn' },
+      { name: 'menuActiveTextColor', label: 'Chữ mục đang chọn' },
     ],
   },
   {
-    title: 'Text',
+    title: 'Chữ hiển thị',
     fields: [
-      { name: 'textColor', label: 'Text chính' },
-      { name: 'textMutedColor', label: 'Text phụ' },
-      { name: 'titleColor', label: 'Title / heading' },
+      { name: 'textColor', label: 'Chữ chính' },
+      { name: 'textMutedColor', label: 'Chữ phụ' },
+      { name: 'titleColor', label: 'Tiêu đề / heading' },
     ],
   },
   {
-    title: 'Button variants',
+    title: 'Nút bấm',
     fields: [
-      { name: 'buttonPrimaryTextColor', label: 'Primary text' },
-      { name: 'buttonDefaultBgColor', label: 'Default bg' },
-      { name: 'buttonDefaultTextColor', label: 'Default text' },
-      { name: 'buttonDefaultBorderColor', label: 'Default border' },
+      { name: 'buttonPrimaryTextColor', label: 'Chữ nút chính' },
+      { name: 'buttonDefaultBgColor', label: 'Nền nút thường' },
+      { name: 'buttonDefaultTextColor', label: 'Chữ nút thường' },
+      { name: 'buttonDefaultBorderColor', label: 'Viền nút thường' },
     ],
   },
 ]
@@ -142,10 +142,10 @@ export function UiSettingsPage() {
       <Flex align="start" justify="space-between" gap={16} wrap>
         <div>
           <Typography.Title level={3} style={{ marginBottom: 4 }}>
-            UI settings
+            Giao diện CMS
           </Typography.Title>
           <Typography.Paragraph style={{ margin: 0 }}>
-            Tùy biến sâu màu sắc CMS cho nền, header, menu, text và button variants.
+            Tuỳ biến sâu màu sắc và phong cách CMS cho nền, đầu trang, menu, chữ và nút bấm.
           </Typography.Paragraph>
         </div>
         <Button icon={<UndoOutlined />} onClick={handleResetDefaults}>
@@ -165,7 +165,7 @@ export function UiSettingsPage() {
                     </Form.Item>
                   </Col>
                   <Col md={12} xs={24}>
-                    <Form.Item label="Icon app URL" name="appIconUrl">
+                    <Form.Item label="URL icon app" name="appIconUrl">
                       <ImagePickerInput placeholder="https://.../icon.png" />
                     </Form.Item>
                   </Col>
@@ -194,19 +194,19 @@ export function UiSettingsPage() {
               <Card className="glass-card settings-card" title="Kích thước & bo góc">
                 <Row gutter={[16, 0]}>
                   <Col md={12} xs={24}>
-                    <Form.Item label="Size app" name="size" rules={[{ required: true }]}>
+                    <Form.Item label="Kích thước giao diện" name="size" rules={[{ required: true }]}>
                       <Radio.Group optionType="button" buttonStyle="solid" options={sizeOptions} />
                     </Form.Item>
                   </Col>
                   <Col md={12} xs={24}>
-                    <Form.Item label="Border radius" name="borderRadius" rules={[{ required: true }]}>
+                    <Form.Item label="Độ bo góc" name="borderRadius" rules={[{ required: true }]}>
                       <InputNumber min={0} max={32} style={{ width: '100%' }} addonBefore={<BorderOutlined />} />
                     </Form.Item>
                   </Col>
                 </Row>
               </Card>
 
-              <Card className="glass-card settings-card" title="Font family">
+              <Card className="glass-card settings-card" title="Phông chữ">
                 <Form.Item label="Chọn font" name="fontFamily" rules={[{ required: true }]}>
                   <Select
                     options={fontFamilyOptions.map((font) => ({ value: font.value, label: font.label }))}
@@ -216,10 +216,10 @@ export function UiSettingsPage() {
                 </Form.Item>
               </Card>
 
-              <Card className="glass-card settings-card" title="Shadow">
+              <Card className="glass-card settings-card" title="Đổ bóng">
                 <Row gutter={[16, 0]}>
                   <Col md={12} xs={24}>
-                    <Form.Item label="Màu shadow" name="shadowColor" rules={colorRules}>
+                    <Form.Item label="Màu bóng" name="shadowColor" rules={colorRules}>
                       <ColorInput placeholder="#0f172a" />
                     </Form.Item>
                   </Col>
@@ -229,12 +229,12 @@ export function UiSettingsPage() {
                     </Form.Item>
                   </Col>
                   <Col md={12} xs={24}>
-                    <Form.Item label="Blur" name="shadowBlur" rules={[{ required: true }]}>
+                    <Form.Item label="Độ mờ" name="shadowBlur" rules={[{ required: true }]}>
                       <InputNumber min={0} max={60} style={{ width: '100%' }} />
                     </Form.Item>
                   </Col>
                   <Col md={12} xs={24}>
-                    <Form.Item label="Offset Y" name="shadowOffsetY" rules={[{ required: true }]}>
+                    <Form.Item label="Độ lệch Y" name="shadowOffsetY" rules={[{ required: true }]}>
                       <InputNumber min={0} max={24} style={{ width: '100%' }} />
                     </Form.Item>
                   </Col>
@@ -245,7 +245,7 @@ export function UiSettingsPage() {
 
           <Col lg={9} xs={24}>
             <div className="ui-settings-preview-sticky">
-            <Card className="glass-card settings-card" title="Preview nhanh">
+            <Card className="glass-card settings-card" title="Xem trước nhanh">
               <div
                 style={{
                   background: preview.pageBgColor,

@@ -60,8 +60,18 @@ interface RelatedRecordEditState {
   recordId: string
 }
 
-export function RecordDetailPage() {
-  const { resource = "customers", id = "" } = useParams()
+interface RecordDetailPageProps {
+  resource?: string
+  id?: string
+  embedded?: boolean
+  onClose?: () => void
+}
+
+export function RecordDetailPage(props: RecordDetailPageProps = {}) {
+  const params = useParams()
+  const resource = props.resource ?? params.resource ?? "customers"
+  const id = props.id ?? params.id ?? ""
+  const embedded = Boolean(props.embedded)
   const navigate = useNavigate()
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [related, setRelated] = useState<RelatedBlock[]>([])
@@ -143,40 +153,76 @@ export function RecordDetailPage() {
     return <Empty description="Không tìm thấy bản ghi" />
   }
 
+  if (embedded) {
+    return (
+      <>
+        <Card className="glass-card detail-card" loading={loading}>
+          <Typography.Title level={4} style={{ marginBottom: 16 }}>
+            Thông tin chính
+          </Typography.Title>
+          <div className="detail-grid-stacked">
+            {fields.map((field) => (
+              <div key={field.key} className="detail-item">
+                <div className="detail-item-label">
+                  {field.description ? (
+                    <Space direction="vertical" size={0}>
+                      <span>{field.label}</span>
+                      <Typography.Text type="secondary">{field.description}</Typography.Text>
+                    </Space>
+                  ) : field.label}
+                </div>
+                <div className="detail-item-content">
+                  <RecordValueView
+                    field={field}
+                    fileLookups={fileLookups}
+                    lookups={lookups}
+                    value={record?.[field.key] ?? record?.customFields?.[field.key]}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </>
+    )
+  }
+
   return (
     <>
-      <div className="page-header">
-        <div>
-          <Typography.Title level={3}>
-            {detailTitle(resource, record)}
-          </Typography.Title>
-        </div>
-        <Space>
-          <Link to={`/${resource}`}>
-            <Button>Quay lại</Button>
-          </Link>
-          {resource === "leads" && !record?.convertedCustomerId && hasActionAccess(resource, "convert-to-customer") && (
-            <Tooltip title="Chuyển lead thành khách hàng">
-              <Button
-                onClick={async () => {
-                  const response = await convertLead(id)
-                  message.success("Đã chuyển lead thành khách hàng")
-                  navigate(`/customers/${response.data.data.id}`)
-                }}
-              >
-                Chuyển thành khách hàng
-              </Button>
-            </Tooltip>
-          )}
-          {hasActionAccess(resource, "update") && (
-            <Link to={`/${resource}/${id}/edit`}>
-              <Button className="primary-glow" type="primary">
-                Sửa hồ sơ
-              </Button>
+      {!embedded && (
+        <div className="page-header">
+          <div>
+            <Typography.Title level={3}>
+              {detailTitle(resource, record)}
+            </Typography.Title>
+          </div>
+          <Space>
+            <Link to={`/${resource}`}>
+              <Button>Quay lại</Button>
             </Link>
-          )}
-        </Space>
-      </div>
+            {resource === "leads" && !record?.convertedCustomerId && hasActionAccess(resource, "convert-to-customer") && (
+              <Tooltip title="Chuyển lead thành khách hàng">
+                <Button
+                  onClick={async () => {
+                    const response = await convertLead(id)
+                    message.success("Đã chuyển lead thành khách hàng")
+                    navigate(`/customers?detail=${response.data.data.id}`)
+                  }}
+                >
+                  Chuyển thành khách hàng
+                </Button>
+              </Tooltip>
+            )}
+            {hasActionAccess(resource, "update") && (
+              <Link to={`/${resource}/${id}/edit`}>
+                <Button className="primary-glow" type="primary">
+                  Sửa hồ sơ
+                </Button>
+              </Link>
+            )}
+          </Space>
+        </div>
+      )}
 
       <Row gutter={[18, 18]} align="stretch" className="detail-split-row">
         {/* Left: related tabs */}

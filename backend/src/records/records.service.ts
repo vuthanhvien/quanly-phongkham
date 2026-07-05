@@ -257,7 +257,7 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
         matchField: 'email',
-        columns: ['recordId', 'staffCode', 'email', 'password', 'fullName', 'role', 'branchId'],
+        columns: ['recordId', 'staffCode', 'email', 'username', 'password', 'fullName', 'role', 'branchId'],
       },
     ],
   },
@@ -461,7 +461,7 @@ export class RecordsService {
         'work-schedules': ['shiftLabel', 'status'],
         'branch-role-assignments': ['roleName'],
         'branch-permissions': ['roleName'],
-        'user-accounts': ['email', 'fullName', 'role'],
+        'user-accounts': ['email', 'username', 'fullName', 'role'],
       };
       where = (searchable[resource] || []).map((field) => ({ [field]: ILike(`%${search}%`) })) as FindOptionsWhere<ConfigurableEntity>[];
     }
@@ -1742,12 +1742,19 @@ export class RecordsService {
     if (typeof value.role === 'string' && !['ADMIN', 'STAFF', 'DOCTOR'].includes(value.role)) {
       throw new BadRequestException('Vai tro khong hop le');
     }
+    if (typeof value.email === 'string') {
+      value.email = value.email.trim().toLowerCase();
+    }
+    if (typeof value.username === 'string') {
+      value.username = value.username.trim() || undefined;
+    }
     if (typeof value.password === 'string' && value.password) {
       value.passwordHash = await hash(value.password, 10);
     }
     delete value.password;
     if (creating && !value.passwordHash) throw new BadRequestException('Mat khau tai khoan la bat buoc');
     if (!value.passwordHash) delete value.passwordHash;
+    if (!value.username) delete value.username;
     if (typeof value.fullName !== 'string' || !value.fullName.trim()) {
       value.fullName = typeof value.email === 'string' ? value.email.trim() : '';
     }

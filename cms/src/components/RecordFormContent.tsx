@@ -526,7 +526,7 @@ function FileSelectInput({
         <div className="image-library-picker">
           <div className="image-library-sidebar">
             <div className="image-library-sidebar-header">
-              <Typography.Text className="eyebrow">Folders</Typography.Text>
+              <Typography.Text className="eyebrow">Thư mục</Typography.Text>
               <Typography.Title level={5}>Cây thư mục</Typography.Title>
             </div>
             <Button block onClick={() => setSelectedFolderId(undefined)}>
@@ -822,7 +822,7 @@ function ImageLibrarySelectInput({
         <div className="image-library-picker">
           <div className="image-library-sidebar">
             <div className="image-library-sidebar-header">
-              <Typography.Text className="eyebrow">Folders</Typography.Text>
+              <Typography.Text className="eyebrow">Thư mục</Typography.Text>
               <Typography.Title level={5}>Cây thư mục</Typography.Title>
             </div>
             <Button block onClick={() => setSelectedFolderId(undefined)}>

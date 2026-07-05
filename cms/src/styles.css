@@ -509,6 +509,32 @@ body {
   margin: 0 !important;
 }
 
+.staff-home-panel {
+  align-items: center;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.4fr) auto;
+}
+
+.staff-home-copy .ant-typography {
+  display: block;
+}
+
+.staff-home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.staff-home-metrics {
+  height: 100%;
+}
+
+.staff-home-metrics .dashboard-mini-card {
+  min-height: 122px;
+}
+
 .dashboard-week-grid {
   display: grid;
   gap: 12px;
@@ -651,34 +677,40 @@ body {
 .detail-grid-stacked {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 2px;
   margin-top: 0;
 }
 
 .detail-grid-stacked .detail-item {
-  border-radius: calc(var(--app-radius) - 4px);
+  border-radius: 0;
 }
 
 .detail-item {
-  background: rgba(15, 23, 42, 0.03);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: var(--app-radius);
-  height: 100%;
-  overflow: hidden;
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  column-gap: 14px;
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+  min-height: 0;
+  padding: 8px 0;
 }
 
 .detail-item-label {
-  background: rgba(15, 23, 42, 0.045);
   color: var(--app-text-soft);
   font-size: 11px;
   font-weight: 700;
-  padding: 7px 10px;
+  line-height: 1.45;
+  padding: 0;
 }
 
 .detail-item-content {
-  background: rgba(15, 23, 42, 0.025);
-  min-height: 36px;
-  padding: 8px 10px;
+  min-height: 0;
+  padding: 0;
+}
+
+.detail-item-content .ant-typography,
+.detail-item-content .ant-tag {
+  margin-bottom: 0;
 }
 
 .related-tab-toolbar {
@@ -733,6 +765,108 @@ body {
 .profile-summary h4 {
   color: var(--app-text) !important;
   margin: 0 !important;
+}
+
+.profile-left-stack {
+  top: 84px;
+}
+
+.profile-account-card .ant-card-body {
+  display: grid;
+  gap: 16px;
+}
+
+.profile-account-header {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+}
+
+.profile-account-copy {
+  min-width: 0;
+}
+
+.profile-account-copy .ant-typography {
+  display: block;
+}
+
+.profile-hero-card .ant-card-body {
+  padding: 20px;
+}
+
+.profile-hero {
+  align-items: flex-start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.9fr);
+}
+
+.profile-hero-main {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  min-width: 0;
+}
+
+.profile-hero-copy {
+  min-width: 0;
+}
+
+.profile-hero-copy .ant-typography {
+  display: block;
+}
+
+.profile-link-list {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-link-item {
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  padding: 0 0 12px;
+}
+
+.profile-link-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.profile-link-item > .anticon {
+  color: var(--app-primary);
+  font-size: 16px;
+  margin-top: 2px;
+}
+
+.profile-link-item .ant-typography {
+  display: block;
+}
+
+.profile-link-value {
+  color: var(--app-text);
+  line-height: 1.6;
+  margin-top: 4px;
+}
+
+.profile-branch-roles {
+  display: grid;
+  gap: 12px;
+}
+
+.profile-branch-role-card {
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: var(--app-radius);
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.profile-tabs-card .ant-tabs-tab {
+  font-weight: 700;
 }
 
 .settings-grid {
@@ -943,9 +1077,9 @@ body {
 .login-shell {
   align-items: center;
   background:
-    radial-gradient(circle at 20% 18%, color-mix(in srgb, var(--app-primary) 14%, transparent), transparent 34%),
-    radial-gradient(circle at 78% 24%, color-mix(in srgb, var(--app-primary) 10%, transparent), transparent 28%),
-    var(--app-page-bg);
+    radial-gradient(circle at 20% 18%, color-mix(in srgb, #ffffff 10%, transparent), transparent 34%),
+    radial-gradient(circle at 78% 24%, color-mix(in srgb, #ffffff 8%, transparent), transparent 28%),
+    var(--app-primary);
   display: flex;
   justify-content: center;
   min-height: 100vh;
@@ -954,31 +1088,41 @@ body {
   position: relative;
 }
 
-.login-card {
-  backdrop-filter: blur(24px);
-  background: rgba(255, 255, 255, 0.9) !important;
-  border: 1px solid rgba(15, 23, 42, 0.12) !important;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.1);
+.login-panel {
+  display: grid;
+  gap: 18px;
   max-width: 460px;
   width: 100%;
 }
 
-.login-brand {
-  margin-bottom: 18px;
+.login-card {
+  backdrop-filter: blur(24px);
+  background: rgba(255, 255, 255, 0.96) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow: 0 26px 70px rgba(15, 23, 42, 0.14);
+  width: 100%;
 }
 
-.login-copy {
-  color: var(--app-text-soft);
-  margin-bottom: 22px !important;
+.login-card .ant-card-body {
+  padding: 30px !important;
 }
 
-.login-footnote {
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-  color: var(--app-text-soft);
-  font-size: 12px;
-  font-weight: 700;
-  margin-top: 18px;
-  padding-top: 16px;
+.login-brand-outside {
+  align-items: center;
+  color: #ffffff;
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  text-align: center;
+}
+
+.login-brand-mark {
+  background: #ffffff;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.16);
+  color: var(--app-primary);
+  font-size: 22px;
+  height: 58px;
+  width: 58px;
 }
 
 .login-orb {
@@ -1045,8 +1189,17 @@ body {
 .ant-select-selector,
 .ant-picker,
 textarea.ant-input {
-  background: rgba(15, 23, 42, 0.055) !important;
+  background: #ffffff !important;
   border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+.ant-input[disabled],
+.ant-input-affix-wrapper-disabled,
+.ant-input-number-disabled,
+.ant-select-disabled .ant-select-selector,
+.ant-picker-disabled,
+textarea.ant-input[disabled] {
+  background: rgba(15, 23, 42, 0.055) !important;
 }
 
 .ant-input-affix-wrapper .ant-input,
@@ -2117,6 +2270,20 @@ textarea.ant-input {
     display: none;
   }
 
+  .profile-left-stack {
+    position: static;
+    top: auto;
+  }
+
+  .detail-item {
+    grid-template-columns: 1fr;
+    row-gap: 4px;
+  }
+
+  .profile-hero {
+    grid-template-columns: 1fr;
+  }
+
   .page-header,
   .hero-panel {
     align-items: flex-start;
@@ -2185,6 +2352,14 @@ textarea.ant-input {
     grid-template-columns: 1fr;
   }
 
+  .staff-home-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-home-actions {
+    justify-content: flex-start;
+  }
+
   .calendar-planner-layout {
     grid-template-columns: 1fr;
   }
@@ -2242,6 +2417,14 @@ textarea.ant-input {
 
   .zalo-message-bubble {
     max-width: 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  .profile-account-header,
+  .profile-hero-main {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

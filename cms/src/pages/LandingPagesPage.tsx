@@ -504,7 +504,7 @@ export function LandingPagesPage() {
         {
           ...createBlock('title'),
           ...meta,
-          title: width === 'full' ? 'Section full width' : 'Section container',
+          title: width === 'full' ? 'Section tràn chiều rộng' : 'Section trong khung',
         },
         current.blocks.length,
       )
@@ -683,7 +683,7 @@ export function LandingPagesPage() {
       {/* ── Header ── */}
       <div className="page-header" style={{ flexShrink: 0 }}>
         <Flex align="center" gap={12} wrap="wrap">
-          <Typography.Title level={3} style={{ margin: 0 }}>Landing pages</Typography.Title>
+          <Typography.Title level={3} style={{ margin: 0 }}>Trang landing</Typography.Title>
           <Select
             style={{ minWidth: 240 }}
             placeholder="Chọn page..."
@@ -724,9 +724,9 @@ export function LandingPagesPage() {
                 children: (
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
                     {/* Page meta */}
-                    <Card className="glass-card" size="small" title="Thông tin page">
+                    <Card className="glass-card" size="small" title="Thông tin trang">
                       <Form layout="vertical" size="small">
-                        <Form.Item label="Tên page" style={{ marginBottom: 8 }}>
+                        <Form.Item label="Tên trang" style={{ marginBottom: 8 }}>
                           <Input value={draft.title} onChange={(event) => syncSlugFromTitle(event.target.value)} placeholder="Ví dụ: Trang chủ" />
                         </Form.Item>
                         <Row gutter={8}>
@@ -736,7 +736,7 @@ export function LandingPagesPage() {
                             </Form.Item>
                           </Col>
                           <Col span={12}>
-                            <Form.Item label="Path" style={{ marginBottom: 8 }}>
+                            <Form.Item label="Đường dẫn" style={{ marginBottom: 8 }}>
                               <Input value={draft.path} onChange={(event) => updateDraft({ path: normalizePath(event.target.value) })} placeholder="/" />
                             </Form.Item>
                           </Col>
@@ -746,12 +746,12 @@ export function LandingPagesPage() {
                         </Form.Item>
                         <Row gutter={8}>
                           <Col span={12}>
-                            <Form.Item label="SEO title" style={{ marginBottom: 8 }}>
+                            <Form.Item label="Tiêu đề SEO" style={{ marginBottom: 8 }}>
                               <Input value={draft.seoTitle} onChange={(event) => updateDraft({ seoTitle: event.target.value })} />
                             </Form.Item>
                           </Col>
                           <Col span={12}>
-                            <Form.Item label="SEO desc" style={{ marginBottom: 8 }}>
+                            <Form.Item label="Mô tả SEO" style={{ marginBottom: 8 }}>
                               <Input value={draft.seoDescription} onChange={(event) => updateDraft({ seoDescription: event.target.value })} />
                             </Form.Item>
                           </Col>
@@ -759,7 +759,7 @@ export function LandingPagesPage() {
                         <Form.Item label="Xuất bản" style={{ marginBottom: 0 }}>
                           <Flex align="center" gap={8}>
                             <Switch size="small" checked={draft.isPublished} onChange={(checked) => updateDraft({ isPublished: checked })} />
-                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>{draft.isPublished ? 'Đang public' : 'Draft'}</Typography.Text>
+                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>{draft.isPublished ? 'Đang xuất bản' : 'Bản nháp'}</Typography.Text>
                           </Flex>
                         </Form.Item>
                       </Form>
@@ -817,12 +817,12 @@ export function LandingPagesPage() {
                 icon={<TabletOutlined />}
                 type={previewDevice === 'tablet' ? 'primary' : 'default'}
                 onClick={() => setPreviewDevice('tablet')}
-              >Tablet</Button>
+              >Máy tính bảng</Button>
               <Button
                 icon={<MobileOutlined />}
                 type={previewDevice === 'mobile' ? 'primary' : 'default'}
                 onClick={() => setPreviewDevice('mobile')}
-              >Mobile</Button>
+              >Điện thoại</Button>
             </Space.Compact>
             <Typography.Text type="secondary" style={{ fontSize: 11 }}>{previewUrl}</Typography.Text>
           </Flex>
@@ -841,7 +841,7 @@ export function LandingPagesPage() {
                 flexShrink: 0,
                 transition: 'width 0.25s',
               }}
-              title="Landing page preview"
+              title="Xem trước trang landing"
             />
           </div>
         </div>

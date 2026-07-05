@@ -25,7 +25,7 @@ import {
 } from "antd"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
-import { Link, useNavigate, useParams } from "react-router-dom"
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { hasActionAccess } from "../access"
 import { FileUploadPanel } from "../components/FileUploadPanel"
@@ -34,6 +34,7 @@ import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
 import { StockBatchForm } from "../components/StockBatchForm"
 import { CustomField, entityLabels } from "../models"
+import { RecordDetailPage } from "./RecordDetailPage"
 import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
 import {
   FieldLayoutConfig,
@@ -47,6 +48,7 @@ export function RecordListPage() {
   const screens = Grid.useBreakpoint()
   const { resource = "customers" } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
@@ -69,6 +71,7 @@ export function RecordListPage() {
   const rows = response?.data || []
   const total = response?.total || 0
   const loading = query.query?.isLoading || query.isLoading
+  const detailId = searchParams.get("detail")
   const { mutate: deleteRecord } = useDelete()
   const refresh = () => query.query?.refetch?.() || query.refetch?.()
 
@@ -78,6 +81,11 @@ export function RecordListPage() {
     setEditingId(null)
     setDuplicateValues(undefined)
     setDuplicatingId(null)
+    if (detailId) {
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.delete("detail")
+      setSearchParams(nextParams, { replace: true })
+    }
   }, [resource])
 
   useEffect(() => {
@@ -134,9 +142,7 @@ export function RecordListPage() {
           <Space size={2}>
             {hasActionAccess(resource, "view") && (
               <Tooltip title="Xem chi tiết">
-                <Link to={`/${resource}/${row.id}`}>
-                  <Button icon={<EyeOutlined />} type="text" />
-                </Link>
+                <Button icon={<EyeOutlined />} type="text" onClick={() => openDetail(String(row.id))} />
               </Tooltip>
             )}
             {hasActionAccess(resource, "update") && (
@@ -227,7 +233,7 @@ export function RecordListPage() {
     const response = await api.post(`/records/leads/${recordId}/convert-to-customer`)
     message.success("Đã chuyển lead thành khách hàng")
     refresh()
-    navigate(`/customers/${response.data.data.id}`)
+    navigate(`/customers?detail=${response.data.data.id}`)
   }
 
   async function duplicateRecord(recordId: string) {
@@ -243,6 +249,18 @@ export function RecordListPage() {
     } finally {
       setDuplicatingId(null)
     }
+  }
+
+  function openDetail(recordId: string) {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set("detail", recordId)
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  function closeDetail() {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete("detail")
+    setSearchParams(nextParams, { replace: true })
   }
 
   return (
@@ -308,6 +326,46 @@ export function RecordListPage() {
           scroll={{ x: "max-content" }}
         />
       </Card>
+      <Drawer
+        className="quick-drawer"
+        destroyOnClose
+        maskClosable={false}
+        open={Boolean(detailId)}
+        placement="right"
+        title={`Chi tiết ${entityLabels[resource] || resource}`}
+        extra={
+          detailId ? (
+            <Space>
+              <Button onClick={() => navigate(`/${resource}/${detailId}/full`)}>
+                Xem đầy đủ
+              </Button>
+              {hasActionAccess(resource, "update") && (
+                <Button
+                  className="primary-glow"
+                  type="primary"
+                  onClick={() => {
+                    closeDetail()
+                    setEditingId(detailId)
+                  }}
+                >
+                  Sửa hồ sơ
+                </Button>
+              )}
+            </Space>
+          ) : null
+        }
+        width={screens.md ? (resource === "service-orders" ? 1040 : 720) : "100%"}
+        onClose={closeDetail}
+      >
+        {detailId ? (
+          <RecordDetailPage
+            embedded
+            id={detailId}
+            resource={resource}
+            onClose={closeDetail}
+          />
+        ) : null}
+      </Drawer>
       <Drawer
         className="quick-drawer"
         destroyOnClose

@@ -34,16 +34,16 @@ export function SectionsTreeCard({
     <Card
       className="glass-card"
       size="small"
-      title={<span>Sections <Tag style={{ marginLeft: 4 }}>{sections.length}</Tag></span>}
+      title={<span>Danh sách section <Tag style={{ marginLeft: 4 }}>{sections.length}</Tag></span>}
       extra={
         <Flex gap={4} wrap="wrap">
-          <Button size="small" icon={<PlusOutlined />} onClick={() => onAddSection('container')}>Section container</Button>
-          <Button size="small" icon={<PlusOutlined />} onClick={() => onAddSection('full')}>Section full</Button>
+          <Button size="small" icon={<PlusOutlined />} onClick={() => onAddSection('container')}>Section trong khung</Button>
+          <Button size="small" icon={<PlusOutlined />} onClick={() => onAddSection('full')}>Section tràn rộng</Button>
         </Flex>
       }
     >
       {sections.length === 0 ? (
-        <Typography.Text type="secondary">No sections yet</Typography.Text>
+        <Typography.Text type="secondary">Chưa có section nào</Typography.Text>
       ) : (
         <Collapse
           size="small"
@@ -51,18 +51,18 @@ export function SectionsTreeCard({
             key: section.id,
             label: (
               <Flex align="center" gap={8} wrap="wrap">
-                <Typography.Text strong>{section.title || `Section ${section.order}`}</Typography.Text>
-                <Tag>{section.width === 'full' ? 'Full width' : 'Container'}</Tag>
-                <Tag color="blue">{section.blocks.length} blocks</Tag>
+                <Typography.Text strong>{section.title || `Khu vực ${section.order}`}</Typography.Text>
+                <Tag>{section.width === 'full' ? 'Tràn chiều rộng' : 'Trong khung'}</Tag>
+                <Tag color="blue">{section.blocks.length} block</Tag>
               </Flex>
             ),
             extra: (
               <Space size={6} onClick={(event) => event.stopPropagation()}>
                 <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => onOpenBlockComposer(section.id)}>
-                  Add block
+                  Thêm block
                 </Button>
-                <Popconfirm title="Delete this section?" onConfirm={() => onRemoveSection(section.id)}>
-                  <Button size="small" danger>Delete</Button>
+                <Popconfirm title="Xoá section này?" onConfirm={() => onRemoveSection(section.id)}>
+                  <Button size="small" danger>Xoá</Button>
                 </Popconfirm>
               </Space>
             ),
@@ -70,18 +70,18 @@ export function SectionsTreeCard({
               <Space direction="vertical" size={10} style={{ width: '100%' }}>
                 <Row gutter={8}>
                   <Col span={14}>
-                    <Form.Item label="Section name" style={{ marginBottom: 8 }}>
+                    <Form.Item label="Tên section" style={{ marginBottom: 8 }}>
                       <Input value={section.title} onChange={(e) => onUpdateSection(section.id, { sectionTitle: e.target.value })} />
                     </Form.Item>
                   </Col>
                   <Col span={10}>
-                    <Form.Item label="Width mode" style={{ marginBottom: 8 }}>
+                    <Form.Item label="Kiểu chiều rộng" style={{ marginBottom: 8 }}>
                       <Select
                         value={section.width}
                         onChange={(value) => onUpdateSection(section.id, { sectionWidth: value })}
                         options={[
-                          { value: 'container', label: 'Container' },
-                          { value: 'full', label: 'Full width' },
+                          { value: 'container', label: 'Trong khung' },
+                          { value: 'full', label: 'Tràn chiều rộng' },
                         ]}
                       />
                     </Form.Item>
@@ -107,8 +107,8 @@ export function SectionsTreeCard({
                           </div>
                         </Flex>
                         <Space size={4}>
-                          <Button size="small" onClick={(event) => { event.stopPropagation(); onSelectBlock(block.id) }}>Config</Button>
-                          <Button size="small" danger onClick={(event) => { event.stopPropagation(); onRemoveBlock(block.id) }}>Delete</Button>
+                          <Button size="small" onClick={(event) => { event.stopPropagation(); onSelectBlock(block.id) }}>Cấu hình</Button>
+                          <Button size="small" danger onClick={(event) => { event.stopPropagation(); onRemoveBlock(block.id) }}>Xoá</Button>
                         </Space>
                       </Flex>
                     </Card>

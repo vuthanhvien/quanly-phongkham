@@ -424,7 +424,7 @@ export function ZaloInboxPage() {
     <>
       <div className="page-header">
         <div>
-          <Typography.Title level={3}>Zalo Inbox</Typography.Title>
+          <Typography.Title level={3}>Hộp thư Zalo</Typography.Title>
         </div>
         <Space>
           <Button icon={<PlusOutlined />} type="primary" onClick={openCreateAccount}>
