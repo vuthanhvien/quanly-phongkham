@@ -214,6 +214,9 @@ export class SettingsService {
     this.assertSettingsAccess(user);
     const current = await this.ensureAppUiSettings();
     const next = this.appUiSettings.merge(current, this.normalizeAppUiPayload(payload, current));
+    if (payload.appDescription !== undefined && !String(payload.appDescription || '').trim()) {
+      next.appDescription = null as unknown as string;
+    }
     return this.appUiSettings.save(next);
   }
 

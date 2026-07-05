@@ -125,7 +125,7 @@ export function UiSettingsPage() {
     try {
       await save({
         ...values,
-        appDescription: values.appDescription?.trim() || undefined,
+        appDescription: typeof values.appDescription === 'string' ? values.appDescription.trim() : '',
       })
       message.success('Đã cập nhật giao diện CMS')
     } finally {

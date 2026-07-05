@@ -474,6 +474,10 @@ body {
   margin-top: 2px;
 }
 
+.dashboard-staff-section {
+  margin-bottom: 12px;
+}
+
 .pipeline-list {
   display: grid;
   gap: 12px;
@@ -509,31 +513,89 @@ body {
   margin: 0 !important;
 }
 
-.staff-home-panel {
-  align-items: center;
-  display: grid;
-  gap: 18px;
-  grid-template-columns: minmax(0, 1.4fr) auto;
+.staff-home-hero-card {
+  overflow: hidden;
+  position: relative;
 }
 
-.staff-home-copy .ant-typography {
+.staff-home-hero-card::before {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--app-primary) 18%, transparent), transparent 58%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.staff-home-hero {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
+  position: relative;
+  z-index: 1;
+}
+
+.staff-home-main {
+  display: grid;
+  gap: 20px;
+}
+
+.staff-home-mainhead .ant-typography,
+.staff-home-statusline .ant-typography,
+.staff-home-sidecard .ant-typography {
   display: block;
+}
+
+.staff-home-statusline {
+  display: grid;
+  gap: 14px;
+}
+
+.staff-home-primary-status {
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: calc(var(--app-radius) + 4px);
+  padding: 14px 18px;
 }
 
 .staff-home-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 2px;
 }
 
-.staff-home-metrics {
-  height: 100%;
+.staff-home-side {
+  display: grid;
+  gap: 16px;
 }
 
-.staff-home-metrics .dashboard-mini-card {
-  min-height: 122px;
+.staff-home-sidecard {
+  background: rgba(15, 23, 42, 0.035);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: calc(var(--app-radius) + 2px);
+  display: grid;
+  gap: 6px;
+  min-height: 118px;
+  padding: 18px 16px;
 }
+
+.staff-home-sidecard h4,
+.staff-home-summary-card h4 {
+  margin: 4px 0 2px !important;
+}
+
+.staff-home-mainhead h4 {
+  font-size: 21px !important;
+  line-height: 1.2 !important;
+}
+
+.staff-home-primary-status h5,
+.staff-home-sidecard h5 {
+  font-size: 16px !important;
+  line-height: 1.25 !important;
+  margin: 0 !important;
+}
+
 
 .dashboard-week-grid {
   display: grid;
@@ -2352,12 +2414,12 @@ textarea.ant-input {
     grid-template-columns: 1fr;
   }
 
-  .staff-home-panel {
-    grid-template-columns: 1fr;
-  }
-
   .staff-home-actions {
     justify-content: flex-start;
+  }
+
+  .staff-home-hero {
+    grid-template-columns: 1fr;
   }
 
   .calendar-planner-layout {
