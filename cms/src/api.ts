@@ -56,21 +56,21 @@ export const authProvider: AuthProvider = {
       const { data } = await api.post('/auth/login', { identifier: identifier || email, password });
       localStorage.setItem('clinic-token', data.accessToken);
       localStorage.setItem('clinic-user', JSON.stringify(data.user));
-      return { success: true, redirectTo: resolveAppPath('/') };
+      return { success: true, redirectTo: '/' };
     } catch {
       return { success: false, error: { name: 'LoginError', message: 'Thông tin đăng nhập hoặc mật khẩu không đúng' } };
     }
   },
   logout: async () => {
     clearAuthSession();
-    return { success: true, redirectTo: resolveAppPath('/login') };
+    return { success: true, redirectTo: '/login' };
   },
   check: async () =>
     localStorage.getItem('clinic-token')
       ? { authenticated: true }
-      : { authenticated: false, redirectTo: resolveAppPath('/login') },
+      : { authenticated: false, redirectTo: '/login' },
   onError: async (error) =>
-    error?.status === 401 ? { logout: true, redirectTo: resolveAppPath('/login'), error } : { error },
+    error?.status === 401 ? { logout: true, redirectTo: '/login', error } : { error },
   getIdentity: async () => JSON.parse(localStorage.getItem('clinic-user') || 'null'),
 };
 

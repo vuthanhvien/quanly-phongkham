@@ -1,17 +1,29 @@
 import { useLogin } from "@refinedev/core"
 import { Alert, Button, Card, Form, Input } from "antd"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+
+const LAST_LOGIN_IDENTIFIER_KEY = "clinic-last-login-identifier"
 
 export function LoginPage() {
+  const [form] = Form.useForm<{ identifier: string; password: string }>()
   const { mutateAsync: login, isPending } = useLogin()
   const [loginError, setLoginError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const savedIdentifier = localStorage.getItem(LAST_LOGIN_IDENTIFIER_KEY)
+    if (savedIdentifier) {
+      form.setFieldsValue({ identifier: savedIdentifier })
+    }
+  }, [form])
 
   async function handleSubmit(values: { identifier: string; password: string }) {
     setLoginError(null)
     const result = await login(values)
     if (result?.success === false) {
       setLoginError(result.error?.message || "Đăng nhập thất bại")
+      return
     }
+    localStorage.setItem(LAST_LOGIN_IDENTIFIER_KEY, values.identifier.trim())
   }
 
   return (
@@ -24,11 +36,8 @@ export function LoginPage() {
         </div>
         <Card className="login-card">
           <Form
+            form={form}
             layout="vertical"
-            initialValues={{
-              identifier: "admin@thienchanh.local",
-              password: "Admin@123",
-            }}
             onFinish={handleSubmit}
           >
             <Form.Item label="Email / tên đăng nhập / mã NV / SĐT" name="identifier" rules={[{ required: true }]}>

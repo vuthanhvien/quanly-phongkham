@@ -1,0 +1,12 @@
+.git
+.gitignore
+.DS_Store
+backend/node_modules
+backend/dist
+backend/storage/uploads
+cms/node_modules
+cms/dist
+landing/node_modules
+landing/.next
+proxy
+docs

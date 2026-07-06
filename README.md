@@ -20,7 +20,7 @@ docker compose up --build
 - CMS: [http://localhost/admin](http://localhost/admin)
 - API: [http://localhost/api](http://localhost/api)
 
-Production compose đã kèm `watchtower` để tự kiểm tra image mới và auto pull/restart các service app (`backend`, `cms`, `landing`, `proxy`). Mặc định watch mỗi `300` giây và không đụng `postgres`.
+Production compose đã gom `backend`, `cms`, `landing` vào 1 image duy nhất với service `app`.
 
 Can cau hinh `DATABASE_URL` tro den MySQL cua server truoc khi `docker compose up`.
 Vi du:
@@ -37,43 +37,6 @@ Password: Admin@123
 ```
 
 Thay `JWT_SECRET` và mật khẩu admin trong `.env` trước khi sử dụng ngoài môi trường phát triển.
-
-## Chạy Docker Dev Có Hot Reload
-
-Compose dev mount source code từ máy host vào container để khi sửa file thì NestJS và Vite tự reload ngay.
-
-```bash
-cp .env.example .env
-docker compose -f docker-compose.dev.yml up --build
-```
-
-- Start nền:
-
-```bash
-docker compose -f docker-compose.dev.yml up -d --build
-```
-
-- Xem log:
-
-```bash
-docker compose -f docker-compose.dev.yml logs -f
-```
-
-- Dừng dev:
-
-```bash
-docker compose -f docker-compose.dev.yml down
-```
-
-- Landing dev qua proxy: [http://localhost](http://localhost)
-- CMS dev qua proxy: [http://localhost/admin](http://localhost/admin)
-- API dev qua proxy: [http://localhost/api](http://localhost/api)
-
-Trong dev mode, Nginx proxy được bật luôn để URL giống prod. CMS chạy Vite dưới base path `/admin/`, nên frontend gọi relative `/api` qua cùng host `localhost`.
-
-Nếu cần debug trực tiếp từng service, bạn có thể tạm publish lại port cho `backend`, `cms`, hoặc `landing` trong `docker-compose.dev.yml`.
-
-Nếu lần đầu khởi động thấy watcher chưa bắt thay đổi trên Docker Desktop, compose dev đã bật polling sẵn cho cả backend và cms.
 
 ## Chức Năng MVP
 
@@ -92,10 +55,10 @@ Nếu lần đầu khởi động thấy watcher chưa bắt thay đổi trên D
 ```text
 backend/                 NestJS REST API
 cms/                     Refine CMS
-proxy/                   Nginx reverse proxy cho Landing + CMS + /api
+docker/                  Gateway + PM2 config cho single-container runtime
 docs/FEATURE_SCOPE.md    Phạm vi rút từ PDF
 docs/WORKLOG.md          Đã làm / cần làm tiếp
-docker-compose.yml       PostgreSQL + API + Landing + CMS + proxy
+docker-compose.yml       Single-container production stack
 ```
 
 ## API Chính
@@ -153,9 +116,3 @@ con server này
 Root/QG5oZjRSn1OH793Q0x53H
 
 cd phongkham && docker compose pull && docker compose up -d
-
-Nếu muốn đổi chu kỳ auto update:
-
-```bash
-WATCHTOWER_POLL_INTERVAL=300
-```
