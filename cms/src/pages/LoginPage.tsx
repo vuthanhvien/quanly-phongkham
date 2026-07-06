@@ -1,8 +1,19 @@
 import { useLogin } from "@refinedev/core"
-import { Button, Card, Form, Input } from "antd"
+import { Alert, Button, Card, Form, Input } from "antd"
+import { useState } from "react"
 
 export function LoginPage() {
-  const { mutate: login, isPending } = useLogin()
+  const { mutateAsync: login, isPending } = useLogin()
+  const [loginError, setLoginError] = useState<string | null>(null)
+
+  async function handleSubmit(values: { identifier: string; password: string }) {
+    setLoginError(null)
+    const result = await login(values)
+    if (result?.success === false) {
+      setLoginError(result.error?.message || "Đăng nhập thất bại")
+    }
+  }
+
   return (
     <div className="login-shell">
       <div className="login-orb login-orb-one" />
@@ -18,7 +29,7 @@ export function LoginPage() {
               identifier: "admin@thienchanh.local",
               password: "Admin@123",
             }}
-            onFinish={(values) => login(values)}
+            onFinish={handleSubmit}
           >
             <Form.Item label="Email / tên đăng nhập / mã NV / SĐT" name="identifier" rules={[{ required: true }]}>
               <Input placeholder="Nhập email, tên đăng nhập, mã nhân viên hoặc số điện thoại" />
@@ -39,6 +50,14 @@ export function LoginPage() {
             >
               Đăng nhập CMS
             </Button>
+            {loginError ? (
+              <Alert
+                showIcon
+                style={{ marginTop: 14 }}
+                message={loginError}
+                type="error"
+              />
+            ) : null}
           </Form>
         </Card>
       </div>
