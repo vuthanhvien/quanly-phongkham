@@ -1941,6 +1941,68 @@ textarea.ant-input {
   gap: 8px;
 }
 
+.record-image-url-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.record-image-url-list.compact {
+  gap: 6px;
+}
+
+.record-image-thumb {
+  align-items: flex-start;
+  color: var(--app-text);
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 140px;
+  text-decoration: none;
+}
+
+.record-image-thumb.compact {
+  gap: 0;
+  max-width: none;
+}
+
+.record-image-thumb img {
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--app-line);
+  border-radius: calc(var(--app-radius) - 2px);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  height: 48px;
+  object-fit: cover;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  width: 48px;
+}
+
+.record-image-thumb.compact img {
+  height: 36px;
+  width: 36px;
+}
+
+.record-image-thumb:hover img,
+.record-image-thumb:focus-visible img {
+  border-color: color-mix(in srgb, var(--app-primary) 38%, transparent);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.record-image-thumb-caption {
+  align-items: center;
+  color: var(--app-text-soft);
+  display: inline-flex;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.record-image-thumb-caption span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .record-media-stack.compact {
   flex-direction: row;
   flex-wrap: wrap;

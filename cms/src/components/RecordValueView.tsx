@@ -20,7 +20,7 @@ interface RecordValueViewProps {
 export function RecordValueView({ field, value, lookups, fileLookups, compact }: RecordValueViewProps) {
   if (value === null || value === undefined || value === "") return <span>-</span>
 
-  if (isImageUrlField(field)) {
+  if (isImageUrlField(field, value)) {
     return renderImageUrlValue(value, compact)
   }
 
@@ -35,25 +35,26 @@ function renderImageUrlValue(value: unknown, compact?: boolean) {
   const items = normalizeStringArray(value)
   if (items.length === 0) return <span>-</span>
   return (
-    <div className={`record-media-stack${compact ? " compact" : ""}`}>
+    <div className={`record-image-url-list${compact ? " compact" : ""}`}>
       {items.map((item, index) => {
         const href = resolveFileUrl(item)
-        const image = isImageUrl(item)
-        const label = compact ? `Tệp ${index + 1}` : extractFileName(item) || `Tệp ${index + 1}`
+        const label = extractFileName(item) || `Ảnh ${index + 1}`
         return (
-          <a key={`${item}-${index}`} className="record-media-card" href={href} rel="noreferrer" target="_blank" title={label}>
-            {image ? (
-              <img alt={label} src={href} />
-            ) : (
-              <div className="record-file-fallback">{renderFileIcon({ extension: extractExtension(item) }, true)}</div>
-            )}
-            <div className="record-media-copy">
-              <strong>{label}</strong>
-              <span>{image ? "Hình ảnh" : formatFileKind(extractExtension(item))}</span>
-            </div>
-            <span className="record-media-open">
-              <LinkOutlined />
-            </span>
+          <a
+            key={`${item}-${index}`}
+            className={`record-image-thumb${compact ? " compact" : ""}`}
+            href={href}
+            rel="noreferrer"
+            target="_blank"
+            title={label}
+          >
+            <img alt={label} src={href} />
+            {!compact ? (
+              <span className="record-image-thumb-caption">
+                <span>{label}</span>
+                <LinkOutlined />
+              </span>
+            ) : null}
           </a>
         )
       })}
@@ -96,8 +97,15 @@ function renderFileValue(value: unknown, lookups: LookupMap, fileLookups: FileLo
   )
 }
 
-function isImageUrlField(field: string | FieldSpec) {
-  return typeof field === "string" ? field === "imageUrl" : field.key === "imageUrl"
+function isImageUrlField(field: string | FieldSpec, value: unknown) {
+  const fieldKey = typeof field === "string" ? field : field.key
+  if (["imageUrl", "avatarUrl", "appIconUrl", "logoUrl", "thumbnailUrl"].includes(fieldKey)) return true
+  const fieldLabel = typeof field === "string" ? "" : String(field.label || "").toLowerCase()
+  const values = normalizeStringArray(value)
+  if (fieldLabel.includes("ảnh") || fieldLabel.includes("image") || fieldLabel.includes("avatar")) {
+    return values.every((item) => isImageUrl(item))
+  }
+  return values.length > 0 && values.every((item) => isImageUrl(item)) && fieldKey.toLowerCase().includes("image")
 }
 
 function isFileField(field: string | FieldSpec) {
