@@ -28,7 +28,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api"
-import { hasActionAccess } from "../access"
+import { hasActionAccess, hasResourceAccess } from "../access"
 import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
@@ -63,6 +63,7 @@ export function RecordListPage() {
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [lookups, setLookups] = useState<LookupMap>({})
   const [fileLookups, setFileLookups] = useState<FileLookupMap>({})
+  const [relatedQuickView, setRelatedQuickView] = useState<{ resource: string; id: string } | null>(null)
   const query = useList({
     resource,
     pagination: { currentPage, pageSize },
@@ -131,6 +132,10 @@ export function RecordListPage() {
             field={field}
             fileLookups={fileLookups}
             lookups={lookups}
+            onRelationClick={(targetResource, id) => {
+              if (!hasResourceAccess(targetResource)) return
+              setRelatedQuickView({ resource: targetResource, id })
+            }}
             value={row[field.key] ?? row.customFields?.[field.key]}
           />,
       })),
@@ -396,6 +401,47 @@ export function RecordListPage() {
             id={detailId}
             resource={resource}
             onClose={closeDetail}
+          />
+        ) : null}
+      </Drawer>
+      <Drawer
+        className="quick-drawer"
+        destroyOnClose
+        maskClosable={false}
+        open={Boolean(relatedQuickView)}
+        placement="right"
+        title={relatedQuickView ? `Chi tiết ${entityLabels[relatedQuickView.resource] || relatedQuickView.resource}` : "Chi tiết liên kết"}
+        extra={
+          relatedQuickView ? (
+            <Space>
+              <Button onClick={() => navigate(`/${relatedQuickView.resource}/${relatedQuickView.id}/full`)}>
+                Xem đầy đủ
+              </Button>
+              {hasActionAccess(relatedQuickView.resource, "update") && (
+                <Button
+                  className="primary-glow"
+                  type="primary"
+                  onClick={() => {
+                    setEditingId(null)
+                    setCreating(false)
+                    navigate(`/${relatedQuickView.resource}/${relatedQuickView.id}/edit`)
+                  }}
+                >
+                  Sửa hồ sơ
+                </Button>
+              )}
+            </Space>
+          ) : null
+        }
+        width={screens.md ? 720 : "100%"}
+        onClose={() => setRelatedQuickView(null)}
+      >
+        {relatedQuickView ? (
+          <RecordDetailPage
+            embedded
+            id={relatedQuickView.id}
+            resource={relatedQuickView.resource}
+            onClose={() => setRelatedQuickView(null)}
           />
         ) : null}
       </Drawer>

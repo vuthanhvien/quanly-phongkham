@@ -22,6 +22,30 @@ docker compose up --build
 
 Production compose đã gom `backend`, `cms`, `landing` vào 1 image duy nhất với service `app`.
 
+## Docker Dev
+
+Compose mac dinh la production-like runtime, khong hot reload. Neu muon code va thay doi ngay lap tuc, dung compose dev 1 container Node:
+
+```bash
+cp .env.example .env
+docker compose -f docker-compose.dev.yml up
+```
+
+Dev stack se chay trong 1 service `app`, ben trong gom:
+
+- Gateway: [http://localhost:9999](http://localhost:9999)
+- CMS: [http://localhost:9999/admin](http://localhost:9999/admin)
+- API: [http://localhost:9999/api](http://localhost:9999/api)
+- Backend watch mode noi bo: `3001`
+- Vite dev server noi bo: `3003`
+- Next dev server noi bo: `3002`
+
+Luu y:
+
+- Source code duoc mount truc tiep vao container.
+- `backend`, `cms`, `landing` deu chay watch/dev mode trong cung 1 container Node.
+- Neu dang chay production compose tren cung port `9999`, hay dung `docker compose down` truoc.
+
 Can cau hinh `DATABASE_URL` tro den MySQL cua server truoc khi `docker compose up`.
 Vi du:
 

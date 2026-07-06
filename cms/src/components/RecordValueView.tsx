@@ -5,8 +5,9 @@ import {
   FileTextOutlined,
   LinkOutlined,
 } from "@ant-design/icons"
+import { Button } from "antd"
 import { resolveFileUrl } from "../api"
-import { displayValue, FileLookupMap, LookupMap } from "../relations"
+import { displayValue, FileLookupMap, getRelationSpec, LookupMap } from "../relations"
 import { FieldSpec } from "../models"
 
 interface RecordValueViewProps {
@@ -15,9 +16,10 @@ interface RecordValueViewProps {
   lookups: LookupMap
   fileLookups: FileLookupMap
   compact?: boolean
+  onRelationClick?: (resource: string, id: string) => void
 }
 
-export function RecordValueView({ field, value, lookups, fileLookups, compact }: RecordValueViewProps) {
+export function RecordValueView({ field, value, lookups, fileLookups, compact, onRelationClick }: RecordValueViewProps) {
   if (value === null || value === undefined || value === "") return <span>-</span>
 
   if (isImageUrlField(field, value)) {
@@ -28,7 +30,48 @@ export function RecordValueView({ field, value, lookups, fileLookups, compact }:
     return renderFileValue(value, lookups, fileLookups, compact)
   }
 
+  const relationSpec = getRelationSpec(field)
+  if (relationSpec && relationSpec.resource !== "files" && onRelationClick) {
+    return renderRelationValue(field, value, lookups, compact, relationSpec.resource, onRelationClick)
+  }
+
   return <>{displayValue(field, value, lookups)}</>
+}
+
+function renderRelationValue(
+  field: string | FieldSpec,
+  value: unknown,
+  lookups: LookupMap,
+  compact: boolean | undefined,
+  resource: string,
+  onRelationClick: (resource: string, id: string) => void,
+) {
+  const values = Array.isArray(value) ? value : [value]
+  return (
+    <>
+      {values.map((item, index) => {
+        const itemId = String(item)
+        const label = displayValue(field, item, lookups)
+        return (
+          <span key={`${itemId}-${index}`}>
+            <Button
+              size={compact ? "small" : "middle"}
+              style={{ paddingInline: 0 }}
+              type="link"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onRelationClick(resource, itemId)
+              }}
+            >
+              {label}
+            </Button>
+            {index < values.length - 1 ? ", " : null}
+          </span>
+        )
+      })}
+    </>
+  )
 }
 
 function renderImageUrlValue(value: unknown, compact?: boolean) {

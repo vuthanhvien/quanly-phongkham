@@ -1,0 +1,53 @@
+services:
+  app:
+    image: node:22-alpine
+    working_dir: /app
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      PORT: 9999
+      BACKEND_PORT: 3001
+      CMS_PORT: 3003
+      LANDING_PORT: 3002
+      BACKEND_URL: http://127.0.0.1:3001
+      CMS_URL: http://127.0.0.1:3003
+      LANDING_URL: http://127.0.0.1:3002
+      VITE_API_URL: ${VITE_API_URL:-/api}
+      VITE_BASE_PATH: ${VITE_BASE_PATH:-/admin/}
+      LANDING_API_URL: ${LANDING_API_URL:-http://127.0.0.1:3001/api}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+      NODE_PATH: /opt/runtime/node_modules
+      CHOKIDAR_USEPOLLING: "true"
+    command: >
+      sh -lc "
+      cd /opt/runtime &&
+      cp /app/docker/runtime-package.json ./package.json &&
+      npm install &&
+      cd /app/backend && npm install &&
+      cd /app/cms && npm install &&
+      cd /app/landing && npm install &&
+      /opt/runtime/node_modules/.bin/pm2-runtime /app/docker/ecosystem.dev.config.cjs
+      "
+    volumes:
+      - ./backend:/app/backend
+      - ./cms:/app/cms
+      - ./landing:/app/landing
+      - ./docker:/app/docker
+      - backend_node_modules:/app/backend/node_modules
+      - cms_node_modules:/app/cms/node_modules
+      - landing_node_modules:/app/landing/node_modules
+      - runtime_node_modules:/opt/runtime/node_modules
+      - app_storage:/app/backend/storage
+    ports:
+      - "${APP_PORT:-9999}:9999"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  app_storage:
+  backend_node_modules:
+  cms_node_modules:
+  landing_node_modules:
+  runtime_node_modules:
