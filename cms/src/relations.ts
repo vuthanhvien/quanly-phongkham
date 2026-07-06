@@ -42,6 +42,10 @@ function resolveRelationSpec(field: string | FieldSpec) {
   return field.relation || relationFields[field.key];
 }
 
+export function getRelationSpec(field: string | FieldSpec) {
+  return resolveRelationSpec(field);
+}
+
 export function isRelationField(key: string) {
   return Boolean(relationFields[key]);
 }

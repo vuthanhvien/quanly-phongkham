@@ -10,6 +10,7 @@ export interface StoredUserAccess {
   staffId?: string
   disabledModules?: string[]
   actionPermissions?: Record<string, string[]>
+  screenPermissions?: string[]
 }
 
 function readStoredUser(): StoredUserAccess | null {
@@ -26,19 +27,21 @@ function isAdmin(user: StoredUserAccess | null) {
 
 export function hasResourceAccess(resource: string) {
   const user = readStoredUser()
-  if (!user) return true
+  if (!user || isAdmin(user)) return true
   return !(user?.disabledModules || []).includes(resource)
 }
 
 export function hasScreenAccess(screen: string) {
-  if (screen === "accounting-reports") return Boolean(readStoredUser())
-  if (screen === "zalo-inbox") return Boolean(readStoredUser())
-  return isAdmin(readStoredUser())
+  const user = readStoredUser()
+  void screen
+  if (!user || isAdmin(user)) return true
+  if (Array.isArray(user.screenPermissions)) return user.screenPermissions.includes(screen)
+  return false
 }
 
 export function hasActionAccess(resource: string, action: string) {
   const user = readStoredUser()
-  if (!user) return true
+  if (!user || isAdmin(user)) return true
   const allowedActions = user?.actionPermissions?.[resource]
   if (!Array.isArray(allowedActions) || allowedActions.length === 0) return true
   return allowedActions.includes(action)

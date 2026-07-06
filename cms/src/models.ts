@@ -216,6 +216,18 @@ export const entityLabels: Record<string, string> = {
   payrolls: 'Bảng lương',
 };
 
+export const screenLabels: Record<string, string> = {
+  settings: 'Cấu hình động',
+  'audit-logs': 'Nhật ký hệ thống',
+  'zalo-inbox': 'Hộp thư Zalo',
+  'accounting-reports': 'Báo cáo kế toán',
+};
+
+export const permissionLabels: Record<string, string> = {
+  ...entityLabels,
+  ...screenLabels,
+};
+
 export const relationFields: Record<string, RelationSpec> = {
   folderId: { resource: 'file-folders', labelFields: ['code', 'name'] },
   parentId: { resource: 'file-folders', labelFields: ['code', 'name'] },

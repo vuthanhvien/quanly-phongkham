@@ -17,6 +17,8 @@ const RESOURCE_ACTIONS: Record<string, string[]> = {
   'accounting-vouchers': [...DEFAULT_RESOURCE_ACTIONS, 'post', 'unpost'],
 };
 
+const SCREEN_KEYS = ['settings', 'audit-logs', 'zalo-inbox', 'accounting-reports'];
+
 function normalizeRole(role?: string) {
   return role?.trim().toUpperCase() || DEFAULT_ROLE_SCOPE;
 }
@@ -87,8 +89,10 @@ export class AuthService {
       branchPermissions.find((item) => item.branchId === user.branchId)?.roleKeys?.[0] ||
       branchPermissions[0]?.roleKeys?.[0] ||
       user.role;
-    const disabledModules = await this.resolveDisabledModules(activeRole, user.role);
-    const actionPermissions = await this.resolveActionPermissions(activeRole, user.role);
+    const isAdmin = normalizeRole(user.role) === 'ADMIN';
+    const disabledModules = isAdmin ? [] : await this.resolveDisabledModules(activeRole, user.role);
+    const actionPermissions = isAdmin ? {} : await this.resolveActionPermissions(activeRole, user.role);
+    const screenPermissions = isAdmin ? SCREEN_KEYS : await this.resolveScreenPermissions(activeRole, user.role);
     const profile = {
       id: user.id,
       email: user.email,
@@ -101,6 +105,7 @@ export class AuthService {
       staffId: staff?.id || user.staffId,
       disabledModules,
       actionPermissions,
+      screenPermissions,
       branchPermissions: branchPermissions.map((item) => ({
         branchId: item.branchId,
         roleName: item.roleName,
@@ -143,6 +148,26 @@ export class AuthService {
 
       return false;
     });
+  }
+
+  private async resolveScreenPermissions(role?: string, mainRole?: string) {
+    const roleChain = buildRoleChain(role, mainRole);
+    const views = await this.viewSettings.find();
+    return SCREEN_KEYS.filter((screenKey) => this.resolveScreenEnabled(views, screenKey, roleChain, mainRole));
+  }
+
+  private resolveScreenEnabled(views: ViewSetting[], entityType: string, roleChain: string[], mainRole?: string) {
+    const entityViews = views.filter((view) => view.entityType === entityType);
+    for (const inheritedRole of roleChain) {
+      const inheritedViews = entityViews.filter((view) => normalizeRole(view.role) === inheritedRole);
+      const moduleEnabled = inheritedViews
+        .map((view) => view.config?.moduleEnabled)
+        .find((value) => typeof value === 'boolean');
+
+      if (typeof moduleEnabled === 'boolean') return moduleEnabled;
+    }
+
+    return normalizeRole(mainRole) === 'ADMIN';
   }
 
   private resolveAllowedActionsForEntity(views: ViewSetting[], entityType: string, roleChain: string[]) {

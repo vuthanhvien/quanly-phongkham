@@ -227,6 +227,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
       icon: menuIcons.calendar,
       label: <Link to="/calendar">Lịch tổng</Link>,
     },
+    ...(hasScreenAccess("accounting-reports")
+      ? [
+          {
+            key: "/accounting-reports",
+            icon: menuIcons["accounting-reports"],
+            label: <Link to="/accounting-reports">Báo cáo kế toán</Link>,
+          },
+        ]
+      : []),
     ...visibleGroups.map((group) => ({
       key: group.key,
       icon: group.icon,
@@ -237,15 +246,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
           icon: menuIcons[key] || <SolutionOutlined />,
           label: <Link to={`/${key}`}>{entityLabels[key]}</Link>,
         })),
-        ...(group.key === "finance" && hasScreenAccess("accounting-reports")
-          ? [
-              {
-                key: "/accounting-reports",
-                icon: menuIcons["accounting-reports"],
-                label: <Link to="/accounting-reports">Báo cáo kế toán</Link>,
-              },
-            ]
-          : []),
         ...(group.key === "front-office" && hasScreenAccess("zalo-inbox")
           ? [
               {
@@ -311,6 +311,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
               key: "/audit-logs",
               icon: <AuditOutlined />,
               label: <Link to="/audit-logs">Nhật ký hệ thống</Link>,
+            }
+          : null,
+        hasScreenAccess("accounting-reports")
+          ? {
+              key: "/accounting-reports-system",
+              icon: menuIcons["accounting-reports"],
+              label: <Link to="/accounting-reports">Báo cáo kế toán</Link>,
             }
           : null,
       ].filter(Boolean),

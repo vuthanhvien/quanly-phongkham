@@ -26,7 +26,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { api } from "../api"
-import { CustomField, DynamicRole, entityLabels, getResourceActionOptions, normalizeSelectOption, type SelectOption } from "../models"
+import { CustomField, DynamicRole, entityLabels, getResourceActionOptions, normalizeSelectOption, permissionLabels, type SelectOption } from "../models"
 import {
   buildFieldLayoutConfigs,
   DEFAULT_ROLE_SCOPE,
@@ -691,7 +691,7 @@ export function SettingsPage() {
             value={entityType}
             onChange={setEntityType}
             style={{ width: 240 }}
-            options={Object.entries(entityLabels).map(([value, label]) => ({
+            options={Object.entries(permissionLabels).map(([value, label]) => ({
               value,
               label,
             }))}
@@ -726,7 +726,7 @@ export function SettingsPage() {
                 <div className="settings-tab-panel">
                   <div className="settings-tab-header settings-tab-header-wrap">
                     <Typography.Text>
-                      Module hiện tại là <strong>{entityLabels[entityType] || entityType}</strong>. <strong>{DEFAULT_ROLE_SCOPE}</strong> là config gốc. Chuỗi áp dụng cho role đang chọn là <strong>{[...inheritanceChain].reverse().join(" -> ")}</strong>, nghĩa là hệ thống đọc từ role hiện tại lên main role rồi mới về <strong>{DEFAULT_ROLE_SCOPE}</strong> nếu chưa có config riêng.
+                      Module hiện tại là <strong>{permissionLabels[entityType] || entityType}</strong>. <strong>{DEFAULT_ROLE_SCOPE}</strong> là config gốc. Chuỗi áp dụng cho role đang chọn là <strong>{[...inheritanceChain].reverse().join(" -> ")}</strong>, nghĩa là hệ thống đọc từ role hiện tại lên main role rồi mới về <strong>{DEFAULT_ROLE_SCOPE}</strong> nếu chưa có config riêng.
                     </Typography.Text>
                     <Checkbox
                       checked={moduleEnabled}
