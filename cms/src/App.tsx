@@ -9,6 +9,7 @@ import { authProvider, dataProvider, api } from './api';
 import { Shell } from './components/Shell';
 import { entityLabels } from './models';
 import { AuditPage } from './pages/AuditPage';
+import { AccountingReportsPage } from './pages/AccountingReportsPage';
 import { CustomFieldsPage } from './pages/CustomFieldsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CalendarPage } from './pages/CalendarPage';
@@ -173,6 +174,9 @@ export function App() {
               <Route index element={<DashboardPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route element={<ScreenGuard screen="accounting-reports" />}>
+                <Route path="/accounting-reports" element={<AccountingReportsPage />} />
+              </Route>
               <Route element={<ScreenGuard screen="zalo-inbox" />}>
                 <Route path="/zalo-inbox" element={<ZaloInboxPage />} />
               </Route>

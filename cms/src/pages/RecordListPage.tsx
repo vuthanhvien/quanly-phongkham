@@ -1,5 +1,6 @@
 import { useDelete, useList } from "@refinedev/core"
 import {
+  AuditOutlined,
   CopyOutlined,
   DeleteOutlined,
   EditOutlined,
@@ -170,6 +171,21 @@ export function RecordListPage() {
                 <Button icon={<SwapOutlined />} type="text" onClick={() => convertLead(row.id)} />
               </Tooltip>
             )}
+            {["invoices", "expenses", "payrolls"].includes(resource) && hasActionAccess(resource, "generate-accounting-voucher") && (
+              <Tooltip title="Tạo chứng từ kế toán">
+                <Button icon={<AuditOutlined />} type="text" onClick={() => generateAccountingVoucher(resource, row.id)} />
+              </Tooltip>
+            )}
+            {resource === "accounting-vouchers" && row.status !== "POSTED" && hasActionAccess(resource, "post") && (
+              <Tooltip title="Ghi sổ">
+                <Button icon={<AuditOutlined />} type="text" onClick={() => postAccountingVoucher(row.id)} />
+              </Tooltip>
+            )}
+            {resource === "accounting-vouchers" && row.status === "POSTED" && hasActionAccess(resource, "unpost") && (
+              <Tooltip title="Bỏ ghi sổ">
+                <Button icon={<SwapOutlined />} type="text" onClick={() => unpostAccountingVoucher(row.id)} />
+              </Tooltip>
+            )}
             {templates[0] && hasActionAccess(resource, "print") && (
               <Tooltip title="In biểu mẫu">
                 <Button
@@ -249,6 +265,23 @@ export function RecordListPage() {
     } finally {
       setDuplicatingId(null)
     }
+  }
+
+  async function generateAccountingVoucher(currentResource: string, recordId: string) {
+    await api.post(`/records/${currentResource}/${recordId}/generate-accounting-voucher`)
+    message.success("Đã tạo chứng từ kế toán")
+  }
+
+  async function postAccountingVoucher(recordId: string) {
+    await api.post(`/records/accounting-vouchers/${recordId}/post`)
+    message.success("Đã ghi sổ chứng từ")
+    refresh()
+  }
+
+  async function unpostAccountingVoucher(recordId: string) {
+    await api.post(`/records/accounting-vouchers/${recordId}/unpost`)
+    message.success("Đã bỏ ghi sổ chứng từ")
+    refresh()
   }
 
   function openDetail(recordId: string) {

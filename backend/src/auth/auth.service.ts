@@ -11,6 +11,10 @@ const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print']
 const RESOURCE_ACTIONS: Record<string, string[]> = {
   customers: [...DEFAULT_RESOURCE_ACTIONS, 'reveal-phone'],
   leads: [...DEFAULT_RESOURCE_ACTIONS, 'convert-to-customer'],
+  invoices: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
+  expenses: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
+  payrolls: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
+  'accounting-vouchers': [...DEFAULT_RESOURCE_ACTIONS, 'post', 'unpost'],
 };
 
 function normalizeRole(role?: string) {

@@ -11,6 +11,7 @@ import {
   ExperimentOutlined,
   FileDoneOutlined,
   FolderOpenOutlined,
+  FundOutlined,
   GiftOutlined,
   GoldOutlined,
   GlobalOutlined,
@@ -59,6 +60,7 @@ const menuIcons: Record<string, React.ReactNode> = {
   leads: <LineChartOutlined />,
   "lead-activities": <InteractionOutlined />,
   "zalo-inbox": <MessageOutlined />,
+  "accounting-reports": <FundOutlined />,
   "medical-episodes": <MedicineBoxOutlined />,
   appointments: <CalendarOutlined />,
   calendar: <CalendarOutlined />,
@@ -235,6 +237,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
           icon: menuIcons[key] || <SolutionOutlined />,
           label: <Link to={`/${key}`}>{entityLabels[key]}</Link>,
         })),
+        ...(group.key === "finance" && hasScreenAccess("accounting-reports")
+          ? [
+              {
+                key: "/accounting-reports",
+                icon: menuIcons["accounting-reports"],
+                label: <Link to="/accounting-reports">Báo cáo kế toán</Link>,
+              },
+            ]
+          : []),
         ...(group.key === "front-office" && hasScreenAccess("zalo-inbox")
           ? [
               {
@@ -310,11 +321,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ? "/"
       : location.pathname.startsWith("/calendar")
         ? "/calendar"
+      : location.pathname.startsWith("/accounting-reports")
+        ? "/accounting-reports"
       : location.pathname.startsWith("/zalo-inbox")
         ? "/zalo-inbox"
         : `/${currentResource}`
   const defaultOpenKeys = [
     resourceToGroup[currentResource] ||
+    (location.pathname.startsWith("/accounting-reports")
+      ? "finance"
+      : undefined) ||
     (location.pathname.startsWith("/zalo-inbox")
       ? "front-office"
       : undefined) ||

@@ -875,6 +875,15 @@ export class Invoice extends ConfigurableEntity {
   totalAmount: number;
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  taxableAmount: number;
+
+  @Column({ type: 'decimal', precision: 7, scale: 2, default: 0 })
+  vatRate: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  vatAmount: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   paidAmount: number;
 
   @Column({ default: 'UNPAID' })
@@ -882,6 +891,12 @@ export class Invoice extends ConfigurableEntity {
 
   @Column({ nullable: true })
   method?: string;
+
+  @Column({ nullable: true })
+  paymentAccountNumber?: string;
+
+  @Column({ nullable: true })
+  revenueAccountNumber?: string;
 }
 
 @Entity('expenses')
@@ -898,8 +913,264 @@ export class Expense extends ConfigurableEntity {
   @Column({ type: 'decimal', precision: 15, scale: 2 })
   amount: number;
 
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  beforeTaxAmount: number;
+
+  @Column({ type: 'decimal', precision: 7, scale: 2, default: 0 })
+  vatRate: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  vatAmount: number;
+
   @Column({ type: 'date' })
   paidAt: string;
+
+  @Column({ default: 'CASH' })
+  paymentMethod: string;
+
+  @Column({ nullable: true })
+  paymentAccountNumber?: string;
+
+  @Column({ nullable: true })
+  expenseAccountNumber?: string;
+
+  @Column({ nullable: true })
+  supplierId?: string;
+
+  @Column({ nullable: true })
+  invoiceNumber?: string;
+}
+
+@Entity('accounting_periods')
+@Index(['code'], { unique: true })
+export class AccountingPeriod extends ConfigurableEntity {
+  @Column()
+  code: string;
+
+  @Column()
+  name: string;
+
+  @Column({ type: 'date' })
+  startDate: string;
+
+  @Column({ type: 'date' })
+  endDate: string;
+
+  @Column({ default: 'OPEN' })
+  status: string;
+
+  @Column({ default: false })
+  isYearEnd: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('accounting_chart_accounts')
+@Index(['accountNumber'], { unique: true })
+export class AccountingChartAccount extends ConfigurableEntity {
+  @Column()
+  accountNumber: string;
+
+  @Column()
+  name: string;
+
+  @Column({ nullable: true })
+  shortName?: string;
+
+  @Column({ default: 'ASSET' })
+  accountType: string;
+
+  @Column({ nullable: true })
+  parentAccountId?: string;
+
+  @Column({ default: 1 })
+  level: number;
+
+  @Column({ default: true })
+  allowPosting: boolean;
+
+  @Column({ default: false })
+  isSystem: boolean;
+
+  @Column({ nullable: true })
+  normalBalance?: string;
+
+  @Column({ nullable: true })
+  cashFlowGroup?: string;
+
+  @Column({ nullable: true })
+  legalReference?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+}
+
+@Entity('accounting_fiscal_settings')
+export class AccountingFiscalSetting extends ConfigurableEntity {
+  @Column({ default: 'TT99/2025/TT-BTC' })
+  accountingFramework: string;
+
+  @Column({ default: 'VND' })
+  baseCurrency: string;
+
+  @Column({ default: '01-01' })
+  fiscalYearStart: string;
+
+  @Column({ nullable: true })
+  companyLegalName?: string;
+
+  @Column({ nullable: true })
+  companyTaxCode?: string;
+
+  @Column({ nullable: true })
+  defaultBranchId?: string;
+
+  @Column({ nullable: true })
+  cashAccountNumber?: string;
+
+  @Column({ nullable: true })
+  bankAccountNumber?: string;
+
+  @Column({ nullable: true })
+  receivableAccountNumber?: string;
+
+  @Column({ nullable: true })
+  payableAccountNumber?: string;
+
+  @Column({ nullable: true })
+  revenueAccountNumber?: string;
+
+  @Column({ nullable: true })
+  expenseAccountNumber?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('accounting_cash_flow_mappings')
+@Index(['code'], { unique: true })
+export class AccountingCashFlowMapping extends ConfigurableEntity {
+  @Column()
+  code: string;
+
+  @Column()
+  name: string;
+
+  @Column({ default: 'OPERATING' })
+  section: string;
+
+  @Column({ nullable: true })
+  direction?: string;
+
+  @Column({ nullable: true })
+  accountNumberPrefix?: string;
+
+  @Column({ nullable: true })
+  offsetAccountNumberPrefix?: string;
+
+  @Column({ default: 0 })
+  sortOrder: number;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+}
+
+@Entity('accounting_vouchers')
+@Index(['code'], { unique: true })
+export class AccountingVoucher extends ConfigurableEntity {
+  @Column()
+  code: string;
+
+  @Column()
+  voucherDate: string;
+
+  @Column({ nullable: true })
+  accountingDate?: string;
+
+  @Column({ default: 'GENERAL' })
+  voucherType: string;
+
+  @Column({ nullable: true })
+  periodId?: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ nullable: true })
+  referenceNumber?: string;
+
+  @Column({ nullable: true })
+  sourceModule?: string;
+
+  @Column({ nullable: true })
+  sourceRecordId?: string;
+
+  @Column({ type: 'text' })
+  description: string;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  totalDebit: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  totalCredit: number;
+
+  @Column({ default: 'DRAFT' })
+  status: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  postedAt?: Date;
+
+  @Column({ nullable: true })
+  postedById?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('accounting_voucher_lines')
+export class AccountingVoucherLine extends ConfigurableEntity {
+  @Column()
+  voucherId: string;
+
+  @Column()
+  accountId: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  debitAmount: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  creditAmount: number;
+
+  @Column({ nullable: true })
+  customerId?: string;
+
+  @Column({ nullable: true })
+  supplierId?: string;
+
+  @Column({ nullable: true })
+  staffId?: string;
+
+  @Column({ nullable: true })
+  cashFlowMappingId?: string;
+
+  @Column({ nullable: true })
+  lineDescription?: string;
+
+  @Column({ nullable: true })
+  referenceNumber?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
 }
 
 @Entity('treatments')
@@ -1594,6 +1865,15 @@ export class Payroll extends ConfigurableEntity {
   deduction: number;
 
   @Column({ type: 'float', default: 0 })
+  insuranceDeduction: number;
+
+  @Column({ type: 'float', default: 0 })
+  pitAmount: number;
+
+  @Column({ type: 'float', default: 0 })
+  employerInsuranceAmount: number;
+
+  @Column({ type: 'float', default: 0 })
   netSalary: number;
 
   @Column({ default: 'draft' })
@@ -1604,6 +1884,18 @@ export class Payroll extends ConfigurableEntity {
 
   @Column({ nullable: true })
   branchId?: string;
+
+  @Column({ type: 'date', nullable: true })
+  paidAt?: string;
+
+  @Column({ default: 'TRANSFER' })
+  paymentMethod: string;
+
+  @Column({ nullable: true })
+  paymentAccountNumber?: string;
+
+  @Column({ nullable: true })
+  expenseAccountNumber?: string;
 }
 
 @Entity('landing_global_settings')
@@ -1717,6 +2009,12 @@ export const ENTITIES = [
   ManagedFile,
   Invoice,
   Expense,
+  AccountingPeriod,
+  AccountingChartAccount,
+  AccountingFiscalSetting,
+  AccountingCashFlowMapping,
+  AccountingVoucher,
+  AccountingVoucherLine,
   Treatment,
   Commission,
   CustomFieldDefinition,

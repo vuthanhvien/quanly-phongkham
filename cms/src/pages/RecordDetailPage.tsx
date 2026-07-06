@@ -18,6 +18,7 @@ import {
 import { useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
+  AuditOutlined,
   DeleteOutlined,
   EditOutlined,
   EyeOutlined,
@@ -135,6 +136,11 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
           "userId",
           "invoiceId",
           "convertedCustomerId",
+          "periodId",
+          "accountId",
+          "voucherId",
+          "cashFlowMappingId",
+          "postedById",
         ]),
         loadFileLookupMap(),
       ]).then(([lookupResponse, nextFileLookups]) => {
@@ -213,6 +219,45 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                 </Button>
               </Tooltip>
             )}
+            {["invoices", "expenses", "payrolls"].includes(resource) && hasActionAccess(resource, "generate-accounting-voucher") && (
+              <Tooltip title="Tạo chứng từ kế toán">
+                <Button
+                  onClick={async () => {
+                    await generateAccountingVoucher(resource, id)
+                    message.success("Đã tạo chứng từ kế toán")
+                  }}
+                >
+                  Tạo chứng từ kế toán
+                </Button>
+              </Tooltip>
+            )}
+            {resource === "accounting-vouchers" && record?.status !== "POSTED" && hasActionAccess(resource, "post") && (
+              <Tooltip title="Ghi sổ chứng từ">
+                <Button
+                  icon={<AuditOutlined />}
+                  onClick={async () => {
+                    await postAccountingVoucher(id)
+                    message.success("Đã ghi sổ chứng từ")
+                    await reloadCurrentRecord()
+                  }}
+                >
+                  Ghi sổ
+                </Button>
+              </Tooltip>
+            )}
+            {resource === "accounting-vouchers" && record?.status === "POSTED" && hasActionAccess(resource, "unpost") && (
+              <Tooltip title="Bỏ ghi sổ chứng từ">
+                <Button
+                  onClick={async () => {
+                    await unpostAccountingVoucher(id)
+                    message.success("Đã bỏ ghi sổ chứng từ")
+                    await reloadCurrentRecord()
+                  }}
+                >
+                  Bỏ ghi sổ
+                </Button>
+              </Tooltip>
+            )}
             {hasActionAccess(resource, "update") && (
               <Link to={`/${resource}/${id}/edit`}>
                 <Button className="primary-glow" type="primary">
@@ -241,6 +286,41 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                         { title: "Thành tiền", dataIndex: "lineTotal", key: "lineTotal", width: 160 },
                       ]}
                       dataSource={record.items}
+                      pagination={false}
+                      rowKey="id"
+                      scroll={{ x: "max-content" }}
+                      size="small"
+                    />
+                  ),
+                }]
+              : []
+            const accountingVoucherLinesTab = resource === "accounting-vouchers" && Array.isArray(record?.lines) && record.lines.length > 0
+              ? [{
+                  key: "__accounting-voucher-lines",
+                  label: "Dòng hạch toán",
+                  children: (
+                    <Table
+                      columns={[
+                        {
+                          title: "Tài khoản",
+                          dataIndex: "accountId",
+                          key: "accountId",
+                          width: 220,
+                          render: (value: unknown) => (
+                            <RecordValueView
+                              compact
+                              field="accountId"
+                              fileLookups={fileLookups}
+                              lookups={lookups}
+                              value={value}
+                            />
+                          ),
+                        },
+                        { title: "Nợ", dataIndex: "debitAmount", key: "debitAmount", width: 140 },
+                        { title: "Có", dataIndex: "creditAmount", key: "creditAmount", width: 140 },
+                        { title: "Diễn giải", dataIndex: "lineDescription", key: "lineDescription" },
+                      ]}
+                      dataSource={record.lines}
                       pagination={false}
                       rowKey="id"
                       scroll={{ x: "max-content" }}
@@ -401,7 +481,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
               ),
             }))
 
-            const allTabs = [...infoTab, ...relatedTabs, ...serviceOrderItemsTab]
+            const allTabs = [...infoTab, ...accountingVoucherLinesTab, ...relatedTabs, ...serviceOrderItemsTab]
             if (allTabs.length === 0) {
               return <Card className="glass-card detail-card" loading={loading}><Empty description="Không có dữ liệu liên kết" /></Card>
             }
@@ -608,8 +688,18 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
       "userId",
       "invoiceId",
       "convertedCustomerId",
+      "periodId",
+      "accountId",
+      "voucherId",
+      "cashFlowMappingId",
+      "postedById",
     ])
     setLookups(nextLookups)
+  }
+
+  async function reloadCurrentRecord() {
+    const response = await api.get(`/records/${resource}/${id}`)
+    setRecord(response.data.data)
   }
 
   async function revealPhone(recordId: string) {
@@ -831,6 +921,18 @@ async function loadBlocks(
 
 async function convertLead(id: string) {
   return api.post(`/records/leads/${id}/convert-to-customer`)
+}
+
+async function generateAccountingVoucher(resource: string, id: string) {
+  return api.post(`/records/${resource}/${id}/generate-accounting-voucher`)
+}
+
+async function postAccountingVoucher(id: string) {
+  return api.post(`/records/accounting-vouchers/${id}/post`)
+}
+
+async function unpostAccountingVoucher(id: string) {
+  return api.post(`/records/accounting-vouchers/${id}/unpost`)
 }
 
 async function printRecord(templateId: string, recordId: string) {

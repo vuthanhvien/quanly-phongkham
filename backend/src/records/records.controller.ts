@@ -33,6 +33,36 @@ export class RecordsController {
     return this.records.convertLeadToCustomer(id, request.user);
   }
 
+  @Post('records/accounting-vouchers/:id/post')
+  postAccountingVoucher(@Param('id') id: string, @Request() request: { user: AuthUser }) {
+    return this.records.postAccountingVoucher(id, request.user);
+  }
+
+  @Post('records/accounting-vouchers/:id/unpost')
+  unpostAccountingVoucher(@Param('id') id: string, @Request() request: { user: AuthUser }) {
+    return this.records.unpostAccountingVoucher(id, request.user);
+  }
+
+  @Post('records/accounting/bootstrap-vn')
+  bootstrapVietnameseAccounting(@Request() request: { user: AuthUser }) {
+    return this.records.bootstrapVietnameseAccounting(request.user);
+  }
+
+  @Post('records/invoices/:id/generate-accounting-voucher')
+  generateInvoiceAccountingVoucher(@Param('id') id: string, @Request() request: { user: AuthUser }) {
+    return this.records.generateSourceAccountingVoucher('invoices', id, request.user);
+  }
+
+  @Post('records/expenses/:id/generate-accounting-voucher')
+  generateExpenseAccountingVoucher(@Param('id') id: string, @Request() request: { user: AuthUser }) {
+    return this.records.generateSourceAccountingVoucher('expenses', id, request.user);
+  }
+
+  @Post('records/payrolls/:id/generate-accounting-voucher')
+  generatePayrollAccountingVoucher(@Param('id') id: string, @Request() request: { user: AuthUser }) {
+    return this.records.generateSourceAccountingVoucher('payrolls', id, request.user);
+  }
+
   @Post('records/files/upload')
   @UseInterceptors(FilesInterceptor('files', 50))
   uploadFiles(
@@ -94,6 +124,62 @@ export class RecordsController {
   @Get('records/:resource/:id')
   find(@Param('resource') resource: string, @Param('id') id: string, @Request() request: ExpressRequest & { user: AuthUser }) {
     return this.records.find(resource, id, request.user, request);
+  }
+
+  @Get('reports/accounting/general-ledger')
+  accountingGeneralLedger(
+    @Query() query: Record<string, string>,
+    @Request() request?: ExpressRequest & { user?: AuthUser },
+  ) {
+    return this.records.accountingGeneralLedger(query || {}, request?.user);
+  }
+
+  @Get('reports/accounting/trial-balance')
+  accountingTrialBalance(
+    @Query() query: Record<string, string>,
+    @Request() request?: ExpressRequest & { user?: AuthUser },
+  ) {
+    return this.records.accountingTrialBalance(query || {}, request?.user);
+  }
+
+  @Get('reports/accounting/cash-flow')
+  accountingCashFlow(
+    @Query() query: Record<string, string>,
+    @Request() request?: ExpressRequest & { user?: AuthUser },
+  ) {
+    return this.records.accountingCashFlow(query || {}, request?.user);
+  }
+
+  @Get('reports/accounting/receivables')
+  accountingReceivables(
+    @Query() query: Record<string, string>,
+    @Request() request?: ExpressRequest & { user?: AuthUser },
+  ) {
+    return this.records.accountingReceivables(query || {}, request?.user);
+  }
+
+  @Get('reports/accounting/payables')
+  accountingPayables(
+    @Query() query: Record<string, string>,
+    @Request() request?: ExpressRequest & { user?: AuthUser },
+  ) {
+    return this.records.accountingPayables(query || {}, request?.user);
+  }
+
+  @Get('reports/accounting/cash-book')
+  accountingCashBook(
+    @Query() query: Record<string, string>,
+    @Request() request?: ExpressRequest & { user?: AuthUser },
+  ) {
+    return this.records.accountingCashBook(query || {}, request?.user);
+  }
+
+  @Get('reports/accounting/bank-book')
+  accountingBankBook(
+    @Query() query: Record<string, string>,
+    @Request() request?: ExpressRequest & { user?: AuthUser },
+  ) {
+    return this.records.accountingBankBook(query || {}, request?.user);
   }
 
   @Post('records/:resource')

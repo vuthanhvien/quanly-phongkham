@@ -7,6 +7,12 @@ import { FindOptionsWhere, ILike, In, LessThan, MoreThan, QueryFailedError, Repo
 import { AuthUser } from '../common/auth';
 import {
   Appointment,
+  AccountingCashFlowMapping,
+  AccountingChartAccount,
+  AccountingFiscalSetting,
+  AccountingPeriod,
+  AccountingVoucher,
+  AccountingVoucherLine,
   Attendance,
   AuditLog,
   BranchRoleAssignment,
@@ -53,6 +59,10 @@ const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print']
 const RESOURCE_ACTIONS: Record<string, string[]> = {
   customers: [...DEFAULT_RESOURCE_ACTIONS, 'reveal-phone'],
   leads: [...DEFAULT_RESOURCE_ACTIONS, 'convert-to-customer'],
+  invoices: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
+  expenses: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
+  payrolls: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
+  'accounting-vouchers': [...DEFAULT_RESOURCE_ACTIONS, 'post', 'unpost'],
 };
 
 function normalizeRole(role?: string) {
@@ -287,6 +297,11 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   leadId: 'leads',
   userId: 'user-accounts',
   invoiceId: 'invoices',
+  periodId: 'accounting-periods',
+  accountId: 'accounting-chart-accounts',
+  parentAccountId: 'accounting-chart-accounts',
+  voucherId: 'accounting-vouchers',
+  cashFlowMappingId: 'accounting-cash-flow-mappings',
 };
 
 const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
@@ -302,6 +317,10 @@ const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
   products: 'code',
   invoices: 'code',
   'user-accounts': 'email',
+  'accounting-periods': 'code',
+  'accounting-chart-accounts': 'accountNumber',
+  'accounting-cash-flow-mappings': 'code',
+  'accounting-vouchers': 'code',
 };
 
 const RESOURCE_IMPORT_KEYS: Record<string, string> = {
@@ -340,6 +359,12 @@ const RESOURCE_IMPORT_KEYS: Record<string, string> = {
   'staff-trainings': 'id',
   'performance-reviews': 'id',
   'position-histories': 'id',
+  'accounting-periods': 'code',
+  'accounting-chart-accounts': 'accountNumber',
+  'accounting-fiscal-settings': 'id',
+  'accounting-cash-flow-mappings': 'code',
+  'accounting-vouchers': 'code',
+  'accounting-voucher-lines': 'id',
 };
 
 @Injectable()
@@ -350,6 +375,12 @@ export class RecordsService {
     @InjectRepository(Room) private readonly rooms: Repository<Room>,
     @InjectRepository(Equipment) private readonly equipments: Repository<Equipment>,
     @InjectRepository(Staff) private readonly staff: Repository<Staff>,
+    @InjectRepository(AccountingPeriod) private readonly accountingPeriods: Repository<AccountingPeriod>,
+    @InjectRepository(AccountingChartAccount) private readonly accountingChartAccounts: Repository<AccountingChartAccount>,
+    @InjectRepository(AccountingFiscalSetting) private readonly accountingFiscalSettings: Repository<AccountingFiscalSetting>,
+    @InjectRepository(AccountingCashFlowMapping) private readonly accountingCashFlowMappings: Repository<AccountingCashFlowMapping>,
+    @InjectRepository(AccountingVoucher) private readonly accountingVouchers: Repository<AccountingVoucher>,
+    @InjectRepository(AccountingVoucherLine) private readonly accountingVoucherLines: Repository<AccountingVoucherLine>,
     @InjectRepository(BranchRoleAssignment) private readonly branchPermissions: Repository<BranchRoleAssignment>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
@@ -393,6 +424,12 @@ export class RecordsService {
       rooms: this.rooms,
       equipments: this.equipments,
       staff: this.staff,
+      'accounting-periods': this.accountingPeriods,
+      'accounting-chart-accounts': this.accountingChartAccounts,
+      'accounting-fiscal-settings': this.accountingFiscalSettings,
+      'accounting-cash-flow-mappings': this.accountingCashFlowMappings,
+      'accounting-vouchers': this.accountingVouchers,
+      'accounting-voucher-lines': this.accountingVoucherLines,
       'branch-role-assignments': this.branchPermissions,
       'branch-permissions': this.branchPermissions,
       'user-accounts': this.users,
@@ -453,6 +490,12 @@ export class RecordsService {
         rooms: ['code', 'name'],
         equipments: ['code', 'name'],
         staff: ['code', 'fullName', 'email', 'phone'],
+        'accounting-periods': ['code', 'name', 'status', 'note'],
+        'accounting-chart-accounts': ['accountNumber', 'name', 'shortName', 'accountType', 'legalReference'],
+        'accounting-fiscal-settings': ['accountingFramework', 'baseCurrency', 'companyLegalName', 'companyTaxCode'],
+        'accounting-cash-flow-mappings': ['code', 'name', 'section', 'direction', 'accountNumberPrefix'],
+        'accounting-vouchers': ['code', 'voucherType', 'description', 'referenceNumber', 'status', 'sourceModule'],
+        'accounting-voucher-lines': ['lineDescription', 'referenceNumber', 'note'],
         consultations: ['summary', 'diagnosis', 'status'],
         'service-orders': ['code', 'serviceName', 'status'],
         'customer-images': ['title', 'mediaType', 'diagnosisNote'],
@@ -482,6 +525,9 @@ export class RecordsService {
     const [hydrated] = await this.hydrateCustomFields(resource, [record]);
     if (resource === 'service-orders') {
       return this.attachServiceOrderItems(hydrated as ServiceOrder);
+    }
+    if (resource === 'accounting-vouchers') {
+      return this.attachAccountingVoucherLines(hydrated as AccountingVoucher);
     }
     return hydrated;
   }
@@ -618,7 +664,9 @@ export class RecordsService {
     const repository = this.repository(resource);
     const record = await this.saveRecord(resource, repository.create(normalized), repository);
     if (resource === 'service-orders') await this.replaceServiceOrderItems(record.id, serviceOrderItems);
+    if (resource === 'accounting-voucher-lines') await this.recalculateAccountingVoucherTotals(String(record.voucherId || ''));
     await this.replaceCustomFieldValues(resource, record.id, (payload.customFields || {}) as Record<string, unknown>);
+    await this.syncAccountingForSourceResource(resource, record.id, user);
     await this.audit(user, 'CREATE', resource, record.id, normalized);
     const hydrated = await this.findRaw(resource, record.id);
     return { data: this.protect(resource, hydrated) };
@@ -645,7 +693,12 @@ export class RecordsService {
     const repository = this.repository(resource);
     const record = await this.saveRecord(resource, repository.merge(previous, normalized), repository);
     if (resource === 'service-orders') await this.replaceServiceOrderItems(id, serviceOrderItems);
+    if (resource === 'accounting-voucher-lines') {
+      const voucherIds = Array.from(new Set([String(previous.voucherId || ''), String(record.voucherId || '')].filter(Boolean)));
+      await Promise.all(voucherIds.map((voucherId) => this.recalculateAccountingVoucherTotals(voucherId)));
+    }
     await this.replaceCustomFieldValues(resource, id, mergedCustomFields);
+    await this.syncAccountingForSourceResource(resource, id, user);
     await this.audit(user, 'UPDATE', resource, id, { before: previous, changes: normalized });
     const hydrated = await this.findRaw(resource, record.id);
     return { data: this.protect(resource, hydrated) };
@@ -654,14 +707,22 @@ export class RecordsService {
   async remove(resource: string, id: string, user: AuthUser) {
     const record = await this.findStored(resource, id);
     await this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
+    await this.ensureNoPostedAccountingVoucher(resource, id);
     if (resource === 'files') {
       await fs.unlink((record as ManagedFile).storagePath).catch(() => undefined);
     }
     if (resource === 'service-orders') {
       await this.serviceOrderItems.delete({ orderId: id });
     }
+    if (resource === 'accounting-vouchers') {
+      await this.accountingVoucherLines.delete({ voucherId: id });
+    }
     await this.customFieldValues.delete({ entityType: resource, recordId: id });
     await this.repository(resource).remove(record);
+    if (resource === 'accounting-voucher-lines') {
+      await this.recalculateAccountingVoucherTotals(String((record as Record<string, unknown>).voucherId || ''));
+    }
+    await this.removeDraftSourceVouchers(resource, id);
     await this.audit(user, 'DELETE', resource, id);
     return { data: { id } };
   }
@@ -752,6 +813,12 @@ export class RecordsService {
       rooms: 'phòng',
       equipments: 'máy móc',
       staff: 'nhân viên',
+      'accounting-periods': 'kỳ kế toán',
+      'accounting-chart-accounts': 'tài khoản kế toán',
+      'accounting-fiscal-settings': 'thiết lập tài chính',
+      'accounting-cash-flow-mappings': 'mã dòng tiền',
+      'accounting-vouchers': 'chứng từ kế toán',
+      'accounting-voucher-lines': 'dòng hạch toán',
       customers: 'khách hàng',
       leads: 'lead',
       suppliers: 'nhà cung cấp',
@@ -1573,6 +1640,924 @@ export class RecordsService {
     };
   }
 
+  async postAccountingVoucher(id: string, user: AuthUser) {
+    const voucher = await this.accountingVouchers.findOne({ where: { id } });
+    if (!voucher) throw new NotFoundException('Khong tim thay chung tu ke toan');
+    await this.assertPermission(user, 'accounting-vouchers', 'post', voucher.branchId);
+    if (voucher.status === 'POSTED') {
+      return { data: await this.findRaw('accounting-vouchers', id) };
+    }
+
+    const lines = await this.accountingVoucherLines.find({ where: { voucherId: id } });
+    if (lines.length < 2) {
+      throw new BadRequestException('Chung tu ke toan phai co it nhat 2 dong hach toan');
+    }
+
+    await this.recalculateAccountingVoucherTotals(id);
+    const refreshed = await this.accountingVouchers.findOne({ where: { id } });
+    if (!refreshed) throw new NotFoundException('Khong tim thay chung tu ke toan');
+    if (Number(refreshed.totalDebit || 0) <= 0 || Number(refreshed.totalCredit || 0) <= 0) {
+      throw new BadRequestException('Tong No va Co phai lon hon 0');
+    }
+    if (Number(refreshed.totalDebit || 0) !== Number(refreshed.totalCredit || 0)) {
+      throw new BadRequestException('Tong No va Co phai can bang truoc khi ghi so');
+    }
+
+    if (refreshed.periodId) {
+      const period = await this.accountingPeriods.findOne({ where: { id: refreshed.periodId } });
+      if (period?.status === 'CLOSED') {
+        throw new BadRequestException('Khong the ghi so vao ky da khoa');
+      }
+    }
+
+    refreshed.status = 'POSTED';
+    refreshed.postedAt = new Date();
+    refreshed.postedById = user.id;
+    await this.accountingVouchers.save(refreshed);
+    await this.audit(user, 'POST', 'accounting-vouchers', id, {
+      totalDebit: refreshed.totalDebit,
+      totalCredit: refreshed.totalCredit,
+    });
+    return { data: await this.findRaw('accounting-vouchers', id) };
+  }
+
+  async unpostAccountingVoucher(id: string, user: AuthUser) {
+    const voucher = await this.accountingVouchers.findOne({ where: { id } });
+    if (!voucher) throw new NotFoundException('Khong tim thay chung tu ke toan');
+    await this.assertPermission(user, 'accounting-vouchers', 'unpost', voucher.branchId);
+    if (voucher.status !== 'POSTED') {
+      return { data: await this.findRaw('accounting-vouchers', id) };
+    }
+    voucher.status = 'DRAFT';
+    voucher.postedAt = undefined;
+    voucher.postedById = undefined;
+    await this.accountingVouchers.save(voucher);
+    await this.audit(user, 'UNPOST', 'accounting-vouchers', id);
+    return { data: await this.findRaw('accounting-vouchers', id) };
+  }
+
+  async accountingGeneralLedger(params: Record<string, string>, user?: AuthUser) {
+    await this.assertAnyActionPermission(user, 'accounting-vouchers', ['view']);
+    const rows = await this.loadPostedVoucherLines(params, user);
+    const accounts = await this.accountingChartAccounts.find();
+    const vouchers = await this.accountingVouchers.find();
+    const accountsById = new Map(accounts.map((item) => [item.id, item]));
+    const vouchersById = new Map(vouchers.map((item) => [item.id, item]));
+
+    const data = rows.map((line) => {
+      const account = accountsById.get(line.accountId);
+      const voucher = vouchersById.get(line.voucherId);
+      return {
+        id: line.id,
+        voucherId: line.voucherId,
+        voucherCode: voucher?.code || '',
+        voucherDate: voucher?.voucherDate || '',
+        accountingDate: voucher?.accountingDate || voucher?.voucherDate || '',
+        accountId: line.accountId,
+        accountNumber: account?.accountNumber || '',
+        accountName: account?.name || '',
+        description: line.lineDescription || voucher?.description || '',
+        debitAmount: Number(line.debitAmount || 0),
+        creditAmount: Number(line.creditAmount || 0),
+        branchId: line.branchId || voucher?.branchId || '',
+        customerId: line.customerId || '',
+        supplierId: line.supplierId || '',
+        staffId: line.staffId || '',
+      };
+    });
+
+    return { data, total: data.length };
+  }
+
+  async accountingTrialBalance(params: Record<string, string>, user?: AuthUser) {
+    await this.assertAnyActionPermission(user, 'accounting-vouchers', ['view']);
+    const rows = await this.loadPostedVoucherLines(params, user);
+    const accounts = await this.accountingChartAccounts.find({ order: { accountNumber: 'ASC' } });
+    const accountsById = new Map(accounts.map((item) => [item.id, item]));
+    const grouped = new Map<string, {
+      accountId: string;
+      accountNumber: string;
+      accountName: string;
+      totalDebit: number;
+      totalCredit: number;
+      balance: number;
+    }>();
+
+    for (const line of rows) {
+      const account = accountsById.get(line.accountId);
+      if (!account) continue;
+      const current = grouped.get(line.accountId) || {
+        accountId: line.accountId,
+        accountNumber: account.accountNumber,
+        accountName: account.name,
+        totalDebit: 0,
+        totalCredit: 0,
+        balance: 0,
+      };
+      current.totalDebit += Number(line.debitAmount || 0);
+      current.totalCredit += Number(line.creditAmount || 0);
+      current.balance = current.totalDebit - current.totalCredit;
+      grouped.set(line.accountId, current);
+    }
+
+    const data = Array.from(grouped.values()).sort((a, b) => a.accountNumber.localeCompare(b.accountNumber));
+    return {
+      data,
+      total: data.length,
+      summary: {
+        totalDebit: data.reduce((sum, item) => sum + item.totalDebit, 0),
+        totalCredit: data.reduce((sum, item) => sum + item.totalCredit, 0),
+      },
+    };
+  }
+
+  async accountingCashFlow(params: Record<string, string>, user?: AuthUser) {
+    await this.assertAnyActionPermission(user, 'accounting-vouchers', ['view']);
+    const rows = await this.loadPostedVoucherLines(params, user);
+    const mappings = await this.accountingCashFlowMappings.find({ where: { isActive: true }, order: { sortOrder: 'ASC', createdAt: 'ASC' } });
+    const mappingById = new Map(mappings.map((item) => [item.id, item]));
+    const grouped = new Map<string, {
+      mappingId: string;
+      code: string;
+      name: string;
+      section: string;
+      direction: string;
+      inflow: number;
+      outflow: number;
+      netAmount: number;
+    }>();
+
+    for (const line of rows) {
+      const mapping = line.cashFlowMappingId ? mappingById.get(line.cashFlowMappingId) : undefined;
+      if (!mapping) continue;
+      const current = grouped.get(mapping.id) || {
+        mappingId: mapping.id,
+        code: mapping.code,
+        name: mapping.name,
+        section: mapping.section,
+        direction: mapping.direction || '',
+        inflow: 0,
+        outflow: 0,
+        netAmount: 0,
+      };
+      current.inflow += Number(line.debitAmount || 0);
+      current.outflow += Number(line.creditAmount || 0);
+      current.netAmount = current.inflow - current.outflow;
+      grouped.set(mapping.id, current);
+    }
+
+    const data = Array.from(grouped.values()).sort((a, b) => a.code.localeCompare(b.code));
+    return {
+      data,
+      total: data.length,
+      summary: {
+        inflow: data.reduce((sum, item) => sum + item.inflow, 0),
+        outflow: data.reduce((sum, item) => sum + item.outflow, 0),
+        netAmount: data.reduce((sum, item) => sum + item.netAmount, 0),
+      },
+    };
+  }
+
+  async accountingReceivables(params: Record<string, string>, user?: AuthUser) {
+    await this.assertAnyActionPermission(user, 'accounting-vouchers', ['view']);
+    const rows = await this.loadPostedVoucherLines(params, user);
+    const accounts = await this.accountingChartAccounts.find();
+    const accountIds = new Set(
+      accounts
+        .filter((item) => String(item.accountNumber || '').startsWith(params.accountPrefix || '131'))
+        .map((item) => item.id),
+    );
+    const customers = await this.customers.find();
+    const customersById = new Map(customers.map((item) => [item.id, item]));
+    const grouped = new Map<string, {
+      customerId: string;
+      customerCode: string;
+      customerName: string;
+      totalDebit: number;
+      totalCredit: number;
+      balance: number;
+    }>();
+
+    for (const line of rows) {
+      if (!accountIds.has(line.accountId) || !line.customerId) continue;
+      const customer = customersById.get(line.customerId);
+      const current = grouped.get(line.customerId) || {
+        customerId: line.customerId,
+        customerCode: customer?.code || '',
+        customerName: customer?.fullName || '',
+        totalDebit: 0,
+        totalCredit: 0,
+        balance: 0,
+      };
+      current.totalDebit += Number(line.debitAmount || 0);
+      current.totalCredit += Number(line.creditAmount || 0);
+      current.balance = current.totalDebit - current.totalCredit;
+      grouped.set(line.customerId, current);
+    }
+
+    const data = Array.from(grouped.values())
+      .filter((item) => item.balance !== 0)
+      .sort((a, b) => b.balance - a.balance);
+    return {
+      data,
+      total: data.length,
+      summary: {
+        receivableBalance: data.reduce((sum, item) => sum + item.balance, 0),
+      },
+    };
+  }
+
+  async accountingPayables(params: Record<string, string>, user?: AuthUser) {
+    await this.assertAnyActionPermission(user, 'accounting-vouchers', ['view']);
+    const rows = await this.loadPostedVoucherLines(params, user);
+    const accounts = await this.accountingChartAccounts.find();
+    const accountIds = new Set(
+      accounts
+        .filter((item) => String(item.accountNumber || '').startsWith(params.accountPrefix || '331'))
+        .map((item) => item.id),
+    );
+    const suppliers = await this.suppliers.find();
+    const suppliersById = new Map(suppliers.map((item) => [item.id, item]));
+    const grouped = new Map<string, {
+      supplierId: string;
+      supplierCode: string;
+      supplierName: string;
+      totalDebit: number;
+      totalCredit: number;
+      balance: number;
+    }>();
+
+    for (const line of rows) {
+      if (!accountIds.has(line.accountId) || !line.supplierId) continue;
+      const supplier = suppliersById.get(line.supplierId);
+      const current = grouped.get(line.supplierId) || {
+        supplierId: line.supplierId,
+        supplierCode: supplier?.code || '',
+        supplierName: supplier?.name || '',
+        totalDebit: 0,
+        totalCredit: 0,
+        balance: 0,
+      };
+      current.totalDebit += Number(line.debitAmount || 0);
+      current.totalCredit += Number(line.creditAmount || 0);
+      current.balance = current.totalCredit - current.totalDebit;
+      grouped.set(line.supplierId, current);
+    }
+
+    const data = Array.from(grouped.values())
+      .filter((item) => item.balance !== 0)
+      .sort((a, b) => b.balance - a.balance);
+    return {
+      data,
+      total: data.length,
+      summary: {
+        payableBalance: data.reduce((sum, item) => sum + item.balance, 0),
+      },
+    };
+  }
+
+  async accountingCashBook(params: Record<string, string>, user?: AuthUser) {
+    return this.accountingMoneyBook({ ...params, accountPrefix: params.accountPrefix || '111' }, user);
+  }
+
+  async accountingBankBook(params: Record<string, string>, user?: AuthUser) {
+    return this.accountingMoneyBook({ ...params, accountPrefix: params.accountPrefix || '112' }, user);
+  }
+
+  private async accountingMoneyBook(params: Record<string, string>, user?: AuthUser) {
+    await this.assertAnyActionPermission(user, 'accounting-vouchers', ['view']);
+    const rows = await this.loadPostedVoucherLines(params, user);
+    const accounts = await this.accountingChartAccounts.find();
+    const vouchers = await this.accountingVouchers.find();
+    const accountById = new Map(accounts.map((item) => [item.id, item]));
+    const voucherById = new Map(vouchers.map((item) => [item.id, item]));
+    const filtered = rows
+      .filter((line) => {
+        const account = accountById.get(line.accountId);
+        return account && String(account.accountNumber || '').startsWith(params.accountPrefix || '');
+      })
+      .map((line) => {
+        const account = accountById.get(line.accountId);
+        const voucher = voucherById.get(line.voucherId);
+        return {
+          id: line.id,
+          voucherId: line.voucherId,
+          voucherCode: voucher?.code || '',
+          voucherDate: voucher?.voucherDate || '',
+          accountingDate: voucher?.accountingDate || voucher?.voucherDate || '',
+          accountNumber: account?.accountNumber || '',
+          accountName: account?.name || '',
+          description: line.lineDescription || voucher?.description || '',
+          debitAmount: Number(line.debitAmount || 0),
+          creditAmount: Number(line.creditAmount || 0),
+          branchId: line.branchId || voucher?.branchId || '',
+          referenceNumber: line.referenceNumber || voucher?.referenceNumber || '',
+        };
+      })
+      .sort((a, b) => `${a.accountingDate}-${a.voucherCode}`.localeCompare(`${b.accountingDate}-${b.voucherCode}`));
+
+    let runningBalance = 0;
+    const data = filtered.map((item) => {
+      runningBalance += item.debitAmount - item.creditAmount;
+      return {
+        ...item,
+        runningBalance,
+      };
+    });
+
+    return {
+      data,
+      total: data.length,
+      summary: {
+        totalInflow: data.reduce((sum, item) => sum + item.debitAmount, 0),
+        totalOutflow: data.reduce((sum, item) => sum + item.creditAmount, 0),
+        endingBalance: data[data.length - 1]?.runningBalance || 0,
+      },
+    };
+  }
+
+  async bootstrapVietnameseAccounting(user: AuthUser) {
+    await this.assertPermission(user, 'accounting-chart-accounts', 'create');
+
+    const starterAccounts: Array<Partial<AccountingChartAccount>> = [
+      { accountNumber: '111', name: 'Tiền mặt', accountType: 'ASSET', normalBalance: 'DEBIT', allowPosting: true, isSystem: true, legalReference: 'Khởi tạo chuẩn nội bộ theo TT99/2025/TT-BTC' },
+      { accountNumber: '112', name: 'Tiền gửi ngân hàng', accountType: 'ASSET', normalBalance: 'DEBIT', allowPosting: true, isSystem: true, legalReference: 'Khởi tạo chuẩn nội bộ theo TT99/2025/TT-BTC' },
+      { accountNumber: '131', name: 'Phải thu của khách hàng', accountType: 'ASSET', normalBalance: 'DEBIT', allowPosting: true, isSystem: true },
+      { accountNumber: '133', name: 'Thuế GTGT được khấu trừ', accountType: 'ASSET', normalBalance: 'DEBIT', allowPosting: true, isSystem: true },
+      { accountNumber: '138', name: 'Phải thu khác', accountType: 'ASSET', normalBalance: 'DEBIT', allowPosting: true, isSystem: true },
+      { accountNumber: '141', name: 'Tạm ứng', accountType: 'ASSET', normalBalance: 'DEBIT', allowPosting: true, isSystem: true },
+      { accountNumber: '152', name: 'Nguyên liệu, vật liệu', accountType: 'ASSET', normalBalance: 'DEBIT', allowPosting: true, isSystem: true },
+      { accountNumber: '153', name: 'Công cụ, dụng cụ', accountType: 'ASSET', normalBalance: 'DEBIT', allowPosting: true, isSystem: true },
+      { accountNumber: '156', name: 'Hàng hóa', accountType: 'ASSET', normalBalance: 'DEBIT', allowPosting: true, isSystem: true },
+      { accountNumber: '211', name: 'Tài sản cố định hữu hình', accountType: 'ASSET', normalBalance: 'DEBIT', allowPosting: true, isSystem: true, cashFlowGroup: 'INVESTING' },
+      { accountNumber: '214', name: 'Hao mòn lũy kế tài sản cố định', accountType: 'ASSET', normalBalance: 'CREDIT', allowPosting: true, isSystem: true },
+      { accountNumber: '242', name: 'Chi phí trả trước', accountType: 'ASSET', normalBalance: 'DEBIT', allowPosting: true, isSystem: true },
+      { accountNumber: '331', name: 'Phải trả cho người bán', accountType: 'LIABILITY', normalBalance: 'CREDIT', allowPosting: true, isSystem: true },
+      { accountNumber: '3331', name: 'Thuế GTGT phải nộp', accountType: 'LIABILITY', normalBalance: 'CREDIT', allowPosting: true, isSystem: true },
+      { accountNumber: '3334', name: 'Thuế thu nhập doanh nghiệp', accountType: 'LIABILITY', normalBalance: 'CREDIT', allowPosting: true, isSystem: true },
+      { accountNumber: '334', name: 'Phải trả người lao động', accountType: 'LIABILITY', normalBalance: 'CREDIT', allowPosting: true, isSystem: true },
+      { accountNumber: '338', name: 'Phải trả, phải nộp khác', accountType: 'LIABILITY', normalBalance: 'CREDIT', allowPosting: true, isSystem: true },
+      { accountNumber: '341', name: 'Vay và nợ thuê tài chính', accountType: 'LIABILITY', normalBalance: 'CREDIT', allowPosting: true, isSystem: true, cashFlowGroup: 'FINANCING' },
+      { accountNumber: '411', name: 'Vốn đầu tư của chủ sở hữu', accountType: 'EQUITY', normalBalance: 'CREDIT', allowPosting: true, isSystem: true, cashFlowGroup: 'FINANCING' },
+      { accountNumber: '421', name: 'Lợi nhuận sau thuế chưa phân phối', accountType: 'EQUITY', normalBalance: 'CREDIT', allowPosting: true, isSystem: true },
+      { accountNumber: '511', name: 'Doanh thu bán hàng và cung cấp dịch vụ', accountType: 'REVENUE', normalBalance: 'CREDIT', allowPosting: true, isSystem: true, cashFlowGroup: 'OPERATING' },
+      { accountNumber: '515', name: 'Doanh thu hoạt động tài chính', accountType: 'REVENUE', normalBalance: 'CREDIT', allowPosting: true, isSystem: true, cashFlowGroup: 'FINANCING' },
+      { accountNumber: '521', name: 'Các khoản giảm trừ doanh thu', accountType: 'REVENUE', normalBalance: 'DEBIT', allowPosting: true, isSystem: true },
+      { accountNumber: '632', name: 'Giá vốn hàng bán', accountType: 'EXPENSE', normalBalance: 'DEBIT', allowPosting: true, isSystem: true },
+      { accountNumber: '635', name: 'Chi phí tài chính', accountType: 'EXPENSE', normalBalance: 'DEBIT', allowPosting: true, isSystem: true, cashFlowGroup: 'FINANCING' },
+      { accountNumber: '641', name: 'Chi phí bán hàng', accountType: 'EXPENSE', normalBalance: 'DEBIT', allowPosting: true, isSystem: true, cashFlowGroup: 'OPERATING' },
+      { accountNumber: '642', name: 'Chi phí quản lý doanh nghiệp', accountType: 'EXPENSE', normalBalance: 'DEBIT', allowPosting: true, isSystem: true, cashFlowGroup: 'OPERATING' },
+      { accountNumber: '711', name: 'Thu nhập khác', accountType: 'REVENUE', normalBalance: 'CREDIT', allowPosting: true, isSystem: true },
+      { accountNumber: '811', name: 'Chi phí khác', accountType: 'EXPENSE', normalBalance: 'DEBIT', allowPosting: true, isSystem: true },
+      { accountNumber: '821', name: 'Chi phí thuế thu nhập doanh nghiệp', accountType: 'EXPENSE', normalBalance: 'DEBIT', allowPosting: true, isSystem: true },
+      { accountNumber: '911', name: 'Xác định kết quả kinh doanh', accountType: 'EQUITY', normalBalance: 'CREDIT', allowPosting: true, isSystem: true },
+    ];
+
+    const starterCashFlows: Array<Partial<AccountingCashFlowMapping>> = [
+      { code: 'CFO-01', name: 'Thu tiền từ bán hàng, cung cấp dịch vụ', section: 'OPERATING', direction: 'INFLOW', accountNumberPrefix: '111,112', offsetAccountNumberPrefix: '131,511', sortOrder: 10 },
+      { code: 'CFO-02', name: 'Chi tiền trả cho người cung cấp', section: 'OPERATING', direction: 'OUTFLOW', accountNumberPrefix: '111,112', offsetAccountNumberPrefix: '331,152,156,642', sortOrder: 20 },
+      { code: 'CFO-03', name: 'Chi trả cho người lao động', section: 'OPERATING', direction: 'OUTFLOW', accountNumberPrefix: '111,112', offsetAccountNumberPrefix: '334', sortOrder: 30 },
+      { code: 'CFI-01', name: 'Chi mua sắm TSCĐ, tài sản dài hạn', section: 'INVESTING', direction: 'OUTFLOW', accountNumberPrefix: '111,112', offsetAccountNumberPrefix: '211,213,241', sortOrder: 40 },
+      { code: 'CFF-01', name: 'Thu từ đi vay, nhận vốn góp', section: 'FINANCING', direction: 'INFLOW', accountNumberPrefix: '111,112', offsetAccountNumberPrefix: '341,411', sortOrder: 50 },
+      { code: 'CFF-02', name: 'Chi trả nợ gốc vay', section: 'FINANCING', direction: 'OUTFLOW', accountNumberPrefix: '111,112', offsetAccountNumberPrefix: '341', sortOrder: 60 },
+    ];
+
+    for (const account of starterAccounts) {
+      const existing = await this.accountingChartAccounts.findOne({ where: { accountNumber: String(account.accountNumber) } });
+      if (existing) {
+        await this.accountingChartAccounts.save(this.accountingChartAccounts.merge(existing, account));
+      } else {
+        await this.accountingChartAccounts.save(this.accountingChartAccounts.create(account));
+      }
+    }
+
+    for (const mapping of starterCashFlows) {
+      const existing = await this.accountingCashFlowMappings.findOne({ where: { code: String(mapping.code) } });
+      if (existing) {
+        await this.accountingCashFlowMappings.save(this.accountingCashFlowMappings.merge(existing, mapping));
+      } else {
+        await this.accountingCashFlowMappings.save(this.accountingCashFlowMappings.create(mapping));
+      }
+    }
+
+    const fiscalSetting = await this.accountingFiscalSettings.findOne({ order: { createdAt: 'ASC' } });
+    if (!fiscalSetting) {
+      await this.accountingFiscalSettings.save(
+        this.accountingFiscalSettings.create({
+          accountingFramework: 'TT99/2025/TT-BTC',
+          baseCurrency: 'VND',
+          fiscalYearStart: '01-01',
+          cashAccountNumber: '111',
+          bankAccountNumber: '112',
+          receivableAccountNumber: '131',
+          payableAccountNumber: '331',
+          revenueAccountNumber: '511',
+          expenseAccountNumber: '642',
+          note: 'Bo du lieu khoi tao de bat dau cau hinh ke toan doanh nghiep tai Viet Nam.',
+        }),
+      );
+    }
+
+    await this.audit(user, 'BOOTSTRAP_VN', 'accounting', 'starter', {
+      accounts: starterAccounts.length,
+      cashFlows: starterCashFlows.length,
+    });
+
+    return {
+      data: {
+        accountsSeeded: starterAccounts.length,
+        cashFlowMappingsSeeded: starterCashFlows.length,
+      },
+    };
+  }
+
+  async generateSourceAccountingVoucher(resource: 'invoices' | 'expenses' | 'payrolls', sourceId: string, user: AuthUser) {
+    const vouchers = await this.syncAccountingForSpecificSource(resource, sourceId, user, true);
+    return {
+      data: vouchers[0] ? await this.findRaw('accounting-vouchers', vouchers[0].id) : null,
+      relatedVoucherIds: vouchers.map((item) => item.id),
+    };
+  }
+
+  private async syncAccountingForSourceResource(resource: string, sourceId: string, user: AuthUser) {
+    if (!['invoices', 'expenses', 'payrolls'].includes(resource)) return;
+    await this.syncAccountingForSpecificSource(resource as 'invoices' | 'expenses' | 'payrolls', sourceId, user, false);
+  }
+
+  private async syncAccountingForSpecificSource(
+    resource: 'invoices' | 'expenses' | 'payrolls',
+    sourceId: string,
+    user: AuthUser,
+    manualTrigger: boolean,
+  ) {
+    const sourceRecord = await this.findStored(resource, sourceId) as Record<string, unknown>;
+    const branchId = this.branchIdOf(resource, sourceRecord);
+    if (manualTrigger) {
+      await this.assertPermission(user, resource, 'generate-accounting-voucher', branchId);
+    }
+
+    await this.ensureNoPostedAccountingVoucher(resource, sourceId);
+    const drafts = await this.buildSourceVoucherDrafts(resource, sourceRecord, branchId);
+    await this.removeObsoleteDraftSourceVouchers(resource, sourceId, drafts.map((item) => item.sourceModule));
+
+    const savedVouchers: AccountingVoucher[] = [];
+    for (const draft of drafts) {
+      const existing = await this.accountingVouchers.findOne({
+        where: {
+          sourceModule: draft.sourceModule,
+          sourceRecordId: sourceId,
+        },
+        order: { createdAt: 'DESC' },
+      });
+
+      const voucher = existing
+        ? await this.accountingVouchers.save(this.accountingVouchers.merge(existing, draft.voucher))
+        : await this.accountingVouchers.save(this.accountingVouchers.create(draft.voucher));
+
+      await this.accountingVoucherLines.delete({ voucherId: voucher.id });
+      if (draft.lines.length > 0) {
+        await this.accountingVoucherLines.save(
+          draft.lines.map((line) => this.accountingVoucherLines.create({ ...line, voucherId: voucher.id })),
+        );
+      }
+      await this.recalculateAccountingVoucherTotals(voucher.id);
+      savedVouchers.push(voucher);
+    }
+
+    if (manualTrigger) {
+      await this.audit(user, 'SYNC_VOUCHER', resource, sourceId, {
+        voucherIds: savedVouchers.map((item) => item.id),
+      });
+    }
+
+    return savedVouchers;
+  }
+
+  private async buildSourceVoucherDrafts(
+    resource: 'invoices' | 'expenses' | 'payrolls',
+    sourceRecord: Record<string, unknown>,
+    branchId?: string,
+  ) {
+    const fiscalSetting = await this.getFiscalSetting();
+    if (resource === 'invoices') {
+      return [await this.buildInvoiceVoucherDraft(sourceRecord as unknown as Invoice, fiscalSetting, branchId)];
+    }
+    if (resource === 'expenses') {
+      return [await this.buildExpenseVoucherDraft(sourceRecord as unknown as Expense, fiscalSetting, branchId)];
+    }
+    return this.buildPayrollVoucherDrafts(sourceRecord as unknown as Payroll, fiscalSetting, branchId);
+  }
+
+  private async buildInvoiceVoucherDraft(invoice: Invoice, fiscalSetting: AccountingFiscalSetting, branchId?: string) {
+    const totalAmount = Number(invoice.totalAmount || 0);
+    const paidAmount = Number(invoice.paidAmount || 0);
+    const vatAmount = Number(invoice.vatAmount || 0);
+    const taxableAmount = Number(invoice.taxableAmount || Math.max(totalAmount - vatAmount, 0));
+    const outstandingAmount = Math.max(totalAmount - paidAmount, 0);
+    const accountingDate = this.dateStringFromValue(invoice.createdAt);
+    const period = await this.findPeriodForDate(accountingDate);
+    const moneyAccount = await this.findAccountByNumber(invoice.paymentAccountNumber || this.resolveMoneyAccountNumber(invoice.method, fiscalSetting));
+    const receivableAccount = await this.findAccountByNumber(fiscalSetting.receivableAccountNumber || '131');
+    const revenueAccount = await this.findAccountByNumber(invoice.revenueAccountNumber || fiscalSetting.revenueAccountNumber || '511');
+    const outputVatAccount = vatAmount > 0 ? await this.findAccountByNumber('3331') : null;
+    const cashFlowMapping = paidAmount > 0 ? await this.findCashFlowMappingByCode('CFO-01', false) : undefined;
+
+    const lines: Array<Partial<AccountingVoucherLine>> = [];
+    if (paidAmount > 0) {
+      lines.push({
+        accountId: moneyAccount.id,
+        branchId,
+        debitAmount: paidAmount,
+        creditAmount: 0,
+        customerId: invoice.customerId,
+        cashFlowMappingId: cashFlowMapping?.id,
+        lineDescription: `Thu tien hoa don ${invoice.code}`,
+        referenceNumber: invoice.code,
+      });
+    }
+    if (outstandingAmount > 0 || paidAmount === 0) {
+      lines.push({
+        accountId: receivableAccount.id,
+        branchId,
+        debitAmount: paidAmount > 0 ? outstandingAmount : totalAmount,
+        creditAmount: 0,
+        customerId: invoice.customerId,
+        lineDescription: `Cong no hoa don ${invoice.code}`,
+        referenceNumber: invoice.code,
+      });
+    }
+    lines.push({
+      accountId: revenueAccount.id,
+      branchId,
+      debitAmount: 0,
+      creditAmount: taxableAmount || totalAmount,
+      customerId: invoice.customerId,
+      lineDescription: `Doanh thu hoa don ${invoice.code}`,
+      referenceNumber: invoice.code,
+    });
+    if (outputVatAccount && vatAmount > 0) {
+      lines.push({
+        accountId: outputVatAccount.id,
+        branchId,
+        debitAmount: 0,
+        creditAmount: vatAmount,
+        customerId: invoice.customerId,
+        lineDescription: `VAT dau ra hoa don ${invoice.code}`,
+        referenceNumber: invoice.code,
+      });
+    }
+
+    return {
+      sourceModule: 'invoices',
+      voucher: {
+        code: `KT-${invoice.code}`,
+        voucherDate: accountingDate,
+        accountingDate,
+        voucherType: paidAmount > 0 ? 'CASH_RECEIPT' : 'GENERAL',
+        periodId: period?.id,
+        branchId,
+        referenceNumber: invoice.code,
+        sourceModule: 'invoices',
+        sourceRecordId: invoice.id,
+        description: `Hach toan doanh thu hoa don ${invoice.code}`,
+        status: 'DRAFT',
+      },
+      lines,
+    };
+  }
+
+  private async buildExpenseVoucherDraft(expense: Expense, fiscalSetting: AccountingFiscalSetting, branchId?: string) {
+    const amount = Number(expense.amount || 0);
+    const vatAmount = Number(expense.vatAmount || 0);
+    const beforeTaxAmount = Number(expense.beforeTaxAmount || Math.max(amount - vatAmount, 0));
+    const accountingDate = expense.paidAt;
+    const period = await this.findPeriodForDate(accountingDate);
+    const expenseAccount = await this.findAccountByNumber(expense.expenseAccountNumber || this.resolveExpenseAccountNumber(expense, fiscalSetting));
+    const paymentAccount = await this.findAccountByNumber(expense.paymentAccountNumber || this.resolveMoneyAccountNumber(expense.paymentMethod, fiscalSetting));
+    const inputVatAccount = vatAmount > 0 ? await this.findAccountByNumber('133') : null;
+    const cashFlowMapping = await this.findCashFlowMappingByCode('CFO-02', false);
+
+    const lines: Array<Partial<AccountingVoucherLine>> = [
+      {
+        accountId: expenseAccount.id,
+        branchId,
+        debitAmount: beforeTaxAmount || amount,
+        creditAmount: 0,
+        supplierId: expense.supplierId,
+        lineDescription: `Chi phi ${expense.category}`,
+        referenceNumber: expense.invoiceNumber || expense.id,
+      },
+    ];
+    if (inputVatAccount && vatAmount > 0) {
+      lines.push({
+        accountId: inputVatAccount.id,
+        branchId,
+        debitAmount: vatAmount,
+        creditAmount: 0,
+        supplierId: expense.supplierId,
+        lineDescription: `VAT dau vao ${expense.category}`,
+        referenceNumber: expense.invoiceNumber || expense.id,
+      });
+    }
+    lines.push({
+      accountId: paymentAccount.id,
+      branchId,
+      debitAmount: 0,
+      creditAmount: amount,
+      supplierId: expense.supplierId,
+      cashFlowMappingId: cashFlowMapping?.id,
+      lineDescription: `Thanh toan chi phi ${expense.category}`,
+      referenceNumber: expense.invoiceNumber || expense.id,
+    });
+
+    return {
+      sourceModule: 'expenses',
+      voucher: {
+        code: `PC-${expense.id.slice(0, 8).toUpperCase()}`,
+        voucherDate: accountingDate,
+        accountingDate,
+        voucherType: expense.paymentMethod === 'TRANSFER' ? 'BANK_PAYMENT' : 'CASH_PAYMENT',
+        periodId: period?.id,
+        branchId,
+        referenceNumber: expense.invoiceNumber || expense.id,
+        sourceModule: 'expenses',
+        sourceRecordId: expense.id,
+        description: expense.description || `Hach toan chi phi ${expense.category}`,
+        status: 'DRAFT',
+      },
+      lines,
+    };
+  }
+
+  private async buildPayrollVoucherDrafts(payroll: Payroll, fiscalSetting: AccountingFiscalSetting, branchId?: string) {
+    if (!['confirmed', 'paid'].includes(String(payroll.status || ''))) return [];
+
+    const accountingDate = this.lastDateOfMonth(payroll.year, payroll.month);
+    const period = await this.findPeriodForDate(accountingDate);
+    const payrollExpenseAccount = await this.findAccountByNumber(payroll.expenseAccountNumber || this.resolvePayrollExpenseAccountNumber(fiscalSetting));
+    const payrollPayableAccount = await this.findAccountByNumber('334');
+    const otherPayableAccount = Number(payroll.employerInsuranceAmount || 0) > 0 ? await this.findAccountByNumber('338') : null;
+
+    const accruedAmount = this.resolvePayrollAccruedAmount(payroll);
+    const drafts: Array<{
+      sourceModule: string;
+      voucher: Partial<AccountingVoucher>;
+      lines: Array<Partial<AccountingVoucherLine>>;
+    }> = [];
+
+    const accrualLines: Array<Partial<AccountingVoucherLine>> = [
+      {
+        accountId: payrollExpenseAccount.id,
+        branchId,
+        debitAmount: accruedAmount,
+        creditAmount: 0,
+        staffId: payroll.staffId,
+        lineDescription: `Trich luong thang ${payroll.month}/${payroll.year}`,
+        referenceNumber: payroll.id,
+      },
+      {
+        accountId: payrollPayableAccount.id,
+        branchId,
+        debitAmount: 0,
+        creditAmount: accruedAmount,
+        staffId: payroll.staffId,
+        lineDescription: `Phai tra luong thang ${payroll.month}/${payroll.year}`,
+        referenceNumber: payroll.id,
+      },
+    ];
+
+    if (Number(payroll.employerInsuranceAmount || 0) > 0 && otherPayableAccount) {
+      accrualLines.push(
+        {
+          accountId: payrollExpenseAccount.id,
+          branchId,
+          debitAmount: Number(payroll.employerInsuranceAmount || 0),
+          creditAmount: 0,
+          staffId: payroll.staffId,
+          lineDescription: `Chi phi BH cong ty dong thang ${payroll.month}/${payroll.year}`,
+          referenceNumber: payroll.id,
+        },
+        {
+          accountId: otherPayableAccount.id,
+          branchId,
+          debitAmount: 0,
+          creditAmount: Number(payroll.employerInsuranceAmount || 0),
+          staffId: payroll.staffId,
+          lineDescription: `Phai nop BH cong ty dong thang ${payroll.month}/${payroll.year}`,
+          referenceNumber: payroll.id,
+        },
+      );
+    }
+
+    drafts.push({
+      sourceModule: 'payrolls-accrual',
+      voucher: {
+        code: `LUONG-${payroll.year}-${String(payroll.month).padStart(2, '0')}-${payroll.id.slice(0, 6).toUpperCase()}`,
+        voucherDate: accountingDate,
+        accountingDate,
+        voucherType: 'GENERAL',
+        periodId: period?.id,
+        branchId,
+        referenceNumber: payroll.id,
+        sourceModule: 'payrolls-accrual',
+        sourceRecordId: payroll.id,
+        description: `Trich luong thang ${payroll.month}/${payroll.year}`,
+        status: 'DRAFT',
+      },
+      lines: accrualLines,
+    });
+
+    if (String(payroll.status || '') === 'paid' && Number(payroll.netSalary || 0) > 0) {
+      const paymentDate = payroll.paidAt || accountingDate;
+      const paymentPeriod = await this.findPeriodForDate(paymentDate);
+      const paymentAccount = await this.findAccountByNumber(payroll.paymentAccountNumber || this.resolveMoneyAccountNumber(payroll.paymentMethod, fiscalSetting));
+      const cashFlowMapping = await this.findCashFlowMappingByCode('CFO-03', false);
+      drafts.push({
+        sourceModule: 'payrolls-payment',
+        voucher: {
+          code: `CHILUONG-${payroll.year}-${String(payroll.month).padStart(2, '0')}-${payroll.id.slice(0, 6).toUpperCase()}`,
+          voucherDate: paymentDate,
+          accountingDate: paymentDate,
+          voucherType: payroll.paymentMethod === 'TRANSFER' ? 'BANK_PAYMENT' : 'CASH_PAYMENT',
+          periodId: paymentPeriod?.id,
+          branchId,
+          referenceNumber: payroll.id,
+          sourceModule: 'payrolls-payment',
+          sourceRecordId: payroll.id,
+          description: `Chi luong thang ${payroll.month}/${payroll.year}`,
+          status: 'DRAFT',
+        },
+        lines: [
+          {
+            accountId: payrollPayableAccount.id,
+            branchId,
+            debitAmount: Number(payroll.netSalary || 0),
+            creditAmount: 0,
+            staffId: payroll.staffId,
+            lineDescription: `Thanh toan luong thang ${payroll.month}/${payroll.year}`,
+            referenceNumber: payroll.id,
+          },
+          {
+            accountId: paymentAccount.id,
+            branchId,
+            debitAmount: 0,
+            creditAmount: Number(payroll.netSalary || 0),
+            staffId: payroll.staffId,
+            cashFlowMappingId: cashFlowMapping?.id,
+            lineDescription: `Chi luong thang ${payroll.month}/${payroll.year}`,
+            referenceNumber: payroll.id,
+          },
+        ],
+      });
+    }
+
+    return drafts;
+  }
+
+  private async getFiscalSetting() {
+    const fiscalSetting = await this.accountingFiscalSettings.findOne({ order: { createdAt: 'ASC' } });
+    if (!fiscalSetting) {
+      throw new BadRequestException('Chua cau hinh accounting-fiscal-settings');
+    }
+    return fiscalSetting;
+  }
+
+  private async ensureNoPostedAccountingVoucher(resource: string, sourceId: string) {
+    if (!['invoices', 'expenses', 'payrolls'].includes(resource)) return;
+    const posted = await this.accountingVouchers.find({
+      where: [
+        { sourceModule: resource, sourceRecordId: sourceId, status: 'POSTED' },
+        { sourceModule: `${resource}-accrual`, sourceRecordId: sourceId, status: 'POSTED' },
+        { sourceModule: `${resource}-payment`, sourceRecordId: sourceId, status: 'POSTED' },
+      ] as never,
+    });
+    if (posted.length > 0) {
+      throw new BadRequestException('Nguon nay da co chung tu da ghi so, hay bo ghi so truoc khi thay doi');
+    }
+  }
+
+  private async removeDraftSourceVouchers(resource: string, sourceId: string) {
+    if (!['invoices', 'expenses', 'payrolls'].includes(resource)) return;
+    const drafts = await this.accountingVouchers.find({
+      where: [
+        { sourceModule: resource, sourceRecordId: sourceId, status: 'DRAFT' },
+        { sourceModule: `${resource}-accrual`, sourceRecordId: sourceId, status: 'DRAFT' },
+        { sourceModule: `${resource}-payment`, sourceRecordId: sourceId, status: 'DRAFT' },
+      ] as never,
+    });
+    for (const voucher of drafts) {
+      await this.accountingVoucherLines.delete({ voucherId: voucher.id });
+      await this.accountingVouchers.remove(voucher);
+    }
+  }
+
+  private async removeObsoleteDraftSourceVouchers(resource: string, sourceId: string, activeSourceModules: string[]) {
+    const candidates = await this.accountingVouchers.find({
+      where: [
+        { sourceModule: resource, sourceRecordId: sourceId, status: 'DRAFT' },
+        { sourceModule: `${resource}-accrual`, sourceRecordId: sourceId, status: 'DRAFT' },
+        { sourceModule: `${resource}-payment`, sourceRecordId: sourceId, status: 'DRAFT' },
+        { sourceModule: 'payrolls-accrual', sourceRecordId: sourceId, status: 'DRAFT' },
+        { sourceModule: 'payrolls-payment', sourceRecordId: sourceId, status: 'DRAFT' },
+      ] as never,
+    });
+    const stale = candidates.filter((item) => !activeSourceModules.includes(String(item.sourceModule || '')));
+    for (const voucher of stale) {
+      await this.accountingVoucherLines.delete({ voucherId: voucher.id });
+      await this.accountingVouchers.remove(voucher);
+    }
+  }
+
+  private async findPeriodForDate(accountingDate: string) {
+    if (!accountingDate) return null;
+    const periods = await this.accountingPeriods.find({
+      where: [
+        { status: 'OPEN' as never },
+        { status: 'CLOSED' as never },
+      ],
+      order: { startDate: 'ASC' },
+    });
+    return periods.find((item) => item.startDate <= accountingDate && item.endDate >= accountingDate) || null;
+  }
+
+  private async findAccountByNumber(accountNumber: string) {
+    const normalized = String(accountNumber || '').trim();
+    const account = await this.accountingChartAccounts.findOne({ where: { accountNumber: normalized } });
+    if (!account) {
+      throw new BadRequestException(`Khong tim thay tai khoan ke toan ${normalized}`);
+    }
+    return account;
+  }
+
+  private async findCashFlowMappingByCode(code: string, required = true) {
+    const mapping = await this.accountingCashFlowMappings.findOne({ where: { code } });
+    if (!mapping && required) {
+      throw new BadRequestException(`Khong tim thay ma dong tien ${code}`);
+    }
+    return mapping;
+  }
+
+  private resolveMoneyAccountNumber(method: unknown, fiscalSetting: AccountingFiscalSetting) {
+    const normalizedMethod = String(method || '').toUpperCase();
+    if (normalizedMethod === 'TRANSFER' || normalizedMethod === 'CARD') {
+      return fiscalSetting.bankAccountNumber || '112';
+    }
+    return fiscalSetting.cashAccountNumber || '111';
+  }
+
+  private resolveExpenseAccountNumber(expense: Expense, fiscalSetting: AccountingFiscalSetting) {
+    const category = String(expense.category || '').toLowerCase();
+    if (category.includes('ban hang') || category.includes('marketing')) return '641';
+    if (category.includes('lai vay') || category.includes('tai chinh')) return '635';
+    return fiscalSetting.expenseAccountNumber || '642';
+  }
+
+  private resolvePayrollExpenseAccountNumber(fiscalSetting: AccountingFiscalSetting) {
+    return fiscalSetting.expenseAccountNumber || '642';
+  }
+
+  private resolvePayrollAccruedAmount(payroll: Payroll) {
+    return Number(payroll.netSalary || 0)
+      + Number(payroll.insuranceDeduction || 0)
+      + Number(payroll.pitAmount || 0)
+      + Number(payroll.deduction || 0);
+  }
+
+  private dateStringFromValue(value: unknown) {
+    if (typeof value === 'string') return value.slice(0, 10);
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  private lastDateOfMonth(year: number, month: number) {
+    const date = new Date(Date.UTC(year, month, 0));
+    return date.toISOString().slice(0, 10);
+  }
+
+  private async loadPostedVoucherLines(params: Record<string, string>, user?: AuthUser) {
+    const lines = await this.accountingVoucherLines.find({ order: { createdAt: 'ASC' } });
+    const voucherIds = Array.from(new Set(lines.map((line) => line.voucherId).filter(Boolean)));
+    const vouchers = voucherIds.length > 0
+      ? await this.accountingVouchers.find({ where: { id: In(voucherIds) } })
+      : [];
+    const vouchersById = new Map(vouchers.map((item) => [item.id, item]));
+    const allowedBranches = this.allowedBranches(user);
+
+    return lines.filter((line) => {
+      const voucher = vouchersById.get(line.voucherId);
+      if (!voucher || voucher.status !== 'POSTED') return false;
+      if (allowedBranches && allowedBranches.length > 0 && voucher.branchId && !allowedBranches.includes(voucher.branchId)) return false;
+      if (params.accountId && line.accountId !== params.accountId) return false;
+      if (params.voucherId && line.voucherId !== params.voucherId) return false;
+      if (params.branchId && String(voucher.branchId || '') !== params.branchId) return false;
+      const accountingDate = String(voucher.accountingDate || voucher.voucherDate || '');
+      if (params.periodId && String(voucher.periodId || '') !== params.periodId) return false;
+      if (params.fromDate && accountingDate < params.fromDate) return false;
+      if (params.toDate && accountingDate > params.toDate) return false;
+      return true;
+    });
+  }
+
   private async storeUploadedFile(
     file: any,
     folder: FileFolder,
@@ -1689,6 +2674,77 @@ export class RecordsService {
       const spent = Number(value.totalSpent || 0);
       value.tier = spent >= 200_000_000 ? 'DIAMOND' : spent >= 50_000_000 ? 'GOLD' : spent >= 10_000_000 ? 'SILVER' : 'MEMBER';
     }
+    if (resource === 'accounting-vouchers') {
+      value.voucherDate = value.voucherDate ? String(value.voucherDate) : '';
+      value.accountingDate = value.accountingDate ? String(value.accountingDate) : value.voucherDate;
+      value.totalDebit = Number(value.totalDebit || 0);
+      value.totalCredit = Number(value.totalCredit || 0);
+      if (!value.status) value.status = 'DRAFT';
+    }
+    if (resource === 'invoices') {
+      value.totalAmount = Number(value.totalAmount || 0);
+      value.paidAmount = Number(value.paidAmount || 0);
+      value.taxableAmount = Number(value.taxableAmount || 0);
+      value.vatRate = Number(value.vatRate || 0);
+      value.vatAmount = Number(value.vatAmount || 0);
+      if (!value.taxableAmount && value.totalAmount) {
+        value.taxableAmount = Math.max(Number(value.totalAmount || 0) - Number(value.vatAmount || 0), 0);
+      }
+      if (!value.vatAmount && value.taxableAmount && value.vatRate) {
+        value.vatAmount = Math.round(Number(value.taxableAmount) * Number(value.vatRate) / 100);
+      }
+      if (!value.totalAmount && value.taxableAmount) {
+        value.totalAmount = Number(value.taxableAmount) + Number(value.vatAmount || 0);
+      }
+    }
+    if (resource === 'expenses') {
+      value.amount = Number(value.amount || 0);
+      value.beforeTaxAmount = Number(value.beforeTaxAmount || 0);
+      value.vatRate = Number(value.vatRate || 0);
+      value.vatAmount = Number(value.vatAmount || 0);
+      if (!value.beforeTaxAmount && value.amount) {
+        value.beforeTaxAmount = Math.max(Number(value.amount || 0) - Number(value.vatAmount || 0), 0);
+      }
+      if (!value.vatAmount && value.beforeTaxAmount && value.vatRate) {
+        value.vatAmount = Math.round(Number(value.beforeTaxAmount) * Number(value.vatRate) / 100);
+      }
+      if (!value.amount && value.beforeTaxAmount) {
+        value.amount = Number(value.beforeTaxAmount) + Number(value.vatAmount || 0);
+      }
+      if (!value.paymentMethod) value.paymentMethod = 'CASH';
+    }
+    if (resource === 'payrolls') {
+      value.baseSalary = Number(value.baseSalary || 0);
+      value.workingDays = Number(value.workingDays || 0);
+      value.actualDays = Number(value.actualDays || 0);
+      value.overtimeHours = Number(value.overtimeHours || 0);
+      value.bonus = Number(value.bonus || 0);
+      value.deduction = Number(value.deduction || 0);
+      value.insuranceDeduction = Number(value.insuranceDeduction || 0);
+      value.pitAmount = Number(value.pitAmount || 0);
+      value.employerInsuranceAmount = Number(value.employerInsuranceAmount || 0);
+      value.netSalary = Number(value.netSalary || 0);
+      if (!value.paymentMethod) value.paymentMethod = 'TRANSFER';
+    }
+    if (resource === 'accounting-voucher-lines') {
+      value.debitAmount = Number(value.debitAmount || 0);
+      value.creditAmount = Number(value.creditAmount || 0);
+    }
+    if (resource === 'accounting-chart-accounts') {
+      value.accountNumber = value.accountNumber ? String(value.accountNumber).trim() : '';
+      value.level = Number(value.level || 1);
+      value.allowPosting = value.allowPosting !== false;
+      value.isSystem = value.isSystem === true;
+      value.isActive = value.isActive !== false;
+    }
+    if (resource === 'accounting-periods') {
+      value.isYearEnd = value.isYearEnd === true;
+      if (!value.status) value.status = 'OPEN';
+    }
+    if (resource === 'accounting-cash-flow-mappings') {
+      value.sortOrder = Number(value.sortOrder || 0);
+      value.isActive = value.isActive !== false;
+    }
     return value;
   }
 
@@ -1733,7 +2789,11 @@ export class RecordsService {
   }
 
   private async normalizeInput(resource: string, payload: Record<string, unknown>, creating = false) {
-    if (resource !== 'user-accounts') return this.normalize(resource, payload);
+    if (resource !== 'user-accounts') {
+      const value = this.normalize(resource, payload);
+      await this.validateAccountingResource(resource, value, creating);
+      return value;
+    }
     const value = { ...payload };
     delete value.id;
     delete value.createdAt;
@@ -1762,6 +2822,88 @@ export class RecordsService {
       throw new BadRequestException('Email tai khoan la bat buoc');
     }
     return value;
+  }
+
+  private async validateAccountingResource(resource: string, value: Record<string, unknown>, creating: boolean) {
+    if (resource === 'accounting-vouchers') {
+      if (!String(value.code || '').trim()) throw new BadRequestException('Chung tu ke toan bat buoc co ma');
+      if (!String(value.voucherDate || '').trim()) throw new BadRequestException('Chung tu ke toan bat buoc co ngay chung tu');
+      if (!String(value.description || '').trim()) throw new BadRequestException('Chung tu ke toan bat buoc co dien giai');
+      if (value.periodId) {
+        const period = await this.accountingPeriods.findOne({ where: { id: String(value.periodId) } });
+        if (!period) throw new BadRequestException('Ky ke toan khong hop le');
+        const accountingDate = String(value.accountingDate || value.voucherDate || '');
+        if (accountingDate && (accountingDate < period.startDate || accountingDate > period.endDate)) {
+          throw new BadRequestException('Ngay hach toan nam ngoai ky ke toan da chon');
+        }
+        if (period.status === 'CLOSED') {
+          throw new BadRequestException('Ky ke toan da khoa');
+        }
+      }
+      if (creating && value.status === 'POSTED') {
+        throw new BadRequestException('Khong the tao chung tu o trang thai da ghi so');
+      }
+    }
+
+    if (resource === 'accounting-voucher-lines') {
+      const voucherId = String(value.voucherId || '').trim();
+      const accountId = String(value.accountId || '').trim();
+      const debitAmount = Number(value.debitAmount || 0);
+      const creditAmount = Number(value.creditAmount || 0);
+      if (!voucherId) throw new BadRequestException('Dong hach toan bat buoc co chung tu');
+      if (!accountId) throw new BadRequestException('Dong hach toan bat buoc co tai khoan');
+      if ((debitAmount <= 0 && creditAmount <= 0) || (debitAmount > 0 && creditAmount > 0)) {
+        throw new BadRequestException('Moi dong hach toan chi duoc ghi No hoac Co');
+      }
+      const [voucher, account] = await Promise.all([
+        this.accountingVouchers.findOne({ where: { id: voucherId } }),
+        this.accountingChartAccounts.findOne({ where: { id: accountId } }),
+      ]);
+      if (!voucher) throw new BadRequestException('Chung tu ke toan khong hop le');
+      if (!account) throw new BadRequestException('Tai khoan ke toan khong hop le');
+      if (!account.allowPosting) throw new BadRequestException('Tai khoan tong hop khong duoc hach toan truc tiep');
+      if (voucher.status === 'POSTED') throw new BadRequestException('Khong the sua dong cua chung tu da ghi so');
+      if (!value.branchId && voucher.branchId) {
+        value.branchId = voucher.branchId;
+      }
+    }
+
+    if (resource === 'accounting-chart-accounts') {
+      if (!String(value.accountNumber || '').trim()) throw new BadRequestException('Tai khoan ke toan bat buoc co so tai khoan');
+      if (!String(value.name || '').trim()) throw new BadRequestException('Tai khoan ke toan bat buoc co ten');
+      if (value.parentAccountId) {
+        const parent = await this.accountingChartAccounts.findOne({ where: { id: String(value.parentAccountId) } });
+        if (!parent) throw new BadRequestException('Tai khoan cha khong hop le');
+        value.level = Number(parent.level || 1) + 1;
+      }
+    }
+
+    if (resource === 'accounting-periods') {
+      const startDate = String(value.startDate || '');
+      const endDate = String(value.endDate || '');
+      if (!startDate || !endDate) throw new BadRequestException('Ky ke toan bat buoc co ngay bat dau va ngay ket thuc');
+      if (startDate > endDate) throw new BadRequestException('Ngay bat dau phai nho hon hoac bang ngay ket thuc');
+    }
+
+    if (resource === 'invoices') {
+      if (Number(value.totalAmount || 0) <= 0) throw new BadRequestException('Hoa don bat buoc co tong tien lon hon 0');
+      if (Number(value.paidAmount || 0) < 0) throw new BadRequestException('So tien da thu khong hop le');
+      if (Number(value.paidAmount || 0) > Number(value.totalAmount || 0)) {
+        throw new BadRequestException('So tien da thu khong duoc lon hon tong tien');
+      }
+    }
+
+    if (resource === 'expenses') {
+      if (Number(value.amount || 0) <= 0) throw new BadRequestException('Phieu chi bat buoc co so tien lon hon 0');
+      if (!String(value.paidAt || '').trim()) throw new BadRequestException('Phieu chi bat buoc co ngay chi');
+    }
+
+    if (resource === 'payrolls') {
+      if (!String(value.staffId || '').trim()) throw new BadRequestException('Bang luong bat buoc co nhan vien');
+      if (Number(value.month || 0) < 1 || Number(value.month || 0) > 12) throw new BadRequestException('Thang bang luong khong hop le');
+      if (Number(value.year || 0) < 2000) throw new BadRequestException('Nam bang luong khong hop le');
+      if (Number(value.netSalary || 0) < 0) throw new BadRequestException('Thuc lanh khong hop le');
+    }
   }
 
   private async validateCustomFields(resource: string, payload: Record<string, unknown>, creating: boolean) {
@@ -1963,6 +3105,27 @@ export class RecordsService {
     };
   }
 
+  private async attachAccountingVoucherLines(record: AccountingVoucher) {
+    const lines = await this.accountingVoucherLines.find({
+      where: { voucherId: record.id },
+      order: { createdAt: 'ASC' },
+    });
+    return {
+      ...record,
+      lines,
+    };
+  }
+
+  private async recalculateAccountingVoucherTotals(voucherId: string) {
+    if (!voucherId) return;
+    const voucher = await this.accountingVouchers.findOne({ where: { id: voucherId } });
+    if (!voucher) return;
+    const lines = await this.accountingVoucherLines.find({ where: { voucherId } });
+    voucher.totalDebit = lines.reduce((sum, line) => sum + Number(line.debitAmount || 0), 0);
+    voucher.totalCredit = lines.reduce((sum, line) => sum + Number(line.creditAmount || 0), 0);
+    await this.accountingVouchers.save(voucher);
+  }
+
   private async replaceCustomFieldValues(resource: string, recordId: string, values: Record<string, unknown>) {
     await this.customFieldValues.delete({ entityType: resource, recordId });
 
@@ -2117,6 +3280,9 @@ export class RecordsService {
       rooms: 'branchId',
       equipments: 'branchId',
       staff: 'defaultBranchId',
+      'accounting-fiscal-settings': 'defaultBranchId',
+      'accounting-vouchers': 'branchId',
+      'accounting-voucher-lines': 'branchId',
       'branch-role-assignments': 'branchId',
       'branch-permissions': 'branchId',
       'user-accounts': 'branchId',
