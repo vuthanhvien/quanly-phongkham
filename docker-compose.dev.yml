@@ -7,7 +7,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      PORT: 9999
+      PORT: 80
       BACKEND_PORT: 3001
       CMS_PORT: 3003
       LANDING_PORT: 3002
@@ -41,7 +41,7 @@ services:
       - runtime_node_modules:/opt/runtime/node_modules
       - app_storage:/app/backend/storage
     ports:
-      - "${APP_PORT:-9999}:9999"
+      - "${APP_PORT:-9999}:80"
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

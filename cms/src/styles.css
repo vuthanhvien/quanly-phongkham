@@ -1966,6 +1966,11 @@ textarea.ant-input {
   max-width: none;
 }
 
+.record-image-thumb .ant-image,
+.record-image-thumb .ant-image-img {
+  display: block;
+}
+
 .record-image-thumb img {
   background: rgba(15, 23, 42, 0.04);
   border: 1px solid var(--app-line);
@@ -2037,6 +2042,16 @@ textarea.ant-input {
   transform: translateY(-1px);
 }
 
+.record-media-preview {
+  display: flex;
+  flex: 0 0 52px;
+}
+
+.record-media-preview .ant-image,
+.record-media-preview .ant-image-img {
+  display: block;
+}
+
 .record-media-card img,
 .record-file-fallback {
   border-radius: var(--app-radius);
@@ -2050,6 +2065,10 @@ textarea.ant-input {
   flex-basis: 40px;
   height: 40px;
   width: 40px;
+}
+
+.record-media-stack.compact .record-media-preview {
+  flex-basis: 40px;
 }
 
 .record-media-card img {

@@ -5,7 +5,7 @@ import {
   FileTextOutlined,
   LinkOutlined,
 } from "@ant-design/icons"
-import { Button } from "antd"
+import { Button, Image } from "antd"
 import { resolveFileUrl } from "../api"
 import { displayValue, FileLookupMap, getRelationSpec, LookupMap } from "../relations"
 import { FieldSpec } from "../models"
@@ -78,30 +78,29 @@ function renderImageUrlValue(value: unknown, compact?: boolean) {
   const items = normalizeStringArray(value)
   if (items.length === 0) return <span>-</span>
   return (
-    <div className={`record-image-url-list${compact ? " compact" : ""}`}>
-      {items.map((item, index) => {
-        const href = resolveFileUrl(item)
-        const label = extractFileName(item) || `Ảnh ${index + 1}`
-        return (
-          <a
-            key={`${item}-${index}`}
-            className={`record-image-thumb${compact ? " compact" : ""}`}
-            href={href}
-            rel="noreferrer"
-            target="_blank"
-            title={label}
-          >
-            <img alt={label} src={href} />
-            {!compact ? (
-              <span className="record-image-thumb-caption">
-                <span>{label}</span>
-                <LinkOutlined />
-              </span>
-            ) : null}
-          </a>
-        )
-      })}
-    </div>
+    <Image.PreviewGroup>
+      <div className={`record-image-url-list${compact ? " compact" : ""}`}>
+        {items.map((item, index) => {
+          const href = resolveFileUrl(item)
+          const label = extractFileName(item) || `Ảnh ${index + 1}`
+          return (
+            <div
+              key={`${item}-${index}`}
+              className={`record-image-thumb${compact ? " compact" : ""}`}
+              title={label}
+            >
+              <Image alt={label} preview={{ mask: "Xem" }} src={href} />
+              {!compact ? (
+                <span className="record-image-thumb-caption">
+                  <span>{label}</span>
+                  <LinkOutlined />
+                </span>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+    </Image.PreviewGroup>
   )
 }
 
@@ -112,31 +111,48 @@ function renderFileValue(value: unknown, lookups: LookupMap, fileLookups: FileLo
   if (resolved.length === 0) return <>{displayValue({ key: "", label: "", type: "file" }, value, lookups)}</>
 
   return (
-    <div className={`record-media-stack${compact ? " compact" : ""}`}>
-      {resolved.map((file) => (
-        <a
-          key={file.id}
-          className="record-media-card"
-          href={resolveFileUrl(file.publicUrl)}
-          rel="noreferrer"
-          target="_blank"
-          title={file.title}
-        >
-          {isImageFile(file) ? (
-            <img alt={file.title} src={resolveFileUrl(file.publicUrl)} />
-          ) : (
-            <div className="record-file-fallback">{renderFileIcon(file, true)}</div>
-          )}
-          <div className="record-media-copy">
-            <strong>{file.title}</strong>
-            <span>{file.originalName || formatFileKind(file.extension) || "Tệp đính kèm"}</span>
+    <Image.PreviewGroup>
+      <div className={`record-media-stack${compact ? " compact" : ""}`}>
+        {resolved.map((file) => (
+          <div
+            key={file.id}
+            className="record-media-card"
+            title={file.title}
+          >
+            {isImageFile(file) ? (
+              <div
+                className="record-media-preview"
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                }}
+              >
+                <Image
+                  alt={file.title}
+                  preview={{ mask: "Xem" }}
+                  src={resolveFileUrl(file.publicUrl)}
+                />
+              </div>
+            ) : (
+              <div className="record-file-fallback">{renderFileIcon(file, true)}</div>
+            )}
+            <div className="record-media-copy">
+              <strong>{file.title}</strong>
+              <span>{file.originalName || formatFileKind(file.extension) || "Tệp đính kèm"}</span>
+            </div>
+            <a
+              className="record-media-open"
+              href={resolveFileUrl(file.publicUrl)}
+              rel="noreferrer"
+              target="_blank"
+              title={`Mở ${file.title}`}
+            >
+              <LinkOutlined />
+            </a>
           </div>
-          <span className="record-media-open">
-            <LinkOutlined />
-          </span>
-        </a>
-      ))}
-    </div>
+        ))}
+      </div>
+    </Image.PreviewGroup>
   )
 }
 
