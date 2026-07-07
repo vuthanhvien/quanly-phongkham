@@ -39,10 +39,19 @@ import { Link, useLocation, useNavigate } from "react-router-dom"
 import { hasResourceAccess, hasScreenAccess } from "../access"
 import { api } from "../api"
 import { useAppUi } from "../app-ui"
+import { companyTypeLabels, isResourceEnabledForCompanyType, type CompanyType } from "../company-types"
 import { entityLabels } from "../models"
 
 const { Header, Content, Sider } = Layout
 const SIDER_COLLAPSE_KEY = "clinic-sider-collapsed"
+
+type MenuGroupConfig = {
+  key: string
+  label: string
+  icon: React.ReactNode
+  companyTypes: CompanyType[]
+  resources: string[]
+}
 
 const menuIcons: Record<string, React.ReactNode> = {
   "custom-fields": <AppstoreOutlined />,
@@ -89,35 +98,40 @@ const menuIcons: Record<string, React.ReactNode> = {
   'position-histories': <DeploymentUnitOutlined />,
 }
 
-const menuGroups = [
+const menuGroups: MenuGroupConfig[] = [
   {
     key: "front-office",
     label: "Lễ tân & CRM",
     icon: <TeamOutlined />,
+    companyTypes: ["clinic", "retail", "cafe", "general"],
     resources: ["leads", "lead-activities", "customers", "appointments"],
   },
   {
     key: "clinical",
     label: "Chuyên môn điều trị",
     icon: <MedicineBoxOutlined />,
+    companyTypes: ["clinic"],
     resources: ["medical-episodes", "consultations", "service-orders", "customer-images", "treatments", "rooms", "equipments"],
   },
   {
     key: "inventory",
     label: "Kho & mua hàng",
     icon: <DatabaseOutlined />,
+    companyTypes: ["clinic", "retail", "cafe", "agriculture", "general"],
     resources: ["suppliers", "products", "product-categories", "stock-batches"],
   },
   {
     key: "documents",
     label: "Tài liệu & file",
     icon: <FolderOpenOutlined />,
+    companyTypes: ["clinic", "retail", "cafe", "agriculture", "general"],
     resources: ["file-folders", "files"],
   },
   {
     key: "hr",
     label: "Nhân sự",
     icon: <TeamOutlined />,
+    companyTypes: ["clinic", "retail", "cafe", "agriculture", "general"],
     resources: [
       "work-contracts",
       "staff-insurances",
@@ -134,12 +148,14 @@ const menuGroups = [
     key: "finance",
     label: "Tài chính & lương",
     icon: <DollarOutlined />,
+    companyTypes: ["clinic", "retail", "cafe", "agriculture", "general"],
     resources: ["invoices", "expenses", "commissions", "payrolls"],
   },
   {
     key: "admin",
     label: "Quản trị",
     icon: <SettingOutlined />,
+    companyTypes: ["clinic", "retail", "cafe", "agriculture", "general"],
     resources: [
       "branches",
       "departments",
@@ -210,10 +226,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
   )
 
   const currentResource = location.pathname.split("/")[1]
+  const activeCompanyType = settings.companyType || "clinic"
   const visibleGroups = menuGroups
+    .filter((group) => group.companyTypes.includes(activeCompanyType))
     .map((group) => ({
       ...group,
-      resources: group.resources.filter((resource) => hasResourceAccess(resource)),
+      resources: group.resources.filter((resource) => {
+        if (!isResourceEnabledForCompanyType(resource, activeCompanyType)) return false
+        return hasResourceAccess(resource)
+      }),
     }))
     .filter((group) => group.resources.length > 0)
   const items: MenuProps["items"] = [
@@ -405,6 +426,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="brand-copy">
             <Typography.Title level={4}>{settings.appName}</Typography.Title>
+            <Typography.Text className="brand-kicker" style={{ fontSize: 11, fontWeight: 700 }}>
+              {companyTypeLabels[activeCompanyType] || activeCompanyType}
+            </Typography.Text>
             {settings.appDescription ? (
               <Typography.Text className="brand-kicker" style={{fontSize: 12}}>
                 {settings.appDescription}
@@ -476,6 +500,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="brand-copy">
             <Typography.Title level={4}>{settings.appName}</Typography.Title>
+            <Typography.Text className="brand-kicker" style={{ fontSize: 11, fontWeight: 700 }}>
+              {companyTypeLabels[activeCompanyType] || activeCompanyType}
+            </Typography.Text>
             {settings.appDescription ? (
               <Typography.Text className="brand-kicker" style={{fontSize: 12}}>
                 {settings.appDescription}

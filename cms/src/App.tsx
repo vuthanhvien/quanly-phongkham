@@ -6,6 +6,7 @@ import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
 import { hasResourceAccess, hasScreenAccess } from './access';
 import { AppUiContext, cardPaddingBySize, controlHeightBySize, defaultAppUiSettings, loadCachedAppUiSettings, normalizeAppUiSettings, persistAppUiSettings, syncDocumentBranding, tablePaddingBySize, useAppUi, type AppUiSettings } from './app-ui';
 import { authProvider, dataProvider, api } from './api';
+import { isResourceEnabledForCompanyType } from './company-types';
 import { Shell } from './components/Shell';
 import { entityLabels } from './models';
 import { AuditPage } from './pages/AuditPage';
@@ -59,7 +60,10 @@ function ScreenGuard({ screen }: { screen: string }) {
 
 function ResourceGuard() {
   const { resource = '' } = useParams();
-  return hasResourceAccess(resource) ? <Outlet /> : <Navigate to="/" replace />;
+  const { settings } = useAppUi();
+  return hasResourceAccess(resource) && isResourceEnabledForCompanyType(resource, settings.companyType)
+    ? <Outlet />
+    : <Navigate to="/" replace />;
 }
 
 function RecordDetailRedirect() {

@@ -1340,6 +1340,9 @@ export class AppUiSetting {
   @Column({ default: 'cms' })
   appKey: string;
 
+  @Column({ default: 'clinic' })
+  companyType: string;
+
   @Column({ default: 'Thien Chanh CMS' })
   appName: string;
 

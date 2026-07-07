@@ -1,7 +1,7 @@
 import { BgColorsOutlined, BorderOutlined, FontSizeOutlined, UndoOutlined } from '@ant-design/icons'
 import { Button, Card, Col, Flex, Form, Input, InputNumber, Radio, Row, Select, Space, Typography, message } from 'antd'
 import { useEffect, useState } from 'react'
-import { buildShadowValue, defaultAppUiSettings, fontFamilyOptions, useAppUi, type AppUiSettings } from '../app-ui'
+import { buildShadowValue, companyTypeOptions, defaultAppUiSettings, fontFamilyOptions, useAppUi, type AppUiSettings } from '../app-ui'
 import { ImagePickerInput } from '../components/ImagePickerInput'
 
 type UiSettingsFormValues = AppUiSettings
@@ -159,6 +159,14 @@ export function UiSettingsPage() {
             <Space direction="vertical" size={16} style={{ width: '100%' }}>
               <Card className="glass-card settings-card" title="Nhận diện ứng dụng">
                 <Row gutter={[16, 0]}>
+                  <Col md={12} xs={24}>
+                    <Form.Item label="Loại hình công ty" name="companyType" rules={[{ required: true, message: 'Chọn loại hình' }]}>
+                      <Select
+                        options={companyTypeOptions.map((item) => ({ value: item.value, label: item.label }))}
+                        placeholder="Chọn loại hình doanh nghiệp"
+                      />
+                    </Form.Item>
+                  </Col>
                   <Col md={12} xs={24}>
                     <Form.Item label="Tên app" name="appName" rules={[{ required: true, message: 'Nhập tên app' }]}>
                       <Input placeholder="Ví dụ: Thiện Chánh CMS" />

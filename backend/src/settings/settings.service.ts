@@ -686,6 +686,7 @@ export class SettingsService {
   }
 
   private normalizeAppUiPayload(payload: Partial<AppUiSetting>, fallback?: Partial<AppUiSetting>) {
+    const companyType = this.normalizeCompanyType(payload.companyType ?? fallback?.companyType ?? 'clinic');
     const appName = String(payload.appName ?? fallback?.appName ?? 'Thien Chanh CMS').trim();
     if (!appName) {
       throw new BadRequestException('appName la bat buoc');
@@ -726,6 +727,7 @@ export class SettingsService {
 
     return {
       appKey: 'cms',
+      companyType,
       appName,
       appDescription,
       appIconUrl,
@@ -772,6 +774,14 @@ export class SettingsService {
     const normalized = String(value || '').trim().toLowerCase();
     if (!UI_THEME_OPTIONS.includes(normalized)) {
       throw new BadRequestException('theme khong hop le');
+    }
+    return normalized;
+  }
+
+  private normalizeCompanyType(value: unknown) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!['clinic', 'retail', 'cafe', 'agriculture', 'general'].includes(normalized)) {
+      throw new BadRequestException('companyType khong hop le');
     }
     return normalized;
   }
@@ -827,6 +837,7 @@ export class SettingsService {
   private hasAppUiDiff(current: AppUiSetting, next: ReturnType<SettingsService['normalizeAppUiPayload']>) {
     return (
       current.appKey !== next.appKey ||
+      current.companyType !== next.companyType ||
       current.appName !== next.appName ||
       current.appDescription !== next.appDescription ||
       current.appIconUrl !== next.appIconUrl ||

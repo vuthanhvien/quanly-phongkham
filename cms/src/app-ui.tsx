@@ -5,6 +5,7 @@ const APP_UI_STORAGE_KEY = 'clinic-app-ui-settings'
 export interface AppUiSettings {
   id?: string
   appKey?: string
+  companyType: 'clinic' | 'retail' | 'cafe' | 'agriculture' | 'general'
   appName: string
   appDescription?: string
   appIconUrl?: string
@@ -38,6 +39,14 @@ export interface AppUiSettings {
   fontFamily: string
 }
 
+export const companyTypeOptions = [
+  { value: 'clinic', label: 'Phòng khám / Clinic' },
+  { value: 'retail', label: 'Bán hàng / Retail' },
+  { value: 'cafe', label: 'Quán cafe / F&B nhỏ' },
+  { value: 'agriculture', label: 'Nông nghiệp / Trang trại' },
+  { value: 'general', label: 'Doanh nghiệp chung' },
+] as const
+
 export const fontFamilyOptions = [
   { value: '"Plus Jakarta Sans", Inter, Arial, sans-serif', label: 'Plus Jakarta Sans' },
   { value: '"Be Vietnam Pro", Inter, Arial, sans-serif', label: 'Be Vietnam Pro' },
@@ -52,6 +61,7 @@ export const fontFamilyOptions = [
 ] as const
 
 export const defaultAppUiSettings: AppUiSettings = {
+  companyType: 'clinic',
   appName: 'Thiện Chánh CMS',
   appIconUrl: '',
   primaryColor: '#e889ae',
@@ -89,6 +99,10 @@ export function normalizeAppUiSettings(payload?: Partial<AppUiSettings> | null):
     ...defaultAppUiSettings,
     ...(payload || {}),
     theme: 'light',
+  }
+
+  if (!companyTypeOptions.some((option) => option.value === normalized.companyType)) {
+    normalized.companyType = defaultAppUiSettings.companyType
   }
 
   normalized.appDescription = normalized.appDescription?.trim() || undefined
