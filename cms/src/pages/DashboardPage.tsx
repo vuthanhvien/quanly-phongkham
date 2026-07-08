@@ -5,10 +5,12 @@ import {
   TeamOutlined,
 } from "@ant-design/icons"
 import { useGetIdentity } from "@refinedev/core"
-import { Drawer, Grid, message } from "antd"
+import { Card, Drawer, Grid, Typography, message } from "antd"
 import dayjs from "dayjs"
 import { useEffect, useState } from "react"
+import { useAppUi } from "../app-ui"
 import { api } from "../api"
+import { companyTypeDashboardCopy, type CompanyType } from "../company-types"
 import { DashboardMetricGrid } from "../components/dashboard/DashboardMetricGrid"
 import { DashboardOperationsSection } from "../components/dashboard/DashboardOperationsSection"
 import { DashboardStaffSection } from "../components/dashboard/DashboardStaffSection"
@@ -73,16 +75,19 @@ type StaffDashboardData = {
 export function DashboardPage() {
   const screens = Grid.useBreakpoint()
   const { data: identity } = useGetIdentity<Identity>()
+  const { settings } = useAppUi()
   const [metrics, setMetrics] = useState<DashboardMetric[]>([])
   const [pipeline, setPipeline] = useState<DashboardPipeline[]>([])
   const [quickStats, setQuickStats] = useState<QuickStat[]>([])
   const [staffDashboard, setStaffDashboard] = useState<StaffDashboardData | null>(null)
   const [staffActionLoading, setStaffActionLoading] = useState<"checkin" | "checkout" | undefined>(undefined)
   const [leaveDrawerOpen, setLeaveDrawerOpen] = useState(false)
+  const companyType = settings.companyType || "clinic"
+  const dashboardCopy = companyTypeDashboardCopy[companyType]
 
   useEffect(() => {
     void loadDashboard()
-  }, [identity?.staffId, identity?.branchId, identity?.fullName, identity?.username, identity?.email])
+  }, [companyType, identity?.staffId, identity?.branchId, identity?.fullName, identity?.username, identity?.email])
 
   async function loadDashboard() {
     const [
@@ -96,6 +101,9 @@ export function DashboardPage() {
       serviceOrders,
       invoices,
       expenses,
+      products,
+      stockBatches,
+      payrolls,
     ] = await Promise.all([
       fetchListSafe<Record<string, any>>("appointments", 500),
       fetchListSafe<Record<string, any>>("work-schedules", 500),
@@ -107,6 +115,9 @@ export function DashboardPage() {
       fetchListSafe<Record<string, any>>("service-orders"),
       fetchListSafe<Record<string, any>>("invoices"),
       fetchListSafe<Record<string, any>>("expenses"),
+      fetchListSafe<Record<string, any>>("products"),
+      fetchListSafe<Record<string, any>>("stock-batches"),
+      fetchListSafe<Record<string, any>>("payrolls"),
     ])
 
     const today = dayjs()
@@ -120,10 +131,47 @@ export function DashboardPage() {
     const serviceOrderRows = serviceOrders.data || []
     const invoiceRows = invoices.data || []
     const expenseRows = expenses.data || []
+    const productRows = products.data || []
+    const stockBatchRows = stockBatches.data || []
+    const payrollRows = payrolls.data || []
 
-    setMetrics(buildMetrics(customerRows, leadRows, treatmentRows, medicalEpisodeRows, today))
-    setPipeline(buildPipeline(consultationRows, serviceOrderRows, appointmentRows, invoiceRows, today))
-    setQuickStats(buildQuickStats(invoiceRows, expenseRows, appointmentRows, workScheduleRows, today))
+    setMetrics(
+      buildMetrics(
+        companyType,
+        customerRows,
+        leadRows,
+        treatmentRows,
+        medicalEpisodeRows,
+        productRows,
+        stockBatchRows,
+        invoiceRows,
+        today,
+      ),
+    )
+    setPipeline(
+      buildPipeline(
+        companyType,
+        consultationRows,
+        serviceOrderRows,
+        appointmentRows,
+        invoiceRows,
+        productRows,
+        stockBatchRows,
+        today,
+      ),
+    )
+    setQuickStats(
+      buildQuickStats(
+        companyType,
+        invoiceRows,
+        expenseRows,
+        appointmentRows,
+        workScheduleRows,
+        payrollRows,
+        stockBatchRows,
+        today,
+      ),
+    )
 
     if (identity?.staffId) {
       const staffProfile = await loadStaffDashboard(identity)
@@ -184,6 +232,14 @@ export function DashboardPage() {
 
   return (
     <>
+      <Card className="glass-card spacious-card" style={{ marginBottom: 16 }}>
+        <Typography.Title level={3} style={{ marginBottom: 6 }}>
+          {dashboardCopy.title}
+        </Typography.Title>
+        <Typography.Paragraph style={{ margin: 0 }}>
+          {dashboardCopy.description}
+        </Typography.Paragraph>
+      </Card>
       {staffDashboard ? (
         <DashboardStaffSection
           actionLoading={staffActionLoading}
@@ -197,7 +253,12 @@ export function DashboardPage() {
         />
       ) : null}
       <DashboardMetricGrid metrics={metrics} />
-      <DashboardOperationsSection pipeline={pipeline} quickStats={quickStats} />
+      <DashboardOperationsSection
+        operationsTitle={dashboardCopy.operationsTitle}
+        pipeline={pipeline}
+        quickStats={quickStats}
+        quickStatsTitle={dashboardCopy.quickStatsTitle}
+      />
       <Drawer
         className="quick-drawer"
         destroyOnClose
@@ -290,12 +351,55 @@ async function loadStaffDashboard(identity: Identity): Promise<StaffDashboardDat
 }
 
 function buildMetrics(
+  companyType: CompanyType,
   customerRows: Record<string, any>[],
   leadRows: Record<string, any>[],
   treatmentRows: Record<string, any>[],
   medicalEpisodeRows: Record<string, any>[],
+  productRows: Record<string, any>[],
+  stockBatchRows: Record<string, any>[],
+  invoiceRows: Record<string, any>[],
   today: dayjs.Dayjs,
 ): DashboardMetric[] {
+  if (companyType !== "clinic") {
+    const openLeads = leadRows.filter((item) => !["CONVERTED", "LOST"].includes(String(item.status || "")))
+    const issuedInvoices = invoiceRows.filter((item) => parseAmount(item.totalAmount) > 0)
+    return [
+      {
+        title: "Khách hàng",
+        value: customerRows.length,
+        suffix: "khách",
+        icon: <TeamOutlined />,
+        tone: "rose",
+        trend: `${customerRows.filter((item) => isSameDay(item.createdAt, today)).length} mới hôm nay`,
+      },
+      {
+        title: "Cơ hội đang mở",
+        value: openLeads.length,
+        suffix: "deal",
+        icon: <LineChartOutlined />,
+        tone: "gold",
+        trend: `${leadRows.filter((item) => String(item.status || "") === "NEW").length} mới`,
+      },
+      {
+        title: companyType === "agriculture" ? "Vật tư / hàng hóa" : "Sản phẩm",
+        value: productRows.length,
+        suffix: "mã",
+        icon: <ExperimentOutlined />,
+        tone: "violet",
+        trend: `${stockBatchRows.length.toLocaleString("vi-VN")} lô tồn kho`,
+      },
+      {
+        title: "Hóa đơn phát sinh",
+        value: issuedInvoices.length,
+        suffix: "phiếu",
+        icon: <SafetyCertificateOutlined />,
+        tone: "cyan",
+        trend: `${issuedInvoices.filter((item) => isSameDay(item.createdAt, today)).length} hôm nay`,
+      },
+    ]
+  }
+
   const activeTreatments = treatmentRows.filter((item) => item.status === "ACTIVE")
   const activeMedicalEpisodes = medicalEpisodeRows.filter((item) => item.status === "ACTIVE")
   const openLeads = leadRows.filter((item) => !["CONVERTED", "LOST"].includes(String(item.status || "")))
@@ -337,12 +441,31 @@ function buildMetrics(
 }
 
 function buildPipeline(
+  companyType: CompanyType,
   consultationRows: Record<string, any>[],
   serviceOrderRows: Record<string, any>[],
   appointmentRows: Record<string, any>[],
   invoiceRows: Record<string, any>[],
+  productRows: Record<string, any>[],
+  stockBatchRows: Record<string, any>[],
   today: dayjs.Dayjs,
 ): DashboardPipeline[] {
+  if (companyType !== "clinic") {
+    const pipelineTotals = [
+      { label: "Khách mới hôm nay", count: consultationRows.filter((item) => isSameDay(item.createdAt, today)).length + appointmentRows.filter((item) => isSameDay(item.createdAt || item.startTime, today)).length, color: "#e889ae" },
+      { label: "Đơn / phiếu hôm nay", count: serviceOrderRows.filter((item) => isSameDay(item.orderDate || item.createdAt, today)).length + invoiceRows.filter((item) => isSameDay(item.createdAt, today)).length, color: "#d7a45b" },
+      { label: companyType === "cafe" ? "Mặt hàng đang bán" : "Sản phẩm hoạt động", count: productRows.filter((item) => String(item.isActive ?? true) !== "false").length, color: "#9b7cff" },
+      { label: companyType === "agriculture" ? "Lô vật tư / nông sản" : "Lô tồn kho", count: stockBatchRows.length, color: "#62d8d2" },
+    ]
+    const maxTotal = Math.max(...pipelineTotals.map((item) => item.count), 1)
+    return pipelineTotals.map((item) => ({
+      label: item.label,
+      count: item.count,
+      value: Math.round((item.count / maxTotal) * 100),
+      color: item.color,
+    }))
+  }
+
   const pipelineTotals = [
     { label: "Tư vấn hôm nay", count: consultationRows.filter((item) => isSameDay(item.consultedAt || item.createdAt, today)).length, color: "#e889ae" },
     { label: "Đơn hàng hôm nay", count: serviceOrderRows.filter((item) => isSameDay(item.orderDate || item.createdAt, today)).length, color: "#d7a45b" },
@@ -359,10 +482,13 @@ function buildPipeline(
 }
 
 function buildQuickStats(
+  companyType: CompanyType,
   invoiceRows: Record<string, any>[],
   expenseRows: Record<string, any>[],
   appointmentRows: Record<string, any>[],
   workScheduleRows: Record<string, any>[],
+  payrollRows: Record<string, any>[],
+  stockBatchRows: Record<string, any>[],
   today: dayjs.Dayjs,
 ): QuickStat[] {
   const collectedToday = invoiceRows
@@ -376,6 +502,32 @@ function buildQuickStats(
     0,
   )
   const appointmentsToday = appointmentRows.filter((item) => isSameDay(item.startTime, today))
+  const payrollOutstanding = payrollRows.reduce((sum, item) => sum + parseAmount(item.netSalary), 0)
+
+  if (companyType !== "clinic") {
+    return [
+      {
+        label: "Thu hôm nay",
+        value: `${formatCompactCurrency(collectedToday)} đ`,
+        hint: `${formatCurrency(collectedToday)} đ đã thu`,
+      },
+      {
+        label: "Chi hôm nay",
+        value: `${formatCompactCurrency(expenseToday)} đ`,
+        hint: `${formatCurrency(expenseToday)} đ chi ra`,
+      },
+      {
+        label: "Còn phải thu",
+        value: `${formatCompactCurrency(receivableOutstanding)} đ`,
+        hint: "Công nợ bán hàng chưa thu đủ",
+      },
+      {
+        label: companyType === "agriculture" ? "Giá trị lương" : "Chi phí lương",
+        value: `${formatCompactCurrency(payrollOutstanding)} đ`,
+        hint: `${stockBatchRows.length} lô đang theo dõi`,
+      },
+    ]
+  }
 
   return [
     {

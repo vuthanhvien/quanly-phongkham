@@ -1343,6 +1343,9 @@ export class AppUiSetting {
   @Column({ default: 'clinic' })
   companyType: string;
 
+  @Column({ type: 'simple-json', nullable: true })
+  enabledModules?: string[];
+
   @Column({ default: 'Thien Chanh CMS' })
   appName: string;
 

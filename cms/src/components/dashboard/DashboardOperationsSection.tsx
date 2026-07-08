@@ -4,16 +4,20 @@ import type { DashboardPipeline, QuickStat } from "./types"
 export function DashboardOperationsSection({
   pipeline,
   quickStats,
+  operationsTitle = "Nhịp vận hành trong ngày",
+  quickStatsTitle = "Chỉ số cần chú ý",
 }: {
   pipeline: DashboardPipeline[]
   quickStats: QuickStat[]
+  operationsTitle?: string
+  quickStatsTitle?: string
 }) {
   return (
     <Row gutter={[16, 16]} className="dashboard-grid">
       <Col xs={24} lg={14}>
         <Card
           className="glass-card spacious-card"
-          title="Nhịp vận hành trong ngày"
+          title={operationsTitle}
         >
           <div className="pipeline-list">
             {pipeline.map((item) => (
@@ -35,7 +39,7 @@ export function DashboardOperationsSection({
         </Card>
       </Col>
       <Col xs={24} lg={10}>
-        <Card className="glass-card spacious-card" title="Chỉ số cần chú ý">
+        <Card className="glass-card spacious-card" title={quickStatsTitle}>
           <div className="dashboard-mini-grid">
             {quickStats.map((item) => (
               <div className="dashboard-mini-card" key={item.label}>

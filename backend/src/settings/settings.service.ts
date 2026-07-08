@@ -51,6 +51,51 @@ const DEFAULT_APP_UI_COLORS = {
   shadowBlur: 18,
   shadowOffsetY: 1,
 } as const;
+const APP_MODULE_KEYS = [
+  'calendar',
+  'leads',
+  'lead-activities',
+  'customers',
+  'appointments',
+  'zalo-inbox',
+  'medical-episodes',
+  'consultations',
+  'service-orders',
+  'customer-images',
+  'treatments',
+  'rooms',
+  'equipments',
+  'suppliers',
+  'products',
+  'product-categories',
+  'stock-batches',
+  'file-folders',
+  'files',
+  'work-contracts',
+  'staff-insurances',
+  'attendances',
+  'leave-requests',
+  'work-schedules',
+  'staff-rewards',
+  'staff-trainings',
+  'performance-reviews',
+  'position-histories',
+  'staff',
+  'departments',
+  'invoices',
+  'expenses',
+  'commissions',
+  'payrolls',
+  'accounting-periods',
+  'accounting-chart-accounts',
+  'accounting-fiscal-settings',
+  'accounting-cash-flow-mappings',
+  'accounting-vouchers',
+  'accounting-voucher-lines',
+  'accounting-reports',
+  'branches',
+  'user-accounts',
+] as const;
 
 function slugify(input?: string) {
   return String(input || '')
@@ -247,6 +292,7 @@ export class SettingsService {
       toolSearchServices: config.toolSearchServices,
       toolCreateAppointment: config.toolCreateAppointment,
       toolCheckDoctorSchedule: config.toolCheckDoctorSchedule,
+      toolLookupAppointments: config.toolLookupAppointments,
     };
   }
 
@@ -687,6 +733,7 @@ export class SettingsService {
 
   private normalizeAppUiPayload(payload: Partial<AppUiSetting>, fallback?: Partial<AppUiSetting>) {
     const companyType = this.normalizeCompanyType(payload.companyType ?? fallback?.companyType ?? 'clinic');
+    const enabledModules = this.normalizeEnabledModules(payload.enabledModules ?? fallback?.enabledModules ?? []);
     const appName = String(payload.appName ?? fallback?.appName ?? 'Thien Chanh CMS').trim();
     if (!appName) {
       throw new BadRequestException('appName la bat buoc');
@@ -728,6 +775,7 @@ export class SettingsService {
     return {
       appKey: 'cms',
       companyType,
+      enabledModules,
       appName,
       appDescription,
       appIconUrl,
@@ -794,6 +842,14 @@ export class SettingsService {
     return normalized;
   }
 
+  private normalizeEnabledModules(value: unknown) {
+    if (!Array.isArray(value)) return [];
+    const normalized = value
+      .map((item) => String(item || '').trim())
+      .filter((item): item is (typeof APP_MODULE_KEYS)[number] => APP_MODULE_KEYS.includes(item as (typeof APP_MODULE_KEYS)[number]));
+    return Array.from(new Set(normalized));
+  }
+
   private normalizeFontFamily(value: unknown) {
     const normalized = String(value || '').trim();
     if (!UI_FONT_FAMILIES.includes(normalized)) {
@@ -838,6 +894,7 @@ export class SettingsService {
     return (
       current.appKey !== next.appKey ||
       current.companyType !== next.companyType ||
+      JSON.stringify(current.enabledModules || []) !== JSON.stringify(next.enabledModules || []) ||
       current.appName !== next.appName ||
       current.appDescription !== next.appDescription ||
       current.appIconUrl !== next.appIconUrl ||

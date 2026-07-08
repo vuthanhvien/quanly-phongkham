@@ -1,7 +1,8 @@
 import { BgColorsOutlined, BorderOutlined, FontSizeOutlined, UndoOutlined } from '@ant-design/icons'
-import { Button, Card, Col, Flex, Form, Input, InputNumber, Radio, Row, Select, Space, Typography, message } from 'antd'
+import { Button, Card, Checkbox, Col, Flex, Form, Input, InputNumber, Radio, Row, Select, Space, Typography, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { buildShadowValue, companyTypeOptions, defaultAppUiSettings, fontFamilyOptions, useAppUi, type AppUiSettings } from '../app-ui'
+import { appModuleGroups, appModuleLabels, companyTypeModulePresets, resolveMenuGroupLabel, type CompanyType } from '../company-types'
 import { ImagePickerInput } from '../components/ImagePickerInput'
 
 type UiSettingsFormValues = AppUiSettings
@@ -137,6 +138,12 @@ export function UiSettingsPage() {
     form.setFieldsValue(defaultAppUiSettings)
   }
 
+  function handleApplyCompanyPreset() {
+    const companyType = (form.getFieldValue('companyType') || defaultAppUiSettings.companyType) as CompanyType
+    form.setFieldValue('enabledModules', companyTypeModulePresets[companyType] || [])
+    message.success('Đã áp preset module theo loại hình công ty')
+  }
+
   return (
     <Space direction="vertical" size={20} style={{ width: '100%' }}>
       <Flex align="start" justify="space-between" gap={16} wrap>
@@ -183,6 +190,42 @@ export function UiSettingsPage() {
                     </Form.Item>
                   </Col>
                 </Row>
+              </Card>
+
+              <Card
+                className="glass-card settings-card"
+                extra={
+                  <Button size="small" type="default" onClick={handleApplyCompanyPreset}>
+                    Áp preset theo loại hình
+                  </Button>
+                }
+                title="Bật / tắt module sử dụng"
+              >
+                <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                  <Typography.Paragraph style={{ margin: 0 }}>
+                    `companyType` chỉ là quick action để gợi ý bộ module. Module nào hiển thị thực tế sẽ phụ thuộc vào danh sách bật/tắt bên dưới.
+                  </Typography.Paragraph>
+                  <Form.Item name="enabledModules" style={{ marginBottom: 0 }}>
+                    <Checkbox.Group style={{ width: '100%' }}>
+                      <Space direction="vertical" size={14} style={{ width: '100%' }}>
+                        {appModuleGroups.map((group) => (
+                          <div key={group.key}>
+                            <Typography.Title level={5} style={{ marginBottom: 10 }}>
+                              {resolveMenuGroupLabel(group.key, group.label, preview.companyType)}
+                            </Typography.Title>
+                            <Row gutter={[12, 12]}>
+                              {group.modules.map((moduleKey) => (
+                                <Col key={moduleKey} md={12} xs={24}>
+                                  <Checkbox value={moduleKey}>{appModuleLabels[moduleKey] || moduleKey}</Checkbox>
+                                </Col>
+                              ))}
+                            </Row>
+                          </div>
+                        ))}
+                      </Space>
+                    </Checkbox.Group>
+                  </Form.Item>
+                </Space>
               </Card>
 
               {colorSections.map((section) => (

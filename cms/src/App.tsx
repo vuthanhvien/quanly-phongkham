@@ -6,7 +6,7 @@ import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
 import { hasResourceAccess, hasScreenAccess } from './access';
 import { AppUiContext, cardPaddingBySize, controlHeightBySize, defaultAppUiSettings, loadCachedAppUiSettings, normalizeAppUiSettings, persistAppUiSettings, syncDocumentBranding, tablePaddingBySize, useAppUi, type AppUiSettings } from './app-ui';
 import { authProvider, dataProvider, api } from './api';
-import { isResourceEnabledForCompanyType } from './company-types';
+import { isModuleEnabled } from './company-types';
 import { Shell } from './components/Shell';
 import { entityLabels } from './models';
 import { AuditPage } from './pages/AuditPage';
@@ -58,10 +58,15 @@ function ScreenGuard({ screen }: { screen: string }) {
   return hasScreenAccess(screen) ? <Outlet /> : <Navigate to="/" replace />;
 }
 
+function ModuleGuard({ moduleKey }: { moduleKey: string }) {
+  const { settings } = useAppUi();
+  return isModuleEnabled(moduleKey, settings.enabledModules, settings.companyType) ? <Outlet /> : <Navigate to="/" replace />;
+}
+
 function ResourceGuard() {
   const { resource = '' } = useParams();
   const { settings } = useAppUi();
-  return hasResourceAccess(resource) && isResourceEnabledForCompanyType(resource, settings.companyType)
+  return hasResourceAccess(resource) && isModuleEnabled(resource, settings.enabledModules, settings.companyType)
     ? <Outlet />
     : <Navigate to="/" replace />;
 }
@@ -176,13 +181,19 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedLayout />}>
               <Route index element={<DashboardPage />} />
-              <Route path="/calendar" element={<CalendarPage />} />
+              <Route element={<ModuleGuard moduleKey="calendar" />}>
+                <Route path="/calendar" element={<CalendarPage />} />
+              </Route>
               <Route path="/profile" element={<ProfilePage />} />
               <Route element={<ScreenGuard screen="accounting-reports" />}>
+                <Route element={<ModuleGuard moduleKey="accounting-reports" />}>
                 <Route path="/accounting-reports" element={<AccountingReportsPage />} />
+                </Route>
               </Route>
               <Route element={<ScreenGuard screen="zalo-inbox" />}>
-                <Route path="/zalo-inbox" element={<ZaloInboxPage />} />
+                <Route element={<ModuleGuard moduleKey="zalo-inbox" />}>
+                  <Route path="/zalo-inbox" element={<ZaloInboxPage />} />
+                </Route>
               </Route>
               <Route element={<ScreenGuard screen="settings" />}>
                 <Route path="/custom-fields" element={<CustomFieldsPage />} />

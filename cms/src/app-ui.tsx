@@ -6,6 +6,7 @@ export interface AppUiSettings {
   id?: string
   appKey?: string
   companyType: 'clinic' | 'retail' | 'cafe' | 'agriculture' | 'general'
+  enabledModules: string[]
   appName: string
   appDescription?: string
   appIconUrl?: string
@@ -62,6 +63,7 @@ export const fontFamilyOptions = [
 
 export const defaultAppUiSettings: AppUiSettings = {
   companyType: 'clinic',
+  enabledModules: [],
   appName: 'Thiện Chánh CMS',
   appIconUrl: '',
   primaryColor: '#e889ae',
@@ -104,6 +106,9 @@ export function normalizeAppUiSettings(payload?: Partial<AppUiSettings> | null):
   if (!companyTypeOptions.some((option) => option.value === normalized.companyType)) {
     normalized.companyType = defaultAppUiSettings.companyType
   }
+  normalized.enabledModules = Array.isArray(normalized.enabledModules)
+    ? Array.from(new Set(normalized.enabledModules.map((item) => String(item || "").trim()).filter(Boolean)))
+    : []
 
   normalized.appDescription = normalized.appDescription?.trim() || undefined
   normalized.appIconUrl = normalized.appIconUrl?.trim() || undefined

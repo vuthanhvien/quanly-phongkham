@@ -39,19 +39,17 @@ import { Link, useLocation, useNavigate } from "react-router-dom"
 import { hasResourceAccess, hasScreenAccess } from "../access"
 import { api } from "../api"
 import { useAppUi } from "../app-ui"
-import { companyTypeLabels, isResourceEnabledForCompanyType, type CompanyType } from "../company-types"
+import {
+  appModuleGroups,
+  companyTypeLabels,
+  isModuleEnabled,
+  resolveMenuGroupLabel,
+  type AppModuleGroup,
+} from "../company-types"
 import { entityLabels } from "../models"
 
 const { Header, Content, Sider } = Layout
 const SIDER_COLLAPSE_KEY = "clinic-sider-collapsed"
-
-type MenuGroupConfig = {
-  key: string
-  label: string
-  icon: React.ReactNode
-  companyTypes: CompanyType[]
-  resources: string[]
-}
 
 const menuIcons: Record<string, React.ReactNode> = {
   "custom-fields": <AppstoreOutlined />,
@@ -98,76 +96,19 @@ const menuIcons: Record<string, React.ReactNode> = {
   'position-histories': <DeploymentUnitOutlined />,
 }
 
-const menuGroups: MenuGroupConfig[] = [
-  {
-    key: "front-office",
-    label: "Lễ tân & CRM",
-    icon: <TeamOutlined />,
-    companyTypes: ["clinic", "retail", "cafe", "general"],
-    resources: ["leads", "lead-activities", "customers", "appointments"],
-  },
-  {
-    key: "clinical",
-    label: "Chuyên môn điều trị",
-    icon: <MedicineBoxOutlined />,
-    companyTypes: ["clinic"],
-    resources: ["medical-episodes", "consultations", "service-orders", "customer-images", "treatments", "rooms", "equipments"],
-  },
-  {
-    key: "inventory",
-    label: "Kho & mua hàng",
-    icon: <DatabaseOutlined />,
-    companyTypes: ["clinic", "retail", "cafe", "agriculture", "general"],
-    resources: ["suppliers", "products", "product-categories", "stock-batches"],
-  },
-  {
-    key: "documents",
-    label: "Tài liệu & file",
-    icon: <FolderOpenOutlined />,
-    companyTypes: ["clinic", "retail", "cafe", "agriculture", "general"],
-    resources: ["file-folders", "files"],
-  },
-  {
-    key: "hr",
-    label: "Nhân sự",
-    icon: <TeamOutlined />,
-    companyTypes: ["clinic", "retail", "cafe", "agriculture", "general"],
-    resources: [
-      "work-contracts",
-      "staff-insurances",
-      "attendances",
-      "leave-requests",
-      "work-schedules",
-      "staff-rewards",
-      "staff-trainings",
-      "performance-reviews",
-      "position-histories",
-    ],
-  },
-  {
-    key: "finance",
-    label: "Tài chính & lương",
-    icon: <DollarOutlined />,
-    companyTypes: ["clinic", "retail", "cafe", "agriculture", "general"],
-    resources: ["invoices", "expenses", "commissions", "payrolls"],
-  },
-  {
-    key: "admin",
-    label: "Quản trị",
-    icon: <SettingOutlined />,
-    companyTypes: ["clinic", "retail", "cafe", "agriculture", "general"],
-    resources: [
-      "branches",
-      "departments",
-      "staff",
-      "user-accounts",
-    ],
-  },
-]
+const menuGroupIcons: Record<AppModuleGroup["key"], React.ReactNode> = {
+  "front-office": <TeamOutlined />,
+  clinical: <MedicineBoxOutlined />,
+  inventory: <DatabaseOutlined />,
+  documents: <FolderOpenOutlined />,
+  hr: <TeamOutlined />,
+  finance: <DollarOutlined />,
+  admin: <SettingOutlined />,
+}
 
 const resourceToGroup = Object.fromEntries(
-  menuGroups.flatMap((group) =>
-    group.resources.map((resource) => [resource, group.key]),
+  appModuleGroups.flatMap((group) =>
+    group.modules.map((resource) => [resource, group.key]),
   ),
 )
 
@@ -227,12 +168,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   const currentResource = location.pathname.split("/")[1]
   const activeCompanyType = settings.companyType || "clinic"
-  const visibleGroups = menuGroups
-    .filter((group) => group.companyTypes.includes(activeCompanyType))
+  const visibleGroups = appModuleGroups
     .map((group) => ({
       ...group,
-      resources: group.resources.filter((resource) => {
-        if (!isResourceEnabledForCompanyType(resource, activeCompanyType)) return false
+      label: resolveMenuGroupLabel(group.key, group.label, activeCompanyType),
+      resources: group.modules.filter((resource) => {
+        if (!entityLabels[resource]) return false
+        if (!isModuleEnabled(resource, settings.enabledModules, activeCompanyType)) return false
         return hasResourceAccess(resource)
       }),
     }))
@@ -248,7 +190,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       icon: menuIcons.calendar,
       label: <Link to="/calendar">Lịch tổng</Link>,
     },
-    ...(hasScreenAccess("accounting-reports")
+    ...(hasScreenAccess("accounting-reports") && isModuleEnabled("accounting-reports", settings.enabledModules, activeCompanyType)
       ? [
           {
             key: "/accounting-reports",
@@ -259,7 +201,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       : []),
     ...visibleGroups.map((group) => ({
       key: group.key,
-      icon: group.icon,
+      icon: menuGroupIcons[group.key] || <SolutionOutlined />,
       label: group.label,
       children: [
         ...group.resources.map((key) => ({
@@ -267,7 +209,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           icon: menuIcons[key] || <SolutionOutlined />,
           label: <Link to={`/${key}`}>{entityLabels[key]}</Link>,
         })),
-        ...(group.key === "front-office" && hasScreenAccess("zalo-inbox")
+        ...(group.key === "front-office" && hasScreenAccess("zalo-inbox") && isModuleEnabled("zalo-inbox", settings.enabledModules, activeCompanyType)
           ? [
               {
                 key: "/zalo-inbox",
@@ -334,7 +276,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               label: <Link to="/audit-logs">Nhật ký hệ thống</Link>,
             }
           : null,
-        hasScreenAccess("accounting-reports")
+        hasScreenAccess("accounting-reports") && isModuleEnabled("accounting-reports", settings.enabledModules, activeCompanyType)
           ? {
               key: "/accounting-reports-system",
               icon: menuIcons["accounting-reports"],
@@ -343,7 +285,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
           : null,
       ].filter(Boolean),
     },
-  ].filter((item) => item && (item.key !== "system-tools" || ((item.children as []) || []).length > 0))
+  ]
+    .filter((item) => item.key !== "/calendar" || isModuleEnabled("calendar", settings.enabledModules, activeCompanyType))
+    .filter((item) => item && (item.key !== "system-tools" || ((item.children as []) || []).length > 0))
   const selected =
     location.pathname === "/"
       ? "/"
