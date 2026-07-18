@@ -5,7 +5,16 @@ import {
   PictureOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons'
-import type { LandingBlock, LandingBlockType, LandingFormField, LandingPage, LandingSectionWidth, LandingSlide } from '../../models'
+import type {
+  LandingBlock,
+  LandingBlockType,
+  LandingElementStyle,
+  LandingFormField,
+  LandingPage,
+  LandingSectionWidth,
+  LandingSlide,
+  LandingSpacing,
+} from '../../models'
 import { createId } from '../../utils/createId'
 
 export const blockTypeOptions: Array<{ value: LandingBlockType; label: string }> = [
@@ -66,6 +75,36 @@ export function normalizeSectionWidth(value?: string): LandingSectionWidth {
   return value === 'full' ? 'full' : 'container'
 }
 
+function normalizeSpacing(value?: LandingSpacing): LandingSpacing | undefined {
+  if (!value) return undefined
+  const next = {
+    top: Math.max(0, Number(value.top || 0) || 0),
+    right: Math.max(0, Number(value.right || 0) || 0),
+    bottom: Math.max(0, Number(value.bottom || 0) || 0),
+    left: Math.max(0, Number(value.left || 0) || 0),
+  }
+  return Object.values(next).some((item) => item > 0) ? next : undefined
+}
+
+function normalizeElementStyle(value?: LandingElementStyle): LandingElementStyle | undefined {
+  if (!value) return undefined
+  const backgroundType = value.background?.type || 'none'
+  const next: LandingElementStyle = {
+    padding: normalizeSpacing(value.padding),
+    margin: normalizeSpacing(value.margin),
+    background:
+      backgroundType === 'none'
+        ? undefined
+        : {
+            type: backgroundType,
+            color: value.background?.color || '#ffffff',
+            imageUrl: value.background?.imageUrl || '',
+            videoUrl: value.background?.videoUrl || '',
+          },
+  }
+  return next.padding || next.margin || next.background ? next : undefined
+}
+
 export function createSectionMeta(width: LandingSectionWidth = 'container', order = 1, sectionId?: string) {
   return {
     sectionId: sectionId || createId(),
@@ -80,12 +119,14 @@ export type LandingSectionDraft = {
   title: string
   width: LandingSectionWidth
   order: number
+  style?: LandingElementStyle
   blocks: LandingBlock[]
 }
 
 export type BlockComposerState = {
   sectionId: string
   block: LandingBlock
+  mode?: 'create' | 'edit'
 }
 
 export type PageTemplate = {
@@ -108,6 +149,8 @@ export function normalizeBlock(block: LandingBlock, index: number): LandingBlock
     sectionTitle: block.sectionTitle || '',
     sectionWidth: section.sectionWidth,
     sectionOrder: section.sectionOrder,
+    sectionStyle: normalizeElementStyle(block.sectionStyle),
+    blockStyle: normalizeElementStyle(block.blockStyle),
     fields: block.fields ? block.fields.map((field) => ({ ...field })) : undefined,
     slides: block.slides ? block.slides.map((slide) => ({ ...slide })) : undefined,
   }
@@ -131,12 +174,14 @@ export function deriveSections(blocks: LandingBlock[]): LandingSectionDraft[] {
         title: block.sectionTitle || '',
         width: normalizeSectionWidth(block.sectionWidth),
         order: block.sectionOrder || 1,
+        style: block.sectionStyle,
         blocks: [],
       }
       current.title = current.title || block.sectionTitle || ''
       current.width = normalizeSectionWidth(block.sectionWidth || current.width)
       current.order = Math.min(current.order, block.sectionOrder || current.order || 1)
-      current.blocks.push({ ...block, sectionId, sectionWidth: current.width, sectionOrder: current.order })
+      current.style = current.style || block.sectionStyle
+      current.blocks.push({ ...block, sectionId, sectionWidth: current.width, sectionOrder: current.order, sectionStyle: current.style })
       sectionMap.set(sectionId, current)
     })
   return [...sectionMap.values()].sort((left, right) => left.order - right.order)

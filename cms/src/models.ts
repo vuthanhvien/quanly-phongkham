@@ -61,6 +61,26 @@ export type LandingBlockType = 'title' | 'text' | 'image' | 'video' | 'form' | '
 
 export type LandingSectionWidth = 'container' | 'full';
 
+export interface LandingSpacing {
+  top?: number;
+  right?: number;
+  bottom?: number;
+  left?: number;
+}
+
+export interface LandingBackgroundStyle {
+  type?: 'none' | 'color' | 'image' | 'video';
+  color?: string;
+  imageUrl?: string;
+  videoUrl?: string;
+}
+
+export interface LandingElementStyle {
+  padding?: LandingSpacing;
+  margin?: LandingSpacing;
+  background?: LandingBackgroundStyle;
+}
+
 export interface LandingFormField {
   id: string;
   name: string;
@@ -88,6 +108,8 @@ export interface LandingBlock {
   sectionTitle?: string;
   sectionWidth?: LandingSectionWidth;
   sectionOrder?: number;
+  sectionStyle?: LandingElementStyle;
+  blockStyle?: LandingElementStyle;
   title?: string;
   level?: number;
   align?: 'left' | 'center' | 'right';

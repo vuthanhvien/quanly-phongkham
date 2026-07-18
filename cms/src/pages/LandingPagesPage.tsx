@@ -73,7 +73,10 @@ import {
 } from './landing-pages/site-settings'
 import { PAGE_TEMPLATES } from './landing-pages/templates'
 
-const LANDING_URL = import.meta.env.VITE_LANDING_URL || 'http://localhost:3001'
+function getLandingBaseUrl() {
+  return window.location.origin.replace(/\/$/, '')
+}
+
 function isYoutubeUrl(url: string) {
   return /youtube\.com|youtu\.be/.test(url)
 }
@@ -116,9 +119,9 @@ export function LandingPagesPage() {
     [pages, selectedId],
   )
   const previewUrl = useMemo(() => {
-    const base = LANDING_URL
+    const base = getLandingBaseUrl()
     const path = draft.path === '/' ? '' : draft.path
-    const url = `${base.replace(/\/$/, '')}${path || '/'}`
+    const url = `${base}${path || '/'}`
     if (!selectedId) return url
     const sep = url.includes('?') ? '&' : '?'
     return `${url}${sep}pageId=${selectedId}`
@@ -393,6 +396,18 @@ export function LandingPagesPage() {
     setBlockComposer({
       sectionId,
       block: buildBlockForSection('title', sectionId, draft.blocks),
+      mode: 'create',
+    })
+  }
+
+  function editBlock(blockId: string) {
+    const block = draft.blocks.find((item) => item.id === blockId)
+    if (!block) return
+    setSelectedBlockId(blockId)
+    setBlockComposer({
+      sectionId: block.sectionId || 'default-section',
+      block: normalizeBlock({ ...block }, draft.blocks.findIndex((item) => item.id === blockId)),
+      mode: 'edit',
     })
   }
 
@@ -484,12 +499,17 @@ export function LandingPagesPage() {
 
   async function saveComposerBlock() {
     if (!blockComposer) return
+    const isEditMode = blockComposer.mode === 'edit'
     const nextDraft = {
       ...draft,
-      blocks: normalizeBlocks([...draft.blocks, blockComposer.block]),
+      blocks: normalizeBlocks(
+        isEditMode
+          ? draft.blocks.map((item) => (item.id === blockComposer.block.id ? blockComposer.block : item))
+          : [...draft.blocks, blockComposer.block],
+      ),
     }
     setDraft(nextDraft)
-    const saved = await saveDraftSnapshot(nextDraft, 'Da them block va reload landing page')
+    const saved = await saveDraftSnapshot(nextDraft, isEditMode ? 'Da cap nhat block va reload landing page' : 'Da them block va reload landing page')
     if (!saved) return
     setSelectedBlockId(blockComposer.block.id)
     setBlockComposer(null)
@@ -515,11 +535,22 @@ export function LandingPagesPage() {
     })
   }
 
-  function updateSection(sectionId: string, patch: Partial<Pick<LandingBlock, 'sectionTitle' | 'sectionWidth' | 'sectionOrder'>>) {
+  function updateSection(sectionId: string, patch: Partial<Pick<LandingBlock, 'sectionTitle' | 'sectionWidth' | 'sectionOrder' | 'sectionStyle'>>) {
     setDraft((current) => ({
       ...current,
       blocks: current.blocks.map((block, index) =>
         block.sectionId === sectionId
+          ? normalizeBlock({ ...block, ...patch }, index)
+          : normalizeBlock(block, index),
+      ),
+    }))
+  }
+
+  function updateBlock(blockId: string, patch: Partial<Pick<LandingBlock, 'blockStyle'>>) {
+    setDraft((current) => ({
+      ...current,
+      blocks: current.blocks.map((block, index) =>
+        block.id === blockId
           ? normalizeBlock({ ...block, ...patch }, index)
           : normalizeBlock(block, index),
       ),
@@ -636,7 +667,7 @@ export function LandingPagesPage() {
         message.success('Đã tạo landing page')
         await loadPages(response.data.data.id)
       }
-      const base = LANDING_URL.replace(/\/$/, '')
+      const base = getLandingBaseUrl()
       const path = savedPath === '/' ? '' : savedPath
       const targetUrl = `${base}${path || '/'}`
       const sep = targetUrl.includes('?') ? '&' : '?'
@@ -682,31 +713,33 @@ export function LandingPagesPage() {
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', gap: 0 }}>
       {/* ── Header ── */}
       <div className="page-header" style={{ flexShrink: 0 }}>
-        <Flex align="center" gap={12} wrap="wrap">
-          <Typography.Title level={3} style={{ margin: 0 }}>Trang landing</Typography.Title>
-          <Select
-            style={{ minWidth: 240 }}
-            placeholder="Chọn page..."
-            value={selectedId}
-            onChange={(id) => setSelectedId(id)}
-            loading={loading}
-            options={pages.map((p) => ({ value: p.id, label: p.title || p.path || p.slug }))}
-          />
-          <Tag color={draft.isPublished ? 'green' : 'default'}>
-            {draft.isPublished ? 'Đã xuất bản' : 'Nháp'}
-          </Tag>
+        <Flex align="center" justify="space-between" gap={12} wrap="wrap">
+          <Space wrap size={12}>
+            <Typography.Title level={3} style={{ margin: 0 }}>Trang landing</Typography.Title>
+            <Select
+              style={{ minWidth: 240 }}
+              placeholder="Chọn page..."
+              value={selectedId}
+              onChange={(id) => setSelectedId(id)}
+              loading={loading}
+              options={pages.map((p) => ({ value: p.id, label: p.title || p.path || p.slug }))}
+            />
+            <Tag color={draft.isPublished ? 'green' : 'default'}>
+              {draft.isPublished ? 'Đã xuất bản' : 'Nháp'}
+            </Tag>
+            <Button icon={<PlusOutlined />} onClick={startCreatePage}>Trang mới</Button>
+            <Button icon={<SaveOutlined />} loading={saving} onClick={savePage}>Lưu</Button>
+            <Button icon={<EyeOutlined />} loading={saving} type="primary" onClick={() => void saveAndOpen()}>Lưu & Mở</Button>
+          </Space>
+          <Space wrap>
+            {selectedId ? (
+              <Popconfirm title="Xóa landing page này?" onConfirm={() => void deletePage()}>
+                <Button danger icon={<DeleteOutlined />}>Xóa</Button>
+              </Popconfirm>
+            ) : null}
+            <Button icon={<SettingOutlined />} onClick={() => setGlobalOpen(true)}>Cài đặt site</Button>
+          </Space>
         </Flex>
-        <Space wrap>
-          <Button icon={<PlusOutlined />} onClick={startCreatePage}>Trang mới</Button>
-          {selectedId ? (
-            <Popconfirm title="Xóa landing page này?" onConfirm={() => void deletePage()}>
-              <Button danger icon={<DeleteOutlined />}>Xóa</Button>
-            </Popconfirm>
-          ) : null}
-          <Button icon={<SaveOutlined />} loading={saving} onClick={savePage}>Lưu</Button>
-          <Button icon={<EyeOutlined />} loading={saving} type="primary" onClick={() => void saveAndOpen()}>Lưu & Mở</Button>
-          <Button icon={<SettingOutlined />} onClick={() => setGlobalOpen(true)}>Cài đặt site</Button>
-        </Space>
       </div>
 
       {/* ── Two-column body ── */}
@@ -773,9 +806,11 @@ export function LandingPagesPage() {
                       blockPreview={blockPreview}
                       onAddSection={addSection}
                       onOpenBlockComposer={openBlockComposer}
+                      onEditBlock={editBlock}
                       onRemoveSection={removeSection}
                       onUpdateSection={updateSection}
                       onSelectBlock={setSelectedBlockId}
+                      onUpdateBlock={updateBlock}
                       onRemoveBlock={removeBlock}
                     />
 

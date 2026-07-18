@@ -4,6 +4,26 @@ export type LandingBlockType = 'title' | 'text' | 'image' | 'video' | 'form' | '
 
 export type LandingSectionWidth = 'container' | 'full'
 
+export interface LandingSpacing {
+  top?: number
+  right?: number
+  bottom?: number
+  left?: number
+}
+
+export interface LandingBackgroundStyle {
+  type?: 'none' | 'color' | 'image' | 'video'
+  color?: string
+  imageUrl?: string
+  videoUrl?: string
+}
+
+export interface LandingElementStyle {
+  padding?: LandingSpacing
+  margin?: LandingSpacing
+  background?: LandingBackgroundStyle
+}
+
 export interface LandingFormField {
   id: string
   name: string
@@ -31,6 +51,8 @@ export interface LandingBlock {
   sectionTitle?: string
   sectionWidth?: LandingSectionWidth
   sectionOrder?: number
+  sectionStyle?: LandingElementStyle
+  blockStyle?: LandingElementStyle
   title?: string
   level?: number
   align?: 'left' | 'center' | 'right'
@@ -62,6 +84,7 @@ export interface LandingSection {
   title: string
   width: LandingSectionWidth
   order: number
+  style?: LandingElementStyle
   blocks: LandingBlock[]
 }
 
@@ -186,6 +209,36 @@ export function normalizeSectionWidth(width?: string): LandingSectionWidth {
   return width === 'full' ? 'full' : 'container'
 }
 
+function normalizeSpacing(value?: LandingSpacing): LandingSpacing | undefined {
+  if (!value) return undefined
+  const next = {
+    top: Math.max(0, Number(value.top || 0) || 0),
+    right: Math.max(0, Number(value.right || 0) || 0),
+    bottom: Math.max(0, Number(value.bottom || 0) || 0),
+    left: Math.max(0, Number(value.left || 0) || 0),
+  }
+  return Object.values(next).some((item) => item > 0) ? next : undefined
+}
+
+function normalizeElementStyle(value?: LandingElementStyle): LandingElementStyle | undefined {
+  if (!value) return undefined
+  const backgroundType = value.background?.type || 'none'
+  const next: LandingElementStyle = {
+    padding: normalizeSpacing(value.padding),
+    margin: normalizeSpacing(value.margin),
+    background:
+      backgroundType === 'none'
+        ? undefined
+        : {
+            type: backgroundType,
+            color: value.background?.color || '#ffffff',
+            imageUrl: value.background?.imageUrl || '',
+            videoUrl: value.background?.videoUrl || '',
+          },
+  }
+  return next.padding || next.margin || next.background ? next : undefined
+}
+
 export function deriveLandingSections(blocks: LandingBlock[]) {
   const bucket = new Map<string, LandingSection>()
   sortBlocks(blocks).forEach((block) => {
@@ -195,17 +248,21 @@ export function deriveLandingSections(blocks: LandingBlock[]) {
       title: block.sectionTitle || '',
       width: normalizeSectionWidth(block.sectionWidth),
       order: block.sectionOrder || 1,
+      style: normalizeElementStyle(block.sectionStyle),
       blocks: [],
     }
     current.title = current.title || block.sectionTitle || ''
     current.width = normalizeSectionWidth(block.sectionWidth || current.width)
     current.order = Math.min(current.order, block.sectionOrder || current.order || 1)
+    current.style = current.style || normalizeElementStyle(block.sectionStyle)
     current.blocks.push({
       ...block,
       sectionId,
       sectionTitle: block.sectionTitle || current.title,
       sectionWidth: current.width,
       sectionOrder: current.order,
+      sectionStyle: current.style,
+      blockStyle: normalizeElementStyle(block.blockStyle),
     })
     bucket.set(sectionId, current)
   })

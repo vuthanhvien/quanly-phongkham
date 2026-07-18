@@ -622,6 +622,8 @@ export class SettingsService {
         sectionTitle: String(block?.sectionTitle || ''),
         sectionWidth: String(block?.sectionWidth || '') === 'full' ? 'full' : 'container',
         sectionOrder: Math.max(1, Math.floor(Number(block?.sectionOrder ?? 1) || 1)),
+        sectionStyle: this.normalizeLandingElementStyle(block?.sectionStyle),
+        blockStyle: this.normalizeLandingElementStyle(block?.blockStyle),
       };
 
       if (type === 'title') {
@@ -676,6 +678,41 @@ export class SettingsService {
 
       return normalized;
     });
+  }
+
+  private normalizeLandingElementStyle(input: unknown) {
+    if (!input || typeof input !== 'object') return undefined;
+    const value = input as Record<string, unknown>;
+    const padding = this.normalizeLandingSpacing(value.padding);
+    const margin = this.normalizeLandingSpacing(value.margin);
+    const background = this.normalizeLandingBackground(value.background);
+    if (!padding && !margin && !background) return undefined;
+    return { padding, margin, background };
+  }
+
+  private normalizeLandingSpacing(input: unknown) {
+    if (!input || typeof input !== 'object') return undefined;
+    const value = input as Record<string, unknown>;
+    const next = {
+      top: Math.max(0, Math.floor(Number(value.top ?? 0) || 0)),
+      right: Math.max(0, Math.floor(Number(value.right ?? 0) || 0)),
+      bottom: Math.max(0, Math.floor(Number(value.bottom ?? 0) || 0)),
+      left: Math.max(0, Math.floor(Number(value.left ?? 0) || 0)),
+    };
+    return Object.values(next).some((item) => item > 0) ? next : undefined;
+  }
+
+  private normalizeLandingBackground(input: unknown) {
+    if (!input || typeof input !== 'object') return undefined;
+    const value = input as Record<string, unknown>;
+    const type = String(value.type || 'none');
+    if (!['color', 'image', 'video'].includes(type)) return undefined;
+    return {
+      type,
+      color: String(value.color || '#ffffff'),
+      imageUrl: String(value.imageUrl || ''),
+      videoUrl: String(value.videoUrl || ''),
+    };
   }
 
   private async assertLandingPageUnique(slug: string, path: string, excludeId?: string) {
