@@ -95,6 +95,19 @@ function titleLevel(level?: number): 1 | 2 | 3 | 4 | 5 {
   return next as 1 | 2 | 3 | 4 | 5
 }
 
+function buildInternalSlug(path: string, title: string) {
+  const normalizedPath = normalizePath(path || '')
+  if (normalizedPath && normalizedPath !== '/') {
+    const pathSlug = normalizedPath
+      .split('/')
+      .filter(Boolean)
+      .join('-')
+    const next = slugify(pathSlug)
+    if (next) return next
+  }
+  return slugify(title)
+}
+
 
 export function LandingPagesPage() {
   const [pages, setPages] = useState<LandingPage[]>([])
@@ -371,13 +384,11 @@ export function LandingPagesPage() {
     }
   }
 
-  function syncSlugFromTitle(title: string) {
-    const nextSlug = slugify(title)
+  function syncPageTitle(title: string) {
     setDraft((current) => ({
       ...current,
       title,
-      slug: current.slug ? current.slug : nextSlug,
-      path: current.path && current.path !== '/' ? current.path : normalizePath(nextSlug),
+      path: current.path && current.path !== '/' ? current.path : normalizePath(slugify(title)),
     }))
   }
 
@@ -577,10 +588,11 @@ export function LandingPagesPage() {
 
 
   async function saveDraftSnapshot(nextDraft: Omit<LandingPage, 'id' | 'createdAt' | 'updatedAt'>, successMessage: string) {
+    const resolvedPath = normalizePath(nextDraft.path || nextDraft.title)
     const payload = {
       ...nextDraft,
-      slug: slugify(nextDraft.slug || nextDraft.title),
-      path: normalizePath(nextDraft.path || nextDraft.slug || nextDraft.title),
+      slug: buildInternalSlug(resolvedPath, nextDraft.title),
+      path: resolvedPath,
       blocks: normalizeBlocks(nextDraft.blocks.map((block, index) => ({ ...block, order: index + 1 }))),
     }
 
@@ -609,10 +621,11 @@ export function LandingPagesPage() {
   }
 
   async function savePage() {
+    const resolvedPath = normalizePath(draft.path || draft.title)
     const payload = {
       ...draft,
-      slug: slugify(draft.slug || draft.title),
-      path: normalizePath(draft.path || draft.slug || draft.title),
+      slug: buildInternalSlug(resolvedPath, draft.title),
+      path: resolvedPath,
       blocks: normalizeBlocks(draft.blocks.map((block, index) => ({ ...block, order: index + 1 }))),
     }
 
@@ -640,10 +653,11 @@ export function LandingPagesPage() {
   }
 
   async function saveAndOpen() {
+    const resolvedPath = normalizePath(draft.path || draft.title)
     const payload = {
       ...draft,
-      slug: slugify(draft.slug || draft.title),
-      path: normalizePath(draft.path || draft.slug || draft.title),
+      slug: buildInternalSlug(resolvedPath, draft.title),
+      path: resolvedPath,
       blocks: normalizeBlocks(draft.blocks.map((block, index) => ({ ...block, order: index + 1 }))),
     }
     if (!payload.title.trim()) {
@@ -760,20 +774,11 @@ export function LandingPagesPage() {
                     <Card className="glass-card" size="small" title="Thông tin trang">
                       <Form layout="vertical" size="small">
                         <Form.Item label="Tên trang" style={{ marginBottom: 8 }}>
-                          <Input value={draft.title} onChange={(event) => syncSlugFromTitle(event.target.value)} placeholder="Ví dụ: Trang chủ" />
+                          <Input value={draft.title} onChange={(event) => syncPageTitle(event.target.value)} placeholder="Ví dụ: Trang chủ" />
                         </Form.Item>
-                        <Row gutter={8}>
-                          <Col span={12}>
-                            <Form.Item label="Slug" style={{ marginBottom: 8 }}>
-                              <Input value={draft.slug} onChange={(event) => updateDraft({ slug: slugify(event.target.value) })} placeholder="trang-chu" />
-                            </Form.Item>
-                          </Col>
-                          <Col span={12}>
-                            <Form.Item label="Đường dẫn" style={{ marginBottom: 8 }}>
-                              <Input value={draft.path} onChange={(event) => updateDraft({ path: normalizePath(event.target.value) })} placeholder="/" />
-                            </Form.Item>
-                          </Col>
-                        </Row>
+                        <Form.Item label="Đường dẫn" style={{ marginBottom: 8 }}>
+                          <Input value={draft.path} onChange={(event) => updateDraft({ path: normalizePath(event.target.value) })} placeholder="/" />
+                        </Form.Item>
                         <Form.Item label="Mô tả ngắn" style={{ marginBottom: 8 }}>
                           <Input.TextArea rows={2} value={draft.description} onChange={(event) => updateDraft({ description: event.target.value })} />
                         </Form.Item>

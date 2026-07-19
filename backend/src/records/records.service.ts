@@ -516,13 +516,19 @@ export class RecordsService {
       take: pageSize,
       order: { createdAt: 'DESC' },
     });
-    const hydrated = await this.hydrateCustomFields(resource, rows);
+    let hydrated = await this.hydrateCustomFields(resource, rows);
+    if (resource === 'staff') {
+      hydrated = await this.attachStaffRoleMetadata(hydrated as Staff[]);
+    }
     return { data: hydrated.map((row) => this.protect(resource, row, request)), total };
   }
 
   async findRaw(resource: string, id: string) {
     const record = await this.findStored(resource, id);
-    const [hydrated] = await this.hydrateCustomFields(resource, [record]);
+    let [hydrated] = await this.hydrateCustomFields(resource, [record]);
+    if (resource === 'staff') {
+      [hydrated] = await this.attachStaffRoleMetadata([hydrated as Staff]);
+    }
     if (resource === 'service-orders') {
       return this.attachServiceOrderItems(hydrated as ServiceOrder);
     }
@@ -2628,6 +2634,41 @@ export class RecordsService {
     return customer;
   }
 
+  private async attachStaffRoleMetadata(records: Staff[]) {
+    if (!records.length) return records;
+    const staffIds = records.map((item) => String(item.id));
+    const userIds = records.map((item) => String(item.userId || '')).filter(Boolean);
+    const users = await this.users.find({
+      where: [
+        { staffId: In(staffIds) },
+        ...(userIds.length ? [{ id: In(userIds) }] : []),
+      ],
+      select: ['id', 'staffId', 'role'],
+      take: Math.max(100, staffIds.length * 2),
+    });
+    const userByStaffId = new Map(users.filter((item) => item.staffId).map((item) => [String(item.staffId), item]));
+    const userById = new Map(users.map((item) => [String(item.id), item]));
+
+    return records.map((record) => {
+      const matchedUser = userByStaffId.get(String(record.id)) || (record.userId ? userById.get(String(record.userId)) : undefined);
+      return {
+        ...record,
+        type: this.resolveStaffType(record, matchedUser),
+        userRole: matchedUser?.role || undefined,
+      } as Staff;
+    });
+  }
+
+  private resolveStaffType(record: Pick<Staff, 'position'>, user?: Pick<User, 'role'>) {
+    const normalizedUserRole = String(user?.role || '').trim().toUpperCase();
+    if (['ADMIN', 'DOCTOR', 'STAFF'].includes(normalizedUserRole)) return normalizedUserRole;
+
+    const normalizedPosition = String(record.position || '').trim().toLowerCase();
+    if (/(bac\s*si|bác\s*sĩ|doctor|bs\.)/.test(normalizedPosition)) return 'DOCTOR';
+    if (/(admin|quan\s*tri|quản\s*trị)/.test(normalizedPosition)) return 'ADMIN';
+    return 'STAFF';
+  }
+
   private toAbsolutePublicUrl(url: string | undefined, request?: RequestContext) {
     if (!url) return '';
     if (/^(https?:)?\/\//i.test(url)) return url;
@@ -2780,12 +2821,26 @@ export class RecordsService {
   }
 
   private async resolveStaffIdsByUserRole(role: string) {
-    const users = await this.users.find({
-      where: { role: String(role).trim().toUpperCase() },
-      select: ['staffId'],
-      take: 1000,
-    });
-    return users.map((item) => item.staffId).filter(Boolean) as string[];
+    const normalizedRole = String(role).trim().toUpperCase();
+    const [staffRows, users] = await Promise.all([
+      this.staff.find({
+        select: ['id', 'position', 'userId'],
+        take: 5000,
+      }),
+      this.users.find({
+        select: ['id', 'staffId', 'role'],
+        take: 5000,
+      }),
+    ]);
+    const userByStaffId = new Map(users.filter((item) => item.staffId).map((item) => [String(item.staffId), item]));
+    const userById = new Map(users.map((item) => [String(item.id), item]));
+
+    return staffRows
+      .filter((item) => {
+        const matchedUser = userByStaffId.get(String(item.id)) || (item.userId ? userById.get(String(item.userId)) : undefined);
+        return this.resolveStaffType(item, matchedUser) === normalizedRole;
+      })
+      .map((item) => String(item.id));
   }
 
   private async normalizeInput(resource: string, payload: Record<string, unknown>, creating = false) {

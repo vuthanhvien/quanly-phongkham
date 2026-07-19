@@ -44,7 +44,6 @@ function routeRequest(req, res) {
   }
 
   if (originalPath.startsWith('/admin/')) {
-    req.url = originalPath.replace(/^\/admin/, '') || '/';
     proxy.web(req, res, { target: cmsUrl });
     return;
   }
@@ -58,7 +57,6 @@ server.on('upgrade', (req, socket, head) => {
   const originalPath = req.url || '/';
 
   if (originalPath.startsWith('/admin/')) {
-    req.url = originalPath.replace(/^\/admin/, '') || '/';
     proxy.ws(req, socket, head, { target: cmsUrl });
     return;
   }

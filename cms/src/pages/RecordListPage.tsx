@@ -18,6 +18,7 @@ import {
   Grid,
   Input,
   Popconfirm,
+  Select,
   Space,
   Table,
   Tooltip,
@@ -64,10 +65,16 @@ export function RecordListPage() {
   const [lookups, setLookups] = useState<LookupMap>({})
   const [fileLookups, setFileLookups] = useState<FileLookupMap>({})
   const [relatedQuickView, setRelatedQuickView] = useState<{ resource: string; id: string } | null>(null)
+  const [staffTypeFilter, setStaffTypeFilter] = useState<string | undefined>(undefined)
+  const [doctorFilter, setDoctorFilter] = useState<string | undefined>(undefined)
   const query = useList({
     resource,
     pagination: { currentPage, pageSize },
-    filters: [{ field: "search", operator: "contains", value: search }],
+    filters: [
+      { field: "search", operator: "contains" as const, value: search },
+      ...(resource === "staff" && staffTypeFilter ? [{ field: "type", operator: "eq" as const, value: staffTypeFilter }] : []),
+      ...(resource === "appointments" && doctorFilter ? [{ field: "doctorStaffId", operator: "eq" as const, value: doctorFilter }] : []),
+    ],
   }) as any
   const response = query.result || query.query?.data || query.data?.data
   const rows = response?.data || []
@@ -83,6 +90,8 @@ export function RecordListPage() {
     setEditingId(null)
     setDuplicateValues(undefined)
     setDuplicatingId(null)
+    setStaffTypeFilter(undefined)
+    setDoctorFilter(undefined)
     if (detailId) {
       const nextParams = new URLSearchParams(searchParams)
       nextParams.delete("detail")
@@ -111,7 +120,10 @@ export function RecordListPage() {
         )
         setDisplayFields(tableFields)
         setTemplates(prints.data.data)
-        return Promise.all([loadRelationOptions(tableFields), loadFileLookupMap()])
+        const lookupFields = resource === "appointments"
+          ? [...tableFields, "doctorStaffId"]
+          : tableFields
+        return Promise.all([loadRelationOptions(lookupFields), loadFileLookupMap()])
       })
       .then(([nextLookups, nextFileLookups]) => {
         setLookups(nextLookups)
@@ -227,6 +239,15 @@ export function RecordListPage() {
     [displayFields, resource, templates, lookups, fileLookups],
   )
 
+  const doctorOptions = useMemo(
+    () =>
+      Object.entries(lookups["staff-doctor"] || {}).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    [lookups],
+  )
+
   async function printRecord(templateId: string, recordId: string) {
     const html = (
       await api.get(
@@ -319,6 +340,36 @@ export function RecordListPage() {
               setSearch(value)
             }}
           />
+          {resource === "staff" ? (
+            <Select
+              allowClear
+              options={[
+                { value: "ADMIN", label: "Admin" },
+                { value: "DOCTOR", label: "Bác sĩ" },
+                { value: "STAFF", label: "Nhân viên" },
+              ]}
+              placeholder="Lọc phân loại"
+              style={{ minWidth: 170 }}
+              value={staffTypeFilter}
+              onChange={(value) => {
+                setCurrentPage(1)
+                setStaffTypeFilter(value)
+              }}
+            />
+          ) : null}
+          {resource === "appointments" ? (
+            <Select
+              allowClear
+              options={doctorOptions}
+              placeholder="Lọc bác sĩ"
+              style={{ minWidth: 220 }}
+              value={doctorFilter}
+              onChange={(value) => {
+                setCurrentPage(1)
+                setDoctorFilter(value)
+              }}
+            />
+          ) : null}
           {hasActionAccess(resource, "create") && !["files", "service-orders"].includes(resource) && (
             <Tooltip title="Mở màn hình import">
               <Button

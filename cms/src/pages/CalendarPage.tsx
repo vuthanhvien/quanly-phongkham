@@ -31,6 +31,7 @@ interface PlannerEvent {
   end?: string
   branchId?: string
   staffId?: string
+  doctorStaffId?: string
   customerId?: string
   tone: string
   statusLabel: string
@@ -98,6 +99,12 @@ const QUICK_ACTIONS: QuickActionItem[] = [
   },
 ]
 
+const DAY_VIEW_START_HOUR = 6
+const DAY_VIEW_END_HOUR = 22
+const DAY_VIEW_HOUR_COUNT = DAY_VIEW_END_HOUR - DAY_VIEW_START_HOUR
+const DAY_VIEW_MINUTES = DAY_VIEW_HOUR_COUNT * 60
+const DAY_VIEW_MIN_BLOCK_MINUTES = 30
+
 async function fetchListSafe<T>(resource: string, pageSize = 500) {
   try {
     const response = await api.get(`/records/${resource}`, { params: { pageSize } })
@@ -116,6 +123,7 @@ export function CalendarPage() {
   const [selectedTypes, setSelectedTypes] = useState<PlannerEventType[]>(["appointment", "schedule", "leave", "attendance"])
   const [branchFilter, setBranchFilter] = useState<string | undefined>(undefined)
   const [staffFilter, setStaffFilter] = useState<string | undefined>(undefined)
+  const [doctorFilter, setDoctorFilter] = useState<string | undefined>(undefined)
   const [quickCreateResource, setQuickCreateResource] = useState<QuickCreateResource | null>(null)
   const [quickDetail, setQuickDetail] = useState<CalendarQuickDetailState | null>(null)
   const [quickDetailLoading, setQuickDetailLoading] = useState(false)
@@ -143,9 +151,10 @@ export function CalendarPage() {
         if (!selectedTypes.includes(item.type)) return false
         if (branchFilter && item.branchId !== branchFilter) return false
         if (staffFilter && item.staffId !== staffFilter) return false
+        if (doctorFilter && (item.doctorStaffId || item.staffId) !== doctorFilter) return false
         return true
       }),
-    [branchFilter, events, selectedTypes, staffFilter],
+    [branchFilter, doctorFilter, events, selectedTypes, staffFilter],
   )
 
   const selectedEvents = useMemo(
@@ -188,6 +197,15 @@ export function CalendarPage() {
   const staffOptions = useMemo(
     () =>
       Object.entries(lookups.staff || {}).map(([value, label]) => ({
+        value,
+        label,
+      })),
+    [lookups],
+  )
+
+  const doctorOptions = useMemo(
+    () =>
+      Object.entries(lookups["staff-doctor"] || {}).map(([value, label]) => ({
         value,
         label,
       })),
@@ -256,6 +274,14 @@ export function CalendarPage() {
             options={staffOptions}
             value={staffFilter}
             onChange={(value) => setStaffFilter(value)}
+          />
+          <Select
+            allowClear
+            className="calendar-planner-select"
+            placeholder="Lọc bác sĩ"
+            options={doctorOptions}
+            value={doctorFilter}
+            onChange={(value) => setDoctorFilter(value)}
           />
           <Select
             className="calendar-planner-types"
@@ -338,10 +364,11 @@ export function CalendarPage() {
                 })}
               </div>
             ) : (
-              <List
-                locale={{ emptyText: "Chưa có lịch trong ngày được chọn" }}
-                dataSource={selectedEvents}
-                renderItem={(item) => <PlannerEventRow item={item} onOpen={() => navigate(`/${item.resource}/${item.id}`)} />}
+              <DayPlannerTimeline
+                events={selectedEvents}
+                selectedDate={selectedDate}
+                onOpen={(item) => navigate(`/${item.resource}/${item.id}`)}
+                onOpenQuickDetail={(item) => void openQuickDetail(item)}
               />
             )}
           </Card>
@@ -428,32 +455,6 @@ export function CalendarPage() {
                   </List.Item>
                 )}
               />
-            </Card>
-
-            <Card className="glass-card spacious-card" title="Gợi ý vận hành">
-              <div className="calendar-insight-list">
-                <div className="calendar-insight-item">
-                  <CalendarOutlined />
-                  <div>
-                    <strong>Booking với khách hàng</strong>
-                    <span>Theo dõi lịch hẹn theo bác sĩ, phòng và trạng thái xử lý.</span>
-                  </div>
-                </div>
-                <div className="calendar-insight-item">
-                  <TeamOutlined />
-                  <div>
-                    <strong>Điều phối ca nhân viên</strong>
-                    <span>So lịch làm việc với nghỉ phép để tránh thiếu người trong giờ cao điểm.</span>
-                  </div>
-                </div>
-                <div className="calendar-insight-item">
-                  <FileDoneOutlined />
-                  <div>
-                    <strong>Kiểm tra vắng mặt</strong>
-                    <span>Kết hợp chấm công và đơn nghỉ để phát hiện ca thiếu check-in.</span>
-                  </div>
-                </div>
-              </div>
             </Card>
           </div>
         </div>
@@ -574,6 +575,81 @@ export function CalendarPage() {
     } finally {
       setQuickDetailLoading(false)
     }
+  }
+}
+
+function DayPlannerTimeline({
+  events,
+  selectedDate,
+  onOpen,
+  onOpenQuickDetail,
+}: {
+  events: PlannerEvent[]
+  selectedDate: Dayjs
+  onOpen: (item: PlannerEvent) => void
+  onOpenQuickDetail: (item: PlannerEvent) => void
+}) {
+  const hourSlots = Array.from({ length: DAY_VIEW_HOUR_COUNT + 1 }, (_, index) => DAY_VIEW_START_HOUR + index)
+  const timelineEvents = events.map((event) => projectTimelineEvent(event, selectedDate)).filter(Boolean)
+
+  if (!timelineEvents.length) {
+    return <Empty description="Chưa có lịch trong ngày được chọn" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+  }
+
+  return (
+    <div className="calendar-day-timeline">
+      <div className="calendar-day-timeline__grid">
+        {hourSlots.map((hour) => (
+          <div className="calendar-day-timeline__slot" key={hour}>
+            <div className="calendar-day-timeline__label">{`${String(hour).padStart(2, "0")}:00`}</div>
+            <div className="calendar-day-timeline__line" />
+          </div>
+        ))}
+        <div className="calendar-day-timeline__events">
+          {timelineEvents.map((event) => (
+            <button
+              className={`calendar-day-event tone-${event.type}`}
+              key={event.id}
+              style={{ top: `${event.topPercent}%`, height: `${event.heightPercent}%` }}
+              type="button"
+              onClick={() => onOpenQuickDetail(event)}
+            >
+              <div className="calendar-day-event__time">{formatEventTime(event.start, event.end)}</div>
+              <strong>{event.title}</strong>
+              <span>{event.statusLabel}</span>
+              {event.summary ? <small>{event.summary}</small> : null}
+              <span className="calendar-day-event__link" onClick={(clickEvent) => { clickEvent.stopPropagation(); onOpen(event) }}>
+                Mở chi tiết
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function projectTimelineEvent(event: PlannerEvent, selectedDate: Dayjs) {
+  const dayStart = selectedDate.hour(DAY_VIEW_START_HOUR).minute(0).second(0).millisecond(0)
+  const dayEnd = selectedDate.hour(DAY_VIEW_END_HOUR).minute(0).second(0).millisecond(0)
+  const eventStart = parseClinicDateTime(event.start)
+  const rawEnd = event.end ? parseClinicDateTime(event.end) : eventStart.add(DAY_VIEW_MIN_BLOCK_MINUTES, "minute")
+  const eventEnd = rawEnd.isAfter(eventStart) ? rawEnd : eventStart.add(DAY_VIEW_MIN_BLOCK_MINUTES, "minute")
+  const clippedStart = eventStart.isBefore(dayStart) ? dayStart : eventStart
+  const clippedEndBase = eventEnd.isAfter(dayEnd) ? dayEnd : eventEnd
+  const clippedEnd = clippedEndBase.isAfter(clippedStart)
+    ? clippedEndBase
+    : clippedStart.add(DAY_VIEW_MIN_BLOCK_MINUTES, "minute").isAfter(dayEnd)
+      ? dayEnd
+      : clippedStart.add(DAY_VIEW_MIN_BLOCK_MINUTES, "minute")
+
+  const startMinutes = clippedStart.diff(dayStart, "minute")
+  const durationMinutes = Math.max(DAY_VIEW_MIN_BLOCK_MINUTES, clippedEnd.diff(clippedStart, "minute"))
+
+  return {
+    ...event,
+    topPercent: (startMinutes / DAY_VIEW_MINUTES) * 100,
+    heightPercent: (Math.min(durationMinutes, DAY_VIEW_MINUTES - startMinutes) / DAY_VIEW_MINUTES) * 100,
   }
 }
 
@@ -762,6 +838,7 @@ function buildPlannerEvents({
     branchId: item.branchId ? String(item.branchId) : undefined,
     customerId: item.customerId ? String(item.customerId) : undefined,
     staffId: item.picStaffId ? String(item.picStaffId) : item.doctorStaffId ? String(item.doctorStaffId) : undefined,
+    doctorStaffId: item.doctorStaffId ? String(item.doctorStaffId) : undefined,
     tone: EVENT_TYPE_COLOR.appointment,
     statusLabel: getFieldLabel("appointments", "status", String(item.status || "SCHEDULED")),
     summary: [
@@ -781,6 +858,7 @@ function buildPlannerEvents({
     end: item.endTime ? String(item.endTime) : undefined,
     branchId: item.branchId ? String(item.branchId) : undefined,
     staffId: item.staffId ? String(item.staffId) : undefined,
+    doctorStaffId: item.staffId ? String(item.staffId) : undefined,
     tone: EVENT_TYPE_COLOR.schedule,
     statusLabel: getFieldLabel("work-schedules", "status", String(item.status || "PLANNED")),
     summary: [item.roomId ? lookups.rooms?.[item.roomId] || item.roomId : null, item.note].filter(Boolean).join(" | "),
@@ -795,6 +873,7 @@ function buildPlannerEvents({
     end: item.endDate ? `${String(item.endDate)}T23:59` : undefined,
     branchId: item.branchId ? String(item.branchId) : undefined,
     staffId: item.staffId ? String(item.staffId) : undefined,
+    doctorStaffId: item.staffId ? String(item.staffId) : undefined,
     tone: EVENT_TYPE_COLOR.leave,
     statusLabel: getFieldLabel("leave-requests", "status", String(item.status || "pending")),
     summary: [getFieldLabel("leave-requests", "leaveType", String(item.leaveType || "other")), item.reason].filter(Boolean).join(" | "),
@@ -809,6 +888,7 @@ function buildPlannerEvents({
     end: undefined,
     branchId: item.branchId ? String(item.branchId) : undefined,
     staffId: item.staffId ? String(item.staffId) : undefined,
+    doctorStaffId: item.staffId ? String(item.staffId) : undefined,
     tone: EVENT_TYPE_COLOR.attendance,
     statusLabel: getFieldLabel("attendances", "status", String(item.status || "present")),
     summary: [item.checkIn ? `Vào ${item.checkIn}` : null, item.checkOut ? `Ra ${item.checkOut}` : null, item.note].filter(Boolean).join(" | "),

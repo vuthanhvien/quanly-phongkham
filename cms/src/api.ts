@@ -80,8 +80,33 @@ export const dataProvider: DataProvider = {
     const current = (pagination as { current?: number })?.current || 1;
     const pageSize = (pagination as { pageSize?: number })?.pageSize || 20;
     const search = (filters || []).find((filter) => 'field' in filter && filter.field === 'search');
+    const requestFilters = Object.fromEntries(
+      (filters || [])
+        .filter(
+          (
+            filter,
+          ): filter is {
+            field: string;
+            operator: string;
+            value: unknown;
+          } =>
+            'field' in filter &&
+            'operator' in filter &&
+            'value' in filter &&
+            filter.field !== 'search' &&
+            filter.value !== undefined &&
+            filter.value !== null &&
+            String(filter.value).trim() !== '',
+        )
+        .map((filter) => [filter.field, filter.value]),
+    );
     const response = await api.get(`/records/${resource}`, {
-      params: { page: current, pageSize, search: search && 'value' in search ? search.value : undefined },
+      params: {
+        page: current,
+        pageSize,
+        search: search && 'value' in search ? search.value : undefined,
+        ...requestFilters,
+      },
     });
     return response.data;
   },

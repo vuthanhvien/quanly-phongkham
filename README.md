@@ -140,3 +140,11 @@ con server này
 Root/QG5oZjRSn1OH793Q0x53H
 
 cd phongkham && docker compose pull && docker compose up -d
+
+
+////
+
+
+ssh root@103.1.238.70
+
+cd clinic && docker compose pull && docker compose up -d

@@ -211,6 +211,9 @@ export function App() {
               <Route element={<ResourceGuard />}>
                 <Route path="/file-folders" element={<FileFoldersPage />} />
                 <Route path="/product-categories" element={<CategoriesPage />} />
+                <Route path="/department" element={<Navigate to="/departments" replace />} />
+                <Route path="/deparment" element={<Navigate to="/departments" replace />} />
+                <Route path="/derparment" element={<Navigate to="/departments" replace />} />
                 <Route path="/departments" element={<DepartmentsPage />} />
                 <Route path="/payrolls" element={<PayrollsPage />} />
                 <Route path="/:resource" element={<RecordListPage />} />

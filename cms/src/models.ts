@@ -412,6 +412,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
   staff: [
     { key: 'code', label: 'Mã nhân viên', required: true, width: '33', tableWidth: 140 },
     { key: 'fullName', label: 'Họ tên', required: true, width: '66', tableWidth: 220 },
+    { key: 'type', label: 'Phân loại', type: 'select', options: systemRoleSelectOptions, width: '33', tableWidth: 140 },
     { key: 'phone', label: 'Điện thoại', width: '33', tableWidth: 170 },
     { key: 'email', label: 'Email', width: '50', tableWidth: 220 },
     { key: 'position', label: 'Chức danh', width: '50', tableWidth: 180 },
