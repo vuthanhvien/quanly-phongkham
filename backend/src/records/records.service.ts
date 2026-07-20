@@ -2656,29 +2656,19 @@ export class RecordsService {
       select: ['id', 'staffId', 'role'],
       take: Math.max(100, staffIds.length * 2),
     });
-    const userByStaffId = new Map(users.filter((item) => item.staffId).map((item) => [String(item.staffId), item]));
-    const userById = new Map(users.map((item) => [String(item.id), item]));
-
     return records.map((record) => {
-      const matchedUser = userByStaffId.get(String(record.id)) || (record.userId ? userById.get(String(record.userId)) : undefined);
+      const matchedUser = users.find((item) => String(item.staffId || '') === String(record.id) || String(item.id) === String(record.userId || ''));
       return {
         ...record,
-        type: this.resolveStaffType(record, matchedUser),
+        type: this.resolveStaffType(record),
         userRole: matchedUser?.role || undefined,
       } as Staff;
     });
   }
 
-  private resolveStaffType(record: Pick<Staff, 'position' | 'type'>, user?: Pick<User, 'role'>) {
+  private resolveStaffType(record: Pick<Staff, 'type'>) {
     const normalizedStoredType = String(record.type || '').trim().toUpperCase();
     if (['ADMIN', 'DOCTOR', 'STAFF'].includes(normalizedStoredType)) return normalizedStoredType;
-
-    const normalizedUserRole = String(user?.role || '').trim().toUpperCase();
-    if (['ADMIN', 'DOCTOR', 'STAFF'].includes(normalizedUserRole)) return normalizedUserRole;
-
-    const normalizedPosition = String(record.position || '').trim().toLowerCase();
-    if (/(bac\s*si|bác\s*sĩ|doctor|bs\.)/.test(normalizedPosition)) return 'DOCTOR';
-    if (/(admin|quan\s*tri|quản\s*trị)/.test(normalizedPosition)) return 'ADMIN';
     return 'STAFF';
   }
 
@@ -3043,24 +3033,13 @@ export class RecordsService {
 
   private async resolveStaffIdsByUserRole(role: string) {
     const normalizedRole = String(role).trim().toUpperCase();
-    const [staffRows, users] = await Promise.all([
-      this.staff.find({
-        select: ['id', 'position', 'userId'],
-        take: 5000,
-      }),
-      this.users.find({
-        select: ['id', 'staffId', 'role'],
-        take: 5000,
-      }),
-    ]);
-    const userByStaffId = new Map(users.filter((item) => item.staffId).map((item) => [String(item.staffId), item]));
-    const userById = new Map(users.map((item) => [String(item.id), item]));
+    const staffRows = await this.staff.find({
+      select: ['id', 'type'],
+      take: 5000,
+    });
 
     return staffRows
-      .filter((item) => {
-        const matchedUser = userByStaffId.get(String(item.id)) || (item.userId ? userById.get(String(item.userId)) : undefined);
-        return this.resolveStaffType(item, matchedUser) === normalizedRole;
-      })
+      .filter((item) => this.resolveStaffType(item) === normalizedRole)
       .map((item) => String(item.id));
   }
 

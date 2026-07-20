@@ -6,11 +6,11 @@ import {
   TeamOutlined,
 } from "@ant-design/icons"
 import dayjs, { type Dayjs } from "dayjs"
-import { Button, Calendar, Card, Col, Drawer, Empty, List, Row, Segmented, Select, Space, Tag, Typography } from "antd"
+import { Avatar, Button, Calendar, Card, Col, Drawer, Empty, List, Row, Segmented, Select, Space, Tag, Typography } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { hasActionAccess } from "../access"
-import { api } from "../api"
+import { api, resolveFileUrl } from "../api"
 import { RecordValueView } from "../components/RecordValueView"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { CustomField, getFieldLabel } from "../models"
@@ -36,6 +36,10 @@ interface PlannerEvent {
   tone: string
   statusLabel: string
   summary: string
+  customerName?: string
+  doctorName?: string
+  doctorAvatarUrl?: string
+  roomName?: string
 }
 
 interface CalendarQuickDetailState {
@@ -131,16 +135,28 @@ export function CalendarPage() {
   }, [])
 
   async function loadCalendar() {
-    const [appointments, workSchedules, leaveRequests, attendances, relationLookups] = await Promise.all([
+    const [appointments, workSchedules, leaveRequests, attendances, staffRows, customerRows, roomRows, relationLookups] = await Promise.all([
       fetchListSafe<Record<string, any>>("appointments"),
       fetchListSafe<Record<string, any>>("work-schedules"),
       fetchListSafe<Record<string, any>>("leave-requests"),
       fetchListSafe<Record<string, any>>("attendances"),
+      fetchListSafe<Record<string, any>>("staff"),
+      fetchListSafe<Record<string, any>>("customers"),
+      fetchListSafe<Record<string, any>>("rooms"),
       loadRelationOptions(["branchId", "staffId", "customerId", "doctorStaffId", "picStaffId", "roomId", "equipmentId"]).catch(() => ({} as LookupMap)),
     ])
 
     setLookups(relationLookups)
-    setEvents(buildPlannerEvents({ appointments, workSchedules, leaveRequests, attendances, lookups: relationLookups }))
+    setEvents(buildPlannerEvents({
+      appointments,
+      workSchedules,
+      leaveRequests,
+      attendances,
+      staffRows,
+      customerRows,
+      roomRows,
+      lookups: relationLookups,
+    }))
   }
 
   const filteredEvents = useMemo(
@@ -552,7 +568,9 @@ function DayPlannerTimeline({
   onOpenQuickDetail: (item: PlannerEvent) => void
 }) {
   const hourSlots = Array.from({ length: DAY_VIEW_HOUR_COUNT + 1 }, (_, index) => DAY_VIEW_START_HOUR + index)
-  const timelineEvents = events.map((event) => projectTimelineEvent(event, selectedDate)).filter(Boolean)
+  const timelineEvents = layoutTimelineEvents(
+    events.map((event) => projectTimelineEvent(event, selectedDate)).filter(Boolean),
+  )
 
   return (
     <div className="calendar-day-timeline">
@@ -568,14 +586,39 @@ function DayPlannerTimeline({
             <button
               className={`calendar-day-event tone-${event.type}`}
               key={event.id}
-              style={{ top: `${event.topPercent}%`, height: `${event.heightPercent}%` }}
+              style={{
+                top: `${event.topPercent}%`,
+                height: `${event.heightPercent}%`,
+                left: `calc(${event.leftPercent}% + 8px)`,
+                width: `calc(${event.widthPercent}% - 12px)`,
+              }}
               type="button"
               onClick={() => onOpenQuickDetail(event)}
             >
               <div className="calendar-day-event__time">{formatEventTime(event.start, event.end)}</div>
-              <strong>{event.title}</strong>
-              <span>{event.statusLabel}</span>
-              {event.summary ? <small>{event.summary}</small> : null}
+              {event.type === "appointment" ? (
+                <div className="calendar-day-event__appointment">
+                  <div className="calendar-day-event__appointment-head">
+                    <Avatar
+                      className="calendar-day-event__avatar"
+                      icon={<TeamOutlined />}
+                      size={28}
+                      src={event.doctorAvatarUrl ? resolveFileUrl(event.doctorAvatarUrl) : undefined}
+                    />
+                    <div className="calendar-day-event__appointment-copy">
+                      <strong>{event.customerName || event.title}</strong>
+                      <span>{event.doctorName || "Chưa chọn bác sĩ"}</span>
+                    </div>
+                  </div>
+                  {event.roomName ? <small>{event.roomName}</small> : null}
+                </div>
+              ) : (
+                <>
+                  <strong>{event.title}</strong>
+                  <span>{event.statusLabel}</span>
+                  {event.summary ? <small>{event.summary}</small> : null}
+                </>
+              )}
               <span className="calendar-day-event__link" onClick={(clickEvent) => { clickEvent.stopPropagation(); onOpen(event) }}>
                 Mở chi tiết
               </span>
@@ -606,9 +649,78 @@ function projectTimelineEvent(event: PlannerEvent, selectedDate: Dayjs) {
 
   return {
     ...event,
+    startMinutes,
+    endMinutes: Math.min(DAY_VIEW_MINUTES, startMinutes + durationMinutes),
     topPercent: (startMinutes / DAY_VIEW_MINUTES) * 100,
     heightPercent: (Math.min(durationMinutes, DAY_VIEW_MINUTES - startMinutes) / DAY_VIEW_MINUTES) * 100,
   }
+}
+
+function layoutTimelineEvents<T extends PlannerEvent & { startMinutes: number; endMinutes: number; topPercent: number; heightPercent: number }>(
+  events: T[],
+) {
+  const sorted = [...events].sort((left, right) => {
+    if (left.startMinutes !== right.startMinutes) return left.startMinutes - right.startMinutes
+    return left.endMinutes - right.endMinutes
+  })
+  const laidOut: Array<T & { leftPercent: number; widthPercent: number }> = []
+  let cluster: T[] = []
+  let clusterEnd = -1
+
+  const flushCluster = () => {
+    if (!cluster.length) return
+    const active: Array<{ endMinutes: number; column: number }> = []
+    const assigned: Array<T & { column: number }> = []
+    let maxColumns = 1
+
+    cluster.forEach((event) => {
+      for (let index = active.length - 1; index >= 0; index -= 1) {
+        if (active[index].endMinutes <= event.startMinutes) {
+          active.splice(index, 1)
+        }
+      }
+
+      let column = 0
+      const usedColumns = new Set(active.map((item) => item.column))
+      while (usedColumns.has(column)) column += 1
+
+      active.push({ endMinutes: event.endMinutes, column })
+      assigned.push({ ...event, column })
+      maxColumns = Math.max(maxColumns, active.length, column + 1)
+    })
+
+    assigned.forEach((event) => {
+      laidOut.push({
+        ...event,
+        leftPercent: (event.column / maxColumns) * 100,
+        widthPercent: 100 / maxColumns,
+      })
+    })
+
+    cluster = []
+    clusterEnd = -1
+  }
+
+  sorted.forEach((event) => {
+    if (!cluster.length) {
+      cluster = [event]
+      clusterEnd = event.endMinutes
+      return
+    }
+
+    if (event.startMinutes < clusterEnd) {
+      cluster.push(event)
+      clusterEnd = Math.max(clusterEnd, event.endMinutes)
+      return
+    }
+
+    flushCluster()
+    cluster = [event]
+    clusterEnd = event.endMinutes
+  })
+
+  flushCluster()
+  return laidOut
 }
 
 function renderMonthCell(value: Dayjs, events: PlannerEvent[], onOpen: (event: PlannerEvent) => void) {
@@ -778,19 +890,29 @@ function buildPlannerEvents({
   workSchedules,
   leaveRequests,
   attendances,
+  staffRows,
+  customerRows,
+  roomRows,
   lookups,
 }: {
   appointments: Record<string, any>[]
   workSchedules: Record<string, any>[]
   leaveRequests: Record<string, any>[]
   attendances: Record<string, any>[]
+  staffRows: Record<string, any>[]
+  customerRows: Record<string, any>[]
+  roomRows: Record<string, any>[]
   lookups: LookupMap
 }) {
+  const staffById = new Map(staffRows.map((item) => [String(item.id), item]))
+  const customerById = new Map(customerRows.map((item) => [String(item.id), item]))
+  const roomById = new Map(roomRows.map((item) => [String(item.id), item]))
+
   const appointmentEvents: PlannerEvent[] = appointments.map((item) => ({
     id: String(item.id),
     resource: "appointments",
     type: "appointment",
-    title: `${lookups.customers?.[item.customerId] || item.customerId || "Khách hàng"}${item.doctorStaffId ? ` · ${lookups["staff-doctor"]?.[item.doctorStaffId] || lookups.staff?.[item.doctorStaffId] || item.doctorStaffId}` : ""}`,
+    title: customerDisplayName(customerById.get(String(item.customerId || "")), item.customerId),
     start: String(item.startTime || item.createdAt || ""),
     end: item.endTime ? String(item.endTime) : undefined,
     branchId: item.branchId ? String(item.branchId) : undefined,
@@ -800,11 +922,15 @@ function buildPlannerEvents({
     tone: EVENT_TYPE_COLOR.appointment,
     statusLabel: getFieldLabel("appointments", "status", String(item.status || "SCHEDULED")),
     summary: [
-      getFieldLabel("appointments", "type", String(item.type || "CONSULTATION")),
-      item.roomId ? lookups.rooms?.[item.roomId] || item.roomId : null,
-      item.equipmentId ? lookups.equipments?.[item.equipmentId] || item.equipmentId : null,
-      item.picStaffId ? `PIC: ${lookups["staff-staff"]?.[item.picStaffId] || lookups.staff?.[item.picStaffId] || item.picStaffId}` : null,
+      staffDisplayName(staffById.get(String(item.doctorStaffId || "")), item.doctorStaffId),
+      roomDisplayName(roomById.get(String(item.roomId || "")), item.roomId),
     ].filter(Boolean).join(" | "),
+    customerName: customerDisplayName(customerById.get(String(item.customerId || "")), item.customerId),
+    doctorName: staffDisplayName(staffById.get(String(item.doctorStaffId || "")), item.doctorStaffId),
+    doctorAvatarUrl: staffById.get(String(item.doctorStaffId || ""))?.avatarUrl
+      ? String(staffById.get(String(item.doctorStaffId || ""))?.avatarUrl)
+      : undefined,
+    roomName: roomDisplayName(roomById.get(String(item.roomId || "")), item.roomId),
   }))
 
   const scheduleEvents: PlannerEvent[] = workSchedules.map((item) => ({
@@ -863,4 +989,16 @@ function buildAttendanceStart(item: Record<string, any>) {
   if (!item.checkIn) return `${dateValue}T00:00`
   const normalizedCheckIn = String(item.checkIn).slice(0, 5)
   return `${dateValue}T${normalizedCheckIn}`
+}
+
+function customerDisplayName(record?: Record<string, any>, fallback?: unknown) {
+  return record?.fullName || record?.display_title || String(fallback || "Khách hàng")
+}
+
+function staffDisplayName(record?: Record<string, any>, fallback?: unknown) {
+  return record?.fullName || record?.display_title || String(fallback || "Nhân sự")
+}
+
+function roomDisplayName(record?: Record<string, any>, fallback?: unknown) {
+  return record?.name || record?.display_title || (fallback ? String(fallback) : "")
 }

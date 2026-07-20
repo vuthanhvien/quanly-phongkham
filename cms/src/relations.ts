@@ -62,10 +62,20 @@ export async function loadRelationOptions(fields: Array<string | FieldSpec>) {
   const relationSpecs = fields
     .map((field) => resolveRelationSpec(field))
     .filter(Boolean) as RelationSpec[];
-  const uniqueKeys = Array.from(new Set(relationSpecs.map((spec) => spec.lookupKey || spec.resource)));
+  const requestSpecs = [
+    ...relationSpecs,
+    ...relationSpecs
+      .filter((spec) => spec.lookupKey && spec.lookupKey !== spec.resource)
+      .map((spec) => ({
+        ...spec,
+        lookupKey: spec.resource,
+        params: undefined,
+      })),
+  ]
+  const uniqueKeys = Array.from(new Set(requestSpecs.map((spec) => spec.lookupKey || spec.resource)));
   const entries = await Promise.all(
     uniqueKeys.map(async (key) => {
-      const spec = relationSpecs.find((item) => (item.lookupKey || item.resource) === key)!;
+      const spec = requestSpecs.find((item) => (item.lookupKey || item.resource) === key)!;
       const response = await api
         .get(`/records/${spec.resource}`, { params: { pageSize: 500, ...spec.params } })
         .catch(() => ({ data: { data: [] } }));

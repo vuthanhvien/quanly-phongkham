@@ -2406,8 +2406,6 @@ textarea.ant-input {
 
 .calendar-day-event {
   position: absolute;
-  left: 12px;
-  right: 12px;
   pointer-events: auto;
   appearance: none;
   border-radius: calc(var(--app-radius) + 2px);
@@ -2435,6 +2433,38 @@ textarea.ant-input {
   color: var(--app-title);
   font-size: 11px;
   font-weight: 700;
+}
+
+.calendar-day-event__appointment {
+  display: grid;
+  gap: 6px;
+}
+
+.calendar-day-event__appointment-head {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 28px minmax(0, 1fr);
+}
+
+.calendar-day-event__avatar {
+  background: color-mix(in srgb, var(--app-primary) 18%, white);
+  color: var(--app-primary);
+  flex-shrink: 0;
+}
+
+.calendar-day-event__appointment-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.calendar-day-event__appointment-copy strong,
+.calendar-day-event__appointment-copy span,
+.calendar-day-event__appointment small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .calendar-day-event__link {
