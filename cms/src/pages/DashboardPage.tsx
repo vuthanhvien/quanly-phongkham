@@ -321,7 +321,7 @@ async function loadStaffDashboard(identity: Identity): Promise<StaffDashboardDat
     staffName: String(staff.fullName || staff.code || identity.fullName || identity.username || identity.email || "Nhân viên"),
     position: staff.position ? String(staff.position) : undefined,
     departmentName: staff.departmentId ? departmentMap[String(staff.departmentId)] : undefined,
-    branchName: branchMap[String(staff.defaultBranchId || identity.branchId || "")] || undefined,
+    branchName: branchMap[String(identity.branchId || "")] || undefined,
     todayShift: todayShift
       ? {
           label: String(todayShift.shiftLabel || "Ca làm"),

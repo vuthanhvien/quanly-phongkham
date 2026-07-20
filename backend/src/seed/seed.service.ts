@@ -226,7 +226,7 @@ export class SeedService implements OnApplicationBootstrap {
     let adminDepartment = await this.departments.findOne({ where: { code: 'BOD' } });
     if (!adminDepartment) {
       adminDepartment = await this.departments.save(
-        this.departments.create({ code: 'BOD', name: 'Ban dieu hanh', branchId: branch.id, isActive: true }),
+        this.departments.create({ code: 'BOD', name: 'Ban dieu hanh', isActive: true }),
       );
     }
 
@@ -239,7 +239,6 @@ export class SeedService implements OnApplicationBootstrap {
           email,
           position: 'System Administrator',
           departmentId: adminDepartment.id,
-          defaultBranchId: branch.id,
           userId: admin.id,
           status: 'ACTIVE',
         }),
@@ -320,8 +319,8 @@ export class SeedService implements OnApplicationBootstrap {
     if ((await this.views.count()) === 0) {
       await this.views.save([
         this.views.create({ entityType: 'customers', viewType: 'TABLE', role: 'ALL', config: { columns: ['code', 'fullName', 'phone', 'status', 'tier', 'nguon_khach'] } }),
-        this.views.create({ entityType: 'customers', viewType: 'FORM', role: 'ALL', config: { fields: ['code', 'fullName', 'phone', 'email', 'status', 'branchId', 'nguon_khach'] } }),
-        this.views.create({ entityType: 'customers', viewType: 'DETAIL', role: 'ALL', config: { fields: ['code', 'fullName', 'phone', 'email', 'status', 'tier', 'branchId', 'nguon_khach'] } }),
+        this.views.create({ entityType: 'customers', viewType: 'FORM', role: 'ALL', config: { fields: ['code', 'fullName', 'phone', 'email', 'status', 'nguon_khach'] } }),
+        this.views.create({ entityType: 'customers', viewType: 'DETAIL', role: 'ALL', config: { fields: ['code', 'fullName', 'phone', 'email', 'status', 'tier', 'nguon_khach'] } }),
       ]);
     }
 
@@ -454,11 +453,9 @@ export class SeedService implements OnApplicationBootstrap {
     if (current >= target) return;
 
     await this.insertGenerated(this.departments, current + 1, target, (index) => {
-      const branch = branches[(index - 1) % branches.length];
       return {
         code: `${LARGE_SEED_PREFIXES.departmentCode}${padSerial(index)}`,
         name: `${LARGE_SEED_PREFIXES.departmentName}${index}`,
-        branchId: branch.id,
         description: `Bo phan bulk ${index}`,
         isActive: boolFlag(index, 7),
       };
@@ -488,7 +485,6 @@ export class SeedService implements OnApplicationBootstrap {
     if (current >= target) return;
 
     await this.insertGenerated(this.staff, current + 1, target, (index) => {
-      const branch = branches[(index - 1) % branches.length];
       const department = departments[(index - 1) % departments.length];
       const user = users[index - 1];
       return {
@@ -498,7 +494,6 @@ export class SeedService implements OnApplicationBootstrap {
         email: `${LARGE_SEED_PREFIXES.userEmail}${padSerial(index)}@thienchanh.local`,
         position: index % 6 === 0 ? 'Bac si' : 'Tu van vien',
         departmentId: department?.id,
-        defaultBranchId: branch.id,
         userId: user?.id,
         status: index % 8 === 0 ? 'ON_LEAVE' : 'ACTIVE',
         joinedAt: dateOnly(index % 365),
@@ -542,7 +537,6 @@ export class SeedService implements OnApplicationBootstrap {
     if (current >= target) return;
 
     await this.insertGenerated(this.customers, current + 1, target, (index) => {
-      const branch = branches[(index - 1) % branches.length];
       const staffMember = staff[(index - 1) % staff.length];
       return {
         code: `${LARGE_SEED_PREFIXES.customerCode}${padSerial(index)}`,
@@ -555,7 +549,6 @@ export class SeedService implements OnApplicationBootstrap {
         tier: ['MEMBER', 'SILVER', 'GOLD'][index % 3],
         totalSpent: decimalValue(index * 125000),
         assignedStaff: staffMember?.id,
-        branchId: branch.id,
         note: `Khach hang sinh ra de load test #${index}`,
       };
     }, 'customers');
@@ -566,7 +559,6 @@ export class SeedService implements OnApplicationBootstrap {
     if (current >= target) return;
 
     await this.insertGenerated(this.leads, current + 1, target, (index) => {
-      const branch = branches[(index - 1) % branches.length];
       const staffMember = staff[(index - 1) % staff.length];
       const customer = customers[(index - 1) % customers.length];
       const converted = index % 5 === 0;
@@ -578,10 +570,9 @@ export class SeedService implements OnApplicationBootstrap {
         source: ['Facebook', 'TikTok', 'Google', 'Referral'][index % 4],
         status: converted ? 'CONVERTED' : ['NEW', 'QUALIFIED', 'FOLLOWING'][index % 3],
         assignedStaffId: staffMember?.id,
-        branchId: branch.id,
         convertedCustomerId: converted ? customer?.id : undefined,
         convertedAt: converted ? timeValue(index % 12, index % 60) : undefined,
-        note: `Lead test tai branch ${branch.name}`,
+        note: `Lead test #${index}`,
       };
     }, 'leads');
   }

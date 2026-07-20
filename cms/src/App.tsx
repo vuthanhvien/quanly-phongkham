@@ -4,8 +4,8 @@ import { ConfigProvider, theme } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
 import { hasResourceAccess, hasScreenAccess } from './access';
+import { authProvider, dataProvider, api, getGlobalBranchFilterIds, onGlobalBranchFilterChange } from './api';
 import { AppUiContext, cardPaddingBySize, controlHeightBySize, defaultAppUiSettings, loadCachedAppUiSettings, normalizeAppUiSettings, persistAppUiSettings, syncDocumentBranding, tablePaddingBySize, useAppUi, type AppUiSettings } from './app-ui';
-import { authProvider, dataProvider, api } from './api';
 import { isModuleEnabled } from './company-types';
 import { Shell } from './components/Shell';
 import { entityLabels } from './models';
@@ -42,14 +42,19 @@ const resources = Object.entries(entityLabels).map(([name, label]) => ({
 
 function ProtectedLayout() {
   const { refresh } = useAppUi();
+  const [branchScopeKey, setBranchScopeKey] = useState(() => getGlobalBranchFilterIds().join(','));
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => onGlobalBranchFilterChange((branchIds) => {
+    setBranchScopeKey(branchIds.join(','));
+  }), []);
+
   return (
     <Authenticated key="authenticated" fallback={<CatchAllNavigate to="/login" />}>
-      <Shell><Outlet /></Shell>
+      <Shell key={branchScopeKey}><Outlet /></Shell>
     </Authenticated>
   );
 }

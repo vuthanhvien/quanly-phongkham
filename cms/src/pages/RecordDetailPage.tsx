@@ -15,23 +15,29 @@ import {
   Tag,
   Typography,
 } from "antd"
-import { useEffect, useState } from "react"
+import { ReactNode, useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
   AuditOutlined,
+  BankOutlined,
+  CalendarOutlined,
   DeleteOutlined,
   EditOutlined,
   EyeOutlined,
+  FileTextOutlined,
+  IdcardOutlined,
   PhoneOutlined,
   PrinterOutlined,
   SwapOutlined,
+  TagOutlined,
+  TeamOutlined,
 } from "@ant-design/icons"
 import { api } from "../api"
 import { hasActionAccess } from "../access"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
-import { CustomField, entityLabels } from "../models"
+import { CustomField, entityLabels, getFieldLabel } from "../models"
 import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
 import {
   FieldLayoutConfig,
@@ -61,6 +67,11 @@ interface RelatedRecordEditState {
   recordId: string
 }
 
+interface MainRecordEditState {
+  resource: string
+  recordId: string
+}
+
 interface RecordDetailPageProps {
   resource?: string
   id?: string
@@ -83,6 +94,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   const [relatedDetail, setRelatedDetail] = useState<RelatedRecordDrawerState | null>(null)
   const [relatedDetailLoading, setRelatedDetailLoading] = useState(false)
   const [relatedEdit, setRelatedEdit] = useState<RelatedRecordEditState | null>(null)
+  const [mainEdit, setMainEdit] = useState<MainRecordEditState | null>(null)
   const [quickCreateBlock, setQuickCreateBlock] = useState<RelatedBlock | null>(null)
   const { mutate: deleteRecord } = useDelete()
 
@@ -259,11 +271,13 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
               </Tooltip>
             )}
             {hasActionAccess(resource, "update") && (
-              <Link to={`/${resource}/${id}/edit`}>
-                <Button className="primary-glow" type="primary">
-                  Sửa hồ sơ
-                </Button>
-              </Link>
+              <Button
+                className="primary-glow"
+                type="primary"
+                onClick={() => setMainEdit({ resource, recordId: id })}
+              >
+                Sửa hồ sơ
+              </Button>
             )}
           </Space>
         </div>
@@ -496,44 +510,41 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
         {/* Right: detail info */}
         <Col xs={24} xl={6}>
           <div className="detail-right-stack">
-            {(resource === "customers" || resource === "staff") && (
-              <Card className="glass-card detail-card" loading={loading}>
-                <div className="profile-summary">
-                  <div>
-                    <Typography.Text type="secondary">Trạng thái</Typography.Text>
-                    <Tag className="soft-tag">
-                      {record?.status || record?.role || "ACTIVE"}
-                    </Tag>
-                  </div>
-                  {resource === "customers" && (
-                    <>
-                      <div>
-                        <Typography.Text type="secondary">Hạng khách</Typography.Text>
-                        <Typography.Title level={3}>{record?.tier || "MEMBER"}</Typography.Title>
-                      </div>
-                      <div>
-                        <Typography.Text type="secondary">Tổng chi tiêu</Typography.Text>
-                        <Typography.Title level={4}>{formatCurrencyValue(record?.totalSpent)}</Typography.Title>
-                      </div>
-                    </>
-                  )}
-                  {resource === "staff" && (
-                    <>
-                      <div>
-                        <Typography.Text type="secondary">Chức danh</Typography.Text>
-                        <Typography.Title level={4}>{record?.position || "-"}</Typography.Title>
-                      </div>
-                      <div>
-                        <Typography.Text type="secondary">Chi nhánh mặc định</Typography.Text>
-                        <Typography.Text>
-                          <RecordValueView field="defaultBranchId" fileLookups={fileLookups} lookups={lookups} value={record?.defaultBranchId} />
-                        </Typography.Text>
-                      </div>
-                    </>
-                  )}
+            <Card className="glass-card detail-card profile-account-card detail-side-card" loading={loading}>
+              <div className="detail-side-header">
+                <div className="profile-account-copy">
+                  <Typography.Text className="eyebrow">Thông tin chính</Typography.Text>
+                  <Typography.Title level={4} style={{ margin: "4px 0 2px" }}>
+                    {getSummaryTitle(resource)}
+                  </Typography.Title>
+                  <Typography.Text type="secondary">
+                    {detailTitle(resource, record)}
+                  </Typography.Text>
                 </div>
-              </Card>
-            )}
+              </div>
+
+              {getSummaryTags(resource, record).length > 0 ? (
+                <Space size={[8, 8]} wrap>
+                  {getSummaryTags(resource, record).map((tag) => (
+                    <Tag key={`${tag.label}-${tag.value}`} className="soft-tag">
+                      {tag.value}
+                    </Tag>
+                  ))}
+                </Space>
+              ) : null}
+
+              <div className="profile-link-list">
+                {buildDetailSummaryItems(resource, record, lookups, fileLookups).map((item) => (
+                  <div key={item.key} className="profile-link-item">
+                    {item.icon}
+                    <div>
+                      <Typography.Text type="secondary">{item.label}</Typography.Text>
+                      <div className="profile-link-value">{item.value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
         </Col>
       </Row>
@@ -606,6 +617,43 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
               onSuccess={() => {
                 setQuickCreateBlock(null)
                 void reloadRelatedBlocks()
+              }}
+            />
+          )
+        )}
+      </Drawer>
+
+      <Drawer
+        destroyOnClose
+        maskClosable={false}
+        open={Boolean(mainEdit)}
+        placement="right"
+        title={mainEdit ? `Chỉnh sửa ${entityLabels[mainEdit.resource] || mainEdit.resource}` : "Chỉnh sửa"}
+        width={mainEdit?.resource === "service-orders" ? 980 : 620}
+        onClose={() => setMainEdit(null)}
+      >
+        {mainEdit && (
+          mainEdit.resource === "service-orders" ? (
+            <ServiceOrderForm
+              compact
+              id={mainEdit.recordId}
+              onCancel={() => setMainEdit(null)}
+              onSuccess={async () => {
+                setMainEdit(null)
+                await reloadCurrentRecord()
+                await reloadRelatedBlocks()
+              }}
+            />
+          ) : (
+            <RecordFormContent
+              compact
+              id={mainEdit.recordId}
+              resource={mainEdit.resource}
+              onCancel={() => setMainEdit(null)}
+              onSuccess={async () => {
+                setMainEdit(null)
+                await reloadCurrentRecord()
+                await reloadRelatedBlocks()
               }}
             />
           )
@@ -960,6 +1008,131 @@ function detailTitle(resource: string, record: Record<string, any> | null) {
     entityLabels[resource] ||
     resource
   )
+}
+
+function getSummaryTitle(resource: string) {
+  const label = entityLabels[resource] || resource
+  return `Tóm tắt ${String(label).toLowerCase()}`
+}
+
+function getSummaryStatusLabel(resource: string, record: Record<string, any> | null) {
+  const rawValue = String(record?.status || record?.role || "ACTIVE")
+  const label = getFieldLabel(resource, "status", rawValue)
+  if (label !== rawValue) return label
+  return rawValue
+    .replace(/[_-]+/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function getSummaryTags(resource: string, record: Record<string, any> | null) {
+  if (!record) return []
+
+  const tags: Array<{ label: string; value: string }> = []
+  const statusLabel = getSummaryStatusLabel(resource, record)
+  if (statusLabel && statusLabel !== "-") {
+    tags.push({ label: "status", value: statusLabel })
+  }
+
+  if (record.code) {
+    tags.push({ label: "code", value: String(record.code) })
+  }
+
+  return tags.slice(0, 2)
+}
+
+type DetailSummaryItem = {
+  key: string
+  icon: ReactNode
+  label: string
+  value: ReactNode
+}
+
+function buildDetailSummaryItems(
+  resource: string,
+  record: Record<string, any> | null,
+  lookups: LookupMap,
+  fileLookups: FileLookupMap,
+): DetailSummaryItem[] {
+  if (!record) return []
+
+  const catalog = getFieldCatalog(resource, [])
+  const fieldMap = new Map(catalog.map((field) => [field.key, field]))
+  const items: DetailSummaryItem[] = []
+  const added = new Set<string>()
+
+  const pushItem = (key: string, icon: ReactNode, fallbackLabel?: string) => {
+    if (added.has(key)) return
+    const value = record[key]
+    if (value === null || value === undefined || value === "") return
+    const field = fieldMap.get(key)
+    items.push({
+      key,
+      icon,
+      label: field?.label || fallbackLabel || key,
+      value: (
+        <RecordValueView
+          compact
+          field={field || key}
+          fileLookups={fileLookups}
+          lookups={lookups}
+          value={value}
+        />
+      ),
+    })
+    added.add(key)
+  }
+
+  if (resource === "customers") {
+    pushItem("status", <AuditOutlined />)
+    pushItem("tier", <TagOutlined />, "Hạng khách")
+    pushItem("totalSpent", <BankOutlined />)
+    pushItem("phone", <PhoneOutlined />)
+    pushItem("email", <IdcardOutlined />)
+    return items
+  }
+
+  if (resource === "staff") {
+    pushItem("status", <AuditOutlined />)
+    pushItem("type", <TagOutlined />, "Loại nhân sự")
+    pushItem("position", <IdcardOutlined />, "Chức danh")
+    pushItem("departmentId", <TeamOutlined />, "Phòng ban")
+    pushItem("phone", <PhoneOutlined />)
+    pushItem("email", <IdcardOutlined />)
+    return items
+  }
+
+  const candidateFields: Array<[string, ReactNode, string?]> = [
+    ["status", <AuditOutlined />],
+    ["code", <TagOutlined />],
+    ["name", <FileTextOutlined />],
+    ["fullName", <FileTextOutlined />],
+    ["customerId", <TeamOutlined />, "Khách hàng"],
+    ["leadId", <TeamOutlined />, "Lead"],
+    ["staffId", <TeamOutlined />, "Nhân viên"],
+    ["doctorStaffId", <TeamOutlined />, "Bác sĩ"],
+    ["assignedStaffId", <TeamOutlined />, "Phụ trách"],
+    ["ownerStaffId", <TeamOutlined />, "Người phụ trách"],
+    ["departmentId", <TeamOutlined />, "Phòng ban"],
+    ["branchId", <BankOutlined />, "Chi nhánh"],
+    ["totalAmount", <BankOutlined />, "Tổng tiền"],
+    ["paidAmount", <BankOutlined />, "Đã thanh toán"],
+    ["amount", <BankOutlined />, "Giá trị"],
+    ["orderDate", <CalendarOutlined />, "Ngày"],
+    ["workDate", <CalendarOutlined />, "Ngày làm"],
+    ["date", <CalendarOutlined />, "Ngày"],
+    ["startDate", <CalendarOutlined />, "Từ ngày"],
+    ["startTime", <CalendarOutlined />, "Bắt đầu"],
+    ["createdAt", <CalendarOutlined />, "Ngày tạo"],
+  ]
+
+  candidateFields.forEach(([key, icon, fallbackLabel]) => pushItem(key, icon, fallbackLabel))
+
+  if (!items.length) {
+    pushItem("note", <FileTextOutlined />, "Ghi chú")
+  }
+
+  return items.slice(0, 6)
 }
 
 function formatValue(value: unknown) {

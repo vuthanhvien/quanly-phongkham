@@ -271,20 +271,15 @@ export class ZaloService implements OnModuleInit {
     }
 
     const account = await this.getAccountOrFail(conversation.accountId);
-    const branchId = this.normalizeOptionalString(payload.branchId) || conversation.branchId || account.branchId || user.branchId;
     const phone = this.normalizeOptionalString(payload.phone) || conversation.contactPhone;
     const fullName = this.normalizeOptionalString(payload.fullName) || conversation.displayName || 'Khách Zalo';
 
-    if (!branchId) throw new BadRequestException('Cần chọn chi nhánh để tạo khách hàng');
     if (!phone) throw new BadRequestException('Cần số điện thoại để tạo khách hàng');
-
-    await this.ensureBranch(branchId);
     const customer = await this.customers.save(
       this.customers.create({
         code: await this.generateCustomerCode(),
         fullName,
         phone,
-        branchId,
         note: this.normalizeOptionalString(payload.note) || `Tạo từ hội thoại Zalo ${conversation.displayName}`,
         status: 'CONSULTING',
         tier: 'MEMBER',

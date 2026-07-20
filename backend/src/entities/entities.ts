@@ -104,9 +104,6 @@ export class Department extends ConfigurableEntity {
   name: string;
 
   @Column({ nullable: true })
-  branchId?: string;
-
-  @Column({ nullable: true })
   managerStaffId?: string;
 
   @Column({ type: 'text', nullable: true })
@@ -166,6 +163,9 @@ export class Staff extends ConfigurableEntity {
   @Column()
   fullName: string;
 
+  @Column({ default: 'STAFF' })
+  type: string;
+
   @Column({ nullable: true })
   phone?: string;
 
@@ -177,9 +177,6 @@ export class Staff extends ConfigurableEntity {
 
   @Column({ nullable: true })
   departmentId?: string;
-
-  @Column({ nullable: true })
-  defaultBranchId?: string;
 
   @Column({ nullable: true })
   userId?: string;
@@ -302,9 +299,6 @@ export class Customer extends ConfigurableEntity {
   @Column({ nullable: true })
   assignedStaff?: string;
 
-  @Column()
-  branchId: string;
-
   @Column({ type: 'text', nullable: true })
   note?: string;
 }
@@ -331,9 +325,6 @@ export class Lead extends ConfigurableEntity {
 
   @Column({ nullable: true })
   assignedStaffId?: string;
-
-  @Column()
-  branchId: string;
 
   @Column({ nullable: true })
   convertedCustomerId?: string;

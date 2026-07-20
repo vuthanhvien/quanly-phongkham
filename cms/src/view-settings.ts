@@ -1,4 +1,4 @@
-import { baseFields, CustomField, DynamicRole, FieldSpec, getResourceActionOptions, normalizeSelectOption, systemRoleOptions } from './models'
+import { baseFields, CustomField, DynamicRole, FieldSpec, getResourceActionOptions, isFieldHiddenForResource, normalizeSelectOption, systemRoleOptions } from './models'
 
 export const DEFAULT_ROLE_SCOPE = 'ALL'
 export const DEFAULT_ROLE_GROUPS = [DEFAULT_ROLE_SCOPE, ...systemRoleOptions]
@@ -214,9 +214,10 @@ export function getRoleOptions(views: ViewSettingRecord[], extraRoles: string[] 
 
 export function getFieldCatalog(resource: string, customFields: CustomField[]) {
   return [
-    ...(baseFields[resource] || []),
+    ...(baseFields[resource] || []).filter((field) => !isFieldHiddenForResource(resource, field.key)),
     ...customFields
       .filter((field) => field.isActive)
+      .filter((field) => !isFieldHiddenForResource(resource, field.key))
       .map(
         (field): FieldSpec => ({
           key: field.key,
@@ -298,6 +299,7 @@ export function buildFieldLayoutConfigs(
   view: ViewSettingRecord | undefined,
   viewType: ViewType,
 ) {
+  const resource = view?.entityType
   const entries = getConfigEntries(view, viewType)
 
   if (!entries.length) {
@@ -315,6 +317,7 @@ export function buildFieldLayoutConfigs(
 
   entries.forEach((entry) => {
     if (typeof entry === 'string') {
+      if (resource && isFieldHiddenForResource(resource, entry)) return
       const base = fallbackField(entry, catalog)
       seen.add(entry)
       configs.push({
@@ -326,6 +329,10 @@ export function buildFieldLayoutConfigs(
     }
 
     if (!entry || typeof entry !== 'object' || typeof entry.key !== 'string') {
+      return
+    }
+
+    if (resource && isFieldHiddenForResource(resource, entry.key)) {
       return
     }
 

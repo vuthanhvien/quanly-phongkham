@@ -20,25 +20,18 @@ import {
 } from "antd"
 import { useEffect, useState } from "react"
 import { api } from "../api"
-import { getFirstOptionValue } from "../utils/branchDefaults"
 import { getApiErrorMessage } from "../utils/apiError"
 
 interface Department {
   id: string
   code: string
   name: string
-  branchId?: string
   managerStaffId?: string
   description?: string
   parentId?: string
   sortOrder: number
   isActive: boolean
   children?: Department[]
-}
-
-interface Branch {
-  id: string
-  name: string
 }
 
 interface Staff {
@@ -67,7 +60,6 @@ function buildTree(flat: Department[]): Department[] {
 
 export function DepartmentsPage() {
   const [flat, setFlat] = useState<Department[]>([])
-  const [branches, setBranches] = useState<Branch[]>([])
   const [staffList, setStaffList] = useState<Staff[]>([])
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -79,13 +71,11 @@ export function DepartmentsPage() {
   async function load() {
     setLoading(true)
     try {
-      const [deptRes, branchRes, staffRes] = await Promise.all([
+      const [deptRes, staffRes] = await Promise.all([
         api.get("/records/departments", { params: { pageSize: 500 } }),
-        api.get("/records/branches", { params: { pageSize: 200 } }),
         api.get("/records/staff", { params: { pageSize: 500 } }),
       ])
       setFlat(deptRes.data.data as Department[])
-      setBranches(branchRes.data.data.map((r: Record<string, unknown>) => ({ id: String(r.id), name: String(r.name || r.slug) })))
       setStaffList(staffRes.data.data.map((r: Record<string, unknown>) => ({ id: String(r.id), fullName: String(r.fullName || r.code), code: String(r.code) })))
     } finally {
       setLoading(false)
@@ -95,7 +85,7 @@ export function DepartmentsPage() {
   function openCreate(parentId?: string) {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ parentId: parentId ?? null, branchId: getFirstOptionValue(branches), isActive: true, sortOrder: 0 })
+    form.setFieldsValue({ parentId: parentId ?? null, isActive: true, sortOrder: 0 })
     setModalOpen(true)
   }
 
@@ -104,7 +94,6 @@ export function DepartmentsPage() {
     form.setFieldsValue({
       code: dept.code,
       name: dept.name,
-      branchId: dept.branchId ?? null,
       managerStaffId: dept.managerStaffId ?? null,
       description: dept.description ?? "",
       parentId: dept.parentId ?? null,
@@ -118,7 +107,6 @@ export function DepartmentsPage() {
     const payload = {
       ...values,
       parentId: values.parentId || null,
-      branchId: values.branchId || null,
       managerStaffId: values.managerStaffId || null,
     }
     try {
@@ -158,7 +146,6 @@ export function DepartmentsPage() {
 
   const tree = buildTree(flat)
 
-  const branchMap = Object.fromEntries(branches.map((b) => [b.id, b.name]))
   const staffMap = Object.fromEntries(staffList.map((s) => [s.id, s.fullName]))
 
   const parentOptions = flat
@@ -175,13 +162,6 @@ export function DepartmentsPage() {
           <code style={{ fontSize: 11, opacity: 0.6 }}>{row.code}</code>
         </Space>
       ),
-    },
-    {
-      title: "Chi nhánh",
-      dataIndex: "branchId",
-      key: "branchId",
-      width: 160,
-      render: (v?: string) => v ? <Tag>{branchMap[v] || v}</Tag> : "—",
     },
     {
       title: "Trưởng bộ phận",
@@ -260,15 +240,6 @@ export function DepartmentsPage() {
               allowClear
               placeholder="— Cấp gốc (không có cha) —"
               options={parentOptions}
-              showSearch
-              optionFilterProp="label"
-            />
-          </Form.Item>
-          <Form.Item name="branchId" label="Chi nhánh">
-            <Select
-              allowClear
-              placeholder="Chọn chi nhánh..."
-              options={branches.map((b) => ({ value: b.id, label: b.name }))}
               showSearch
               optionFilterProp="label"
             />

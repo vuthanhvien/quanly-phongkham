@@ -1,10 +1,22 @@
 export type SelectOption = string | { value: string; label: string };
 
+const RESOURCE_HIDDEN_FIELD_KEYS: Record<string, string[]> = {
+  customers: ['branchId'],
+  leads: ['branchId'],
+  staff: ['defaultBranchId'],
+  departments: ['branchId'],
+}
+
 export function normalizeSelectOption (opt: SelectOption): { value: string; label: string } {
   return typeof opt === 'string' ? { value: opt, label: opt } : opt;
 }
 
+export function isFieldHiddenForResource(resource: string, fieldKey: string) {
+  return (RESOURCE_HIDDEN_FIELD_KEYS[resource] || []).includes(fieldKey)
+}
+
 export function getFieldLabel (resource: string, fieldKey: string, value: string): string {
+  if (isFieldHiddenForResource(resource, fieldKey)) return value;
   const fields = (baseFields as Record<string, FieldSpec[]>)[resource] || [];
   const field = fields.find((f) => f.key === fieldKey);
   if (!field?.options) return value;
@@ -393,7 +405,6 @@ export const baseFields: Record<string, FieldSpec[]> = {
   departments: [
     { key: 'code', label: 'Mã phòng ban', required: true, width: '33', tableWidth: 140 },
     { key: 'name', label: 'Tên phòng ban', required: true, width: '66', tableWidth: 220 },
-    { key: 'branchId', label: 'Chi nhánh', width: '50', tableWidth: 190 },
     { key: 'managerStaffId', label: 'Trưởng bộ phận', width: '50', tableWidth: 220 },
     { key: 'description', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
   ],
@@ -417,7 +428,6 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'email', label: 'Email', width: '50', tableWidth: 220 },
     { key: 'position', label: 'Chức danh', width: '50', tableWidth: 180 },
     { key: 'departmentId', label: 'Phòng ban', width: '50', tableWidth: 200 },
-    { key: 'defaultBranchId', label: 'Chi nhánh mặc định', width: '50', tableWidth: 200 },
     { key: 'userId', label: 'Tài khoản đăng nhập', width: '50', tableWidth: 220 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'ACTIVE', label: 'Đang làm' }, { value: 'INACTIVE', label: 'Ngừng' }, { value: 'ON_LEAVE', label: 'Nghỉ phép' }], width: '33', tableWidth: 140 },
     { key: 'joinedAt', label: 'Ngày vào làm', type: 'date', width: '33', tableWidth: 150 },
@@ -472,7 +482,6 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'address', label: 'Địa chỉ', width: '100', tableWidth: 300 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'CONSULTING', label: 'Đang tư vấn' }, { value: 'WAITING_SURGERY', label: 'Chờ phẫu thuật' }, { value: 'IN_TREATMENT', label: 'Đang điều trị' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'INACTIVE', label: 'Ngừng hoạt động' }], width: '33', tableWidth: 160 },
     { key: 'totalSpent', label: 'Tổng chi tiêu', type: 'number', width: '33', tableWidth: 160 },
-    { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   leads: [
@@ -483,7 +492,6 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'source', label: 'Nguồn lead', width: '50', tableWidth: 180 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'NEW', label: 'Mới' }, { value: 'CONTACTING', label: 'Đang liên hệ' }, { value: 'QUALIFIED', label: 'Tiềm năng' }, { value: 'CONVERTED', label: 'Đã chuyển đổi' }, { value: 'LOST', label: 'Mất' }], width: '33', tableWidth: 150 },
     { key: 'assignedStaffId', label: 'Nhân viên phụ trách', width: '50', tableWidth: 220 },
-    { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
     { key: 'convertedCustomerId', label: 'Khách hàng đã chuyển đổi', disabled: true, width: '66', tableWidth: 240 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],

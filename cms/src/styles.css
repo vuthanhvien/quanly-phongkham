@@ -820,24 +820,77 @@ body {
   background: color-mix(in srgb, var(--app-primary) 10%, transparent) !important;
 }
 
+.detail-summary-card {
+  overflow: hidden;
+}
+
+.detail-summary-card .ant-card-body {
+  padding: 18px !important;
+}
+
 .profile-summary {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
-.profile-summary > div {
-  background: rgba(15, 23, 42, 0.045);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: var(--app-radius);
+.profile-summary-header {
   display: grid;
-  gap: 8px;
-  padding: 12px;
+  gap: 4px;
 }
 
-.profile-summary h3,
-.profile-summary h4 {
-  color: var(--app-text) !important;
+.profile-summary-kicker {
+  color: var(--app-text-soft) !important;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-summary-header .ant-typography {
+  color: var(--app-title) !important;
   margin: 0 !important;
+}
+
+.profile-summary-list {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: calc(var(--app-radius) + 2px);
+  overflow: hidden;
+}
+
+.profile-summary-row {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.profile-summary-row + .profile-summary-row {
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.profile-summary-meta {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.profile-summary-value {
+  color: var(--app-title) !important;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.profile-summary-value-strong {
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.profile-summary-tag {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .profile-left-stack {

@@ -4,7 +4,7 @@ import { hash } from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { extname, join } from 'path';
-import { FindOptionsWhere, ILike, In, LessThan, MoreThan, QueryFailedError, Repository } from 'typeorm';
+import { FindOptionsWhere, ILike, In, IsNull, LessThan, MoreThan, QueryFailedError, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
 import {
   Appointment,
@@ -110,7 +110,7 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
     main: {
       sheetName: 'customers',
       resource: 'customers',
-      columns: ['code', 'fullName', 'phone', 'email', 'gender', 'idNumber', 'address', 'status', 'totalSpent', 'branchId', 'note'],
+      columns: ['code', 'fullName', 'phone', 'email', 'gender', 'idNumber', 'address', 'status', 'totalSpent', 'note'],
     },
     related: [
       {
@@ -162,7 +162,7 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
     main: {
       sheetName: 'leads',
       resource: 'leads',
-      columns: ['code', 'fullName', 'phone', 'email', 'source', 'status', 'assignedStaffId', 'branchId', 'note'],
+      columns: ['code', 'fullName', 'phone', 'email', 'source', 'status', 'assignedStaffId', 'note'],
     },
     related: [
       {
@@ -179,7 +179,7 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
       sheetName: 'staff',
       resource: 'staff',
       columns: [
-        'code', 'fullName', 'phone', 'email', 'position', 'departmentId', 'defaultBranchId', 'userId', 'status', 'joinedAt',
+        'code', 'fullName', 'type', 'phone', 'email', 'position', 'departmentId', 'userId', 'status', 'joinedAt',
         'dateOfBirth', 'gender', 'idCardNumber', 'idCardIssuedDate', 'idCardIssuedPlace', 'address', 'avatarUrl',
         'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelation',
         'bankAccountNumber', 'bankAccountName', 'bankName', 'bankBranch', 'taxCode', 'dependants', 'note',
@@ -677,6 +677,7 @@ export class RecordsService {
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
     const record = await this.saveRecord(resource, repository.create(normalized), repository);
+    await this.syncStaffTypeToUserRole(resource, record);
     if (resource === 'service-orders') await this.replaceServiceOrderItems(record.id, serviceOrderItems);
     if (resource === 'accounting-voucher-lines') await this.recalculateAccountingVoucherTotals(String(record.voucherId || ''));
     await this.replaceCustomFieldValues(resource, record.id, (payload.customFields || {}) as Record<string, unknown>);
@@ -706,6 +707,7 @@ export class RecordsService {
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
     const record = await this.saveRecord(resource, repository.merge(previous, normalized), repository);
+    await this.syncStaffTypeToUserRole(resource, record);
     if (resource === 'service-orders') await this.replaceServiceOrderItems(id, serviceOrderItems);
     if (resource === 'accounting-voucher-lines') {
       const voucherIds = Array.from(new Set([String(previous.voucherId || ''), String(record.voucherId || '')].filter(Boolean)));
@@ -743,14 +745,14 @@ export class RecordsService {
 
   async revealPhone(id: string, user: AuthUser) {
     const customer = (await this.findRaw('customers', id)) as Customer;
-    await this.assertPermission(user, 'customers', 'reveal-phone', customer.branchId);
+    await this.assertPermission(user, 'customers', 'reveal-phone');
     await this.audit(user, 'REVEAL_PHONE', 'customers', id);
     return { data: { phone: customer.phone } };
   }
 
   async convertLeadToCustomer(id: string, user: AuthUser) {
     const lead = await this.findStored('leads', id) as Lead;
-    await this.assertPermission(user, 'leads', 'convert-to-customer', lead.branchId);
+    await this.assertPermission(user, 'leads', 'convert-to-customer');
 
     if (lead.convertedCustomerId) {
       const existingCustomer = await this.findRaw('customers', lead.convertedCustomerId);
@@ -763,7 +765,6 @@ export class RecordsService {
         fullName: lead.fullName,
         phone: lead.phone,
         email: lead.email,
-        branchId: lead.branchId,
         assignedStaff: lead.assignedStaffId,
         status: 'CONSULTING',
         note: lead.note,
@@ -1109,6 +1110,7 @@ export class RecordsService {
 
     if (resource === 'staff') {
       if (column === 'fullName') return `Mau nhân viên ${context.index + 1}`;
+      if (column === 'type') return ['STAFF', 'DOCTOR', 'STAFF', 'ADMIN'][context.index % 4];
       if (column === 'position') return ['Điều dưỡng', 'Lễ tân', 'Kỹ thuật viên', 'Bác sĩ'][context.index % 4];
       if (column === 'status') return ['ACTIVE', 'ACTIVE', 'ON_LEAVE', 'ACTIVE'][context.index % 4];
       if (column === 'joinedAt') return this.fakeFixedDate(2025, 0, 6 + context.index * 9);
@@ -2667,7 +2669,10 @@ export class RecordsService {
     });
   }
 
-  private resolveStaffType(record: Pick<Staff, 'position'>, user?: Pick<User, 'role'>) {
+  private resolveStaffType(record: Pick<Staff, 'position' | 'type'>, user?: Pick<User, 'role'>) {
+    const normalizedStoredType = String(record.type || '').trim().toUpperCase();
+    if (['ADMIN', 'DOCTOR', 'STAFF'].includes(normalizedStoredType)) return normalizedStoredType;
+
     const normalizedUserRole = String(user?.role || '').trim().toUpperCase();
     if (['ADMIN', 'DOCTOR', 'STAFF'].includes(normalizedUserRole)) return normalizedUserRole;
 
@@ -2675,6 +2680,29 @@ export class RecordsService {
     if (/(bac\s*si|bác\s*sĩ|doctor|bs\.)/.test(normalizedPosition)) return 'DOCTOR';
     if (/(admin|quan\s*tri|quản\s*trị)/.test(normalizedPosition)) return 'ADMIN';
     return 'STAFF';
+  }
+
+  private async syncStaffTypeToUserRole(resource: string, record: Record<string, unknown>) {
+    if (resource !== 'staff') return;
+    const userId = String(record.userId || '').trim();
+    const nextRole = String(record.type || '').trim().toUpperCase();
+    if (!userId || !['ADMIN', 'DOCTOR', 'STAFF'].includes(nextRole)) return;
+
+    const linkedUser = await this.users.findOne({ where: { id: userId } });
+    if (!linkedUser) return;
+
+    let changed = false;
+    if (linkedUser.role !== nextRole) {
+      linkedUser.role = nextRole;
+      changed = true;
+    }
+    if (!linkedUser.staffId && record.id) {
+      linkedUser.staffId = String(record.id);
+      changed = true;
+    }
+    if (changed) {
+      await this.users.save(linkedUser);
+    }
   }
 
   private toAbsolutePublicUrl(url: string | undefined, request?: RequestContext) {
@@ -2716,6 +2744,10 @@ export class RecordsService {
     delete value.updatedAt;
     delete value.customFields;
     delete value.items;
+    if (resource === 'staff') {
+      const normalizedType = String(value.type || '').trim().toUpperCase();
+      value.type = ['ADMIN', 'DOCTOR', 'STAFF'].includes(normalizedType) ? normalizedType : 'STAFF';
+    }
     if (resource === 'customers') {
       if (typeof value.phone === 'string' && value.phone.includes('*')) {
         delete value.phone;
@@ -3000,10 +3032,13 @@ export class RecordsService {
 
   private mergeWhere(
     where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
-    scoped: FindOptionsWhere<ConfigurableEntity>,
+    scoped: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
   ) {
-    if (Array.isArray(where)) return where.length ? where.map((item) => ({ ...item, ...scoped })) : scoped;
-    return { ...where, ...scoped };
+    const whereItems = Array.isArray(where) ? where : [where];
+    const scopedItems = Array.isArray(scoped) ? scoped : [scoped];
+    const merged = whereItems.flatMap((whereItem) => scopedItems.map((scopedItem) => ({ ...whereItem, ...scopedItem })));
+    if (merged.length === 1) return merged[0];
+    return merged;
   }
 
   private async resolveStaffIdsByUserRole(role: string) {
@@ -3501,12 +3536,10 @@ export class RecordsService {
     where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
     user?: AuthUser,
   ) {
-    const branchField = this.branchField(resource);
     const branches = this.allowedBranches(user);
-    if (!branchField || !branches || branches.length === 0) return where;
-    const scoped = { [branchField]: In(branches) } as FindOptionsWhere<ConfigurableEntity>;
-    if (Array.isArray(where)) return where.length ? where.map((item) => ({ ...item, ...scoped })) : scoped;
-    return { ...where, ...scoped };
+    if (!branches || branches.length === 0) return where;
+    const scoped = this.buildBranchScopedWhere(resource, branches);
+    return scoped ? this.mergeWhere(where, scoped) : where;
   }
 
   private applySelectedBranchFilters(
@@ -3520,20 +3553,41 @@ export class RecordsService {
       .filter(Boolean);
     if (branchIds.length === 0) return where;
 
+    const scoped = this.buildBranchScopedWhere(resource, branchIds);
+    return scoped ? this.mergeWhere(where, scoped) : where;
+  }
+
+  private buildBranchScopedWhere(resource: string, branchIds: string[]) {
     const branchField = this.branchField(resource);
     if (branchField) {
-      const scoped = { [branchField]: In(branchIds) } as FindOptionsWhere<ConfigurableEntity>;
-      if (Array.isArray(where)) return where.length ? where.map((item) => ({ ...item, ...scoped })) : scoped;
-      return { ...where, ...scoped };
+      const scoped = { [branchField]: In(Array.from(new Set([...branchIds, '']))) } as FindOptionsWhere<ConfigurableEntity>;
+      if (!this.branchFieldAllowsEmpty(resource)) return scoped;
+      return [scoped, { [branchField]: IsNull() } as FindOptionsWhere<ConfigurableEntity>];
     }
 
     if (resource === 'branches') {
-      const scoped = { id: In(branchIds) } as FindOptionsWhere<ConfigurableEntity>;
-      if (Array.isArray(where)) return where.length ? where.map((item) => ({ ...item, ...scoped })) : scoped;
-      return { ...where, ...scoped };
+      return { id: In(branchIds) } as FindOptionsWhere<ConfigurableEntity>;
     }
 
-    return where;
+    return undefined;
+  }
+
+  private branchFieldAllowsEmpty(resource: string) {
+    return [
+      'accounting-fiscal-settings',
+      'accounting-vouchers',
+      'accounting-voucher-lines',
+      'user-accounts',
+      'work-contracts',
+      'staff-insurances',
+      'attendances',
+      'leave-requests',
+      'payrolls',
+      'staff-rewards',
+      'staff-trainings',
+      'performance-reviews',
+      'position-histories',
+    ].includes(resource);
   }
 
   private branchIdOf(resource: string, record: object) {
@@ -3544,18 +3598,14 @@ export class RecordsService {
   private branchField(resource: string) {
     const map: Record<string, string> = {
       branches: 'id',
-      departments: 'branchId',
       rooms: 'branchId',
       equipments: 'branchId',
-      staff: 'defaultBranchId',
       'accounting-fiscal-settings': 'defaultBranchId',
       'accounting-vouchers': 'branchId',
       'accounting-voucher-lines': 'branchId',
       'branch-role-assignments': 'branchId',
       'branch-permissions': 'branchId',
       'user-accounts': 'branchId',
-      customers: 'branchId',
-      leads: 'branchId',
       'lead-activities': 'branchId',
       'medical-episodes': 'branchId',
       appointments: 'branchId',
@@ -3567,6 +3617,15 @@ export class RecordsService {
       invoices: 'branchId',
       expenses: 'branchId',
       treatments: 'branchId',
+      'work-contracts': 'branchId',
+      'staff-insurances': 'branchId',
+      attendances: 'branchId',
+      'leave-requests': 'branchId',
+      payrolls: 'branchId',
+      'staff-rewards': 'branchId',
+      'staff-trainings': 'branchId',
+      'performance-reviews': 'branchId',
+      'position-histories': 'branchId',
     };
     return map[resource];
   }

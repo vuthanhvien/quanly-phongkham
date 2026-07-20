@@ -39,7 +39,6 @@ type StaffProfile = {
   phone?: string
   position?: string
   departmentId?: string
-  defaultBranchId?: string
   status?: string
   joinedAt?: string
   dateOfBirth?: string
@@ -134,7 +133,6 @@ export function ProfilePage() {
   const { data: identity } = useGetIdentity<Identity>()
   const [staff, setStaff] = useState<StaffProfile | null>(null)
   const [branch, setBranch] = useState<BranchProfile | null>(null)
-  const [staffBranch, setStaffBranch] = useState<BranchProfile | null>(null)
   const [department, setDepartment] = useState<DepartmentProfile | null>(null)
   const [branchMap, setBranchMap] = useState<Record<string, string>>({})
 
@@ -146,7 +144,6 @@ export function ProfilePage() {
         if (!active) return
         setStaff(null)
         setBranch(null)
-        setStaffBranch(null)
         setDepartment(null)
         setBranchMap({})
         return
@@ -170,9 +167,8 @@ export function ProfilePage() {
           ]),
         )
 
-        const [departmentResponse, staffBranchResponse] = await Promise.all([
+        const [departmentResponse] = await Promise.all([
           nextStaff?.departmentId ? api.get(`/records/departments/${nextStaff.departmentId}`) : Promise.resolve(null),
-          nextStaff?.defaultBranchId ? api.get(`/records/branches/${nextStaff.defaultBranchId}`) : Promise.resolve(null),
         ])
 
         if (!active) return
@@ -180,13 +176,11 @@ export function ProfilePage() {
         setStaff(nextStaff)
         setBranch(nextBranch)
         setDepartment((departmentResponse?.data?.data ?? null) as DepartmentProfile | null)
-        setStaffBranch((staffBranchResponse?.data?.data ?? null) as BranchProfile | null)
         setBranchMap(nextBranchMap)
       } catch {
         if (!active) return
         setStaff(null)
         setBranch(null)
-        setStaffBranch(null)
         setDepartment(null)
         setBranchMap({})
       }
@@ -244,7 +238,6 @@ export function ProfilePage() {
         <DetailItem label="Chức vụ" value={staff.position || "—"} />
         <DetailItem label="Trạng thái" value={<Tag color={staffStatusColor}>{staff.status || "—"}</Tag>} />
         <DetailItem label="Phòng ban" value={department ? `${department.name || "—"}${department.code ? ` (${department.code})` : ""}` : (staff.departmentId || "—")} />
-        <DetailItem label="Chi nhánh nhân viên" value={staffBranch?.name || staffBranch?.slug || staff.defaultBranchId || "—"} />
         <DetailItem label="Ngày vào làm" value={formatDate(staff.joinedAt)} />
         <DetailItem label="Ngày sinh" value={formatDate(staff.dateOfBirth)} />
         <DetailItem label="Giới tính" value={staff.gender || "—"} />
@@ -320,8 +313,6 @@ export function ProfilePage() {
     department,
     identity?.branchId,
     staff,
-    staffBranch?.name,
-    staffBranch?.slug,
     staffStatusColor,
   ])
 
