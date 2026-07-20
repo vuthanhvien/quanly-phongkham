@@ -1,13 +1,14 @@
 import {
+  UserOutlined,
   FileImageOutlined,
   FileOutlined,
   FilePdfOutlined,
   FileTextOutlined,
   LinkOutlined,
 } from "@ant-design/icons"
-import { Button, Image } from "antd"
+import { Avatar, Button, Image } from "antd"
 import { resolveFileUrl } from "../api"
-import { displayValue, FileLookupMap, getRelationSpec, LookupMap } from "../relations"
+import { displayValue, FileLookupMap, getRelationMeta, getRelationSpec, LookupMap, RelationLookupRecord } from "../relations"
 import { FieldSpec } from "../models"
 
 interface RecordValueViewProps {
@@ -31,11 +32,58 @@ export function RecordValueView({ field, value, lookups, fileLookups, compact, o
   }
 
   const relationSpec = getRelationSpec(field)
+  const relationMeta = getRelationMeta(lookups, field, value)
+  if (relationSpec && isCompactRelationCard(relationSpec.resource) && relationMeta) {
+    return renderRelationCardValue(field, value, lookups, compact, relationSpec.resource, relationMeta, onRelationClick)
+  }
   if (relationSpec && relationSpec.resource !== "files" && onRelationClick) {
     return renderRelationValue(field, value, lookups, compact, relationSpec.resource, onRelationClick)
   }
 
   return <>{displayValue(field, value, lookups)}</>
+}
+
+function renderRelationCardValue(
+  field: string | FieldSpec,
+  value: unknown,
+  lookups: LookupMap,
+  compact: boolean | undefined,
+  resource: string,
+  relationMeta: RelationLookupRecord,
+  onRelationClick?: (resource: string, id: string) => void,
+) {
+  const itemId = Array.isArray(value) ? String(value[0] || "") : String(value)
+  const content = (
+    <span className={`relation-entity-card${compact ? " compact" : ""}`}>
+      <Avatar
+        className="relation-entity-card__avatar"
+        icon={<UserOutlined />}
+        size={24}
+        src={relationMeta.avatarUrl ? resolveFileUrl(String(relationMeta.avatarUrl)) : undefined}
+      />
+      <span className="relation-entity-card__copy">
+        <strong>{relationMeta.code || relationMeta.display_title || displayValue(field, value, lookups)}</strong>
+        <span>{relationMeta.fullName || relationMeta.name || relationMeta.display_title || displayValue(field, value, lookups)}</span>
+      </span>
+    </span>
+  )
+
+  if (!onRelationClick) return content
+
+  return (
+    <Button
+      size={compact ? "small" : "middle"}
+      style={{ paddingInline: 0 }}
+      type="link"
+      onClick={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onRelationClick(resource, itemId)
+      }}
+    >
+      {content}
+    </Button>
+  )
 }
 
 function renderRelationValue(
@@ -229,4 +277,8 @@ function renderFileIcon(file: { mimeType?: string; extension?: string }, large =
     return <FileTextOutlined style={iconStyle} />
   }
   return <FileOutlined style={iconStyle} />
+}
+
+function isCompactRelationCard(resource: string) {
+  return ["customers", "leads", "staff"].includes(resource)
 }

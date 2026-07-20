@@ -5,6 +5,15 @@ import { formatClinicDateTime, normalizeDateValueForInput } from './utils/dateti
 import { buildFolderPathMap, normalizeFileFolderRows } from './utils/fileFolders';
 
 export type LookupMap = Record<string, Record<string, string>>;
+export interface RelationLookupRecord extends Record<string, unknown> {
+  id: string
+  label: string
+  code?: string
+  fullName?: string
+  name?: string
+  avatarUrl?: string
+  display_title?: string
+}
 export interface FileLookupItem {
   id: string;
   title: string;
@@ -46,6 +55,27 @@ export function getRelationSpec(field: string | FieldSpec) {
   return resolveRelationSpec(field);
 }
 
+export function getRelationMetaMapKey(key: string) {
+  return `${key}__meta`
+}
+
+export function getRelationMetaMap(lookups: LookupMap, key: string) {
+  return ((lookups as unknown as Record<string, Record<string, RelationLookupRecord>>)[getRelationMetaMapKey(key)]) || {}
+}
+
+export function getRelationMeta(lookups: LookupMap, field: string | FieldSpec, value: unknown) {
+  const relation = resolveRelationSpec(field)
+  if (!relation || value === null || value === undefined || value === '') return undefined
+  const itemId = String(value)
+  const lookupKey = relation.lookupKey || relation.resource
+  const primary = getRelationMetaMap(lookups, lookupKey)[itemId]
+  if (primary) return primary
+  if (lookupKey !== relation.resource) {
+    return getRelationMetaMap(lookups, relation.resource)[itemId]
+  }
+  return undefined
+}
+
 export function isRelationField(key: string) {
   return Boolean(relationFields[key]);
 }
@@ -73,7 +103,7 @@ export async function loadRelationOptions(fields: Array<string | FieldSpec>) {
       })),
   ]
   const uniqueKeys = Array.from(new Set(requestSpecs.map((spec) => spec.lookupKey || spec.resource)));
-  const entries = await Promise.all(
+  const entryGroups = await Promise.all(
     uniqueKeys.map(async (key) => {
       const spec = requestSpecs.find((item) => (item.lookupKey || item.resource) === key)!;
       const response = await api
@@ -81,18 +111,32 @@ export async function loadRelationOptions(fields: Array<string | FieldSpec>) {
         .catch(() => ({ data: { data: [] } }));
       if (spec.resource === 'file-folders') {
         const rows = normalizeFileFolderRows(response.data.data || []);
-        return [key, buildFolderPathMap(rows)] as const;
+        return [[key, buildFolderPathMap(rows)]] as const;
       }
+      const rows = response.data.data || []
       const byId = Object.fromEntries(
-        response.data.data.map((row: Record<string, unknown>) => [
+        rows.map((row: Record<string, unknown>) => [
           String(row.id),
           relationLabel(row, spec),
         ]),
       );
-      return [key, byId] as const;
+      const metaById = Object.fromEntries(
+        rows.map((row: Record<string, unknown>) => [
+          String(row.id),
+          {
+            ...row,
+            id: String(row.id),
+            label: relationLabel(row, spec),
+          } satisfies RelationLookupRecord,
+        ]),
+      )
+      return [
+        [key, byId],
+        [getRelationMetaMapKey(key), metaById],
+      ] as const;
     }),
   );
-  return Object.fromEntries(entries) as LookupMap;
+  return Object.fromEntries(entryGroups.flat()) as LookupMap;
 }
 
 export async function loadFileLookupMap(pageSize = 500) {

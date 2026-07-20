@@ -6,6 +6,7 @@ import {
   FileTextOutlined,
 } from "@ant-design/icons"
 import {
+  Avatar,
   Button,
   Empty,
   Form,
@@ -23,12 +24,13 @@ import {
   Typography,
   message,
 } from "antd"
+import { UserOutlined } from "@ant-design/icons"
 import { useEffect, useState } from "react"
 import dayjs from "dayjs"
 import { api, resolveFileUrl } from "../api"
 import { FileUploadPanel } from "./FileUploadPanel"
 import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
-import { loadRelationOptions, LookupMap } from "../relations"
+import { getRelationMetaMap, loadRelationOptions, LookupMap, RelationLookupRecord } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
 import { getFirstLookupValue } from "../utils/branchDefaults"
 import { buildLocalDateTime, currentLocalDate, currentLocalDateTime, normalizeDateTimeValueForInput, normalizeDateValueForInput, parseClinicDateTime } from "../utils/datetime"
@@ -633,10 +635,8 @@ function FieldInput({
         allowClear
         disabled={field.disabled}
         showSearch
-        optionFilterProp="label"
-        options={Object.entries(lookups[relation.lookupKey || relation.resource] || {}).map(
-          ([v, label]) => ({ value: v, label }),
-        )}
+        optionFilterProp="searchLabel"
+        options={buildRelationSelectOptions(lookups, relation.lookupKey || relation.resource, relation.resource)}
         placeholder={field.placeholder || `Chọn ${field.label.toLowerCase()}`}
         value={value}
         onChange={onChange}
@@ -680,6 +680,43 @@ function FieldInput({
       value={value as string | undefined}
       onChange={(e) => onChange?.(e.target.value)}
     />
+  )
+}
+
+function buildRelationSelectOptions(lookups: LookupMap, lookupKey: string, resource: string) {
+  const labels = lookups[lookupKey] || {}
+  const metaMap = getRelationMetaMap(lookups, lookupKey)
+  const fallbackMetaMap = lookupKey === resource ? metaMap : getRelationMetaMap(lookups, resource)
+
+  return Object.entries(labels).map(([value, label]) => {
+    const meta = metaMap[value] || fallbackMetaMap[value]
+    if (!meta || !["customers", "leads", "staff"].includes(resource)) {
+      return { value, label, searchLabel: String(label) }
+    }
+    const primaryText = meta.code || meta.display_title || String(label)
+    const secondaryText = meta.fullName || meta.name || meta.display_title || String(label)
+    return {
+      value,
+      label: renderRelationSelectLabel(meta, primaryText, secondaryText),
+      searchLabel: `${primaryText} ${secondaryText}`.trim(),
+    }
+  })
+}
+
+function renderRelationSelectLabel(meta: RelationLookupRecord, primaryText: string, secondaryText: string) {
+  return (
+    <span className="relation-entity-card compact">
+      <Avatar
+        className="relation-entity-card__avatar"
+        icon={<UserOutlined />}
+        size={24}
+        src={meta.avatarUrl ? resolveFileUrl(String(meta.avatarUrl)) : undefined}
+      />
+      <span className="relation-entity-card__copy">
+        <strong>{primaryText}</strong>
+        <span>{secondaryText}</span>
+      </span>
+    </span>
   )
 }
 
