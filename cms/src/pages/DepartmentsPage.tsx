@@ -20,6 +20,8 @@ import {
 } from "antd"
 import { useEffect, useState } from "react"
 import { api } from "../api"
+import { getFirstOptionValue } from "../utils/branchDefaults"
+import { getApiErrorMessage } from "../utils/apiError"
 
 interface Department {
   id: string
@@ -93,7 +95,7 @@ export function DepartmentsPage() {
   function openCreate(parentId?: string) {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ parentId: parentId ?? null, isActive: true, sortOrder: 0 })
+    form.setFieldsValue({ parentId: parentId ?? null, branchId: getFirstOptionValue(branches), isActive: true, sortOrder: 0 })
     setModalOpen(true)
   }
 
@@ -131,8 +133,7 @@ export function DepartmentsPage() {
       setEditing(null)
       await load()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Có lỗi xảy ra"
-      void message.error(msg)
+      void message.error(getApiErrorMessage(err, "Có lỗi xảy ra"))
     }
   }
 
@@ -149,8 +150,7 @@ export function DepartmentsPage() {
           void message.success("Đã xóa")
           await load()
         } catch (err: unknown) {
-          const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Có lỗi xảy ra"
-          void message.error(msg)
+          void message.error(getApiErrorMessage(err, "Có lỗi xảy ra"))
         }
       },
     })

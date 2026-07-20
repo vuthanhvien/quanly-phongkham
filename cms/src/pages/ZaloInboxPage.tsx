@@ -34,6 +34,7 @@ import type { UploadFile } from "antd/es/upload/interface"
 import dayjs from "dayjs"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
+import { getFirstOptionValue } from "../utils/branchDefaults"
 import { getApiErrorMessage } from "../utils/apiError"
 
 interface ZaloAccount {
@@ -249,7 +250,7 @@ export function ZaloInboxPage() {
   function openCreateAccount() {
     setEditingAccount(null)
     accountForm.resetFields()
-    accountForm.setFieldsValue({ listenerEnabled: true })
+    accountForm.setFieldsValue({ listenerEnabled: true, branchId: getFirstOptionValue(branchOptions) })
     setAccountModalOpen(true)
   }
 
@@ -397,7 +398,7 @@ export function ZaloInboxPage() {
     customerForm.setFieldsValue({
       fullName: selectedConversation.displayName,
       phone: selectedConversation.contactPhone,
-      branchId: selectedAccount?.branchId,
+      branchId: selectedAccount?.branchId || getFirstOptionValue(branchOptions),
       note: `Tạo từ hội thoại Zalo ${selectedConversation.displayName}`,
     })
     setCustomerModalOpen(true)

@@ -116,13 +116,11 @@ async function fetchListSafe<T>(resource: string, pageSize = 500) {
 
 export function CalendarPage() {
   const navigate = useNavigate()
-  const [calendarMode, setCalendarMode] = useState<CalendarMode>("week")
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("day")
   const [selectedDate, setSelectedDate] = useState(dayjs())
   const [events, setEvents] = useState<PlannerEvent[]>([])
   const [lookups, setLookups] = useState<LookupMap>({})
-  const [selectedTypes, setSelectedTypes] = useState<PlannerEventType[]>(["appointment", "schedule", "leave", "attendance"])
-  const [branchFilter, setBranchFilter] = useState<string | undefined>(undefined)
-  const [staffFilter, setStaffFilter] = useState<string | undefined>(undefined)
+  const [selectedTypes, setSelectedTypes] = useState<PlannerEventType[]>(["appointment"])
   const [doctorFilter, setDoctorFilter] = useState<string | undefined>(undefined)
   const [quickCreateResource, setQuickCreateResource] = useState<QuickCreateResource | null>(null)
   const [quickDetail, setQuickDetail] = useState<CalendarQuickDetailState | null>(null)
@@ -149,12 +147,10 @@ export function CalendarPage() {
     () =>
       events.filter((item) => {
         if (!selectedTypes.includes(item.type)) return false
-        if (branchFilter && item.branchId !== branchFilter) return false
-        if (staffFilter && item.staffId !== staffFilter) return false
         if (doctorFilter && (item.doctorStaffId || item.staffId) !== doctorFilter) return false
         return true
       }),
-    [branchFilter, doctorFilter, events, selectedTypes, staffFilter],
+    [doctorFilter, events, selectedTypes],
   )
 
   const selectedEvents = useMemo(
@@ -184,24 +180,6 @@ export function CalendarPage() {
       attendance: dayEvents.filter((item) => item.type === "attendance").length,
     }
   }, [selectedEvents])
-
-  const branchOptions = useMemo(
-    () =>
-      Object.entries(lookups.branches || {}).map(([value, label]) => ({
-        value,
-        label,
-      })),
-    [lookups],
-  )
-
-  const staffOptions = useMemo(
-    () =>
-      Object.entries(lookups.staff || {}).map(([value, label]) => ({
-        value,
-        label,
-      })),
-    [lookups],
-  )
 
   const doctorOptions = useMemo(
     () =>
@@ -258,22 +236,6 @@ export function CalendarPage() {
             ]}
             value={calendarMode}
             onChange={(value) => setCalendarMode(value)}
-          />
-          <Select
-            allowClear
-            className="calendar-planner-select"
-            placeholder="Lọc chi nhánh"
-            options={branchOptions}
-            value={branchFilter}
-            onChange={(value) => setBranchFilter(value)}
-          />
-          <Select
-            allowClear
-            className="calendar-planner-select"
-            placeholder="Lọc nhân sự"
-            options={staffOptions}
-            value={staffFilter}
-            onChange={(value) => setStaffFilter(value)}
           />
           <Select
             allowClear
@@ -591,10 +553,6 @@ function DayPlannerTimeline({
 }) {
   const hourSlots = Array.from({ length: DAY_VIEW_HOUR_COUNT + 1 }, (_, index) => DAY_VIEW_START_HOUR + index)
   const timelineEvents = events.map((event) => projectTimelineEvent(event, selectedDate)).filter(Boolean)
-
-  if (!timelineEvents.length) {
-    return <Empty description="Chưa có lịch trong ngày được chọn" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-  }
 
   return (
     <div className="calendar-day-timeline">

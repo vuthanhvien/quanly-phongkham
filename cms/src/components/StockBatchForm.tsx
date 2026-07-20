@@ -4,6 +4,7 @@ import type { ColumnsType } from "antd/es/table"
 import dayjs from "dayjs"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
+import { getFirstOptionValue } from "../utils/branchDefaults"
 import { getApiErrorMessage } from "../utils/apiError"
 
 interface StockBatchFormProps {
@@ -120,12 +121,11 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
       const productRows = Array.isArray(payload.products) ? payload.products : []
       const batchRows = Array.isArray(payload.batches) ? payload.batches : []
 
-      setBranchOptions(
-        branchRows.map((row: Record<string, unknown>) => ({
-          value: String(row.id),
-          label: `${row.slug || ""} - ${row.name || row.id}`,
-        })),
-      )
+      const nextBranchOptions = branchRows.map((row: Record<string, unknown>) => ({
+        value: String(row.id),
+        label: `${row.slug || ""} - ${row.name || row.id}`,
+      }))
+      setBranchOptions(nextBranchOptions)
       setSupplierOptions(
         supplierRows.map((row: Record<string, unknown>) => ({
           value: String(row.id),
@@ -153,6 +153,9 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
           unit: String(row.unit || "cai"),
         })),
       )
+      if (!form.getFieldValue("branchId")) {
+        form.setFieldsValue({ branchId: getFirstOptionValue(nextBranchOptions) })
+      }
     } catch (error: any) {
       message.error(getApiErrorMessage(error, "Không tải được danh sách sản phẩm / lô hàng"))
     } finally {

@@ -3,6 +3,7 @@ import { Button, Card, Form, Input, InputNumber, Select, Space, Table, Typograph
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
+import { getFirstOptionValue } from "../utils/branchDefaults"
 import { getApiErrorMessage } from "../utils/apiError"
 
 interface ServiceOrderFormProps {
@@ -82,12 +83,11 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
           label: `${row.code || ""} - ${row.fullName || row.id}`,
         })),
       )
-      setBranchOptions(
-        (branchesResponse.data.data || []).map((row: Record<string, unknown>) => ({
-          value: String(row.id),
-          label: `${row.slug || ""} - ${row.name || row.id}`,
-        })),
-      )
+      const nextBranchOptions = (branchesResponse.data.data || []).map((row: Record<string, unknown>) => ({
+        value: String(row.id),
+        label: `${row.slug || ""} - ${row.name || row.id}`,
+      }))
+      setBranchOptions(nextBranchOptions)
       setStaffOptions(
         (staffResponse.data.data || []).map((row: Record<string, unknown>) => ({
           value: String(row.id),
@@ -102,6 +102,9 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
           sellingPrice: Number(row.sellingPrice || 0),
         })),
       )
+      if (!editing && !form.getFieldValue("branchId")) {
+        form.setFieldsValue({ branchId: getFirstOptionValue(nextBranchOptions) })
+      }
     } catch (error: any) {
       message.error(getApiErrorMessage(error, "Không tải được danh sách sản phẩm/lookup cho đơn hàng"))
     } finally {

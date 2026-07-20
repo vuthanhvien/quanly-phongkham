@@ -13,6 +13,7 @@ import {
 import { useEffect, useState } from "react"
 import { api } from "../api"
 import { BranchRoleAssignment, DynamicRole } from "../models"
+import { getFirstOptionValue } from "../utils/branchDefaults"
 
 interface AssignmentFormValues {
   userId: string
@@ -68,7 +69,7 @@ export function BranchRoleAssignmentsPage() {
     assignmentForm.resetFields()
     assignmentForm.setFieldsValue({
       userId: undefined as unknown as string,
-      branchId: undefined as unknown as string,
+      branchId: getFirstOptionValue(branchOptions),
       roleKeys: [],
       isActive: true,
     })

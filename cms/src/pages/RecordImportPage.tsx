@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import * as XLSX from "xlsx"
 import { api } from "../api"
+import { getApiErrorMessage } from "../utils/apiError"
 import { baseFields, CustomField, entityLabels, FieldSpec, relationFields } from "../models"
 import { displayValue, loadRelationOptions, LookupMap } from "../relations"
 import { getFieldCatalog } from "../view-settings"
@@ -285,7 +286,7 @@ export function RecordImportPage() {
         )
         setTimeout(() => navigate(`/${resource}`), 400)
       } catch (error: any) {
-        message.error(String(error?.response?.data?.message || error?.message || "Import dữ liệu thất bại"))
+        message.error(getApiErrorMessage(error, "Import dữ liệu thất bại"))
       } finally {
         setSaving(false)
       }
@@ -309,8 +310,7 @@ export function RecordImportPage() {
         successCount += 1
         nextRows[index] = { ...row, __saved: true }
       } catch (error: any) {
-        const errorMessage =
-          String(error?.response?.data?.message || error?.message || "Lưu dữ liệu thất bại")
+        const errorMessage = getApiErrorMessage(error, "Lưu dữ liệu thất bại")
         nextRows[index] = {
           ...row,
           errors: [errorMessage],

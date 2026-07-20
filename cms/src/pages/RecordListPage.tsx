@@ -38,6 +38,7 @@ import { StockBatchForm } from "../components/StockBatchForm"
 import { CustomField, entityLabels } from "../models"
 import { RecordDetailPage } from "./RecordDetailPage"
 import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
+import { getApiErrorMessage } from "../utils/apiError"
 import {
   FieldLayoutConfig,
   getFieldCatalog,
@@ -287,7 +288,7 @@ export function RecordListPage() {
       setDuplicateValues(preparedValues)
       setCreating(true)
     } catch (error: any) {
-      message.error(String(error?.response?.data?.message || "Không thể nhân bản bản ghi"))
+      message.error(getApiErrorMessage(error, "Không thể nhân bản bản ghi"))
     } finally {
       setDuplicatingId(null)
     }

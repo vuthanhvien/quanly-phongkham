@@ -71,6 +71,13 @@ function ResourceGuard() {
     : <Navigate to="/" replace />;
 }
 
+function StaticResourceGuard({ resource }: { resource: string }) {
+  const { settings } = useAppUi();
+  return hasResourceAccess(resource) && isModuleEnabled(resource, settings.enabledModules, settings.companyType)
+    ? <Outlet />
+    : <Navigate to="/" replace />;
+}
+
 function RecordDetailRedirect() {
   const { resource = "", id = "" } = useParams()
   return <Navigate replace to={`/${resource}?detail=${id}`} />
@@ -208,14 +215,22 @@ export function App() {
               <Route element={<ScreenGuard screen="audit-logs" />}>
                 <Route path="/audit-logs" element={<AuditPage />} />
               </Route>
-              <Route element={<ResourceGuard />}>
+              <Route element={<StaticResourceGuard resource="file-folders" />}>
                 <Route path="/file-folders" element={<FileFoldersPage />} />
+              </Route>
+              <Route element={<StaticResourceGuard resource="product-categories" />}>
                 <Route path="/product-categories" element={<CategoriesPage />} />
+              </Route>
+              <Route element={<StaticResourceGuard resource="departments" />}>
                 <Route path="/department" element={<Navigate to="/departments" replace />} />
                 <Route path="/deparment" element={<Navigate to="/departments" replace />} />
                 <Route path="/derparment" element={<Navigate to="/departments" replace />} />
                 <Route path="/departments" element={<DepartmentsPage />} />
+              </Route>
+              <Route element={<StaticResourceGuard resource="payrolls" />}>
                 <Route path="/payrolls" element={<PayrollsPage />} />
+              </Route>
+              <Route element={<ResourceGuard />}>
                 <Route path="/:resource" element={<RecordListPage />} />
                 <Route path="/:resource/import" element={<RecordImportPage />} />
                 <Route path="/:resource/:id/edit" element={<RecordFormPage />} />

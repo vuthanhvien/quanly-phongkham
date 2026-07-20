@@ -4,6 +4,8 @@ import type { TabsProps } from "antd"
 import dayjs, { Dayjs } from "dayjs"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
+import { getFirstOptionValue } from "../utils/branchDefaults"
+import { getApiErrorMessage } from "../utils/apiError"
 
 type ReportKey =
   | "general-ledger"
@@ -55,11 +57,13 @@ export function AccountingReportsPage() {
         api.get("/records/accounting-periods", { params: { pageSize: 500 } }),
         api.get("/records/accounting-chart-accounts", { params: { pageSize: 500 } }),
       ])
-      setBranches(branchResponse.data.data || [])
+      const nextBranches = branchResponse.data.data || []
+      setBranches(nextBranches)
       setPeriods(periodResponse.data.data || [])
       setAccounts(accountResponse.data.data || [])
+      setBranchId((current) => current || getFirstOptionValue(nextBranches))
     } catch (error: any) {
-      message.error(String(error?.response?.data?.message || "Không thể tải dữ liệu lọc báo cáo"))
+      message.error(getApiErrorMessage(error, "Không thể tải dữ liệu lọc báo cáo"))
     }
   }
 
@@ -72,7 +76,7 @@ export function AccountingReportsPage() {
       setRows(response.data.data || [])
       setSummary(response.data.summary || {})
     } catch (error: any) {
-      message.error(String(error?.response?.data?.message || "Không thể tải báo cáo"))
+      message.error(getApiErrorMessage(error, "Không thể tải báo cáo"))
       setRows([])
       setSummary({})
     } finally {

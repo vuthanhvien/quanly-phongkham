@@ -25,6 +25,7 @@ import {
 } from "antd"
 import { useEffect, useState } from "react"
 import { api } from "../api"
+import { getApiErrorMessage } from "../utils/apiError"
 
 interface Staff {
   id: string
@@ -144,8 +145,7 @@ export function PayrollsPage() {
         void message.success("Đã tính lương thành công")
         await load()
       } catch (err: unknown) {
-        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Có lỗi xảy ra"
-        void message.error(msg)
+        void message.error(getApiErrorMessage(err, "Có lỗi xảy ra"))
         setGenerating(false)
       } finally {
         setGenerating(false)
@@ -164,8 +164,7 @@ export function PayrollsPage() {
         await api.post("/payroll/generate", { ...values, staffId: id })
         success.push(staffMap2[id] || id)
       } catch (err: unknown) {
-        const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? "Lỗi không xác định"
-        failed.push({ name: staffMap2[id] || id, error: msg })
+        failed.push({ name: staffMap2[id] || id, error: getApiErrorMessage(err, "Lỗi không xác định") })
       }
       setGenProgress({ done: i + 1, total: targets.length })
     }

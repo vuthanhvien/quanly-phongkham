@@ -32,12 +32,12 @@ import {
   UserOutlined,
 } from "@ant-design/icons"
 import { useGetIdentity, useLogout } from "@refinedev/core"
-import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typography } from "antd"
+import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Select, Space, Typography } from "antd"
 import type { MenuProps } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { hasResourceAccess, hasScreenAccess } from "../access"
-import { api } from "../api"
+import { api, getGlobalBranchFilterIds, onGlobalBranchFilterChange, setGlobalBranchFilterIds } from "../api"
 import { useAppUi } from "../app-ui"
 import {
   appModuleGroups,
@@ -133,6 +133,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
     }
   })
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [branchOptions, setBranchOptions] = useState<Array<{ value: string; label: string }>>([])
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>(() => getGlobalBranchFilterIds())
 
   useEffect(() => {
     let active = true
@@ -160,6 +162,42 @@ export function Shell({ children }: { children: React.ReactNode }) {
       active = false
     }
   }, [identity?.staffId])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadBranchOptions() {
+      try {
+        const response = await api.get("/records/branches", { params: { pageSize: 200 } })
+        if (!active) return
+        const nextOptions = (response.data?.data || []).map((row: Record<string, unknown>) => ({
+          value: String(row.id),
+          label: String(row.name || row.slug || row.code || row.id),
+        }))
+        setBranchOptions(nextOptions)
+        setSelectedBranchIds((current) => {
+          const allowedIds = new Set(nextOptions.map((item: { value: string }) => item.value))
+          const normalized = current.filter((item) => allowedIds.has(item))
+          const nextSelected = normalized.length > 0 ? normalized : (nextOptions[0] ? [nextOptions[0].value] : [])
+          if (nextSelected.join(",") !== current.join(",")) {
+            setGlobalBranchFilterIds(nextSelected)
+          }
+          return nextSelected
+        })
+      } catch {
+        if (!active) return
+        setBranchOptions([])
+      }
+    }
+
+    void loadBranchOptions()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => onGlobalBranchFilterChange(setSelectedBranchIds), [])
 
   const profileDisplayName = useMemo(
     () => staffDisplayName || identity?.fullName || identity?.username || identity?.email || "",
@@ -392,6 +430,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
               className="sider-toggle"
               icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={toggleCollapsed}
+            />
+            <Select
+              className="global-branch-filter"
+              mode="multiple"
+              maxTagCount="responsive"
+              options={branchOptions}
+              placeholder="Chọn chi nhánh"
+              showSearch
+              value={selectedBranchIds}
+              onChange={(values) => {
+                const nextValues = values.length > 0 ? values : (branchOptions[0] ? [branchOptions[0].value] : [])
+                setSelectedBranchIds(nextValues)
+                setGlobalBranchFilterIds(nextValues)
+              }}
             />
           </Space>
           <Dropdown

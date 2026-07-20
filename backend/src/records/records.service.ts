@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { extname, join } from 'path';
 import { FindOptionsWhere, ILike, In, LessThan, MoreThan, QueryFailedError, Repository } from 'typeorm';
@@ -90,6 +91,7 @@ type RequestContext = {
 };
 
 type BundleRootResource = 'customers' | 'leads' | 'staff';
+type WorkScheduleRecurrenceType = 'NONE' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
 
 type ImportBundleSheetConfig = {
   sheetName: string;
@@ -477,6 +479,8 @@ export class RecordsService {
   ) {
     await this.assertPermission(user, resource, 'view');
     const repository = this.repository(resource);
+    const normalizedFilters = { ...filters };
+    delete normalizedFilters.branchIds;
     let where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[] = {};
     if (search) {
       const searchable: Record<string, string[]> = {
@@ -508,7 +512,8 @@ export class RecordsService {
       };
       where = (searchable[resource] || []).map((field) => ({ [field]: ILike(`%${search}%`) })) as FindOptionsWhere<ConfigurableEntity>[];
     }
-    where = await this.applyResourceFilters(resource, where, filters);
+    where = await this.applyResourceFilters(resource, where, normalizedFilters);
+    where = this.applySelectedBranchFilters(resource, where, filters);
     where = this.applyBranchScope(resource, where, user);
     const [rows, total] = await repository.findAndCount({
       where,
@@ -665,6 +670,9 @@ export class RecordsService {
       ? await this.normalizeServiceOrderItems(payload.items)
       : [];
     const normalized = await this.normalizeInput(resource, payload, true);
+    if (resource === 'work-schedules' && this.isRecurringWorkSchedule(normalized)) {
+      return this.createRecurringWorkSchedule(normalized, payload, user);
+    }
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
@@ -2786,7 +2794,185 @@ export class RecordsService {
       value.sortOrder = Number(value.sortOrder || 0);
       value.isActive = value.isActive !== false;
     }
+    if (resource === 'work-schedules') {
+      const recurrenceType = String(value.recurrenceType || 'NONE').trim().toUpperCase();
+      value.recurrenceType = recurrenceType;
+      value.recurrenceInterval = recurrenceType !== 'NONE' ? Math.max(1, Number(value.recurrenceInterval || 1)) : undefined;
+      if (Array.isArray(value.recurrenceWeekdays)) {
+        value.recurrenceWeekdays = value.recurrenceWeekdays.map(String).filter(Boolean).join(',');
+      } else if (typeof value.recurrenceWeekdays === 'string') {
+        value.recurrenceWeekdays = value.recurrenceWeekdays
+          .split(',')
+          .map((item) => item.trim().toUpperCase())
+          .filter(Boolean)
+          .join(',');
+      } else {
+        value.recurrenceWeekdays = undefined;
+      }
+      value.recurrenceUntil = recurrenceType !== 'NONE' && value.recurrenceUntil ? String(value.recurrenceUntil) : undefined;
+      value.seriesId = value.seriesId ? String(value.seriesId) : undefined;
+      if (recurrenceType === 'NONE') {
+        delete value.seriesId;
+        delete value.recurrenceInterval;
+        delete value.recurrenceWeekdays;
+        delete value.recurrenceUntil;
+      }
+    }
     return value;
+  }
+
+  private isRecurringWorkSchedule(value: Record<string, unknown>) {
+    return String(value.recurrenceType || 'NONE').trim().toUpperCase() !== 'NONE';
+  }
+
+  private async createRecurringWorkSchedule(
+    normalized: Record<string, unknown>,
+    payload: Record<string, unknown>,
+    user: AuthUser,
+  ) {
+    const occurrences = this.buildRecurringWorkScheduleEntries(normalized);
+    const repository = this.repository('work-schedules');
+    const savedRecords: WorkSchedule[] = [];
+
+    for (const occurrence of occurrences) {
+      const saved = await this.saveRecord('work-schedules', repository.create(occurrence), repository) as WorkSchedule;
+      savedRecords.push(saved);
+      await this.replaceCustomFieldValues('work-schedules', saved.id, (payload.customFields || {}) as Record<string, unknown>);
+    }
+
+    await this.audit(user, 'CREATE', 'work-schedules', savedRecords[0]?.id || normalized.seriesId as string, {
+      seriesId: normalized.seriesId,
+      createdCount: savedRecords.length,
+      recurrenceType: normalized.recurrenceType,
+    });
+
+    const hydrated = await this.findRaw('work-schedules', savedRecords[0].id);
+    return { data: this.protect('work-schedules', hydrated) };
+  }
+
+  private buildRecurringWorkScheduleEntries(normalized: Record<string, unknown>) {
+    const workDate = String(normalized.workDate || '').trim();
+    const recurrenceType = String(normalized.recurrenceType || 'NONE').trim().toUpperCase() as WorkScheduleRecurrenceType;
+    const recurrenceInterval = Math.max(1, Number(normalized.recurrenceInterval || 1));
+    const recurrenceUntil = String(normalized.recurrenceUntil || '').trim();
+    const startTimeText = normalized.startTime ? String(normalized.startTime) : '';
+    const endTimeText = normalized.endTime ? String(normalized.endTime) : '';
+
+    if (!workDate) throw new BadRequestException('Lịch làm việc lặp phải có ngày bắt đầu');
+    if (!startTimeText || !endTimeText) throw new BadRequestException('Lịch làm việc lặp phải có giờ bắt đầu và kết thúc');
+    if (!recurrenceUntil) throw new BadRequestException('Lịch làm việc lặp phải có ngày kết thúc lặp');
+
+    const seriesId = normalized.seriesId || randomUUID();
+    const startDate = this.parseDateOnly(workDate);
+    const untilDate = this.parseDateOnly(recurrenceUntil);
+    if (!startDate || !untilDate || untilDate < startDate) {
+      throw new BadRequestException('Ngày kết thúc lặp không hợp lệ');
+    }
+
+    const weekdays = this.normalizeRecurrenceWeekdays(String(normalized.recurrenceWeekdays || ''), startDate);
+    const dates = this.expandRecurringDates(startDate, untilDate, recurrenceType, recurrenceInterval, weekdays);
+    if (dates.length === 0) throw new BadRequestException('Không tạo được lịch làm việc từ cấu hình lặp');
+    if (dates.length > 180) throw new BadRequestException('Chuỗi lặp quá dài, vui lòng rút ngắn thời gian lặp');
+
+    return dates.map((date) => ({
+      ...normalized,
+      seriesId,
+      workDate: this.formatDateOnly(date),
+      startTime: this.applyDateToDateTime(date, startTimeText),
+      endTime: this.applyDateToDateTime(date, endTimeText),
+      recurrenceType,
+      recurrenceInterval,
+      recurrenceWeekdays: recurrenceType === 'WEEKLY' ? weekdays.join(',') : undefined,
+      recurrenceUntil,
+    }));
+  }
+
+  private expandRecurringDates(
+    startDate: Date,
+    untilDate: Date,
+    recurrenceType: WorkScheduleRecurrenceType,
+    recurrenceInterval: number,
+    weekdays: string[],
+  ) {
+    if (recurrenceType === 'DAILY') {
+      const dates: Date[] = [];
+      for (let current = new Date(startDate); current <= untilDate; current = this.addDays(current, recurrenceInterval)) {
+        dates.push(new Date(current));
+      }
+      return dates;
+    }
+
+    if (recurrenceType === 'WEEKLY') {
+      const selectedDays = new Set(weekdays.length > 0 ? weekdays : [this.weekdayCode(startDate)]);
+      const dates: Date[] = [];
+      for (let current = new Date(startDate); current <= untilDate; current = this.addDays(current, 1)) {
+        const diffDays = Math.floor((current.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000));
+        const weekIndex = Math.floor(diffDays / 7);
+        if (weekIndex % recurrenceInterval !== 0) continue;
+        if (selectedDays.has(this.weekdayCode(current))) {
+          dates.push(new Date(current));
+        }
+      }
+      return dates;
+    }
+
+    if (recurrenceType === 'MONTHLY') {
+      const dates: Date[] = [];
+      for (let offset = 0; ; offset += recurrenceInterval) {
+        const current = this.addMonthsPreservingDay(startDate, offset);
+        if (current > untilDate) break;
+        dates.push(current);
+      }
+      return dates;
+    }
+
+    return [new Date(startDate)];
+  }
+
+  private normalizeRecurrenceWeekdays(value: string, startDate: Date) {
+    const normalized = value
+      .split(',')
+      .map((item) => item.trim().toUpperCase())
+      .filter(Boolean);
+    return normalized.length > 0 ? normalized : [this.weekdayCode(startDate)];
+  }
+
+  private parseDateOnly(value: string) {
+    const parsed = new Date(`${value}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private formatDateOnly(value: Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private addDays(value: Date, days: number) {
+    const next = new Date(value);
+    next.setDate(next.getDate() + days);
+    return next;
+  }
+
+  private addMonthsPreservingDay(value: Date, months: number) {
+    const year = value.getFullYear();
+    const monthIndex = value.getMonth() + months;
+    const targetYear = year + Math.floor(monthIndex / 12);
+    const targetMonth = ((monthIndex % 12) + 12) % 12;
+    const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+    return new Date(targetYear, targetMonth, Math.min(value.getDate(), lastDay));
+  }
+
+  private weekdayCode(value: Date) {
+    return ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][value.getDay()];
+  }
+
+  private applyDateToDateTime(targetDate: Date, dateTimeText: string) {
+    const matched = String(dateTimeText).match(/T(\d{2}:\d{2})/);
+    const timeText = matched?.[1];
+    if (!timeText) return dateTimeText;
+    return `${this.formatDateOnly(targetDate)}T${timeText}`;
   }
 
   private async applyResourceFilters(
@@ -3264,7 +3450,7 @@ export class RecordsService {
           (payload.roomId && item.roomId === payload.roomId)
         ),
     );
-    if (conflict) throw new BadRequestException('Bac si hoac phong da co lich trong khung gio nay');
+    if (conflict) throw new BadRequestException('Bác sĩ hoặc phòng đã có lịch trong khung giờ này');
   }
 
   private async assertPermission(user: AuthUser | undefined, resource: string, action: string, branchId?: string) {
@@ -3321,6 +3507,33 @@ export class RecordsService {
     const scoped = { [branchField]: In(branches) } as FindOptionsWhere<ConfigurableEntity>;
     if (Array.isArray(where)) return where.length ? where.map((item) => ({ ...item, ...scoped })) : scoped;
     return { ...where, ...scoped };
+  }
+
+  private applySelectedBranchFilters(
+    resource: string,
+    where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
+    filters: Record<string, string>,
+  ) {
+    const branchIds = String(filters.branchIds || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (branchIds.length === 0) return where;
+
+    const branchField = this.branchField(resource);
+    if (branchField) {
+      const scoped = { [branchField]: In(branchIds) } as FindOptionsWhere<ConfigurableEntity>;
+      if (Array.isArray(where)) return where.length ? where.map((item) => ({ ...item, ...scoped })) : scoped;
+      return { ...where, ...scoped };
+    }
+
+    if (resource === 'branches') {
+      const scoped = { id: In(branchIds) } as FindOptionsWhere<ConfigurableEntity>;
+      if (Array.isArray(where)) return where.length ? where.map((item) => ({ ...item, ...scoped })) : scoped;
+      return { ...where, ...scoped };
+    }
+
+    return where;
   }
 
   private branchIdOf(resource: string, record: object) {

@@ -597,7 +597,7 @@ export function LandingPagesPage() {
     }
 
     if (!payload.title.trim()) {
-      message.error('Can nhap ten page')
+      message.error('Cần nhập tên page')
       return null
     }
 

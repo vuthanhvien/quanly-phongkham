@@ -650,6 +650,21 @@ export class WorkSchedule extends ConfigurableEntity {
   endTime?: Date;
 
   @Column({ nullable: true })
+  seriesId?: string;
+
+  @Column({ nullable: true })
+  recurrenceType?: string;
+
+  @Column({ type: 'int', nullable: true })
+  recurrenceInterval?: number;
+
+  @Column({ type: 'text', nullable: true })
+  recurrenceWeekdays?: string;
+
+  @Column({ type: 'date', nullable: true })
+  recurrenceUntil?: string;
+
+  @Column({ nullable: true })
   roomId?: string;
 
   @Column({ default: 'PLANNED' })

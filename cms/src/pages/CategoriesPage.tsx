@@ -26,6 +26,7 @@ import type { UploadFile } from "antd"
 import { useEffect, useState } from "react"
 import * as XLSX from "xlsx"
 import { api } from "../api"
+import { getApiErrorMessage } from "../utils/apiError"
 
 interface ItemCategory {
   id: string
@@ -146,10 +147,7 @@ export function CategoriesPage() {
       setEditing(null)
       await load()
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        "Có lỗi xảy ra"
-      void message.error(msg)
+      void message.error(getApiErrorMessage(err, "Có lỗi xảy ra"))
     }
   }
 
@@ -166,10 +164,7 @@ export function CategoriesPage() {
           void message.success("Đã xóa")
           await load()
         } catch (err: unknown) {
-          const msg =
-            (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-            "Có lỗi xảy ra"
-          void message.error(msg)
+          void message.error(getApiErrorMessage(err, "Có lỗi xảy ra"))
         }
       },
     })
@@ -209,10 +204,7 @@ export function CategoriesPage() {
       setImportResult(res.data as ImportResult)
       await load()
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        "Import thất bại"
-      void message.error(msg)
+      void message.error(getApiErrorMessage(err, "Import thất bại"))
     } finally {
       setImporting(false)
     }

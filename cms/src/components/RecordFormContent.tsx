@@ -24,12 +24,14 @@ import {
   message,
 } from "antd"
 import { useEffect, useState } from "react"
+import dayjs from "dayjs"
 import { api, resolveFileUrl } from "../api"
 import { FileUploadPanel } from "./FileUploadPanel"
 import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
 import { loadRelationOptions, LookupMap } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
-import { currentLocalDate, currentLocalDateTime, normalizeDateTimeValueForInput, normalizeDateValueForInput } from "../utils/datetime"
+import { getFirstLookupValue } from "../utils/branchDefaults"
+import { buildLocalDateTime, currentLocalDate, currentLocalDateTime, normalizeDateTimeValueForInput, normalizeDateValueForInput, parseClinicDateTime } from "../utils/datetime"
 import { buildFolderPathMap, buildFolderTree, FolderTreeNode, normalizeFileFolderRows } from "../utils/fileFolders"
 import {
   getFieldCatalog,
@@ -47,6 +49,33 @@ interface RecordFormContentProps {
   onSuccess?: () => void
 }
 
+const APPOINTMENT_DURATION_OPTIONS = [
+  { value: 15, label: "15 phút" },
+  { value: 30, label: "30 phút" },
+  { value: 45, label: "45 phút" },
+  { value: 60, label: "60 phút" },
+  { value: 90, label: "90 phút" },
+  { value: 120, label: "120 phút" },
+  { value: "custom", label: "Nhập giờ kết thúc" },
+]
+
+const WORK_SCHEDULE_REPEAT_OPTIONS = [
+  { value: "NONE", label: "Không lặp" },
+  { value: "DAILY", label: "Hàng ngày" },
+  { value: "WEEKLY", label: "Hàng tuần" },
+  { value: "MONTHLY", label: "Hàng tháng" },
+]
+
+const WORK_SCHEDULE_WEEKDAY_OPTIONS = [
+  { value: "MON", label: "Th 2" },
+  { value: "TUE", label: "Th 3" },
+  { value: "WED", label: "Th 4" },
+  { value: "THU", label: "Th 5" },
+  { value: "FRI", label: "Th 6" },
+  { value: "SAT", label: "Th 7" },
+  { value: "SUN", label: "CN" },
+]
+
 export function RecordFormContent({
   resource,
   id,
@@ -61,6 +90,8 @@ export function RecordFormContent({
   const [lookups, setLookups] = useState<LookupMap>({})
   const { mutate: create } = useCreate()
   const { mutate: update } = useUpdate()
+  const isAppointmentForm = resource === "appointments"
+  const isWorkScheduleForm = resource === "work-schedules"
   const recordQuery = useOne({
     resource,
     id: id || "",
@@ -93,7 +124,7 @@ export function RecordFormContent({
       recordQuery.result?.data ||
       recordQuery.query?.data?.data ||
       recordQuery.data?.data?.data
-    if (data) {
+      if (data) {
       const normalizedData = { ...data, ...(data.customFields || {}) } as Record<string, unknown>
       fields.forEach((field) => {
         if (field.type === "date" && normalizedData[field.key]) {
@@ -103,14 +134,19 @@ export function RecordFormContent({
           normalizedData[field.key] = normalizeDateTimeValueForInput(normalizedData[field.key])
         }
       })
+      if (isAppointmentForm) {
+        Object.assign(normalizedData, buildAppointmentEditorValues(normalizedData))
+      }
+      if (isWorkScheduleForm) {
+        Object.assign(normalizedData, buildWorkScheduleEditorValues(normalizedData))
+      }
       form.setFieldsValue(normalizedData)
       return
     }
     if (!editing && fields.length > 0) {
       const todayDate = currentLocalDate()
       const todayDatetime = currentLocalDateTime()
-      form.setFieldsValue(
-        {
+      const defaultValues = {
           ...Object.fromEntries(
             fields
               .filter((field) => field.type === "date")
@@ -127,16 +163,48 @@ export function RecordFormContent({
               .map((field) => [field.key, field.defaultValue]),
           ),
           ...(initialValues || {}),
-        },
-      )
+        }
+      const nextDefaults = isAppointmentForm
+        ? { ...defaultValues, ...buildAppointmentEditorValues(defaultValues) }
+        : isWorkScheduleForm
+          ? { ...defaultValues, ...buildWorkScheduleEditorValues(defaultValues) }
+          : defaultValues
+      form.setFieldsValue(nextDefaults)
     }
-  }, [editing, fields, form, initialValues, recordQuery.result, recordQuery.query?.data, recordQuery.data?.data?.data])
+  }, [editing, fields, form, initialValues, isAppointmentForm, isWorkScheduleForm, recordQuery.result, recordQuery.query?.data, recordQuery.data?.data?.data])
+
+  useEffect(() => {
+    if (editing || fields.length === 0) return
+    const defaultBranchId = getFirstLookupValue(lookups.branches)
+    if (!defaultBranchId) return
+    const nextValues: Record<string, string> = {}
+    ;["branchId", "defaultBranchId"].forEach((key) => {
+      const fieldExists = fields.some((field) => field.key === key)
+      const currentValue = form.getFieldValue(key)
+      const initialValue = initialValues?.[key]
+      if (fieldExists && !currentValue && !initialValue) {
+        nextValues[key] = defaultBranchId
+      }
+    })
+    if (Object.keys(nextValues).length > 0) {
+      form.setFieldsValue(nextValues)
+    }
+  }, [editing, fields, form, initialValues, lookups])
 
   function submit(values: Record<string, unknown>) {
     const mergedValues = { ...(initialValues || {}), ...values }
+    if (isAppointmentForm) {
+      applyAppointmentDateTimeValues(mergedValues)
+    }
+    if (isWorkScheduleForm) {
+      applyWorkScheduleEditorValues(mergedValues)
+    }
     const baseKeys = new Set(
       getFieldCatalog(resource, []).map((field) => field.key),
     )
+    if (isWorkScheduleForm) {
+      ;["seriesId", "recurrenceType", "recurrenceInterval", "recurrenceWeekdays", "recurrenceUntil"].forEach((key) => baseKeys.add(key))
+    }
     const payload: Record<string, unknown> = { customFields: {} }
     Object.entries(mergedValues).forEach(([key, value]) => {
       if (baseKeys.has(key)) payload[key] = value
@@ -182,7 +250,13 @@ export function RecordFormContent({
         onFinish={submit}
       >
         <Row gutter={[16, 0]}>
-          {fields.map((field) => (
+          {fields
+            .filter((field) => {
+              if (isAppointmentForm && (field.key === "startTime" || field.key === "endTime")) return false
+              if (isWorkScheduleForm && (field.key === "workDate" || field.key === "startTime" || field.key === "endTime")) return false
+              return true
+            })
+            .map((field) => (
             <Col key={field.key} span={widthToSpan(field.width)} xs={24}>
               <Form.Item
                 label={
@@ -209,6 +283,8 @@ export function RecordFormContent({
               </Form.Item>
             </Col>
           ))}
+          {isAppointmentForm ? <AppointmentDateTimeFields form={form} /> : null}
+          {isWorkScheduleForm ? <WorkScheduleRepeatFields form={form} editing={editing} /> : null}
         </Row>
         <Space>
           <Button className="primary-glow" htmlType="submit" type="primary">
@@ -219,6 +295,243 @@ export function RecordFormContent({
       </Form>
     </>
   )
+}
+
+function WorkScheduleRepeatFields({
+  form,
+  editing,
+}: {
+  form: ReturnType<typeof Form.useForm>[0]
+  editing: boolean
+}) {
+  const recurrenceType = (Form.useWatch("recurrenceType", form) as string | undefined) || "NONE"
+  const scheduleDate = Form.useWatch("scheduleDate", form) as string | undefined
+
+  useEffect(() => {
+    if (recurrenceType !== "WEEKLY" || !scheduleDate) return
+    const current = form.getFieldValue("recurrenceWeekdays")
+    if (Array.isArray(current) && current.length > 0) return
+    form.setFieldsValue({ recurrenceWeekdays: [weekdayCodeFromDate(scheduleDate)] })
+  }, [form, recurrenceType, scheduleDate])
+
+  return (
+    <>
+      <Col span={12} xs={24}>
+        <Form.Item
+          label="Ngày làm việc"
+          name="scheduleDate"
+          rules={[{ required: true, message: "Chọn ngày làm việc" }]}
+        >
+          <Input type="date" />
+        </Form.Item>
+      </Col>
+      <Col span={6} xs={24}>
+        <Form.Item
+          label="Giờ bắt đầu"
+          name="scheduleStartTime"
+          rules={[{ required: true, message: "Chọn giờ bắt đầu" }]}
+        >
+          <Input type="time" />
+        </Form.Item>
+      </Col>
+      <Col span={6} xs={24}>
+        <Form.Item
+          label="Giờ kết thúc"
+          name="scheduleEndTime"
+          rules={[{ required: true, message: "Chọn giờ kết thúc" }]}
+        >
+          <Input type="time" />
+        </Form.Item>
+      </Col>
+      <Col span={12} xs={24}>
+        <Form.Item label="Lặp lại" name="recurrenceType">
+          <Select options={WORK_SCHEDULE_REPEAT_OPTIONS} />
+        </Form.Item>
+      </Col>
+      {recurrenceType !== "NONE" ? (
+        <Col span={12} xs={24}>
+          <Form.Item
+            label="Lặp mỗi"
+            name="recurrenceInterval"
+            rules={[{ required: true, message: "Nhập chu kỳ lặp" }]}
+          >
+            <InputNumber min={1} style={{ width: "100%" }} />
+          </Form.Item>
+        </Col>
+      ) : null}
+      {recurrenceType === "WEEKLY" ? (
+        <Col span={12} xs={24}>
+          <Form.Item
+            label="Lặp vào"
+            name="recurrenceWeekdays"
+            rules={[{ required: true, message: "Chọn ít nhất 1 thứ" }]}
+          >
+            <Select mode="multiple" options={WORK_SCHEDULE_WEEKDAY_OPTIONS} placeholder="Chọn các thứ lặp" />
+          </Form.Item>
+        </Col>
+      ) : null}
+      {recurrenceType !== "NONE" ? (
+        <Col span={12} xs={24}>
+          <Form.Item
+            label="Kết thúc lặp"
+            name="recurrenceUntil"
+            rules={[{ required: true, message: "Chọn ngày kết thúc lặp" }]}
+            extra={editing ? "Sửa bản ghi hiện tại sẽ cập nhật ca này; metadata chuỗi vẫn được giữ để dùng về sau." : undefined}
+          >
+            <Input type="date" />
+          </Form.Item>
+        </Col>
+      ) : null}
+    </>
+  )
+}
+
+function AppointmentDateTimeFields({ form }: { form: ReturnType<typeof Form.useForm>[0] }) {
+  const appointmentDate = Form.useWatch("appointmentDate", form) as string | undefined
+  const appointmentStartTime = Form.useWatch("appointmentStartTime", form) as string | undefined
+  const durationMode = Form.useWatch("appointmentDurationMinutes", form) as number | "custom" | undefined
+  const useCustomEndTime = durationMode === "custom"
+
+  useEffect(() => {
+    if (useCustomEndTime) return
+    if (!appointmentDate || !appointmentStartTime || !durationMode) return
+    const start = dayjs(`${appointmentDate}T${appointmentStartTime}`)
+    if (!start.isValid()) return
+    const end = start.add(Number(durationMode), "minute")
+    const nextEndTime = end.format("HH:mm")
+    if (form.getFieldValue("appointmentEndTime") !== nextEndTime) {
+      form.setFieldsValue({ appointmentEndTime: nextEndTime })
+    }
+  }, [appointmentDate, appointmentStartTime, durationMode, form, useCustomEndTime])
+
+  return (
+    <>
+      <Col span={12} xs={24}>
+        <Form.Item
+          label="Ngày hẹn"
+          name="appointmentDate"
+          rules={[{ required: true, message: "Chọn ngày hẹn" }]}
+        >
+          <Input type="date" />
+        </Form.Item>
+      </Col>
+      <Col span={12} xs={24}>
+        <Form.Item
+          label="Giờ bắt đầu"
+          name="appointmentStartTime"
+          rules={[{ required: true, message: "Chọn giờ bắt đầu" }]}
+        >
+          <Input type="time" />
+        </Form.Item>
+      </Col>
+      <Col span={12} xs={24}>
+        <Form.Item
+          label="Thời lượng"
+          name="appointmentDurationMinutes"
+          rules={[{ required: true, message: "Chọn thời lượng" }]}
+        >
+          <Select options={APPOINTMENT_DURATION_OPTIONS} placeholder="Chọn thời lượng" />
+        </Form.Item>
+      </Col>
+      <Col span={12} xs={24}>
+        <Form.Item
+          label="Giờ kết thúc"
+          name="appointmentEndTime"
+          rules={useCustomEndTime ? [{ required: true, message: "Chọn giờ kết thúc" }] : []}
+        >
+          <Input disabled={!useCustomEndTime} type="time" />
+        </Form.Item>
+      </Col>
+    </>
+  )
+}
+
+function buildAppointmentEditorValues(values: Record<string, unknown>) {
+  const start = parseClinicDateTime(values.startTime || values.appointmentDate || currentLocalDateTime())
+  const end = parseClinicDateTime(values.endTime || values.startTime || currentLocalDateTime())
+  const durationMinutes = Math.max(15, end.diff(start, "minute") || 60)
+  const matchedDuration = APPOINTMENT_DURATION_OPTIONS.some((item) => item.value === durationMinutes)
+  return {
+    appointmentDate: start.isValid() ? start.format("YYYY-MM-DD") : currentLocalDate(),
+    appointmentStartTime: start.isValid() ? start.format("HH:mm") : "09:00",
+    appointmentDurationMinutes: matchedDuration ? durationMinutes : "custom",
+    appointmentEndTime: end.isValid() ? end.format("HH:mm") : "10:00",
+  }
+}
+
+function buildWorkScheduleEditorValues(values: Record<string, unknown>) {
+  const workDate = normalizeDateValueForInput(values.workDate) || currentLocalDate()
+  const start = values.startTime ? parseClinicDateTime(values.startTime) : null
+  const end = values.endTime ? parseClinicDateTime(values.endTime) : null
+  return {
+    scheduleDate: workDate,
+    scheduleStartTime: start?.isValid() ? start.format("HH:mm") : "08:00",
+    scheduleEndTime: end?.isValid() ? end.format("HH:mm") : "17:00",
+    recurrenceType: String(values.recurrenceType || "NONE").toUpperCase(),
+    recurrenceInterval: Number(values.recurrenceInterval || 1),
+    recurrenceWeekdays: typeof values.recurrenceWeekdays === "string"
+      ? String(values.recurrenceWeekdays).split(",").map((item) => item.trim()).filter(Boolean)
+      : Array.isArray(values.recurrenceWeekdays)
+        ? values.recurrenceWeekdays.map(String)
+        : [weekdayCodeFromDate(workDate)],
+    recurrenceUntil: normalizeDateValueForInput(values.recurrenceUntil),
+  }
+}
+
+function applyAppointmentDateTimeValues(values: Record<string, unknown>) {
+  const dateText = String(values.appointmentDate || "").trim()
+  const startText = String(values.appointmentStartTime || "").trim()
+  if (!dateText || !startText) return
+
+  const start = dayjs(`${dateText}T${startText}`)
+  if (!start.isValid()) return
+
+  const useCustomEndTime = values.appointmentDurationMinutes === "custom"
+  const durationMinutes = Number(values.appointmentDurationMinutes || 60)
+  const customEndText = String(values.appointmentEndTime || "").trim()
+  let end = useCustomEndTime && customEndText
+    ? dayjs(`${dateText}T${customEndText}`)
+    : start.add(durationMinutes > 0 ? durationMinutes : 60, "minute")
+
+  if (!end.isValid() || !end.isAfter(start)) {
+    end = start.add(durationMinutes > 0 ? durationMinutes : 60, "minute")
+  }
+
+  values.startTime = buildLocalDateTime(start, start.hour(), start.minute())
+  values.endTime = buildLocalDateTime(end, end.hour(), end.minute())
+
+  delete values.appointmentDate
+  delete values.appointmentStartTime
+  delete values.appointmentDurationMinutes
+  delete values.appointmentEndTime
+}
+
+function applyWorkScheduleEditorValues(values: Record<string, unknown>) {
+  const scheduleDate = String(values.scheduleDate || "").trim()
+  const scheduleStartTime = String(values.scheduleStartTime || "").trim()
+  const scheduleEndTime = String(values.scheduleEndTime || "").trim()
+  if (scheduleDate) values.workDate = scheduleDate
+  if (scheduleDate && scheduleStartTime) values.startTime = `${scheduleDate}T${scheduleStartTime}`
+  if (scheduleDate && scheduleEndTime) values.endTime = `${scheduleDate}T${scheduleEndTime}`
+
+  const recurrenceType = String(values.recurrenceType || "NONE").toUpperCase()
+  values.recurrenceType = recurrenceType
+  values.recurrenceInterval = recurrenceType === "NONE" ? undefined : Math.max(1, Number(values.recurrenceInterval || 1))
+  values.recurrenceWeekdays = recurrenceType === "WEEKLY"
+    ? Array.isArray(values.recurrenceWeekdays)
+      ? values.recurrenceWeekdays.map(String)
+      : []
+    : undefined
+  values.recurrenceUntil = recurrenceType === "NONE" ? undefined : values.recurrenceUntil
+
+  delete values.scheduleDate
+  delete values.scheduleStartTime
+  delete values.scheduleEndTime
+}
+
+function weekdayCodeFromDate(value: string) {
+  const dayIndex = dayjs(value).day()
+  return ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][dayIndex] || "MON"
 }
 
 function widthToSpan(width?: FieldSpec["width"]) {

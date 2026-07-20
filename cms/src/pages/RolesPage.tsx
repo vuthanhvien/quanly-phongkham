@@ -23,6 +23,7 @@ import {
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
 import { BranchRoleAssignment, DynamicRole, systemRoleSelectOptions } from "../models"
+import { getFirstOptionValue } from "../utils/branchDefaults"
 
 interface RoleFormValues {
   key: string
@@ -143,7 +144,7 @@ export function RolesPage() {
   function openCreateAssign() {
     setEditingAssign(null)
     assignForm.resetFields()
-    assignForm.setFieldsValue({ userIds: [], branchId: undefined as unknown as string, isActive: true })
+    assignForm.setFieldsValue({ userIds: [], branchId: getFirstOptionValue(branchOptions), isActive: true })
     setAssignModal(true)
   }
 
