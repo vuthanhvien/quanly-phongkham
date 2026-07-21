@@ -6,6 +6,7 @@ import {
   FileTextOutlined,
 } from "@ant-design/icons"
 import {
+  Alert,
   Avatar,
   Button,
   Empty,
@@ -90,6 +91,7 @@ export function RecordFormContent({
   const [form] = Form.useForm()
   const [fields, setFields] = useState<FieldSpec[]>([])
   const [lookups, setLookups] = useState<LookupMap>({})
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const { mutate: create } = useCreate()
   const { mutate: update } = useUpdate()
   const isAppointmentForm = resource === "appointments"
@@ -213,6 +215,7 @@ export function RecordFormContent({
       else (payload.customFields as Record<string, unknown>)[key] = value
     })
     const done = () => {
+      setSubmitError(null)
       message.success("Đã lưu dữ liệu")
       onSuccess?.()
     }
@@ -222,7 +225,9 @@ export function RecordFormContent({
         {
           onSuccess: done,
           onError: (error) => {
-            message.error(getApiErrorMessage(error, "Không thể lưu dữ liệu"))
+            const errorMessage = getApiErrorMessage(error, "Không thể lưu dữ liệu")
+            setSubmitError(errorMessage)
+            message.error(errorMessage)
           },
         },
       )
@@ -232,7 +237,9 @@ export function RecordFormContent({
         {
           onSuccess: done,
           onError: (error) => {
-            message.error(getApiErrorMessage(error, "Không thể lưu dữ liệu"))
+            const errorMessage = getApiErrorMessage(error, "Không thể lưu dữ liệu")
+            setSubmitError(errorMessage)
+            message.error(errorMessage)
           },
         },
       )
@@ -249,8 +256,21 @@ export function RecordFormContent({
         className="record-form"
         form={form}
         layout="vertical"
+        onValuesChange={() => {
+          if (submitError) setSubmitError(null)
+        }}
         onFinish={submit}
       >
+        {submitError ? (
+          <Alert
+            closable
+            message={submitError}
+            showIcon
+            style={{ marginBottom: 16 }}
+            type="error"
+            onClose={() => setSubmitError(null)}
+          />
+        ) : null}
         <Row gutter={[16, 0]}>
           {fields
             .filter((field) => {

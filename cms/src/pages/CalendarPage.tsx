@@ -40,6 +40,10 @@ interface PlannerEvent {
   doctorName?: string
   doctorAvatarUrl?: string
   roomName?: string
+  staffName?: string
+  staffAvatarUrl?: string
+  staffType?: string
+  shiftLabel?: string
 }
 
 interface CalendarQuickDetailState {
@@ -124,7 +128,7 @@ export function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(dayjs())
   const [events, setEvents] = useState<PlannerEvent[]>([])
   const [lookups, setLookups] = useState<LookupMap>({})
-  const [selectedTypes, setSelectedTypes] = useState<PlannerEventType[]>(["appointment"])
+  const [selectedTypes, setSelectedTypes] = useState<PlannerEventType[]>(["appointment", "schedule"])
   const [doctorFilter, setDoctorFilter] = useState<string | undefined>(undefined)
   const [quickCreateResource, setQuickCreateResource] = useState<QuickCreateResource | null>(null)
   const [quickDetail, setQuickDetail] = useState<CalendarQuickDetailState | null>(null)
@@ -196,6 +200,14 @@ export function CalendarPage() {
       attendance: dayEvents.filter((item) => item.type === "attendance").length,
     }
   }, [selectedEvents])
+
+  const selectedScheduleEvents = useMemo(
+    () =>
+      selectedEvents
+        .filter((item) => item.type === "schedule")
+        .sort((left, right) => parseClinicDateTime(left.start).valueOf() - parseClinicDateTime(right.start).valueOf()),
+    [selectedEvents],
+  )
 
   const doctorOptions = useMemo(
     () =>
@@ -433,6 +445,44 @@ export function CalendarPage() {
                   </List.Item>
                 )}
               />
+            </Card>
+
+            <Card className="glass-card spacious-card" title="Lịch làm việc nhân sự">
+              {selectedScheduleEvents.length === 0 ? (
+                <Empty description="Chưa có ca làm trong ngày" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              ) : (
+                <div className="calendar-staff-schedule-list">
+                  {selectedScheduleEvents.map((item) => (
+                    <button
+                      key={`schedule-${item.id}`}
+                      className="calendar-staff-schedule-card"
+                      type="button"
+                      onClick={() => void openQuickDetail(item)}
+                    >
+                      <div className="calendar-staff-schedule-card__head">
+                        <Avatar
+                          className="calendar-staff-schedule-card__avatar"
+                          icon={<TeamOutlined />}
+                          size={32}
+                          src={item.staffAvatarUrl ? resolveFileUrl(item.staffAvatarUrl) : undefined}
+                        />
+                        <div className="calendar-staff-schedule-card__copy">
+                          <strong>{item.staffName || item.title}</strong>
+                          <span>{item.shiftLabel || "Ca làm"}</span>
+                        </div>
+                        <Tag color={item.staffType === "DOCTOR" ? "green" : "blue"}>
+                          {item.staffType === "DOCTOR" ? "Bác sĩ" : "Nhân viên"}
+                        </Tag>
+                      </div>
+                      <div className="calendar-staff-schedule-card__meta">
+                        <span>{formatEventTime(item.start, item.end)}</span>
+                        {item.roomName ? <span>{item.roomName}</span> : null}
+                        <span>{item.statusLabel}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </Card>
           </div>
         </div>
@@ -937,7 +987,7 @@ function buildPlannerEvents({
     id: String(item.id),
     resource: "work-schedules",
     type: "schedule",
-    title: `${lookups.staff?.[item.staffId] || item.staffId || "Nhân sự"} · ${item.shiftLabel || "Ca làm"}`,
+    title: staffDisplayName(staffById.get(String(item.staffId || "")), item.staffId),
     start: String(item.startTime || item.workDate || item.createdAt || ""),
     end: item.endTime ? String(item.endTime) : undefined,
     branchId: item.branchId ? String(item.branchId) : undefined,
@@ -945,7 +995,14 @@ function buildPlannerEvents({
     doctorStaffId: item.staffId ? String(item.staffId) : undefined,
     tone: EVENT_TYPE_COLOR.schedule,
     statusLabel: getFieldLabel("work-schedules", "status", String(item.status || "PLANNED")),
-    summary: [item.roomId ? lookups.rooms?.[item.roomId] || item.roomId : null, item.note].filter(Boolean).join(" | "),
+    summary: [item.shiftLabel || "Ca làm", roomDisplayName(roomById.get(String(item.roomId || "")), item.roomId), item.note].filter(Boolean).join(" | "),
+    staffName: staffDisplayName(staffById.get(String(item.staffId || "")), item.staffId),
+    staffAvatarUrl: staffById.get(String(item.staffId || ""))?.avatarUrl
+      ? String(staffById.get(String(item.staffId || ""))?.avatarUrl)
+      : undefined,
+    staffType: String(staffById.get(String(item.staffId || ""))?.type || "STAFF"),
+    shiftLabel: item.shiftLabel ? String(item.shiftLabel) : undefined,
+    roomName: roomDisplayName(roomById.get(String(item.roomId || "")), item.roomId),
   }))
 
   const leaveEvents: PlannerEvent[] = leaveRequests.map((item) => ({

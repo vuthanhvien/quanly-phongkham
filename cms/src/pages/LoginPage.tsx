@@ -1,12 +1,14 @@
 import { useLogin } from "@refinedev/core"
 import { Alert, Button, Card, Form, Input } from "antd"
 import { useEffect, useState } from "react"
+import { useAppUi } from "../app-ui"
 
 const LAST_LOGIN_IDENTIFIER_KEY = "clinic-last-login-identifier"
 
 export function LoginPage() {
   const [form] = Form.useForm<{ identifier: string; password: string }>()
   const { mutateAsync: login, isPending } = useLogin()
+  const { settings } = useAppUi()
   const [loginError, setLoginError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -32,7 +34,9 @@ export function LoginPage() {
       <div className="login-orb login-orb-two" />
       <div className="login-panel">
         <div className="login-brand-outside">
-          <div className="brand-mark login-brand-mark">TC</div>
+          <div className="brand-mark login-brand-mark">
+            {settings.appIconUrl ? <img alt={settings.appName} src={settings.appIconUrl} /> : "TC"}
+          </div>
         </div>
         <Card className="login-card">
           <Form
@@ -40,7 +44,7 @@ export function LoginPage() {
             layout="vertical"
             onFinish={handleSubmit}
           >
-            <Form.Item label="Email / tên đăng nhập / mã NV / SĐT" name="identifier" rules={[{ required: true }]}>
+            <Form.Item label="Tên đăng nhập" name="identifier" rules={[{ required: true }]}>
               <Input placeholder="Nhập email, tên đăng nhập, mã nhân viên hoặc số điện thoại" />
             </Form.Item>
             <Form.Item

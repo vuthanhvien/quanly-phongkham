@@ -2339,6 +2339,74 @@ textarea.ant-input {
   font-size: 12px;
 }
 
+.calendar-staff-schedule-list {
+  display: grid;
+  gap: 10px;
+}
+
+.calendar-staff-schedule-card {
+  background: color-mix(in srgb, var(--app-surface) 96%, var(--app-primary));
+  border: 1px solid var(--app-line);
+  border-radius: calc(var(--app-radius) + 2px);
+  color: var(--app-text);
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  text-align: left;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.calendar-staff-schedule-card:hover {
+  border-color: color-mix(in srgb, var(--app-primary) 36%, var(--app-line));
+  box-shadow: var(--app-shadow-soft);
+  transform: translateY(-1px);
+}
+
+.calendar-staff-schedule-card__head {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+}
+
+.calendar-staff-schedule-card__avatar {
+  background: color-mix(in srgb, var(--app-primary) 16%, white);
+  color: var(--app-primary);
+}
+
+.calendar-staff-schedule-card__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.calendar-staff-schedule-card__copy strong,
+.calendar-staff-schedule-card__copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-staff-schedule-card__copy strong {
+  color: var(--app-title);
+  font-size: 13px;
+}
+
+.calendar-staff-schedule-card__copy span {
+  color: var(--app-text-soft);
+  font-size: 12px;
+}
+
+.calendar-staff-schedule-card__meta {
+  color: var(--app-text-soft);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-size: 12px;
+}
+
 .calendar-kpi-card .ant-card-body {
   display: grid;
   gap: 4px;
