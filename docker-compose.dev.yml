@@ -17,6 +17,8 @@ services:
       VITE_API_URL: ${VITE_API_URL:-/api}
       VITE_BASE_PATH: ${VITE_BASE_PATH:-/admin/}
       LANDING_API_URL: ${LANDING_API_URL:-http://127.0.0.1:3001/api}
+      LANDING_REVALIDATE_URL: ${LANDING_REVALIDATE_URL:-http://127.0.0.1:3002/api/revalidate}
+      LANDING_REVALIDATE_SECRET: ${LANDING_REVALIDATE_SECRET}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
       NODE_PATH: /opt/runtime/node_modules
       CHOKIDAR_USEPOLLING: "true"
@@ -39,14 +41,13 @@ services:
       - cms_node_modules:/app/cms/node_modules
       - landing_node_modules:/app/landing/node_modules
       - runtime_node_modules:/opt/runtime/node_modules
-      - app_storage:/app/backend/storage
+      - ${UPLOADS_DIR:-./data/uploads}:/app/backend/storage/uploads
     ports:
       - "${APP_PORT:-9999}:80"
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
 volumes:
-  app_storage:
   backend_node_modules:
   cms_node_modules:
   landing_node_modules:

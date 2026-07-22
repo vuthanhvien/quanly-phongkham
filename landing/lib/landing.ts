@@ -146,7 +146,9 @@ const SERVER_API_URL = process.env.LANDING_API_URL || 'http://localhost:3000/api
 
 export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
   try {
-    const res = await fetch(`${SERVER_API_URL}/public/landing-pages/global`, { next: { revalidate: 60 } })
+    const res = await fetch(`${SERVER_API_URL}/public/landing-pages/global`, {
+      next: { revalidate: 60, tags: ['landing-content'] },
+    })
     if (!res.ok) return {}
     const raw = await res.json() as LandingGlobalSetting & { data?: LandingGlobalSetting }
     const data = raw.data ?? raw
@@ -158,7 +160,9 @@ export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
 
 export async function getMenuSettings(): Promise<NavItem[]> {
   try {
-    const res = await fetch(`${SERVER_API_URL}/public/landing-pages/menu`, { next: { revalidate: 60 } })
+    const res = await fetch(`${SERVER_API_URL}/public/landing-pages/menu`, {
+      next: { revalidate: 60, tags: ['landing-content'] },
+    })
     if (!res.ok) {
       const globalSettings = await getGlobalSettings()
       return normalizeMenuItems(globalSettings.menuItems)
@@ -179,7 +183,7 @@ export async function getLandingPage(pathname: string): Promise<LandingPageData 
 
   try {
     const response = await fetch(`${SERVER_API_URL}/public/landing-pages/resolve?path=${encodeURIComponent(pathname)}`, {
-      next: { revalidate: 30 },
+      next: { revalidate: 30, tags: ['landing-content'] },
     })
 
     if (response.status === 404) {

@@ -21,6 +21,7 @@ module.exports = {
         HOSTNAME: '0.0.0.0',
         LANDING_API_URL:
           process.env.LANDING_API_URL || 'http://127.0.0.1:3001/api',
+        LANDING_REVALIDATE_SECRET: process.env.LANDING_REVALIDATE_SECRET || process.env.JWT_SECRET,
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
       },
     },

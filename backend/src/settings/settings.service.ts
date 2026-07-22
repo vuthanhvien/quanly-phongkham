@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import Handlebars from 'handlebars';
@@ -120,6 +120,8 @@ function normalizeRole(role?: string) {
 
 @Injectable()
 export class SettingsService {
+  private readonly logger = new Logger(SettingsService.name);
+
   constructor(
     @InjectRepository(CustomFieldDefinition) private readonly fields: Repository<CustomFieldDefinition>,
     @InjectRepository(ViewSetting) private readonly views: Repository<ViewSetting>,
@@ -148,6 +150,7 @@ export class SettingsService {
     const { data: current } = await this.getLandingGlobalSettings();
     const merged = this.landingGlobalSettings.merge(current, payload);
     const saved = await this.landingGlobalSettings.save(merged);
+    await this.revalidateLandingCache();
     return { data: saved };
   }
 
@@ -160,6 +163,7 @@ export class SettingsService {
     const { data: current } = await this.getLandingGlobalSettings();
     current.menuItems = Array.isArray(menuItems) ? menuItems : [];
     const saved = await this.landingGlobalSettings.save(current);
+    await this.revalidateLandingCache();
     return { data: saved.menuItems ?? [] };
   }
 
@@ -328,7 +332,9 @@ export class SettingsService {
       borderRadius: payload.borderRadius !== undefined ? (payload.borderRadius === null ? undefined : Number(payload.borderRadius)) : current.borderRadius,
       customCss: payload.customCss !== undefined ? (String(payload.customCss || '').trim() || undefined) : current.customCss,
     });
-    return this.landingThemeSettings.save(next);
+    const saved = await this.landingThemeSettings.save(next);
+    await this.revalidateLandingCache();
+    return saved;
   }
 
   async getLandingThemePresets() {
@@ -355,7 +361,9 @@ export class SettingsService {
     this.assertSettingsAccess(user);
     const normalized = this.normalizeLandingPagePayload(payload, true);
     await this.assertLandingPageUnique(normalized.slug, normalized.path);
-    return this.landingPages.save(this.landingPages.create(normalized));
+    const saved = await this.landingPages.save(this.landingPages.create(normalized));
+    await this.revalidateLandingCache();
+    return saved;
   }
 
   async updateLandingPage(id: string, payload: Partial<LandingPage>, user?: AuthUser) {
@@ -364,7 +372,9 @@ export class SettingsService {
     if (!page) throw new NotFoundException('Khong tim thay landing page');
     const normalized = this.normalizeLandingPagePayload({ ...page, ...payload }, false);
     await this.assertLandingPageUnique(normalized.slug, normalized.path, id);
-    return this.landingPages.save(this.landingPages.merge(page, normalized));
+    const saved = await this.landingPages.save(this.landingPages.merge(page, normalized));
+    await this.revalidateLandingCache();
+    return saved;
   }
 
   async deleteLandingPage(id: string, user?: AuthUser) {
@@ -372,7 +382,28 @@ export class SettingsService {
     const page = await this.landingPages.findOne({ where: { id } });
     if (!page) throw new NotFoundException('Khong tim thay landing page');
     await this.landingPages.remove(page);
+    await this.revalidateLandingCache();
     return { id };
+  }
+
+  private async revalidateLandingCache() {
+    const url = process.env.LANDING_REVALIDATE_URL?.trim();
+    const secret = (process.env.LANDING_REVALIDATE_SECRET || process.env.JWT_SECRET)?.trim();
+
+    if (!url || !secret) return;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${secret}` },
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!response.ok) {
+        this.logger.warn(`Landing cache revalidation failed with status ${response.status}`);
+      }
+    } catch {
+      this.logger.warn('Landing cache revalidation request failed');
+    }
   }
 
   async findPublishedLandingPageByPath(path?: string) {

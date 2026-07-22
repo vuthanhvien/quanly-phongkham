@@ -8,6 +8,7 @@ cms/dist
 backend/dist
 backend/storage/uploads/*
 !backend/storage/uploads/.gitignore
+data/
 
 .next
 

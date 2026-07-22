@@ -61,7 +61,7 @@ export function LoginPage() {
               loading={isPending}
               type="primary"
             >
-              Đăng nhập CMS
+              Đăng nhập
             </Button>
             {loginError ? (
               <Alert
