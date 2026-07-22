@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { LandingPageView } from '../components/LandingPageView'
-import { getLandingPage } from '../lib/landing'
+import { getLandingPage } from '../lib/landing-server'
 
 export const dynamic = 'force-dynamic'
 

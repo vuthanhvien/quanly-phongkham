@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { ChatbotWidget } from '../components/ChatbotWidget'
 import { SiteFooter } from '../components/SiteFooter'
 import { SiteHeader } from '../components/SiteHeader'
-import { getGlobalSettings, getMenuSettings } from '../lib/landing'
+import { getGlobalSettings, getMenuSettings } from '../lib/landing-server'
 import './globals.css'
 
 const THEME_CSS_URL = `${process.env.NEXT_PUBLIC_API_URL ?? '/api'}/public/landing-theme/style.css`
