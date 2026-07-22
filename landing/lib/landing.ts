@@ -147,7 +147,7 @@ const SERVER_API_URL = process.env.LANDING_API_URL || 'http://localhost:3000/api
 export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
   try {
     const res = await fetch(`${SERVER_API_URL}/public/landing-pages/global`, {
-      next: { revalidate: 60, tags: ['landing-content'] },
+      cache: 'no-store',
     })
     if (!res.ok) return {}
     const raw = await res.json() as LandingGlobalSetting & { data?: LandingGlobalSetting }
@@ -161,7 +161,7 @@ export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
 export async function getMenuSettings(): Promise<NavItem[]> {
   try {
     const res = await fetch(`${SERVER_API_URL}/public/landing-pages/menu`, {
-      next: { revalidate: 60, tags: ['landing-content'] },
+      cache: 'no-store',
     })
     if (!res.ok) {
       const globalSettings = await getGlobalSettings()
@@ -182,8 +182,9 @@ export async function getLandingPage(pathname: string): Promise<LandingPageData 
   }
 
   try {
-    const response = await fetch(`${SERVER_API_URL}/public/landing-pages/resolve?path=${encodeURIComponent(pathname)}`, {
-      next: { revalidate: 30, tags: ['landing-content'] },
+    const endpoint = `${SERVER_API_URL}/public/landing-pages/resolve?path=${encodeURIComponent(pathname)}`
+    const response = await fetch(endpoint, {
+      cache: 'no-store',
     })
 
     if (response.status === 404) {
@@ -191,13 +192,17 @@ export async function getLandingPage(pathname: string): Promise<LandingPageData 
     }
 
     if (!response.ok) {
-      return null
+      throw new Error(`Landing API returned ${response.status} for ${pathname}`)
     }
 
     const payload = await response.json()
+    if (!payload.data) {
+      throw new Error(`Landing API returned no data for ${pathname}`)
+    }
     return payload.data as LandingPageData
-  } catch {
-    return null
+  } catch (error) {
+    console.error('Failed to load landing page', { pathname, apiUrl: SERVER_API_URL, error })
+    throw error
   }
 }
 
