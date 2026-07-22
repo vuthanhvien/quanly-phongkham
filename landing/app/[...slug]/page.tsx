@@ -1,8 +1,20 @@
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { LandingPageView } from '../../components/LandingPageView'
 import { getLandingPage } from '../../lib/landing'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({ params }: { params: Promise<{ slug?: string[] }> }): Promise<Metadata> {
+  const resolvedParams = await params
+  const page = await getLandingPage(`/${(resolvedParams.slug || []).join('/')}`)
+  if (!page) return {}
+
+  return {
+    title: page.seoTitle?.trim() || page.title,
+    description: page.seoDescription?.trim() || page.description?.trim(),
+  }
+}
 
 export default async function DynamicLandingPage({
   params,
