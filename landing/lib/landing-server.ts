@@ -4,6 +4,17 @@ import { normalizeMenuItems, type LandingGlobalSetting, type LandingPageData, ty
 
 const FALLBACK_SERVER_API_URL = process.env.LANDING_API_URL || 'http://127.0.0.1:3001/api'
 
+function normalizeGlobalSettings(data: LandingGlobalSetting): LandingGlobalSetting {
+  return {
+    ...data,
+    menuItems: normalizeMenuItems(data.menuItems),
+    footerColumns: Array.isArray(data.footerColumns)
+      ? data.footerColumns.map((column) => ({ ...column, links: Array.isArray(column.links) ? column.links : [] }))
+      : [],
+    footerSocialLinks: Array.isArray(data.footerSocialLinks) ? data.footerSocialLinks : [],
+  }
+}
+
 async function getServerApiUrl() {
   const requestHeaders = await headers()
   const host = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').split(',')[0].trim()
@@ -30,7 +41,7 @@ export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
     if (!res.ok) return {}
     const raw = await res.json() as LandingGlobalSetting & { data?: LandingGlobalSetting }
     const data = raw.data ?? raw
-    return { ...data, menuItems: normalizeMenuItems(data.menuItems) }
+    return normalizeGlobalSettings(data)
   } catch (error) {
     console.error('[landing] Failed to load global settings', { error })
     return {}

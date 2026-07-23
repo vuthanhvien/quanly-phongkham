@@ -15,7 +15,9 @@ function socialIcon(platform: string) {
 }
 
 export function SiteFooter({ settings }: { settings: LandingGlobalSetting }) {
-  const { footerColumns = [], footerSocialLinks = [], footerCopyright } = settings
+  const footerColumns = Array.isArray(settings.footerColumns) ? settings.footerColumns : []
+  const footerSocialLinks = Array.isArray(settings.footerSocialLinks) ? settings.footerSocialLinks : []
+  const { footerCopyright } = settings
 
   if (!footerColumns.length && !footerSocialLinks.length && !footerCopyright) return null
 
@@ -28,7 +30,7 @@ export function SiteFooter({ settings }: { settings: LandingGlobalSetting }) {
               <div key={col.id} className="site-footer__col">
                 <p className="site-footer__col-title">{col.title}</p>
                 <ul className="site-footer__links">
-                  {col.links.map((link) => (
+                  {(Array.isArray(col.links) ? col.links : []).map((link) => (
                     <li key={link.id}>
                       <a href={link.href} className="site-footer__link">{link.label}</a>
                     </li>
