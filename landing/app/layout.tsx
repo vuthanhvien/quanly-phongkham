@@ -8,6 +8,8 @@ import './globals.css'
 
 const THEME_CSS_URL = `${process.env.NEXT_PUBLIC_API_URL ?? '/api'}/public/landing-theme/style.css`
 
+export const dynamic = 'force-dynamic'
+
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getGlobalSettings()
   const brandName = settings.logoAlt?.trim() || 'Landing'
