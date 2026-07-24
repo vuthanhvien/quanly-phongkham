@@ -37,6 +37,7 @@ import { hasActionAccess } from "../access"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
+import { ProductForm } from "../components/ProductForm"
 import { CustomField, entityLabels, getFieldLabel } from "../models"
 import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
 import {
@@ -644,6 +645,8 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                 await reloadRelatedBlocks()
               }}
             />
+          ) : mainEdit.resource === "products" ? (
+            <ProductForm compact id={mainEdit.recordId} onCancel={() => setMainEdit(null)} onSuccess={async () => { setMainEdit(null); await reloadCurrentRecord(); await reloadRelatedBlocks() }} />
           ) : (
             <RecordFormContent
               compact
@@ -683,6 +686,8 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                 }
               }}
             />
+          ) : relatedEdit.block.resource === "products" ? (
+            <ProductForm compact id={relatedEdit.recordId} onCancel={() => setRelatedEdit(null)} onSuccess={() => { setRelatedEdit(null); void reloadRelatedBlocks(); if (relatedDetail?.record?.id === relatedEdit.recordId) void openRelatedDetail(relatedEdit.block, relatedEdit.recordId) }} />
           ) : (
             <RecordFormContent
               compact

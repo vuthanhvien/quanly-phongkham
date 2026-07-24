@@ -24,6 +24,8 @@ interface ProductOption {
   label: string
   name: string
   sellingPrice: number
+  productType: string
+  bundleItems: Array<{ productId: string; quantity: number }>
 }
 
 interface OrderLineValue {
@@ -100,6 +102,8 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
           label: `${row.code || ""} - ${row.name || row.id}`,
           name: String(row.name || row.id),
           sellingPrice: Number(row.sellingPrice || 0),
+          productType: String(row.productType || ""),
+          bundleItems: normalizeBundleItems(row.bundleItems),
         })),
       )
       if (!editing && !form.getFieldValue("branchId")) {
@@ -126,12 +130,27 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
   function handleProductChange(index: number, productId?: string) {
     const product = productOptions.find((item) => item.value === productId)
     const nextItems = normalizeItems(form.getFieldValue("items"))
+    const selectedQuantity = Number(nextItems[index]?.quantity || 1)
     nextItems[index] = {
       ...nextItems[index],
       productId,
       itemName: product?.name,
       unitPrice: product ? Number(nextItems[index]?.unitPrice || product.sellingPrice) : nextItems[index]?.unitPrice,
-      quantity: Number(nextItems[index]?.quantity || 1),
+      quantity: selectedQuantity,
+    }
+    if (product?.productType === "COMBO" && product.bundleItems.length > 0) {
+      const componentLines = product.bundleItems
+        .map((component) => {
+          const componentProduct = productOptions.find((item) => item.value === component.productId)
+          return componentProduct ? {
+            productId: componentProduct.value,
+            itemName: componentProduct.name,
+            quantity: selectedQuantity * Number(component.quantity || 1),
+            unitPrice: 0,
+          } : null
+        })
+        .filter(Boolean) as OrderLineValue[]
+      nextItems.splice(index + 1, 0, ...componentLines)
     }
     form.setFieldsValue({ items: nextItems })
   }
@@ -326,6 +345,16 @@ function normalizeItems(value: unknown): OrderLineValue[] {
     quantity: Number((item as Record<string, unknown>)?.quantity || 0),
     unitPrice: Number((item as Record<string, unknown>)?.unitPrice || 0),
   }))
+}
+
+function normalizeBundleItems(value: unknown): Array<{ productId: string; quantity: number }> {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => ({
+      productId: String((item as Record<string, unknown>)?.productId || ""),
+      quantity: Number((item as Record<string, unknown>)?.quantity || 0),
+    }))
+    .filter((item) => item.productId && item.quantity > 0)
 }
 
 function formatNumber(value: number) {

@@ -547,6 +547,12 @@ export class Product extends ConfigurableEntity {
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   sellingPrice: number;
 
+  // Only used when productType is COMBO.  Keeping the composition on the
+  // product makes a bundle portable and prevents its selling price from being
+  // derived from (and accidentally changed by) its components.
+  @Column({ type: 'simple-json', nullable: true })
+  bundleItems?: Array<{ productId: string; quantity: number }>;
+
   @Column({ default: 0 })
   minStockLevel: number;
 

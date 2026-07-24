@@ -1554,6 +1554,142 @@ export class RecordsService {
     };
   }
 
+  async commissionReconciliation(year: string | undefined, user?: AuthUser) {
+    await this.assertAnyActionPermission(user, 'commissions', ['view']);
+    const selectedYear = /^\d{4}$/.test(String(year || '')) ? String(year) : String(new Date().getFullYear());
+    const commissions = (await this.commissions.find({ order: { createdAt: 'DESC' } }))
+      .filter((item) => String(item.roleType || '').toUpperCase() === 'KOL')
+      .filter((item) => item.createdAt.getFullYear() === Number(selectedYear));
+    const invoiceIds = Array.from(new Set(commissions.map((item) => item.invoiceId).filter(Boolean)));
+    const invoices = invoiceIds.length ? await this.invoices.find({ where: { id: In(invoiceIds) } }) : [];
+    const invoiceById = new Map(invoices.map((item) => [item.id, item]));
+    const periods = new Map<string, Commission[]>();
+    commissions.forEach((item) => {
+      const key = item.createdAt.toISOString().slice(0, 7);
+      periods.set(key, [...(periods.get(key) || []), item]);
+    });
+    const rows = Array.from(periods.entries()).map(([period, items]) => {
+      const periodInvoices = this.uniqueCommissionInvoices(items, invoiceById);
+      const success = periodInvoices.filter((invoice) => !['CANCELLED', 'CANCELED', 'VOID'].includes(String(invoice.status).toUpperCase())).length;
+      const cancelled = periodInvoices.length - success;
+      return {
+        period,
+        status: items.every((item) => String(item.status).toUpperCase() === 'PAID') ? 'PAID' : 'PENDING',
+        paidAt: items.map((item) => item.paidAt).filter(Boolean).sort().at(-1) || null,
+        totalOrders: periodInvoices.length,
+        successfulOrders: success,
+        cancelledOrders: cancelled,
+        revenue: periodInvoices.reduce((sum, invoice) => sum + Number(invoice.totalAmount || 0), 0),
+        commissionAmount: items.reduce((sum, item) => sum + Number(item.amount || 0), 0),
+        details: items.map((item) => ({
+          id: item.id,
+          kolName: item.staffName,
+          amount: Number(item.amount || 0),
+          status: item.status,
+          invoiceCode: invoiceById.get(item.invoiceId)?.code || item.invoiceId,
+          invoiceAmount: Number(invoiceById.get(item.invoiceId)?.totalAmount || 0),
+        })),
+      };
+    }).sort((a, b) => b.period.localeCompare(a.period));
+    return { data: rows, year: selectedYear };
+  }
+
+  async markCommissionReconciliationPaid(period: string, user: AuthUser) {
+    if (!/^\d{4}-\d{2}$/.test(period)) throw new BadRequestException('Ky doi soat khong hop le');
+    await this.assertAnyActionPermission(user, 'commissions', ['update']);
+    const rows = (await this.commissions.find())
+      .filter((item) => String(item.roleType || '').toUpperCase() === 'KOL')
+      .filter((item) => item.createdAt.toISOString().slice(0, 7) === period)
+      .filter((item) => String(item.status).toUpperCase() !== 'PAID');
+    const paidAt = new Date().toISOString().slice(0, 10);
+    if (rows.length) await this.commissions.save(rows.map((item) => this.commissions.merge(item, { status: 'PAID', paidAt, paidBy: user.fullName, paymentNote: 'Đã xác nhận chi trả' })));
+    await this.audit(user, 'RECONCILE_COMMISSION', 'commissions', period, { period, paidAt, commissionIds: rows.map((item) => item.id) });
+    return this.commissionReconciliation(period.slice(0, 4), user);
+  }
+
+  async myKolCommissions(year: string | undefined, user: AuthUser) {
+    const selectedYear = /^\d{4}$/.test(String(year || '')) ? String(year) : String(new Date().getFullYear());
+    const rows = await this.loadMyKolCommissions(selectedYear, user);
+    const periods = new Map<string, Commission[]>();
+    rows.forEach((item) => {
+      const period = item.createdAt.toISOString().slice(0, 7);
+      periods.set(period, [...(periods.get(period) || []), item]);
+    });
+    const invoiceIds = Array.from(new Set(rows.map((item) => item.invoiceId).filter(Boolean)));
+    const invoices = invoiceIds.length ? await this.invoices.find({ where: { id: In(invoiceIds) } }) : [];
+    const invoiceById = new Map(invoices.map((item) => [item.id, item]));
+    return {
+      status: 200,
+      message: 'Thành công',
+      detail: Array.from(periods.entries()).map(([period, items]) => {
+        const invoiceRows = this.uniqueCommissionInvoices(items, invoiceById);
+        const [periodYear, periodMonth] = period.split('-').map(Number);
+        return {
+          id: Number(period.replace('-', '')),
+          period_month: periodMonth,
+          period_year: periodYear,
+          total_orders: invoiceRows.length,
+          success_orders: invoiceRows.filter((invoice) => !['CANCELLED', 'CANCELED', 'VOID'].includes(String(invoice.status).toUpperCase())).length,
+          failed_orders: invoiceRows.filter((invoice) => ['CANCELLED', 'CANCELED', 'VOID'].includes(String(invoice.status).toUpperCase())).length,
+          total_revenue: invoiceRows.reduce((sum, invoice) => sum + Number(invoice.totalAmount || 0), 0),
+          total_commission: items.reduce((sum, item) => sum + Number(item.amount || 0), 0),
+          status: items.every((item) => String(item.status).toUpperCase() === 'PAID') ? 'PAID' : 'DRAFT',
+          paid_at: items.map((item) => item.paidAt).filter(Boolean).sort().at(-1) || null,
+          paid_by: items.map((item) => item.paidBy).filter(Boolean).at(-1) || null,
+          payment_note: items.map((item) => item.paymentNote).filter(Boolean).at(-1) || null,
+        };
+      }).sort((a, b) => `${b.period_year}-${b.period_month}`.localeCompare(`${a.period_year}-${a.period_month}`)),
+    };
+  }
+
+  async myKolCommissionDetail(period: string, user: AuthUser) {
+    if (/^\d{6}$/.test(period)) period = `${period.slice(0, 4)}-${period.slice(4, 6)}`;
+    if (!/^\d{4}-\d{2}$/.test(period)) throw new BadRequestException('Ky doi soat khong hop le');
+    const rows = (await this.loadMyKolCommissions(period.slice(0, 4), user)).filter((item) => item.createdAt.toISOString().slice(0, 7) === period);
+    const invoiceIds = Array.from(new Set(rows.map((item) => item.invoiceId).filter(Boolean)));
+    const invoices = invoiceIds.length ? await this.invoices.find({ where: { id: In(invoiceIds) } }) : [];
+    const invoiceById = new Map(invoices.map((item) => [item.id, item]));
+    const staff = user.staffId ? await this.staff.findOne({ where: { id: user.staffId } }) : await this.staff.findOne({ where: { fullName: user.fullName } });
+    const [periodYear, periodMonth] = period.split('-').map(Number);
+    const invoiceRows = this.uniqueCommissionInvoices(rows, invoiceById);
+    return {
+      status: 200,
+      message: 'Thành công',
+      detail: {
+        id: period,
+        period_month: periodMonth,
+        period_year: periodYear,
+        status: rows.every((item) => String(item.status).toUpperCase() === 'PAID') ? 'PAID' : 'DRAFT',
+        total_revenue: invoiceRows.reduce((sum, invoice) => sum + Number(invoice.totalAmount || 0), 0),
+        total_commission: rows.reduce((sum, item) => sum + Number(item.amount || 0), 0),
+        total_orders: invoiceRows.length,
+        paid_at: rows.map((item) => item.paidAt).filter(Boolean).sort().at(-1) || null,
+        paid_by: rows.map((item) => item.paidBy).filter(Boolean).at(-1) || null,
+        influencer: { name: staff?.fullName || user.fullName, bank_code: staff?.bankName || null, bank_account_no: staff?.bankAccountNumber || null, bank_account_name: staff?.bankAccountName || null },
+        order_items: rows.map((item) => {
+          const invoice = invoiceById.get(item.invoiceId);
+          return { id: item.id, ecom_order_id: invoice?.code || item.invoiceId, voucher_code: item.voucherCode || null, order_status: invoice?.status || 'SUCCESS', order_amount: Number(invoice?.totalAmount || 0), commission_amount: Number(item.amount || 0), commission_type: item.commissionType || 'PERCENT', commission_value: Number(item.commissionValue || 0), created_at: item.createdAt };
+        }),
+      },
+    };
+  }
+
+  private async loadMyKolCommissions(year: string, user: AuthUser) {
+    return (await this.commissions.find({ order: { createdAt: 'DESC' } }))
+      .filter((item) => String(item.roleType || '').toUpperCase() === 'KOL')
+      .filter((item) => item.createdAt.getFullYear() === Number(year))
+      .filter((item) => item.staffId ? item.staffId === user.staffId : item.staffName === user.fullName);
+  }
+
+  private uniqueCommissionInvoices(items: Commission[], invoiceById: Map<string, Invoice>) {
+    const pairs = items.reduce<Array<[string, Invoice]>>((result, item) => {
+      const invoice = invoiceById.get(item.invoiceId);
+      if (invoice) result.push([item.invoiceId, invoice]);
+      return result;
+    }, []);
+    return Array.from(new Map<string, Invoice>(pairs).values());
+  }
+
   async stockBatchFormOptions(user?: AuthUser) {
     await this.assertAnyActionPermission(user, 'stock-batches', ['create', 'update', 'view']);
     const [products, branches, suppliers, batches] = await Promise.all([
@@ -3046,6 +3182,7 @@ export class RecordsService {
   private async normalizeInput(resource: string, payload: Record<string, unknown>, creating = false) {
     if (resource !== 'user-accounts') {
       const value = this.normalize(resource, payload);
+      if (resource === 'products') await this.normalizeProductBundle(value, String(payload.id || ''));
       await this.validateAccountingResource(resource, value, creating);
       return value;
     }
@@ -3267,6 +3404,37 @@ export class RecordsService {
         unitPrice,
         lineTotal: quantity * unitPrice,
       });
+    });
+  }
+
+  private async normalizeProductBundle(value: Record<string, unknown>, bundleProductId = '') {
+    const productType = String(value.productType || 'CONSUMABLE').toUpperCase();
+    value.productType = productType;
+    if (productType !== 'COMBO') {
+      value.bundleItems = [];
+      return;
+    }
+
+    if (!Array.isArray(value.bundleItems) || value.bundleItems.length === 0) {
+      throw new BadRequestException('Combo phai co it nhat 1 san pham/dich vu thanh phan');
+    }
+    const rawItems = value.bundleItems as Array<Record<string, unknown>>;
+    const productIds = Array.from(new Set(rawItems.map((item) => String(item.productId || '')).filter(Boolean)));
+    if (productIds.length !== rawItems.length) {
+      throw new BadRequestException('Moi san pham trong combo chi duoc cau hinh mot lan');
+    }
+    if (bundleProductId && productIds.includes(bundleProductId)) {
+      throw new BadRequestException('Combo khong the chua chinh no');
+    }
+    const products = await this.products.find({ where: { id: In(productIds) } });
+    if (products.length !== productIds.length) throw new BadRequestException('San pham thanh phan cua combo khong hop le');
+    if (products.some((product) => String(product.productType).toUpperCase() === 'COMBO')) {
+      throw new BadRequestException('Chua ho tro long combo trong combo');
+    }
+    value.bundleItems = rawItems.map((item) => {
+      const quantity = Number(item.quantity || 0);
+      if (quantity <= 0) throw new BadRequestException('So luong thanh phan combo phai lon hon 0');
+      return { productId: String(item.productId), quantity };
     });
   }
 

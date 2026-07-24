@@ -34,6 +34,7 @@ import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
+import { ProductForm } from "../components/ProductForm"
 import { StockBatchForm } from "../components/StockBatchForm"
 import { CustomField, entityLabels } from "../models"
 import { RecordDetailPage } from "./RecordDetailPage"
@@ -535,6 +536,14 @@ export function RecordListPage() {
               setDuplicateValues(undefined)
               refresh()
             }}
+          />
+        ) : resource === "products" ? (
+          <ProductForm
+            compact
+            id={editingId || undefined}
+            initialValues={editingId ? undefined : duplicateValues}
+            onCancel={() => { setCreating(false); setEditingId(null); setDuplicateValues(undefined) }}
+            onSuccess={() => { setCreating(false); setEditingId(null); setDuplicateValues(undefined); refresh() }}
           />
         ) : resource === "stock-batches" && !editingId ? (
           <StockBatchForm
