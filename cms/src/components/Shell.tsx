@@ -32,7 +32,7 @@ import {
   UserOutlined,
 } from "@ant-design/icons"
 import { useGetIdentity, useLogout } from "@refinedev/core"
-import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Select, Space, Typography } from "antd"
+import { Avatar, Button, Dropdown, Grid, Layout, Menu, Modal, Select, Space, Typography } from "antd"
 import type { MenuProps } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
@@ -482,13 +482,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </Header>
         <Content className="app-content">{children}</Content>
       </Layout>
-      <Drawer
+      <Modal
         className="mobile-menu-drawer"
         open={mobileMenuOpen}
-        placement="left"
         title={settings.appName}
         width={320}
-        onClose={() => setMobileMenuOpen(false)}
+        footer={null}
+        onCancel={() => setMobileMenuOpen(false)}
       >
         <div className="brand-card mobile-menu-brand">
           <div className="brand-mark">
@@ -507,7 +507,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <div className="mobile-menu-scroll">{menuNode}</div>
-      </Drawer>
+      </Modal>
     </Layout>
   )
 }

@@ -79,6 +79,7 @@ function getModuleEnabledValue(view: ViewSettingRecord | undefined) {
 
 export interface FieldLayoutConfig extends FieldSpec {
   visible: boolean
+  tab?: string
   disabled?: boolean
   description?: string
   placeholder?: string
@@ -344,6 +345,10 @@ export function buildFieldLayoutConfigs(
         typeof entry.label === 'string' && entry.label.trim()
           ? entry.label
           : base.label,
+      tab:
+        typeof entry.tab === 'string' && entry.tab.trim()
+          ? entry.tab.trim()
+          : undefined,
       required: base.required,
       options:
         Array.isArray(entry.options)
@@ -427,6 +432,7 @@ export function serializeViewConfig(
     }
 
     if (field.label?.trim()) next.label = field.label.trim()
+    if (field.tab?.trim()) next.tab = field.tab.trim()
     if (typeof field.disabled === 'boolean') next.disabled = field.disabled
     if (Array.isArray(field.options) && field.options.length > 0) next.options = field.options
     if (field.description?.trim()) next.description = field.description.trim()

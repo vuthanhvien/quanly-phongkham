@@ -3,8 +3,8 @@ import {
   Button,
   Card,
   Col,
-  Drawer,
   Empty,
+  Modal,
   Popconfirm,
   Tabs,
   Tooltip,
@@ -86,6 +86,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   const id = props.id ?? params.id ?? ""
   const embedded = Boolean(props.embedded)
   const navigate = useNavigate()
+  const [toast, toastContextHolder] = message.useMessage()
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [related, setRelated] = useState<RelatedBlock[]>([])
   const [fields, setFields] = useState<FieldLayoutConfig[]>([])
@@ -173,41 +174,58 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   }
 
   if (embedded) {
-    return (
-      <>
-        <Card className="glass-card detail-card" loading={loading}>
-          <Typography.Title level={4} style={{ marginBottom: 16 }}>
-            Thông tin chính
-          </Typography.Title>
-          <div className="detail-grid-stacked">
-            {fields.map((field) => (
-              <div key={field.key} className="detail-item">
-                <div className="detail-item-label">
-                  {field.description ? (
-                    <Space direction="vertical" size={0}>
-                      <span>{field.label}</span>
-                      <Typography.Text type="secondary">{field.description}</Typography.Text>
-                    </Space>
-                  ) : field.label}
+    const detailTabs = groupDetailFieldsByTab(fields).map((group) => ({
+      key: group.key,
+      label: group.tab || "Thông tin",
+      children: (
+        <div className="detail-grid">
+          <Row gutter={[16, 16]}>
+            {group.fields.map((field) => (
+              <Col key={field.key} xs={24} md={detailWidthToSpan(field.width)}>
+                <div className="detail-item">
+                  <div className="detail-item-label">
+                    {field.description ? (
+                      <Space direction="vertical" size={0}>
+                        <span>{field.label}</span>
+                        <Typography.Text type="secondary">{field.description}</Typography.Text>
+                      </Space>
+                    ) : field.label}
+                  </div>
+                  <div className="detail-item-content">
+                    <RecordValueView
+                      field={field}
+                      fileLookups={fileLookups}
+                      lookups={lookups}
+                      value={record?.[field.key] ?? record?.customFields?.[field.key]}
+                    />
+                  </div>
                 </div>
-                <div className="detail-item-content">
-                  <RecordValueView
-                    field={field}
-                    fileLookups={fileLookups}
-                    lookups={lookups}
-                    value={record?.[field.key] ?? record?.customFields?.[field.key]}
-                  />
-                </div>
-              </div>
+              </Col>
             ))}
-          </div>
-        </Card>
-      </>
+          </Row>
+        </div>
+      ),
+    }))
+
+    return (
+      <Card className="glass-card detail-card" loading={loading}>
+        {detailTabs.length > 1 ? (
+          <Tabs items={detailTabs} />
+        ) : (
+          <>
+            <Typography.Title level={4} style={{ marginBottom: 16 }}>
+              Thông tin chính
+            </Typography.Title>
+            {detailTabs[0]?.children}
+          </>
+        )}
+      </Card>
     )
   }
 
   return (
     <>
+      {toastContextHolder}
       {!embedded && (
         <div className="page-header">
           <div>
@@ -345,14 +363,14 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                 }]
               : []
 
-            const infoTab = fields.length > 0 ? [{
-              key: "__info",
-              label: "Thông tin",
+            const infoTabs = groupDetailFieldsByTab(fields).map((group) => ({
+              key: group.key,
+              label: group.tab || "Thông tin",
               children: (
                 <div className="detail-grid">
                   <Row gutter={[16, 16]}>
-                    {fields.map((field) => (
-                      <Col key={field.key} span={detailWidthToSpan(field.width)} xs={24}>
+                    {group.fields.map((field) => (
+                      <Col key={field.key} xs={24} md={detailWidthToSpan(field.width)}>
                         <div className="detail-item">
                           <div className="detail-item-label">
                             {field.description ? (
@@ -371,7 +389,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                   </Row>
                 </div>
               ),
-            }] : []
+            }))
 
             const relatedTabs = related.map((block) => ({
               key: block.resource,
@@ -496,7 +514,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
               ),
             }))
 
-            const allTabs = [...infoTab, ...accountingVoucherLinesTab, ...relatedTabs, ...serviceOrderItemsTab]
+            const allTabs = [...infoTabs, ...accountingVoucherLinesTab, ...relatedTabs, ...serviceOrderItemsTab]
             if (allTabs.length === 0) {
               return <Card className="glass-card detail-card" loading={loading}><Empty description="Không có dữ liệu liên kết" /></Card>
             }
@@ -550,14 +568,14 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
         </Col>
       </Row>
 
-      <Drawer
-        destroyOnClose
+      <Modal
+        destroyOnHidden
         maskClosable={false}
         open={Boolean(relatedDetail || relatedDetailLoading)}
-        placement="right"
         title={relatedDetail ? `${relatedDetail.block.title} - chi tiết` : "Đang tải chi tiết"}
         width={720}
-        onClose={() => {
+        footer={null}
+        onCancel={() => {
           setRelatedDetail(null)
           setRelatedDetailLoading(false)
         }}
@@ -566,7 +584,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
           <div className="detail-grid">
             <Row gutter={[16, 16]}>
               {relatedDetail.block.detailFields.map((field) => (
-                <Col key={field.key} span={detailWidthToSpan(field.width)} xs={24}>
+                <Col key={field.key} xs={24} md={detailWidthToSpan(field.width)}>
                   <div className="detail-item">
                     <div className="detail-item-label">
                       {field.description ? (
@@ -587,25 +605,27 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
             </Row>
           </div>
         )}
-      </Drawer>
+      </Modal>
 
-      <Drawer
-        destroyOnClose
+      <Modal
+        destroyOnHidden
         maskClosable={false}
         open={Boolean(quickCreateBlock)}
-        placement="right"
         title={quickCreateBlock ? `Thêm nhanh ${entityLabels[quickCreateBlock.resource] || quickCreateBlock.resource}` : "Thêm nhanh"}
         width={quickCreateBlock?.resource === "service-orders" ? 980 : 620}
-        onClose={() => setQuickCreateBlock(null)}
+        footer={null}
+        onCancel={() => setQuickCreateBlock(null)}
       >
         {quickCreateBlock && (
           quickCreateBlock.resource === "service-orders" ? (
             <ServiceOrderForm
               compact
               initialValues={{ [quickCreateBlock.relationField]: id }}
+              notifyOnSuccess={false}
               onCancel={() => setQuickCreateBlock(null)}
               onSuccess={() => {
                 setQuickCreateBlock(null)
+                toast.success("Đã lưu đơn hàng")
                 void reloadRelatedBlocks()
               }}
             />
@@ -614,24 +634,26 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
               compact
               initialValues={{ [quickCreateBlock.relationField]: id }}
               resource={quickCreateBlock.resource}
+              notifyOnSuccess={false}
               onCancel={() => setQuickCreateBlock(null)}
               onSuccess={() => {
                 setQuickCreateBlock(null)
+                toast.success("Đã lưu dữ liệu")
                 void reloadRelatedBlocks()
               }}
             />
           )
         )}
-      </Drawer>
+      </Modal>
 
-      <Drawer
-        destroyOnClose
+      <Modal
+        destroyOnHidden
         maskClosable={false}
         open={Boolean(mainEdit)}
-        placement="right"
         title={mainEdit ? `Chỉnh sửa ${entityLabels[mainEdit.resource] || mainEdit.resource}` : "Chỉnh sửa"}
         width={mainEdit?.resource === "service-orders" ? 980 : 620}
-        onClose={() => setMainEdit(null)}
+        footer={null}
+        onCancel={() => setMainEdit(null)}
       >
         {mainEdit && (
           mainEdit.resource === "service-orders" ? (
@@ -661,16 +683,16 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
             />
           )
         )}
-      </Drawer>
+      </Modal>
 
-      <Drawer
-        destroyOnClose
+      <Modal
+        destroyOnHidden
         maskClosable={false}
         open={Boolean(relatedEdit)}
-        placement="right"
         title={relatedEdit ? `Chỉnh sửa ${entityLabels[relatedEdit.block.resource] || relatedEdit.block.resource}` : "Chỉnh sửa"}
         width={relatedEdit?.block.resource === "service-orders" ? 980 : 620}
-        onClose={() => setRelatedEdit(null)}
+        footer={null}
+        onCancel={() => setRelatedEdit(null)}
       >
         {relatedEdit && (
           relatedEdit.block.resource === "service-orders" ? (
@@ -704,7 +726,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
             />
           )
         )}
-      </Drawer>
+      </Modal>
     </>
   )
 
@@ -782,6 +804,18 @@ function detailWidthToSpan(width?: FieldLayoutConfig["width"]) {
     default:
       return 24
   }
+}
+
+function groupDetailFieldsByTab(fields: FieldLayoutConfig[]) {
+  const groups = new Map<string, { key: string; tab?: string; fields: FieldLayoutConfig[] }>()
+  fields.forEach((field) => {
+    const tab = field.tab?.trim()
+    const key = tab ? `__field-tab-${tab}` : "__info"
+    const group = groups.get(key) || { key, tab, fields: [] }
+    group.fields.push(field)
+    groups.set(key, group)
+  })
+  return Array.from(groups.values())
 }
 
 async function loadRelated(

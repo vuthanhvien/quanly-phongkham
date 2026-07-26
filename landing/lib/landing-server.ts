@@ -2,7 +2,8 @@ import 'server-only'
 import { headers } from 'next/headers'
 import { normalizeMenuItems, type LandingGlobalSetting, type LandingPageData, type NavItem } from './landing'
 
-const FALLBACK_SERVER_API_URL = process.env.LANDING_API_URL || 'http://127.0.0.1:3001/api'
+const CONFIGURED_SERVER_API_URL = process.env.LANDING_API_URL
+const FALLBACK_SERVER_API_URL = 'http://127.0.0.1:3001/api'
 
 function normalizeGlobalSettings(data: LandingGlobalSetting): LandingGlobalSetting {
   return {
@@ -16,6 +17,15 @@ function normalizeGlobalSettings(data: LandingGlobalSetting): LandingGlobalSetti
 }
 
 async function getServerApiUrl() {
+  // Server-side fetches run inside the container.  The request Host header is
+  // the browser-facing address (for example localhost:9999), which is not
+  // necessarily reachable from that container.  Prefer the configured
+  // internal API URL when it is available.
+  if (CONFIGURED_SERVER_API_URL) {
+    console.info('[landing] Using configured server API URL', { apiUrl: CONFIGURED_SERVER_API_URL })
+    return CONFIGURED_SERVER_API_URL
+  }
+
   const requestHeaders = await headers()
   const host = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').split(',')[0].trim()
   const isLocalHost = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(host)

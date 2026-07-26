@@ -29,7 +29,7 @@ export interface FieldSpec {
   key: string;
   label: string;
   type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative' | 'file';
-  displayFormat?: 'currency' | 'number' | 'percent';
+  displayFormat?: 'currency' | 'number' | 'percent' | 'time';
   required?: boolean;
   options?: SelectOption[];
   defaultValue?: unknown;
@@ -665,9 +665,10 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'staffId', label: 'Nhân sự', required: true, width: '50', tableWidth: 220 },
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
     { key: 'workDate', label: 'Ngày làm việc', type: 'date', required: true, width: '33', tableWidth: 150 },
+    { key: 'recurrenceUntil', label: 'Ngày kết thúc', type: 'date', width: '33', tableWidth: 150 },
     { key: 'shiftLabel', label: 'Ca làm', required: true, width: '33', tableWidth: 140 },
-    { key: 'startTime', label: 'Bắt đầu', type: 'datetime', width: '50', tableWidth: 190 },
-    { key: 'endTime', label: 'Kết thúc', type: 'datetime', width: '50', tableWidth: 190 },
+    { key: 'startTime', label: 'Bắt đầu', type: 'datetime', displayFormat: 'time', width: '25', tableWidth: 100 },
+    { key: 'endTime', label: 'Kết thúc', type: 'datetime', displayFormat: 'time', width: '25', tableWidth: 100 },
     { key: 'roomId', label: 'Phòng', width: '33', tableWidth: 180 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'PLANNED', label: 'Dự kiến' }, { value: 'CONFIRMED', label: 'Đã xác nhận' }, { value: 'OFF', label: 'Nghỉ' }], width: '33', tableWidth: 140 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },

@@ -1,6 +1,6 @@
 import { Authenticated, Refine } from '@refinedev/core';
 import routerProvider, { CatchAllNavigate } from '@refinedev/react-router';
-import { ConfigProvider, theme } from 'antd';
+import { App as AntdApp, ConfigProvider, theme } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
 import { hasResourceAccess, hasScreenAccess } from './access';
@@ -31,6 +31,7 @@ import { DepartmentsPage } from './pages/DepartmentsPage';
 import { PayrollsPage } from './pages/PayrollsPage';
 import { UiSettingsPage } from './pages/UiSettingsPage';
 import { ZaloInboxPage } from './pages/ZaloInboxPage';
+import { registerToastApi } from './toast';
 
 const resources = Object.entries(entityLabels).map(([name, label]) => ({
   name,
@@ -86,6 +87,15 @@ function StaticResourceGuard({ resource }: { resource: string }) {
 function RecordDetailRedirect() {
   const { resource = "", id = "" } = useParams()
   return <Navigate replace to={`/${resource}?detail=${id}`} />
+}
+
+function ToastBridge() {
+  const { message } = AntdApp.useApp();
+  // Axios interceptors can run while a component is closing. Register during
+  // render so the global toast instance is always available in that window.
+  registerToastApi(message);
+
+  return null;
 }
 
 export function App() {
@@ -188,7 +198,9 @@ export function App() {
           },
         }}
       >
-        <Refine dataProvider={dataProvider} authProvider={authProvider} routerProvider={routerProvider} resources={resources}>
+        <AntdApp>
+          <ToastBridge />
+          <Refine dataProvider={dataProvider} authProvider={authProvider} routerProvider={routerProvider} resources={resources}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedLayout />}>
@@ -245,7 +257,8 @@ export function App() {
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </Refine>
+          </Refine>
+        </AntdApp>
       </ConfigProvider>
     </AppUiContext.Provider>
   );

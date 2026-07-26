@@ -1,5 +1,6 @@
 import type { AuthProvider, CrudFilter, DataProvider, LogicalFilter } from '@refinedev/core';
 import axios from 'axios';
+import { toastError, toastSuccess } from './toast';
 
 export const API_URL = import.meta.env.VITE_API_URL || '/api';
 export const api = axios.create({ baseURL: API_URL });
@@ -65,6 +66,26 @@ function shouldAttachGlobalBranchFilter(url?: string) {
   return url.startsWith('/records/') || url.startsWith('/reports/accounting/');
 }
 
+function getMutationSuccessMessage(method?: string) {
+  switch ((method || '').toLowerCase()) {
+    case 'delete': return 'Đã xóa thành công';
+    case 'post': return 'Đã lưu thành công';
+    default: return 'Đã cập nhật thành công';
+  }
+}
+
+function isNotifiableMutation(url?: string, method?: string) {
+  if (!['post', 'put', 'patch', 'delete'].includes((method || '').toLowerCase())) return false;
+  return !url?.startsWith('/auth/');
+}
+
+function getMutationErrorMessage(error: unknown) {
+  const payload = (error as { response?: { data?: { message?: unknown } } })?.response?.data;
+  const detail = payload?.message;
+  if (Array.isArray(detail)) return detail.filter(Boolean).join('. ');
+  return typeof detail === 'string' && detail.trim() ? detail : 'Không thể lưu thay đổi';
+}
+
 // Resolves a relative backend path (e.g. /uploads/...) to an absolute URL.
 // publicUrl values stored in DB are root-relative; the backend serves them
 // on the same host as the API but without the /api prefix.
@@ -91,11 +112,19 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (isNotifiableMutation(response.config.url, response.config.method)) {
+      toastSuccess(getMutationSuccessMessage(response.config.method));
+    }
+    return response;
+  },
   (error) => {
     if (error?.response?.status === 401) {
       clearAuthSession();
       redirectToLogin();
+    }
+    if (isNotifiableMutation(error?.config?.url, error?.config?.method)) {
+      toastError(getMutationErrorMessage(error));
     }
     return Promise.reject(error);
   },

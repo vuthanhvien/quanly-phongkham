@@ -20,13 +20,13 @@ import {
   Row,
   Select,
   Space,
+  Tabs,
   Tree,
   TreeSelect,
   Typography,
-  message,
 } from "antd"
 import { UserOutlined } from "@ant-design/icons"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import dayjs from "dayjs"
 import { api, resolveFileUrl } from "../api"
 import { FileUploadPanel } from "./FileUploadPanel"
@@ -34,12 +34,14 @@ import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
 import { getRelationMetaMap, loadRelationOptions, LookupMap, RelationLookupRecord } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
 import { getFirstLookupValue } from "../utils/branchDefaults"
+import { toastError, toastSuccess } from "../toast"
 import { buildLocalDateTime, currentLocalDate, currentLocalDateTime, normalizeDateTimeValueForInput, normalizeDateValueForInput, parseClinicDateTime } from "../utils/datetime"
 import { buildFolderPathMap, buildFolderTree, FolderTreeNode, normalizeFileFolderRows } from "../utils/fileFolders"
 import {
   getFieldCatalog,
   getStoredUserRole,
   getVisibleFieldConfigs,
+  FieldLayoutConfig,
   ViewSettingRecord,
 } from "../view-settings"
 
@@ -50,6 +52,7 @@ interface RecordFormContentProps {
   initialValues?: Record<string, unknown>
   onCancel?: () => void
   onSuccess?: () => void
+  notifyOnSuccess?: boolean
 }
 
 const APPOINTMENT_DURATION_OPTIONS = [
@@ -62,23 +65,6 @@ const APPOINTMENT_DURATION_OPTIONS = [
   { value: "custom", label: "Nhập giờ kết thúc" },
 ]
 
-const WORK_SCHEDULE_REPEAT_OPTIONS = [
-  { value: "NONE", label: "Không lặp" },
-  { value: "DAILY", label: "Hàng ngày" },
-  { value: "WEEKLY", label: "Hàng tuần" },
-  { value: "MONTHLY", label: "Hàng tháng" },
-]
-
-const WORK_SCHEDULE_WEEKDAY_OPTIONS = [
-  { value: "MON", label: "Th 2" },
-  { value: "TUE", label: "Th 3" },
-  { value: "WED", label: "Th 4" },
-  { value: "THU", label: "Th 5" },
-  { value: "FRI", label: "Th 6" },
-  { value: "SAT", label: "Th 7" },
-  { value: "SUN", label: "CN" },
-]
-
 export function RecordFormContent({
   resource,
   id,
@@ -86,12 +72,14 @@ export function RecordFormContent({
   initialValues,
   onCancel,
   onSuccess,
+  notifyOnSuccess = true,
 }: RecordFormContentProps) {
   const editing = Boolean(id)
   const [form] = Form.useForm()
-  const [fields, setFields] = useState<FieldSpec[]>([])
+  const [fields, setFields] = useState<FieldLayoutConfig[]>([])
   const [lookups, setLookups] = useState<LookupMap>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<string | undefined>()
   const { mutate: create } = useCreate()
   const { mutate: update } = useUpdate()
   const isAppointmentForm = resource === "appointments"
@@ -216,7 +204,7 @@ export function RecordFormContent({
     })
     const done = () => {
       setSubmitError(null)
-      message.success("Đã lưu dữ liệu")
+      if (notifyOnSuccess) toastSuccess("Đã lưu dữ liệu")
       onSuccess?.()
     }
     if (editing)
@@ -227,7 +215,7 @@ export function RecordFormContent({
           onError: (error) => {
             const errorMessage = getApiErrorMessage(error, "Không thể lưu dữ liệu")
             setSubmitError(errorMessage)
-            message.error(errorMessage)
+            toastError(errorMessage)
           },
         },
       )
@@ -239,11 +227,58 @@ export function RecordFormContent({
           onError: (error) => {
             const errorMessage = getApiErrorMessage(error, "Không thể lưu dữ liệu")
             setSubmitError(errorMessage)
-            message.error(errorMessage)
+            toastError(errorMessage)
           },
         },
       )
   }
+
+  const visibleFields = useMemo(
+    () => fields.filter((field) => {
+      if (isAppointmentForm && (field.key === "startTime" || field.key === "endTime")) return false
+      if (isWorkScheduleForm && (field.key === "workDate" || field.key === "startTime" || field.key === "endTime" || field.key === "recurrenceUntil")) return false
+      return true
+    }),
+    [fields, isAppointmentForm, isWorkScheduleForm],
+  )
+  const fieldTabs = useMemo(() => groupFieldsByTab(visibleFields), [visibleFields])
+  const usesTabs = fieldTabs.length > 1 || Boolean(fieldTabs[0]?.tab)
+
+  function showValidationError(errorInfo: { errorFields?: Array<{ name: Array<string | number>; errors: string[] }> }) {
+    const firstError = errorInfo.errorFields?.[0]
+    const fieldKey = String(firstError?.name?.[0] || "")
+    const tabIndex = fieldTabs.findIndex((group) => group.fields.some((field) => field.key === fieldKey))
+    const resolvedTabIndex = tabIndex >= 0 ? tabIndex : 0
+    const tab = fieldTabs[resolvedTabIndex]
+
+    if (usesTabs && tab) setActiveTab(tab.key)
+
+    const errorMessage = firstError?.errors?.[0] || "Vui lòng kiểm tra các trường bắt buộc"
+    setSubmitError(usesTabs && tab ? `Tab “${tab.tab || "Thông tin chung"}”: ${errorMessage}` : errorMessage)
+  }
+
+  const renderFieldGrid = (tabFields: FieldLayoutConfig[], includeSpecialFields: boolean) => (
+    <Row gutter={[16, 0]}>
+      {tabFields.map((field) => (
+        <Col key={field.key} xs={24} md={widthToSpan(field.width)}>
+          <Form.Item
+            label={field.description ? (
+              <Space direction="vertical" size={0}>
+                <span>{field.label}</span>
+                <Typography.Text type="secondary">{field.description}</Typography.Text>
+              </Space>
+            ) : field.label}
+            name={field.key}
+            rules={[{ required: Boolean(field.required && !field.disabled), message: `Nhập ${field.label}` }]}
+          >
+            <FieldInput field={field} lookups={lookups} />
+          </Form.Item>
+        </Col>
+      ))}
+      {includeSpecialFields && isAppointmentForm ? <AppointmentDateTimeFields form={form} /> : null}
+      {includeSpecialFields && isWorkScheduleForm ? <WorkSchedulePeriodFields /> : null}
+    </Row>
+  )
 
   return (
     <>
@@ -253,14 +288,26 @@ export function RecordFormContent({
           </Typography.Title>
       )}
       <Form
-        className="record-form"
+        className={`record-form${compact ? " record-form--compact" : ""}`}
         form={form}
         layout="vertical"
         onValuesChange={() => {
           if (submitError) setSubmitError(null)
         }}
         onFinish={submit}
+        onFinishFailed={showValidationError}
       >
+        {usesTabs ? (
+          <Tabs
+            activeKey={activeTab || fieldTabs[0]?.key}
+            items={fieldTabs.map((group, index) => ({
+              key: group.key,
+              label: group.tab || "Thông tin chung",
+              children: renderFieldGrid(group.fields, index === 0),
+            }))}
+            onChange={setActiveTab}
+          />
+        ) : renderFieldGrid(visibleFields, true)}
         {submitError ? (
           <Alert
             closable
@@ -271,44 +318,7 @@ export function RecordFormContent({
             onClose={() => setSubmitError(null)}
           />
         ) : null}
-        <Row gutter={[16, 0]}>
-          {fields
-            .filter((field) => {
-              if (isAppointmentForm && (field.key === "startTime" || field.key === "endTime")) return false
-              if (isWorkScheduleForm && (field.key === "workDate" || field.key === "startTime" || field.key === "endTime")) return false
-              return true
-            })
-            .map((field) => (
-            <Col key={field.key} span={widthToSpan(field.width)} xs={24}>
-              <Form.Item
-                label={
-                  field.description ? (
-                    <Space direction="vertical" size={0}>
-                      <span>{field.label}</span>
-                      <Typography.Text type="secondary">
-                        {field.description}
-                      </Typography.Text>
-                    </Space>
-                  ) : (
-                    field.label
-                  )
-                }
-                name={field.key}
-                rules={[
-                  {
-                    required: Boolean(field.required && !field.disabled),
-                    message: `Nhập ${field.label}`,
-                  },
-                ]}
-              >
-                <FieldInput field={field} lookups={lookups} />
-              </Form.Item>
-            </Col>
-          ))}
-          {isAppointmentForm ? <AppointmentDateTimeFields form={form} /> : null}
-          {isWorkScheduleForm ? <WorkScheduleRepeatFields form={form} editing={editing} /> : null}
-        </Row>
-        <Space>
+        <Space className="record-form-actions">
           <Button className="primary-glow" htmlType="submit" type="primary">
             Lưu
           </Button>
@@ -319,26 +329,22 @@ export function RecordFormContent({
   )
 }
 
-function WorkScheduleRepeatFields({
-  form,
-  editing,
-}: {
-  form: ReturnType<typeof Form.useForm>[0]
-  editing: boolean
-}) {
-  const recurrenceType = (Form.useWatch("recurrenceType", form) as string | undefined) || "NONE"
-  const scheduleDate = Form.useWatch("scheduleDate", form) as string | undefined
+function groupFieldsByTab(fields: FieldLayoutConfig[]) {
+  const groups = new Map<string, { key: string; tab?: string; fields: FieldLayoutConfig[] }>()
+  fields.forEach((field) => {
+    const tab = field.tab?.trim()
+    const key = tab ? `tab-${tab}` : "__general"
+    const group = groups.get(key) || { key, tab, fields: [] }
+    group.fields.push(field)
+    groups.set(key, group)
+  })
+  return Array.from(groups.values())
+}
 
-  useEffect(() => {
-    if (recurrenceType !== "WEEKLY" || !scheduleDate) return
-    const current = form.getFieldValue("recurrenceWeekdays")
-    if (Array.isArray(current) && current.length > 0) return
-    form.setFieldsValue({ recurrenceWeekdays: [weekdayCodeFromDate(scheduleDate)] })
-  }, [form, recurrenceType, scheduleDate])
-
+function WorkSchedulePeriodFields() {
   return (
     <>
-      <Col span={12} xs={24}>
+      <Col xs={24} md={12}>
         <Form.Item
           label="Ngày làm việc"
           name="scheduleDate"
@@ -347,7 +353,7 @@ function WorkScheduleRepeatFields({
           <Input type="date" />
         </Form.Item>
       </Col>
-      <Col span={6} xs={24}>
+      <Col xs={24} md={6}>
         <Form.Item
           label="Giờ bắt đầu"
           name="scheduleStartTime"
@@ -356,7 +362,7 @@ function WorkScheduleRepeatFields({
           <Input type="time" />
         </Form.Item>
       </Col>
-      <Col span={6} xs={24}>
+      <Col xs={24} md={6}>
         <Form.Item
           label="Giờ kết thúc"
           name="scheduleEndTime"
@@ -365,45 +371,11 @@ function WorkScheduleRepeatFields({
           <Input type="time" />
         </Form.Item>
       </Col>
-      <Col span={12} xs={24}>
-        <Form.Item label="Lặp lại" name="recurrenceType">
-          <Select options={WORK_SCHEDULE_REPEAT_OPTIONS} />
+      <Col xs={24} md={12}>
+        <Form.Item label="Ngày kết thúc" name="recurrenceUntil" rules={[{ required: true, message: "Chọn ngày kết thúc" }]}>
+          <Input type="date" />
         </Form.Item>
       </Col>
-      {recurrenceType !== "NONE" ? (
-        <Col span={12} xs={24}>
-          <Form.Item
-            label="Lặp mỗi"
-            name="recurrenceInterval"
-            rules={[{ required: true, message: "Nhập chu kỳ lặp" }]}
-          >
-            <InputNumber min={1} style={{ width: "100%" }} />
-          </Form.Item>
-        </Col>
-      ) : null}
-      {recurrenceType === "WEEKLY" ? (
-        <Col span={12} xs={24}>
-          <Form.Item
-            label="Lặp vào"
-            name="recurrenceWeekdays"
-            rules={[{ required: true, message: "Chọn ít nhất 1 thứ" }]}
-          >
-            <Select mode="multiple" options={WORK_SCHEDULE_WEEKDAY_OPTIONS} placeholder="Chọn các thứ lặp" />
-          </Form.Item>
-        </Col>
-      ) : null}
-      {recurrenceType !== "NONE" ? (
-        <Col span={12} xs={24}>
-          <Form.Item
-            label="Kết thúc lặp"
-            name="recurrenceUntil"
-            rules={[{ required: true, message: "Chọn ngày kết thúc lặp" }]}
-            extra={editing ? "Sửa bản ghi hiện tại sẽ cập nhật ca này; metadata chuỗi vẫn được giữ để dùng về sau." : undefined}
-          >
-            <Input type="date" />
-          </Form.Item>
-        </Col>
-      ) : null}
     </>
   )
 }
@@ -428,7 +400,7 @@ function AppointmentDateTimeFields({ form }: { form: ReturnType<typeof Form.useF
 
   return (
     <>
-      <Col span={12} xs={24}>
+      <Col xs={24} md={12}>
         <Form.Item
           label="Ngày hẹn"
           name="appointmentDate"
@@ -437,7 +409,7 @@ function AppointmentDateTimeFields({ form }: { form: ReturnType<typeof Form.useF
           <Input type="date" />
         </Form.Item>
       </Col>
-      <Col span={12} xs={24}>
+      <Col xs={24} md={12}>
         <Form.Item
           label="Giờ bắt đầu"
           name="appointmentStartTime"
@@ -446,7 +418,7 @@ function AppointmentDateTimeFields({ form }: { form: ReturnType<typeof Form.useF
           <Input type="time" />
         </Form.Item>
       </Col>
-      <Col span={12} xs={24}>
+      <Col xs={24} md={12}>
         <Form.Item
           label="Thời lượng"
           name="appointmentDurationMinutes"
@@ -455,7 +427,7 @@ function AppointmentDateTimeFields({ form }: { form: ReturnType<typeof Form.useF
           <Select options={APPOINTMENT_DURATION_OPTIONS} placeholder="Chọn thời lượng" />
         </Form.Item>
       </Col>
-      <Col span={12} xs={24}>
+      <Col xs={24} md={12}>
         <Form.Item
           label="Giờ kết thúc"
           name="appointmentEndTime"
@@ -489,13 +461,6 @@ function buildWorkScheduleEditorValues(values: Record<string, unknown>) {
     scheduleDate: workDate,
     scheduleStartTime: start?.isValid() ? start.format("HH:mm") : "08:00",
     scheduleEndTime: end?.isValid() ? end.format("HH:mm") : "17:00",
-    recurrenceType: String(values.recurrenceType || "NONE").toUpperCase(),
-    recurrenceInterval: Number(values.recurrenceInterval || 1),
-    recurrenceWeekdays: typeof values.recurrenceWeekdays === "string"
-      ? String(values.recurrenceWeekdays).split(",").map((item) => item.trim()).filter(Boolean)
-      : Array.isArray(values.recurrenceWeekdays)
-        ? values.recurrenceWeekdays.map(String)
-        : [weekdayCodeFromDate(workDate)],
     recurrenceUntil: normalizeDateValueForInput(values.recurrenceUntil),
   }
 }
@@ -536,24 +501,13 @@ function applyWorkScheduleEditorValues(values: Record<string, unknown>) {
   if (scheduleDate && scheduleStartTime) values.startTime = `${scheduleDate}T${scheduleStartTime}`
   if (scheduleDate && scheduleEndTime) values.endTime = `${scheduleDate}T${scheduleEndTime}`
 
-  const recurrenceType = String(values.recurrenceType || "NONE").toUpperCase()
-  values.recurrenceType = recurrenceType
-  values.recurrenceInterval = recurrenceType === "NONE" ? undefined : Math.max(1, Number(values.recurrenceInterval || 1))
-  values.recurrenceWeekdays = recurrenceType === "WEEKLY"
-    ? Array.isArray(values.recurrenceWeekdays)
-      ? values.recurrenceWeekdays.map(String)
-      : []
-    : undefined
-  values.recurrenceUntil = recurrenceType === "NONE" ? undefined : values.recurrenceUntil
+  values.recurrenceType = "DAILY"
+  values.recurrenceInterval = 1
+  values.recurrenceWeekdays = undefined
 
   delete values.scheduleDate
   delete values.scheduleStartTime
   delete values.scheduleEndTime
-}
-
-function weekdayCodeFromDate(value: string) {
-  const dayIndex = dayjs(value).day()
-  return ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][dayIndex] || "MON"
 }
 
 function widthToSpan(width?: FieldSpec["width"]) {
@@ -583,11 +537,12 @@ function FieldInput({
   value?: unknown
   onChange?: (value: unknown) => void
 }) {
+  const placeholder = field.placeholder?.trim() || getDefaultFieldPlaceholder(field)
   if (field.type === "number")
     return (
       <InputNumber
         disabled={field.disabled}
-        placeholder={field.placeholder}
+        placeholder={placeholder}
         style={{ width: "100%" }}
         value={value as number | undefined}
         onChange={onChange}
@@ -600,7 +555,7 @@ function FieldInput({
         options={(field.options || []).map((opt) =>
           typeof opt === "string" ? { value: opt, label: opt } : opt,
         )}
-        placeholder={field.placeholder}
+        placeholder={placeholder}
         value={value}
         onChange={onChange}
       />
@@ -613,7 +568,7 @@ function FieldInput({
         options={(field.options || []).map((opt) =>
           typeof opt === "string" ? { value: opt, label: opt } : opt,
         )}
-        placeholder={field.placeholder}
+        placeholder={placeholder}
         value={value}
         onChange={onChange}
       />
@@ -623,7 +578,7 @@ function FieldInput({
       <FileSelectInput
         disabled={field.disabled}
         onChange={onChange}
-        placeholder={field.placeholder || `Chọn ${field.label.toLowerCase()}`}
+        placeholder={placeholder}
         value={value}
       />
     )
@@ -633,7 +588,7 @@ function FieldInput({
       <ImageLibrarySelectInput
         disabled={field.disabled}
         onChange={onChange}
-        placeholder={field.placeholder || `Chọn ${field.label.toLowerCase()}`}
+        placeholder={placeholder}
         value={value}
       />
     )
@@ -645,7 +600,7 @@ function FieldInput({
         <FolderRelationInput
           disabled={field.disabled}
           onChange={onChange}
-          placeholder={field.placeholder || `Chọn ${field.label.toLowerCase()}`}
+          placeholder={placeholder}
           value={value}
         />
       )
@@ -657,7 +612,7 @@ function FieldInput({
         showSearch
         optionFilterProp="searchLabel"
         options={buildRelationSelectOptions(lookups, relation.lookupKey || relation.resource, relation.resource)}
-        placeholder={field.placeholder || `Chọn ${field.label.toLowerCase()}`}
+        placeholder={placeholder}
         value={value}
         onChange={onChange}
       />
@@ -667,7 +622,7 @@ function FieldInput({
     return (
       <Input.TextArea
         disabled={field.disabled}
-        placeholder={field.placeholder}
+        placeholder={placeholder}
         rows={3}
         value={value as string | undefined}
         onChange={(e) => onChange?.(e.target.value)}
@@ -677,7 +632,7 @@ function FieldInput({
     return (
       <Input
         disabled={field.disabled}
-        placeholder={field.placeholder}
+        placeholder={placeholder}
         type="date"
         value={value as string | undefined}
         onChange={(e) => onChange?.(e.target.value)}
@@ -687,7 +642,7 @@ function FieldInput({
     return (
       <Input
         disabled={field.disabled}
-        placeholder={field.placeholder}
+        placeholder={placeholder}
         type="datetime-local"
         value={value as string | undefined}
         onChange={(e) => onChange?.(e.target.value)}
@@ -696,11 +651,20 @@ function FieldInput({
   return (
     <Input
       disabled={field.disabled}
-      placeholder={field.placeholder}
+      placeholder={placeholder}
       value={value as string | undefined}
       onChange={(e) => onChange?.(e.target.value)}
     />
   )
+}
+
+function getDefaultFieldPlaceholder(field: FieldSpec) {
+  const label = field.label.trim().toLowerCase()
+  if (field.type === "select" || field.type === "multi-select" || field.type === "relative" || field.type === "file" || field.relation || relationFields[field.key] || field.key === "imageUrl") {
+    return `Chọn ${label}`
+  }
+  if (field.type === "date" || field.type === "datetime") return `Chọn ${label}`
+  return `Nhập ${label}`
 }
 
 function buildRelationSelectOptions(lookups: LookupMap, lookupKey: string, resource: string) {
@@ -866,7 +830,7 @@ function FileSelectInput({
         </div>
       ) : null}
       <Modal
-        destroyOnClose
+        destroyOnHidden
         maskClosable={false}
         open={openPicker}
         title="Thư viện file"
@@ -994,7 +958,7 @@ function FileSelectInput({
         </div>
       </Modal>
       <Modal
-        destroyOnClose
+        destroyOnHidden
         footer={null}
         maskClosable={false}
         open={openUpload}
@@ -1162,7 +1126,7 @@ function ImageLibrarySelectInput({
         </Button>
       </Space.Compact>
       <Modal
-        destroyOnClose
+        destroyOnHidden
         maskClosable={false}
         open={openPicker}
         title="Thư viện hình ảnh"
@@ -1280,7 +1244,7 @@ function ImageLibrarySelectInput({
         </div>
       </Modal>
       <Modal
-        destroyOnClose
+        destroyOnHidden
         footer={null}
         maskClosable={false}
         open={openUpload}

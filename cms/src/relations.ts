@@ -173,6 +173,9 @@ export function displayValue(field: string | FieldSpec, value: unknown, lookups:
   // Date / datetime formatting
   const fieldType = typeof field === 'string' ? undefined : field.type;
   const fieldKey = typeof field === 'string' ? field : field.key;
+  if (typeof field !== 'string' && field.displayFormat === 'time') {
+    return formatClinicDateTime(value, 'HH:mm');
+  }
   if (fieldType === 'date') {
     const normalized = normalizeDateValueForInput(value)
     const parsed = normalized ? dayjs(normalized) : dayjs(String(value))

@@ -28,7 +28,7 @@ Compose mac dinh la production-like runtime, khong hot reload. Neu muon code va 
 
 ```bash
 cp .env.example .env
-docker compose -f docker-compose.dev.yml up
+docker compose -f docker-compose.dev.yml up -d 
 ```
 
 Dev stack se chay trong 1 service `app`, ben trong gom:

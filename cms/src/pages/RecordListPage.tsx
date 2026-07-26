@@ -14,9 +14,9 @@ import {
 import {
   Button,
   Card,
-  Drawer,
   Grid,
   Input,
+  Modal,
   Popconfirm,
   Select,
   Space,
@@ -427,14 +427,13 @@ export function RecordListPage() {
           scroll={{ x: "max-content" }}
         />
       </Card>
-      <Drawer
+      <Modal
         className="quick-drawer"
-        destroyOnClose
+        destroyOnHidden
         maskClosable={false}
         open={Boolean(detailId)}
-        placement="right"
         title={`Chi tiết ${entityLabels[resource] || resource}`}
-        extra={
+        footer={
           detailId ? (
             <Space>
               <Button onClick={() => navigate(`/${resource}/${detailId}/full`)}>
@@ -455,8 +454,8 @@ export function RecordListPage() {
             </Space>
           ) : null
         }
-        width={screens.md ? (resource === "service-orders" ? 1040 : 720) : "100%"}
-        onClose={closeDetail}
+        width={screens.md ? (resource === "service-orders" ? 1100 : 900) : "calc(100vw - 16px)"}
+        onCancel={closeDetail}
       >
         {detailId ? (
           <RecordDetailPage
@@ -466,15 +465,14 @@ export function RecordListPage() {
             onClose={closeDetail}
           />
         ) : null}
-      </Drawer>
-      <Drawer
+      </Modal>
+      <Modal
         className="quick-drawer"
-        destroyOnClose
+        destroyOnHidden
         maskClosable={false}
         open={Boolean(relatedQuickView)}
-        placement="right"
         title={relatedQuickView ? `Chi tiết ${entityLabels[relatedQuickView.resource] || relatedQuickView.resource}` : "Chi tiết liên kết"}
-        extra={
+        footer={
           relatedQuickView ? (
             <Space>
               <Button onClick={() => navigate(`/${relatedQuickView.resource}/${relatedQuickView.id}/full`)}>
@@ -496,8 +494,8 @@ export function RecordListPage() {
             </Space>
           ) : null
         }
-        width={screens.md ? 720 : "100%"}
-        onClose={() => setRelatedQuickView(null)}
+        width={screens.md ? 900 : "calc(100vw - 16px)"}
+        onCancel={() => setRelatedQuickView(null)}
       >
         {relatedQuickView ? (
           <RecordDetailPage
@@ -507,16 +505,16 @@ export function RecordListPage() {
             onClose={() => setRelatedQuickView(null)}
           />
         ) : null}
-      </Drawer>
-      <Drawer
+      </Modal>
+      <Modal
         className="quick-drawer"
-        destroyOnClose
+        destroyOnHidden
         maskClosable={false}
         open={creating || Boolean(editingId)}
-        placement="right"
         title={editingId ? `Chỉnh sửa ${entityLabels[resource] || resource}` : `Thêm nhanh ${entityLabels[resource] || resource}`}
-        width={screens.md ? (["service-orders", "stock-batches"].includes(resource) ? 980 : 560) : "100%"}
-        onClose={() => {
+        width={screens.md ? (["service-orders", "stock-batches"].includes(resource) ? 1100 : 760) : "calc(100vw - 16px)"}
+        footer={null}
+        onCancel={() => {
           setCreating(false)
           setEditingId(null)
           setDuplicateValues(undefined)
@@ -589,7 +587,7 @@ export function RecordListPage() {
             }}
           />
         )}
-      </Drawer>
+      </Modal>
     </>
   )
 }

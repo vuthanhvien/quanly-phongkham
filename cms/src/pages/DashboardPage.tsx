@@ -5,7 +5,7 @@ import {
   TeamOutlined,
 } from "@ant-design/icons"
 import { useGetIdentity } from "@refinedev/core"
-import { Card, Drawer, Grid, Typography, message } from "antd"
+import { Card, Grid, Modal, Typography, message } from "antd"
 import dayjs from "dayjs"
 import { useEffect, useState } from "react"
 import { useAppUi } from "../app-ui"
@@ -259,15 +259,15 @@ export function DashboardPage() {
         quickStats={quickStats}
         quickStatsTitle={dashboardCopy.quickStatsTitle}
       />
-      <Drawer
+      <Modal
         className="quick-drawer"
-        destroyOnClose
+        destroyOnHidden
         maskClosable={false}
         open={leaveDrawerOpen}
-        placement="right"
         title="Tạo đơn xin nghỉ"
-        width={screens.md ? 560 : "100%"}
-        onClose={() => setLeaveDrawerOpen(false)}
+        width={screens.md ? 720 : "calc(100vw - 16px)"}
+        footer={null}
+        onCancel={() => setLeaveDrawerOpen(false)}
       >
         <RecordFormContent
           compact
@@ -286,7 +286,7 @@ export function DashboardPage() {
             void loadDashboard()
           }}
         />
-      </Drawer>
+      </Modal>
     </>
   )
 }

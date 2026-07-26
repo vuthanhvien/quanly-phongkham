@@ -9,6 +9,7 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
         VITE_API_URL: ${VITE_API_URL:-/api}
         VITE_BASE_PATH: ${VITE_BASE_PATH:-/admin/}
+        VITE_LANDING_URL: ${VITE_LANDING_URL:-}
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}

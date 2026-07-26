@@ -6,7 +6,7 @@ import {
   TeamOutlined,
 } from "@ant-design/icons"
 import dayjs, { type Dayjs } from "dayjs"
-import { Avatar, Button, Calendar, Card, Col, Drawer, Empty, List, Row, Segmented, Select, Space, Tag, Typography } from "antd"
+import { Avatar, Button, Calendar, Card, Col, Empty, List, Modal, Row, Segmented, Select, Space, Tag, Typography, message } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { hasActionAccess } from "../access"
@@ -53,6 +53,21 @@ interface CalendarQuickDetailState {
   fields: FieldLayoutConfig[]
   lookups: LookupMap
   fileLookups: FileLookupMap
+}
+
+interface CalendarSourceData {
+  appointments: Record<string, any>[]
+  workSchedules: Record<string, any>[]
+  leaveRequests: Record<string, any>[]
+  attendances: Record<string, any>[]
+  staffRows: Record<string, any>[]
+  customerRows: Record<string, any>[]
+  roomRows: Record<string, any>[]
+}
+
+interface ScheduleDisplayWindow {
+  start: Dayjs
+  end: Dayjs
 }
 
 type QuickCreateResource = "appointments" | "work-schedules" | "leave-requests" | "attendances"
@@ -124,9 +139,10 @@ async function fetchListSafe<T>(resource: string, pageSize = 500) {
 
 export function CalendarPage() {
   const navigate = useNavigate()
+  const [toast, toastContextHolder] = message.useMessage()
   const [calendarMode, setCalendarMode] = useState<CalendarMode>("day")
   const [selectedDate, setSelectedDate] = useState(dayjs())
-  const [events, setEvents] = useState<PlannerEvent[]>([])
+  const [calendarSource, setCalendarSource] = useState<CalendarSourceData | null>(null)
   const [lookups, setLookups] = useState<LookupMap>({})
   const [selectedTypes, setSelectedTypes] = useState<PlannerEventType[]>(["appointment", "schedule"])
   const [doctorFilter, setDoctorFilter] = useState<string | undefined>(undefined)
@@ -151,7 +167,7 @@ export function CalendarPage() {
     ])
 
     setLookups(relationLookups)
-    setEvents(buildPlannerEvents({
+    setCalendarSource({
       appointments,
       workSchedules,
       leaveRequests,
@@ -159,9 +175,20 @@ export function CalendarPage() {
       staffRows,
       customerRows,
       roomRows,
-      lookups: relationLookups,
-    }))
+    })
   }
+
+  const scheduleDisplayWindow = useMemo(
+    () => getScheduleDisplayWindow(selectedDate, calendarMode),
+    [calendarMode, selectedDate],
+  )
+
+  const events = useMemo(
+    () => calendarSource
+      ? buildPlannerEvents({ ...calendarSource, lookups, scheduleDisplayWindow })
+      : [],
+    [calendarSource, lookups, scheduleDisplayWindow],
+  )
 
   const filteredEvents = useMemo(
     () =>
@@ -248,6 +275,7 @@ export function CalendarPage() {
 
   return (
     <>
+      {toastContextHolder}
       <div className="page-header">
         <div>
           <Typography.Title level={3} style={{ margin: 0 }}>Calendar điều phối</Typography.Title>
@@ -332,7 +360,11 @@ export function CalendarPage() {
                         {dayEvents.length === 0 ? (
                           <Typography.Text type="secondary">Trống</Typography.Text>
                         ) : (
-                          dayEvents.slice(0, 5).map((event) => (
+                          dayEvents.slice(0, 5).map((event) => event.type === "schedule" ? (
+                            <Tag className="calendar-schedule-tag" key={event.id}>
+                              {formatEventTime(event.start, event.end)} · {event.staffName || event.title}
+                            </Tag>
+                          ) : (
                             <button
                               key={event.id}
                               className={`calendar-event-chip tone-${event.type}`}
@@ -354,12 +386,24 @@ export function CalendarPage() {
                 })}
               </div>
             ) : (
-              <DayPlannerTimeline
-                events={selectedEvents}
-                selectedDate={selectedDate}
-                onOpen={(item) => navigate(`/${item.resource}/${item.id}`)}
-                onOpenQuickDetail={(item) => void openQuickDetail(item)}
-              />
+              <div className="calendar-day-planner-layout">
+                <DayPlannerTimeline
+                  events={selectedEvents.filter((item) => item.type !== "schedule")}
+                  selectedDate={selectedDate}
+                  onOpen={(item) => navigate(`/${item.resource}/${item.id}`)}
+                  onOpenQuickDetail={(item) => void openQuickDetail(item)}
+                />
+                <div className="calendar-day-work-schedule-panels">
+                  <DayWorkSchedulePanel
+                    title="Ca làm bác sĩ"
+                    events={selectedScheduleEvents.filter((item) => item.staffType === "DOCTOR")}
+                  />
+                  <DayWorkSchedulePanel
+                    title="Ca làm nhân viên"
+                    events={selectedScheduleEvents.filter((item) => item.staffType !== "DOCTOR")}
+                  />
+                </div>
+              </div>
             )}
           </Card>
         </div>
@@ -415,7 +459,7 @@ export function CalendarPage() {
                 dataSource={selectedEvents}
                 renderItem={(item) => (
                   <List.Item
-                    actions={[
+                    actions={item.type === "schedule" ? [] : [
                       <Button
                         key={`open-${item.id}`}
                         icon={<EyeOutlined />}
@@ -429,9 +473,11 @@ export function CalendarPage() {
                       title={(
                         <Space size={8} wrap>
                           <Tag color={item.tone}>{EVENT_TYPE_LABEL[item.type]}</Tag>
-                          <button className="calendar-event-link" type="button" onClick={() => void openQuickDetail(item)}>
-                            {item.title}
-                          </button>
+                          {item.type === "schedule" ? <span>{item.title}</span> : (
+                            <button className="calendar-event-link" type="button" onClick={() => void openQuickDetail(item)}>
+                              {item.title}
+                            </button>
+                          )}
                         </Space>
                       )}
                       description={(
@@ -453,11 +499,9 @@ export function CalendarPage() {
               ) : (
                 <div className="calendar-staff-schedule-list">
                   {selectedScheduleEvents.map((item) => (
-                    <button
+                    <div
                       key={`schedule-${item.id}`}
                       className="calendar-staff-schedule-card"
-                      type="button"
-                      onClick={() => void openQuickDetail(item)}
                     >
                       <div className="calendar-staff-schedule-card__head">
                         <Avatar
@@ -479,7 +523,7 @@ export function CalendarPage() {
                         {item.roomName ? <span>{item.roomName}</span> : null}
                         <span>{item.statusLabel}</span>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -488,46 +532,47 @@ export function CalendarPage() {
         </div>
       </div>
 
-      <Drawer
+      <Modal
         className="quick-drawer"
-        destroyOnClose
+        destroyOnHidden
         maskClosable={false}
         open={Boolean(quickCreateResource)}
-        placement="right"
         title={quickCreateResource ? `Thêm nhanh ${resolveQuickCreateTitle(quickCreateResource)}` : "Thêm nhanh"}
         width={620}
-        onClose={() => setQuickCreateResource(null)}
+        footer={null}
+        onCancel={() => setQuickCreateResource(null)}
       >
         {quickCreateResource ? (
           <RecordFormContent
             compact
             initialValues={buildQuickCreateInitialValues(quickCreateResource, selectedDate)}
             resource={quickCreateResource}
+            notifyOnSuccess={false}
             onCancel={() => setQuickCreateResource(null)}
             onSuccess={() => {
               setQuickCreateResource(null)
+              toast.success("Đã lưu dữ liệu")
               void loadCalendar()
             }}
           />
         ) : null}
-      </Drawer>
+      </Modal>
 
-      <Drawer
+      <Modal
         className="quick-drawer"
-        destroyOnClose
+        destroyOnHidden
         maskClosable={false}
         open={Boolean(quickDetail || quickDetailLoading)}
-        placement="right"
         title={quickDetail ? quickDetailTitle : "Đang tải nhanh"}
         width={760}
-        extra={
+        footer={
           quickDetail ? (
             <Button icon={<EyeOutlined />} onClick={() => navigate(`/${quickDetail.resource}/${quickDetail.eventId}`)}>
               Mở chi tiết
             </Button>
           ) : null
         }
-        onClose={() => {
+        onCancel={() => {
           setQuickDetail(null)
           setQuickDetailLoading(false)
         }}
@@ -536,7 +581,7 @@ export function CalendarPage() {
           <div className="detail-grid">
             <Row gutter={[16, 16]}>
               {quickDetail.fields.map((field) => (
-                <Col key={field.key} span={detailWidthToSpan(field.width)} xs={24}>
+                <Col key={field.key} xs={24} md={detailWidthToSpan(field.width)}>
                   <div className="detail-item">
                     <div className="detail-item-label">
                       {field.description ? (
@@ -562,7 +607,7 @@ export function CalendarPage() {
             </Row>
           </div>
         ) : null}
-      </Drawer>
+      </Modal>
     </>
   )
 
@@ -680,6 +725,30 @@ function DayPlannerTimeline({
   )
 }
 
+function DayWorkSchedulePanel({ title, events }: { title: string; events: PlannerEvent[] }) {
+  return (
+    <aside className="calendar-day-work-schedule-panel">
+      <div className="calendar-day-work-schedule-panel__head">
+        <strong>{title}</strong>
+        <span>{events.length} ca</span>
+      </div>
+      {events.length === 0 ? (
+        <Typography.Text type="secondary">Chưa có ca làm.</Typography.Text>
+      ) : (
+        <div className="calendar-day-work-schedule-panel__list">
+          {events.map((event) => (
+            <div className="calendar-day-work-schedule-row" key={`schedule-panel-${event.id}`}>
+              <strong>{formatEventTime(event.start, event.end)}</strong>
+              <span>{event.staffName || event.title}</span>
+              {event.shiftLabel ? <small>{event.shiftLabel}</small> : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </aside>
+  )
+}
+
 function projectTimelineEvent(event: PlannerEvent, selectedDate: Dayjs) {
   const dayStart = selectedDate.hour(DAY_VIEW_START_HOUR).minute(0).second(0).millisecond(0)
   const dayEnd = selectedDate.hour(DAY_VIEW_END_HOUR).minute(0).second(0).millisecond(0)
@@ -779,7 +848,11 @@ function renderMonthCell(value: Dayjs, events: PlannerEvent[], onOpen: (event: P
     <div className="calendar-month-cell">
       <Typography.Text strong>{value.date()}</Typography.Text>
       <div className="calendar-month-cell-events">
-        {dayEvents.slice(0, 3).map((event) => (
+        {dayEvents.slice(0, 3).map((event) => event.type === "schedule" ? (
+          <Tag className="calendar-schedule-tag" key={event.id}>
+            {formatEventTime(event.start, event.end)} · {event.staffName || event.title}
+          </Tag>
+        ) : (
           <button
             className={`calendar-cell-pill tone-${event.type}`}
             key={event.id}
@@ -918,6 +991,7 @@ function buildQuickCreateInitialValues(resource: QuickCreateResource, selectedDa
         status: "PLANNED",
         startTime: buildLocalDateTime(selectedDate, 8, 0),
         endTime: buildLocalDateTime(selectedDate, 17, 0),
+        recurrenceUntil: selectedDay,
       }
     case "leave-requests":
       return {
@@ -935,6 +1009,72 @@ function buildQuickCreateInitialValues(resource: QuickCreateResource, selectedDa
   }
 }
 
+function getScheduleDisplayWindow(selectedDate: Dayjs, calendarMode: CalendarMode): ScheduleDisplayWindow {
+  if (calendarMode === "day") return { start: selectedDate.startOf("day"), end: selectedDate.endOf("day") }
+  if (calendarMode === "week") return { start: selectedDate.startOf("week"), end: selectedDate.endOf("week") }
+  return { start: selectedDate.startOf("month").startOf("week"), end: selectedDate.endOf("month").endOf("week") }
+}
+
+function expandWorkScheduleOccurrences(item: Record<string, any>, window: ScheduleDisplayWindow): Record<string, any>[] {
+  const schema = item.scheduleSchema && typeof item.scheduleSchema === "object" && !Array.isArray(item.scheduleSchema)
+    ? item.scheduleSchema as Record<string, unknown>
+    : {}
+  const workDate = String(schema.workDate || item.workDate || item.startTime || "").slice(0, 10)
+  const anchorDate = dayjs(workDate).startOf("day")
+  if (!anchorDate.isValid()) return [item]
+
+  const recurrenceType = String(schema.recurrenceType || item.recurrenceType || "NONE").toUpperCase()
+  const recurrenceInterval = Math.max(1, Number(schema.recurrenceInterval || item.recurrenceInterval || 1))
+  const untilText = String(schema.recurrenceUntil || item.recurrenceUntil || workDate).slice(0, 10)
+  const untilDate = dayjs(untilText).endOf("day")
+  const rangeStart = window.start.isAfter(anchorDate) ? window.start.startOf("day") : anchorDate
+  const rangeEnd = window.end.isBefore(untilDate) ? window.end.endOf("day") : untilDate
+  if (!untilDate.isValid() || rangeStart.isAfter(rangeEnd)) return []
+
+  const occurrenceDates: Dayjs[] = []
+  if (recurrenceType === "DAILY") {
+    const daysFromAnchor = Math.max(0, rangeStart.diff(anchorDate, "day"))
+    const firstOffset = Math.ceil(daysFromAnchor / recurrenceInterval) * recurrenceInterval
+    for (let date = anchorDate.add(firstOffset, "day"); !date.isAfter(rangeEnd, "day"); date = date.add(recurrenceInterval, "day")) {
+      occurrenceDates.push(date)
+    }
+  } else if (recurrenceType === "WEEKLY") {
+    const recurrenceWeekdays = Array.isArray(schema.recurrenceWeekdays)
+      ? schema.recurrenceWeekdays.map(String)
+      : String(schema.recurrenceWeekdays || item.recurrenceWeekdays || "").split(",").map((value) => value.trim()).filter(Boolean)
+    const weekdayCodes = new Set(recurrenceWeekdays.length > 0 ? recurrenceWeekdays : [weekdayCode(anchorDate)])
+    for (let date = rangeStart; !date.isAfter(rangeEnd, "day"); date = date.add(1, "day")) {
+      const weekIndex = Math.floor(date.startOf("day").diff(anchorDate, "day") / 7)
+      if (weekIndex >= 0 && weekIndex % recurrenceInterval === 0 && weekdayCodes.has(weekdayCode(date))) occurrenceDates.push(date)
+    }
+  } else if (recurrenceType === "MONTHLY") {
+    const monthOffset = Math.max(0, rangeStart.startOf("month").diff(anchorDate.startOf("month"), "month"))
+    const firstOffset = Math.ceil(monthOffset / recurrenceInterval) * recurrenceInterval
+    for (let date = anchorDate.add(firstOffset, "month"); !date.isAfter(rangeEnd, "day"); date = date.add(recurrenceInterval, "month")) {
+      occurrenceDates.push(date)
+    }
+  } else if (!anchorDate.isBefore(rangeStart, "day") && !anchorDate.isAfter(rangeEnd, "day")) {
+    occurrenceDates.push(anchorDate)
+  }
+
+  return occurrenceDates.map((date) => ({
+    ...item,
+    workDate: date.format("YYYY-MM-DD"),
+    startTime: applyScheduleTimeToDate(date, schema.startTime || item.startTime),
+    endTime: applyScheduleTimeToDate(date, schema.endTime || item.endTime),
+  }))
+}
+
+function applyScheduleTimeToDate(date: Dayjs, value: unknown) {
+  if (!value) return undefined
+  const time = parseClinicDateTime(value)
+  return time.isValid() ? `${date.format("YYYY-MM-DD")}T${time.format("HH:mm")}` : undefined
+}
+
+function weekdayCode(date: Dayjs) {
+  return ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][date.day()] || "MON"
+}
+
 function buildPlannerEvents({
   appointments,
   workSchedules,
@@ -944,6 +1084,7 @@ function buildPlannerEvents({
   customerRows,
   roomRows,
   lookups,
+  scheduleDisplayWindow,
 }: {
   appointments: Record<string, any>[]
   workSchedules: Record<string, any>[]
@@ -953,6 +1094,7 @@ function buildPlannerEvents({
   customerRows: Record<string, any>[]
   roomRows: Record<string, any>[]
   lookups: LookupMap
+  scheduleDisplayWindow: ScheduleDisplayWindow
 }) {
   const staffById = new Map(staffRows.map((item) => [String(item.id), item]))
   const customerById = new Map(customerRows.map((item) => [String(item.id), item]))
@@ -983,27 +1125,27 @@ function buildPlannerEvents({
     roomName: roomDisplayName(roomById.get(String(item.roomId || "")), item.roomId),
   }))
 
-  const scheduleEvents: PlannerEvent[] = workSchedules.map((item) => ({
+  const scheduleEvents: PlannerEvent[] = workSchedules.flatMap((item) => expandWorkScheduleOccurrences(item, scheduleDisplayWindow).map((schedule) => ({
     id: String(item.id),
     resource: "work-schedules",
     type: "schedule",
-    title: staffDisplayName(staffById.get(String(item.staffId || "")), item.staffId),
-    start: String(item.startTime || item.workDate || item.createdAt || ""),
-    end: item.endTime ? String(item.endTime) : undefined,
-    branchId: item.branchId ? String(item.branchId) : undefined,
-    staffId: item.staffId ? String(item.staffId) : undefined,
-    doctorStaffId: item.staffId ? String(item.staffId) : undefined,
+    title: staffDisplayName(staffById.get(String(schedule.staffId || "")), schedule.staffId),
+    start: String(schedule.startTime || schedule.workDate || schedule.createdAt || ""),
+    end: schedule.endTime ? String(schedule.endTime) : undefined,
+    branchId: schedule.branchId ? String(schedule.branchId) : undefined,
+    staffId: schedule.staffId ? String(schedule.staffId) : undefined,
+    doctorStaffId: schedule.staffId ? String(schedule.staffId) : undefined,
     tone: EVENT_TYPE_COLOR.schedule,
-    statusLabel: getFieldLabel("work-schedules", "status", String(item.status || "PLANNED")),
-    summary: [item.shiftLabel || "Ca làm", roomDisplayName(roomById.get(String(item.roomId || "")), item.roomId), item.note].filter(Boolean).join(" | "),
-    staffName: staffDisplayName(staffById.get(String(item.staffId || "")), item.staffId),
-    staffAvatarUrl: staffById.get(String(item.staffId || ""))?.avatarUrl
-      ? String(staffById.get(String(item.staffId || ""))?.avatarUrl)
+    statusLabel: getFieldLabel("work-schedules", "status", String(schedule.status || "PLANNED")),
+    summary: [schedule.shiftLabel || "Ca làm", roomDisplayName(roomById.get(String(schedule.roomId || "")), schedule.roomId), schedule.note].filter(Boolean).join(" | "),
+    staffName: staffDisplayName(staffById.get(String(schedule.staffId || "")), schedule.staffId),
+    staffAvatarUrl: staffById.get(String(schedule.staffId || ""))?.avatarUrl
+      ? String(staffById.get(String(schedule.staffId || ""))?.avatarUrl)
       : undefined,
-    staffType: String(staffById.get(String(item.staffId || ""))?.type || "STAFF"),
-    shiftLabel: item.shiftLabel ? String(item.shiftLabel) : undefined,
-    roomName: roomDisplayName(roomById.get(String(item.roomId || "")), item.roomId),
-  }))
+    staffType: String(staffById.get(String(schedule.staffId || ""))?.type || "STAFF"),
+    shiftLabel: schedule.shiftLabel ? String(schedule.shiftLabel) : undefined,
+    roomName: roomDisplayName(roomById.get(String(schedule.roomId || "")), schedule.roomId),
+  })))
 
   const leaveEvents: PlannerEvent[] = leaveRequests.map((item) => ({
     id: String(item.id),

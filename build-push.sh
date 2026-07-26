@@ -26,6 +26,7 @@ docker build \
   --build-arg NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-/api}" \
   --build-arg VITE_API_URL=/api \
   --build-arg VITE_BASE_PATH=/admin/ \
+  --build-arg VITE_LANDING_URL="${VITE_LANDING_URL:-}" \
   -t "$APP_IMAGE" \
   .
 

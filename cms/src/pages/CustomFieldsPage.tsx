@@ -26,6 +26,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import * as XLSX from "xlsx"
 import { api } from "../api"
+import { appModuleGroups } from "../company-types"
 import { CustomField, entityLabels } from "../models"
 
 const CUSTOM_FIELD_TYPES = [
@@ -42,6 +43,34 @@ const CUSTOM_FIELD_TYPES = [
 const RELATIVE_RESOURCE_OPTIONS = Object.entries(entityLabels).map(
   ([value, label]) => ({ value, label }),
 )
+
+const CUSTOM_FIELD_ENTITY_OPTIONS = buildCustomFieldEntityOptions()
+
+function buildCustomFieldEntityOptions() {
+  const groupedResources = new Set<string>()
+  const groups = appModuleGroups
+    .map((group) => {
+      const options = group.modules
+        .filter((resource) => Boolean(entityLabels[resource]))
+        .map((resource) => {
+          groupedResources.add(resource)
+          return { value: resource, label: entityLabels[resource] }
+        })
+
+      return options.length > 0 ? { label: group.label, options } : null
+    })
+    .filter(Boolean) as Array<{ label: string; options: Array<{ value: string; label: string }> }>
+
+  const remainingOptions = Object.entries(entityLabels)
+    .filter(([resource]) => !groupedResources.has(resource))
+    .map(([value, label]) => ({ value, label }))
+
+  if (remainingOptions.length > 0) {
+    groups.push({ label: "Quản trị & dữ liệu hệ thống", options: remainingOptions })
+  }
+
+  return groups
+}
 
 export function CustomFieldsPage() {
   const [entityType, setEntityType] = useState("customers")
@@ -176,9 +205,32 @@ export function CustomFieldsPage() {
       isActive: field.isActive ? "true" : "false",
     }))
     const workbook = XLSX.utils.book_new()
-    const worksheet = XLSX.utils.json_to_sheet(payload)
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ["label", "key", "dataType", "options", "relationResource", "sortOrder", "isActive"],
+      ...payload.map((field) => [field.label, field.key, field.dataType, field.options, field.relationResource, field.sortOrder, field.isActive]),
+    ])
     XLSX.utils.book_append_sheet(workbook, worksheet, "CustomFields")
     XLSX.writeFile(workbook, `${entityType}-custom-fields.xlsx`)
+  }
+
+  function exportSampleFields() {
+    const payload = buildSampleFields(entityType, 0).map((field) => ({
+      label: field.label,
+      key: field.key,
+      dataType: field.dataType,
+      options: Array.isArray(field.options) ? field.options.join(", ") : "",
+      relationResource: "",
+      sortOrder: field.sortOrder,
+      isActive: field.isActive ? "true" : "false",
+    }))
+    const workbook = XLSX.utils.book_new()
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ["label", "key", "dataType", "options", "relationResource", "sortOrder", "isActive"],
+      ...payload.map((field) => [field.label, field.key, field.dataType, field.options, field.relationResource, field.sortOrder, field.isActive]),
+    ])
+    XLSX.utils.book_append_sheet(workbook, worksheet, "CustomFields")
+    XLSX.writeFile(workbook, `${entityType}-custom-fields-test.xlsx`)
+    message.success(`Đã export ${payload.length} field mẫu cho ${entityLabels[entityType] || entityType}`)
   }
 
   const uploadProps: UploadProps = {
@@ -249,13 +301,12 @@ export function CustomFieldsPage() {
         <Typography.Title level={3}>Trường tuỳ biến</Typography.Title>
         <Space wrap>
           <Select
+            showSearch
             value={entityType}
             onChange={setEntityType}
-            style={{ width: 240 }}
-            options={Object.entries(entityLabels).map(([value, label]) => ({
-              value,
-              label,
-            }))}
+            optionFilterProp="label"
+            style={{ width: 280 }}
+            options={CUSTOM_FIELD_ENTITY_OPTIONS}
           />
           <Button
             className="primary-glow"
@@ -272,7 +323,10 @@ export function CustomFieldsPage() {
             Update multi
           </Button>
           <Button icon={<DownloadOutlined />} onClick={exportFields}>
-            Export
+            Export cấu hình
+          </Button>
+          <Button icon={<DownloadOutlined />} onClick={exportSampleFields}>
+            Tải data test
           </Button>
           <Upload {...uploadProps}>
             <Button icon={<ImportOutlined />}>Nhập file</Button>
@@ -623,21 +677,25 @@ async function parseExcelFile(file: File) {
 }
 
 function normalizeParsedField(item: Record<string, unknown>): ParsedFieldInput {
+  const normalized = Object.fromEntries(
+    Object.entries(item).map(([key, value]) => [key.trim().toLowerCase(), value]),
+  ) as Record<string, unknown>
+
   return {
-    label: String(item.label || ""),
-    key: sanitizeFieldKey(String(item.key || "")),
-    dataType: String(item.dataType || "text"),
-    options: Array.isArray(item.options)
-      ? item.options.map((value) => String(value))
-      : item.options !== undefined
-        ? String(item.options)
+    label: String(normalized.label || normalized["nhãn"] || ""),
+    key: sanitizeFieldKey(String(normalized.key || "")),
+    dataType: String(normalized.datatype || normalized.type || "text"),
+    options: Array.isArray(normalized.options)
+      ? normalized.options.map((value) => String(value))
+      : normalized.options !== undefined
+        ? String(normalized.options)
         : undefined,
-    relationResource: item.relationResource
-      ? String(item.relationResource)
+    relationResource: normalized.relationresource || normalized.relation
+      ? String(normalized.relationresource || normalized.relation)
       : undefined,
-    sortOrder: item.sortOrder ? Number(item.sortOrder) : 0,
+    sortOrder: normalized.sortorder ? Number(normalized.sortorder) : 0,
     isActive:
-      item.isActive === false || String(item.isActive).toLowerCase() === "false"
+      normalized.isactive === false || String(normalized.isactive).toLowerCase() === "false"
         ? false
         : true,
   }
@@ -815,4 +873,30 @@ function buildBatchColumns(
       ),
     },
   ]
+}
+
+function buildSampleFields(entityType: string, startSortOrder: number) {
+  const keyPrefix = `sample_${entityType.replace(/[^a-z0-9]+/gi, "_")}`
+  const templates = [
+    { suffix: "text", label: "Thông tin bổ sung", dataType: "text" },
+    { suffix: "note", label: "Ghi chú nội bộ", dataType: "textarea" },
+    { suffix: "priority", label: "Mức ưu tiên", dataType: "select", options: ["Thấp", "Trung bình", "Cao"] },
+    { suffix: "score", label: "Điểm đánh giá", dataType: "number" },
+    { suffix: "date", label: "Ngày theo dõi", dataType: "date" },
+  ]
+
+  return Array.from({ length: 50 }, (_, index) => {
+    const template = templates[index % templates.length]
+    const number = String(index + 1).padStart(2, "0")
+    return {
+      entityType,
+      key: `${keyPrefix}_${template.suffix}_${number}`,
+      label: `Mẫu ${number} - ${template.label}`,
+      dataType: template.dataType,
+      options: template.options,
+      required: false,
+      isActive: true,
+      sortOrder: startSortOrder + index,
+    }
+  })
 }

@@ -24,7 +24,7 @@ import {
 } from "antd"
 import Editor from "@monaco-editor/react"
 import type { ColumnsType } from "antd/es/table"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { getApiErrorMessage } from "../utils/apiError"
@@ -450,6 +450,7 @@ export function SettingsPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [dynamicRoles, setDynamicRoles] = useState<DynamicRole[]>([])
   const [allowedActions, setAllowedActions] = useState<string[]>([])
+  const [toast, toastContextHolder] = message.useMessage()
   const [templateModal, setTemplateModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
   const [templateForm] = Form.useForm()
@@ -570,22 +571,26 @@ export function SettingsPage() {
   }
 
   async function saveView() {
-    await Promise.all([
-      api.put(`/settings/views/${entityType}/TABLE`, {
-        role: selectedRole,
-        config: serializeViewConfig("TABLE", tableConfig, moduleEnabled, allowedActions),
-      }),
-      api.put(`/settings/views/${entityType}/FORM`, {
-        role: selectedRole,
-        config: serializeViewConfig("FORM", formConfig, moduleEnabled, allowedActions),
-      }),
-      api.put(`/settings/views/${entityType}/DETAIL`, {
-        role: selectedRole,
-        config: serializeViewConfig("DETAIL", detailConfig, moduleEnabled, allowedActions),
-      }),
-    ])
-    message.success("Đã lưu cấu hình module theo role")
-    await load()
+    try {
+      await Promise.all([
+        api.put(`/settings/views/${entityType}/TABLE`, {
+          role: selectedRole,
+          config: serializeViewConfig("TABLE", tableConfig, moduleEnabled, allowedActions),
+        }),
+        api.put(`/settings/views/${entityType}/FORM`, {
+          role: selectedRole,
+          config: serializeViewConfig("FORM", formConfig, moduleEnabled, allowedActions),
+        }),
+        api.put(`/settings/views/${entityType}/DETAIL`, {
+          role: selectedRole,
+          config: serializeViewConfig("DETAIL", detailConfig, moduleEnabled, allowedActions),
+        }),
+      ])
+      toast.success("Đã lưu cấu hình module theo role")
+      await load()
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Không thể lưu cấu hình hiển thị"))
+    }
   }
 
   async function resetInheritedView() {
@@ -665,11 +670,11 @@ export function SettingsPage() {
     message.success(`Đã nạp mẫu ${preset.label}`)
   }
 
-  function updateConfig(
+  const updateConfig = useCallback((
     viewType: ViewType,
     key: string,
     patch: Partial<FieldLayoutConfig>,
-  ) {
+  ) => {
     let setter = setDetailConfig
     if (viewType === "FORM") setter = setFormConfig
     if (viewType === "TABLE") setter = setTableConfig
@@ -680,13 +685,13 @@ export function SettingsPage() {
         field.key === key ? { ...field, ...patch } : field,
       ),
     )
-  }
+  }, [])
 
-  function reorderConfig(
+  const reorderConfig = useCallback((
     viewType: ViewType,
     fromKey: string,
     toKey: string,
-  ) {
+  ) => {
     let setter = setDetailConfig
     if (viewType === "FORM") setter = setFormConfig
     if (viewType === "TABLE") setter = setTableConfig
@@ -703,10 +708,11 @@ export function SettingsPage() {
       next.splice(toIndex, 0, moved)
       return next
     })
-  }
+  }, [])
 
   return (
     <>
+      {toastContextHolder}
       <div className="page-header">
           <Typography.Title level={3}>Cấu hình động</Typography.Title>
         <Space wrap>
@@ -775,6 +781,14 @@ export function SettingsPage() {
                     ))}
                   </Space>
                   <Card size="small" title="Action theo role" style={{ marginTop: 16 }}>
+                    <Checkbox
+                      checked={allowedActions.length === actionOptions.length}
+                      indeterminate={allowedActions.length > 0 && allowedActions.length < actionOptions.length}
+                      onChange={(event) => setAllowedActions(event.target.checked ? actionOptions.map((item) => item.key) : [])}
+                      style={{ marginBottom: 10 }}
+                    >
+                      Chọn tất cả action
+                    </Checkbox>
                     <Checkbox.Group
                       options={actionOptions.map((item) => ({
                         label: item.label,
@@ -1056,6 +1070,44 @@ function ViewConfigTable({
   onReorder?: (viewType: ViewType, fromKey: string, toKey: string) => void
 }) {
   const [draggingKey, setDraggingKey] = useState<string | null>(null)
+  const tableComponents = useMemo(
+    () => ({
+      body: {
+        row: (props: React.HTMLAttributes<HTMLTableRowElement>) => {
+          const rowKey = String((props as React.HTMLAttributes<HTMLTableRowElement> & { "data-row-key"?: string })["data-row-key"] || "")
+          const draggable = Boolean(onReorder)
+          return (
+            <tr
+              {...props}
+              className={`${props.className || ""} ${draggingKey === rowKey ? "drag-row-active" : ""}`.trim()}
+              draggable={draggable}
+              onDragStart={(event) => {
+                if (!draggable || !rowKey) return
+                setDraggingKey(rowKey)
+                event.dataTransfer.effectAllowed = "move"
+                event.dataTransfer.setData("text/plain", rowKey)
+              }}
+              onDragOver={(event) => {
+                if (!draggable || !rowKey) return
+                event.preventDefault()
+                event.dataTransfer.dropEffect = "move"
+              }}
+              onDrop={(event) => {
+                if (!draggable || !rowKey || !onReorder) return
+                event.preventDefault()
+                const fromKey = event.dataTransfer.getData("text/plain")
+                if (!fromKey || fromKey === rowKey) return
+                onReorder(viewType, fromKey, rowKey)
+                setDraggingKey(null)
+              }}
+              onDragEnd={() => setDraggingKey(null)}
+            />
+          )
+        },
+      },
+    }),
+    [draggingKey, onReorder, viewType],
+  )
   const columns: ColumnsType<FieldLayoutConfig> = [
     {
       title: "",
@@ -1070,9 +1122,20 @@ function ViewConfigTable({
         ) : null,
     },
     {
-      title: "Hiển thị",
+      title: (
+        <Checkbox
+          checked={dataSource.length > 0 && dataSource.every((row) => row.visible)}
+          indeterminate={dataSource.some((row) => row.visible) && dataSource.some((row) => !row.visible)}
+          onChange={(event) => {
+            dataSource.forEach((row) => onChange(viewType, row.key, { visible: event.target.checked }))
+          }}
+          style={{ whiteSpace: "nowrap" }}
+        >
+          Hiển thị
+        </Checkbox>
+      ),
       dataIndex: "visible",
-      width: 96,
+      width: 132,
       render: (value, row) => (
         <Checkbox
           checked={value}
@@ -1116,6 +1179,18 @@ function ViewConfigTable({
 
   if (viewType !== "TABLE") {
     columns.push(
+      {
+        title: "Tab",
+        key: "tab",
+        width: 180,
+        render: (_, row) => (
+          <Input
+            value={row.tab}
+            onChange={(event) => onChange(viewType, row.key, { tab: event.target.value })}
+            placeholder="Ví dụ: Thông tin chung"
+          />
+        ),
+      },
       {
         title: "Format",
         key: "displayFormat",
@@ -1224,6 +1299,18 @@ function ViewConfigTable({
 
   if (viewType === "FORM") {
     columns.push(
+      {
+        title: "Placeholder",
+        key: "placeholder",
+        width: 220,
+        render: (_, row) => (
+          <Input
+            value={row.placeholder}
+            onChange={(event) => onChange(viewType, row.key, { placeholder: event.target.value })}
+            placeholder="Ví dụ: Nhập số điện thoại"
+          />
+        ),
+      },
       {
         title: "Options",
         key: "options",
@@ -1347,41 +1434,7 @@ function ViewConfigTable({
   return (
     <Table
       columns={columns}
-      components={{
-        body: {
-          row: (props: React.HTMLAttributes<HTMLTableRowElement>) => {
-            const rowKey = String((props as React.HTMLAttributes<HTMLTableRowElement> & { "data-row-key"?: string })["data-row-key"] || "")
-            const draggable = Boolean(onReorder)
-            return (
-              <tr
-                {...props}
-                className={`${props.className || ""} ${draggingKey === rowKey ? "drag-row-active" : ""}`.trim()}
-                draggable={draggable}
-                onDragStart={(event) => {
-                  if (!draggable || !rowKey) return
-                  setDraggingKey(rowKey)
-                  event.dataTransfer.effectAllowed = "move"
-                  event.dataTransfer.setData("text/plain", rowKey)
-                }}
-                onDragOver={(event) => {
-                  if (!draggable || !rowKey) return
-                  event.preventDefault()
-                  event.dataTransfer.dropEffect = "move"
-                }}
-                onDrop={(event) => {
-                  if (!draggable || !rowKey || !onReorder) return
-                  event.preventDefault()
-                  const fromKey = event.dataTransfer.getData("text/plain")
-                  if (!fromKey || fromKey === rowKey) return
-                  onReorder(viewType, fromKey, rowKey)
-                  setDraggingKey(null)
-                }}
-                onDragEnd={() => setDraggingKey(null)}
-              />
-            )
-          },
-        },
-      }}
+      components={tableComponents}
       dataSource={dataSource}
       pagination={false}
       rowKey="key"

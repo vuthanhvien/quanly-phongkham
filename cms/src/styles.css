@@ -673,6 +673,7 @@ body {
 
 .form-card {
   max-width: 920px;
+  margin-inline: auto;
 }
 
 .form-card .ant-card-body,
@@ -685,8 +686,43 @@ body {
   max-width: 100%;
 }
 
+.record-form--compact {
+  max-width: 880px;
+  margin-inline: auto;
+  padding-bottom: 8px;
+}
+
+.ant-modal .ant-modal-body {
+  max-height: calc(100vh - 180px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.record-form--compact .record-form-actions {
+  position: sticky;
+  bottom: -1px;
+  z-index: 2;
+  display: flex;
+  box-sizing: border-box;
+  max-width: 100%;
+  width: 100%;
+  margin-top: 8px;
+  padding: 14px 0 2px;
+  background: var(--app-surface, #fff);
+  box-shadow: 0 -8px 12px -14px rgba(15, 23, 42, 0.65);
+}
+
 .record-form .ant-form-item {
   margin-bottom: 12px;
+}
+
+.record-form .ant-form-item-label > label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.record-form .ant-form-item-label {
+  padding-bottom: 3px;
 }
 
 .record-form .ant-row {
@@ -2349,18 +2385,12 @@ textarea.ant-input {
   border: 1px solid var(--app-line);
   border-radius: calc(var(--app-radius) + 2px);
   color: var(--app-text);
-  cursor: pointer;
+  cursor: default;
   display: grid;
   gap: 10px;
   padding: 12px;
   text-align: left;
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
-}
-
-.calendar-staff-schedule-card:hover {
-  border-color: color-mix(in srgb, var(--app-primary) 36%, var(--app-line));
-  box-shadow: var(--app-shadow-soft);
-  transform: translateY(-1px);
 }
 
 .calendar-staff-schedule-card__head {
@@ -2468,6 +2498,79 @@ textarea.ant-input {
   overflow-x: auto;
 }
 
+.calendar-day-planner-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+}
+
+.calendar-day-work-schedule-panel {
+  align-self: start;
+  background: color-mix(in srgb, #13c2c2 8%, var(--app-surface));
+  border: 1px solid color-mix(in srgb, #13c2c2 28%, var(--app-line));
+  border-radius: var(--app-radius);
+  display: grid;
+  gap: 10px;
+  max-height: 1024px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.calendar-day-work-schedule-panels {
+  align-self: start;
+  display: grid;
+  gap: 16px;
+}
+
+.calendar-day-work-schedule-panel__head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.calendar-day-work-schedule-panel__head strong {
+  color: var(--app-title);
+}
+
+.calendar-day-work-schedule-panel__head span {
+  color: var(--app-text-soft);
+  font-size: 12px;
+}
+
+.calendar-day-work-schedule-panel__list {
+  display: grid;
+  gap: 6px;
+}
+
+.calendar-day-work-schedule-row {
+  align-items: center;
+  border-top: 1px solid color-mix(in srgb, var(--app-line) 78%, transparent);
+  display: grid;
+  gap: 4px 8px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding-top: 8px;
+}
+
+.calendar-day-work-schedule-row strong {
+  color: var(--app-title);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.calendar-day-work-schedule-row span {
+  color: var(--app-text);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-day-work-schedule-row small {
+  color: var(--app-text-soft);
+  font-size: 11px;
+  grid-column: 2;
+}
+
 .calendar-day-timeline__grid {
   position: relative;
   min-height: 1024px;
@@ -2518,9 +2621,11 @@ textarea.ant-input {
 .calendar-day-event {
   position: absolute;
   pointer-events: auto;
+  z-index: 2;
   appearance: none;
   border-radius: calc(var(--app-radius) + 2px);
   display: grid;
+  align-content: start;
   gap: 4px;
   padding: 10px 12px;
   text-align: left;
@@ -2631,6 +2736,25 @@ textarea.ant-input {
   padding: 5px 7px;
   text-align: left;
   width: 100%;
+}
+
+.calendar-cell-pill.is-passive,
+.calendar-event-chip.is-passive {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.calendar-schedule-tag {
+  background: color-mix(in srgb, #13c2c2 12%, var(--app-surface));
+  border-color: color-mix(in srgb, #13c2c2 26%, transparent);
+  color: var(--app-text);
+  display: block;
+  font-size: 10px;
+  margin-inline-end: 0;
+  overflow: hidden;
+  padding: 3px 6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .calendar-cell-pill strong,
@@ -2840,6 +2964,14 @@ textarea.ant-input {
     grid-template-columns: 1fr;
   }
 
+  .calendar-day-planner-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-day-work-schedule-panel {
+    max-height: 360px;
+  }
+
   .calendar-day-timeline__grid {
     min-height: 960px;
     padding-left: 62px;
@@ -2949,4 +3081,8 @@ textarea.ant-input {
 .app-sider.ant-layout-sider-collapsed .side-menu .ant-menu-submenu-title .anticon {
   margin-inline-end: 0 !important;
   font-size: 18px;
+}
+/* Keep feedback visible above modal overlays. */
+.ant-message {
+  z-index: 2100 !important;
 }

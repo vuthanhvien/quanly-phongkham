@@ -1,5 +1,5 @@
 import { PlusOutlined } from '@ant-design/icons'
-import { Button, Card, Col, Drawer, Flex, Form, Input, InputNumber, Row, Select, Space, Switch, Tabs, Tag, Typography } from 'antd'
+import { Button, Card, Col, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Tabs, Tag, Typography } from 'antd'
 import { createContext, useContext } from 'react'
 import { ImagePickerInput } from '../../components/ImagePickerInput'
 import type { FooterColumn, LandingGlobalSetting, NavItem, SocialLink } from './site-settings'
@@ -130,17 +130,13 @@ export function LandingSiteSettingsDrawer() {
   } = useLandingSiteSettings()
 
   return (
-    <Drawer
+    <Modal
       title="Cài đặt site"
       width={860}
       open={open}
-      onClose={onClose}
-      rootClassName="quick-drawer"
-      extra={
-        <Button type="primary" loading={globalSaving} onClick={onSaveGlobal}>
-          Lưu cài đặt
-        </Button>
-      }
+      onCancel={onClose}
+      className="quick-drawer"
+      footer={<Button type="primary" loading={globalSaving} onClick={onSaveGlobal}>Lưu cài đặt</Button>}
     >
       <Tabs
         className="settings-inner-tabs"
@@ -288,6 +284,6 @@ export function LandingSiteSettingsDrawer() {
           },
         ]}
       />
-    </Drawer>
+    </Modal>
   )
 }

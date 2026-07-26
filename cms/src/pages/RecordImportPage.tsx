@@ -75,6 +75,7 @@ export function RecordImportPage() {
   const [bundleSheetStats, setBundleSheetStats] = useState<Array<{ name: string; count: number }>>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const testRowCount = 100
 
   const unsupported = UNSUPPORTED_RESOURCES.has(resource)
   const bundleMode = BUNDLE_RESOURCES.has(resource)
@@ -257,11 +258,12 @@ export function RecordImportPage() {
       return
     }
 
-    const rows = Array.from({ length: 15 }, (_, index) =>
+    const rows = Array.from({ length: testRowCount }, (_, index) =>
       generateFakeImportRow(resource, importableFields, lookups, index),
     )
     const workbook = buildImportWorkbook(importableFields, lookups, rows)
     XLSX.writeFile(workbook, `${resource}-import-test.xlsx`)
+    message.success(`Đã export ${testRowCount} dòng data test, bao gồm custom fields`)
   }
 
   async function saveRows() {
@@ -343,9 +345,15 @@ export function RecordImportPage() {
           <Button icon={<DownloadOutlined />} onClick={() => void downloadTemplate()}>
             Tải file mẫu
           </Button>
-          <Button icon={<ImportOutlined />} onClick={() => void downloadExportData()}>
-            {bundleMode ? "Export data hiện có" : "Tải data test"}
-          </Button>
+          {!bundleMode ? (
+            <Button icon={<ImportOutlined />} onClick={() => void downloadExportData()}>
+              Tải data test + custom fields
+            </Button>
+          ) : (
+            <Button icon={<ImportOutlined />} onClick={() => void downloadExportData()}>
+              Export data hiện có
+            </Button>
+          )}
           <Upload {...uploadProps}>
             <Button icon={<UploadOutlined />}>Upload file</Button>
           </Upload>

@@ -12,13 +12,6 @@ const proxy = httpProxy.createProxyServer({
   ws: true,
 });
 
-function stripAdminPrefix(url) {
-  if (!url) return '/';
-  if (!url.startsWith('/admin/')) return url;
-  const stripped = url.slice('/admin'.length);
-  return stripped || '/';
-}
-
 proxy.on('error', (error, req, res) => {
   if (res && typeof res.writeHead === 'function') {
     res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -51,7 +44,6 @@ function routeRequest(req, res) {
   }
 
   if (originalPath.startsWith('/admin/')) {
-    req.url = stripAdminPrefix(originalPath);
     proxy.web(req, res, { target: cmsUrl });
     return;
   }
@@ -65,7 +57,6 @@ server.on('upgrade', (req, socket, head) => {
   const originalPath = req.url || '/';
 
   if (originalPath.startsWith('/admin/')) {
-    req.url = stripAdminPrefix(originalPath);
     proxy.ws(req, socket, head, { target: cmsUrl });
     return;
   }

@@ -74,6 +74,8 @@ import {
 import { PAGE_TEMPLATES } from './landing-pages/templates'
 
 function getLandingBaseUrl() {
+  const configuredUrl = import.meta.env.VITE_LANDING_URL?.trim()
+  if (configuredUrl) return configuredUrl.replace(/\/+$/, '')
   return window.location.origin.replace(/\/$/, '')
 }
 

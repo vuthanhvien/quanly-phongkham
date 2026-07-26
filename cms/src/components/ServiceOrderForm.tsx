@@ -1,10 +1,11 @@
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons"
-import { Button, Card, Form, Input, InputNumber, Select, Space, Table, Typography, message } from "antd"
+import { Button, Card, Form, Input, InputNumber, Select, Space, Table, Typography } from "antd"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
 import { getFirstOptionValue } from "../utils/branchDefaults"
 import { getApiErrorMessage } from "../utils/apiError"
+import { toastError, toastSuccess } from "../toast"
 
 interface ServiceOrderFormProps {
   id?: string
@@ -12,6 +13,7 @@ interface ServiceOrderFormProps {
   initialValues?: Record<string, unknown>
   onCancel?: () => void
   onSuccess?: () => void
+  notifyOnSuccess?: boolean
 }
 
 interface OptionItem {
@@ -35,7 +37,7 @@ interface OrderLineValue {
   unitPrice?: number
 }
 
-export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSuccess }: ServiceOrderFormProps) {
+export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSuccess, notifyOnSuccess = true }: ServiceOrderFormProps) {
   const editing = Boolean(id)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
@@ -110,7 +112,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
         form.setFieldsValue({ branchId: getFirstOptionValue(nextBranchOptions) })
       }
     } catch (error: any) {
-      message.error(getApiErrorMessage(error, "Không tải được danh sách sản phẩm/lookup cho đơn hàng"))
+      toastError(getApiErrorMessage(error, "Không tải được danh sách sản phẩm/lookup cho đơn hàng"))
     } finally {
       setLookupLoading(false)
     }
@@ -177,11 +179,11 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
         .filter((item) => item.productId)
 
       if (normalizedItems.length === 0) {
-        message.error("Chọn ít nhất 1 sản phẩm cho đơn hàng")
+        toastError("Chọn ít nhất 1 sản phẩm cho đơn hàng")
         return
       }
       if (normalizedItems.some((item) => item.quantity <= 0)) {
-        message.error("Số lượng sản phẩm phải lớn hơn 0")
+        toastError("Số lượng sản phẩm phải lớn hơn 0")
         return
       }
 
@@ -195,10 +197,10 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       } else {
         await api.post("/records/service-orders", payload)
       }
-      message.success("Đã lưu đơn hàng")
+      if (notifyOnSuccess) toastSuccess("Đã lưu đơn hàng")
       onSuccess?.()
     } catch (error: any) {
-      message.error(getApiErrorMessage(error, "Không thể lưu đơn hàng"))
+      toastError(getApiErrorMessage(error, "Không thể lưu đơn hàng"))
     } finally {
       setSubmitting(false)
     }
