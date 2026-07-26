@@ -19,6 +19,7 @@ import {
   Tabs,
   Tag,
   Typography,
+  Upload,
   message,
 } from "antd"
 import Editor from "@monaco-editor/react"
@@ -26,6 +27,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { api } from "../api"
+import { getApiErrorMessage } from "../utils/apiError"
 import { CustomField, DynamicRole, entityLabels, getResourceActionOptions, normalizeSelectOption, permissionLabels, type SelectOption } from "../models"
 import {
   buildFieldLayoutConfigs,
@@ -50,6 +52,8 @@ interface Template {
   id: string
   name: string
   htmlTemplate: string
+  templateType?: string
+  originalFilename?: string
 }
 
 interface TemplatePreset {
@@ -449,6 +453,9 @@ export function SettingsPage() {
   const [templateModal, setTemplateModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
   const [templateForm] = Form.useForm()
+  const [docxTemplateForm] = Form.useForm()
+  const [docxTemplateModal, setDocxTemplateModal] = useState(false)
+  const [docxFile, setDocxFile] = useState<File | null>(null)
   const templateHtml = Form.useWatch("htmlTemplate", templateForm)
 
   const fieldCatalog = useMemo(
@@ -604,6 +611,22 @@ export function SettingsPage() {
     setEditingTemplate(null)
     templateForm.resetFields()
     await load()
+  }
+
+  async function saveDocxTemplate(values: Record<string, unknown>) {
+    if (!docxFile) { message.error("Chọn file DOCX mẫu"); return }
+    const formData = new FormData()
+    formData.append("file", docxFile)
+    formData.append("entityType", entityType)
+    formData.append("name", String(values.name || ""))
+    try {
+      await api.post("/settings/print-templates/docx", formData)
+      message.success("Đã lưu mẫu DOCX")
+      setDocxTemplateModal(false)
+      setDocxFile(null)
+      docxTemplateForm.resetFields()
+      await load()
+    } catch (error) { message.error(getApiErrorMessage(error, "Không thể lưu mẫu DOCX")) }
   }
 
   function openCreateTemplate() {
@@ -838,6 +861,7 @@ export function SettingsPage() {
                     </Typography.Paragraph>
                     <Space wrap>
                       <Button onClick={openCreateTemplate}>Thêm mẫu</Button>
+                      <Button onClick={() => setDocxTemplateModal(true)}>Tải mẫu DOCX</Button>
                       {templatePresets.length > 0 && (
                         <Button onClick={() => openCreateTemplateFromPreset(templatePresets[0])}>
                           Tạo từ mẫu có sẵn
@@ -885,16 +909,20 @@ export function SettingsPage() {
                                 ellipsis={{ rows: 2 }}
                                 style={{ marginBottom: 0, maxWidth: 360 }}
                               >
-                                {row.htmlTemplate}
+                                {row.templateType === "DOCX" ? `DOCX: ${row.originalFilename || row.name}` : row.htmlTemplate}
                               </Typography.Paragraph>
                             ),
                           },
                           {
                             title: "",
                             render: (_, row) => (
-                              <Button type="link" onClick={() => openEditTemplate(row)}>
-                                Sửa
-                              </Button>
+                              row.templateType === "DOCX" ? (
+                                <Typography.Text type="secondary">Tải mẫu mới để thay thế</Typography.Text>
+                              ) : (
+                                <Button type="link" onClick={() => openEditTemplate(row)}>
+                                  Sửa
+                                </Button>
+                              )
                             ),
                           },
                         ]}
@@ -994,6 +1022,18 @@ export function SettingsPage() {
           <Button className="primary-glow" htmlType="submit" type="primary">
             {editingTemplate ? "Cập nhật mẫu" : "Lưu mẫu in"}
           </Button>
+        </Form>
+      </Modal>
+      <Modal title="Tải mẫu in DOCX" open={docxTemplateModal} footer={null} onCancel={() => { setDocxTemplateModal(false); setDocxFile(null) }}>
+        <Typography.Paragraph type="secondary">Dùng placeholder liền mạch như <code>{"{{fullName}}"}</code>, <code>{"{{code}}"}</code>. Khi in, hệ thống sẽ thay dữ liệu và tải DOCX kết quả.</Typography.Paragraph>
+        <Form form={docxTemplateForm} layout="vertical" onFinish={saveDocxTemplate}>
+          <Form.Item name="name" label="Tên mẫu" rules={[{ required: true }]}><Input placeholder="Phiếu thông tin khách hàng" /></Form.Item>
+          <Form.Item label="File DOCX" required>
+            <Upload accept=".docx" maxCount={1} beforeUpload={(file) => { setDocxFile(file); return false }} onRemove={() => setDocxFile(null)}>
+              <Button>Chọn file DOCX</Button>
+            </Upload>
+          </Form.Item>
+          <Button className="primary-glow" htmlType="submit" type="primary">Lưu mẫu DOCX</Button>
         </Form>
       </Modal>
     </>

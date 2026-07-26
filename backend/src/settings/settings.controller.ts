@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, Request, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, Request, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { AuthUser, Public } from '../common/auth';
 import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, DynamicRoleDefinition, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
@@ -184,10 +185,24 @@ export class SettingsController {
     return { data: await this.settings.updateTemplate(id, payload, request?.user) };
   }
 
+  @Post('print-templates/docx')
+  @UseInterceptors(FileInterceptor('file'))
+  async createDocxTemplate(@UploadedFile() file: any, @Body() payload: { entityType?: string; name?: string }, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.saveDocxTemplate(file, payload, request?.user) };
+  }
+
   @Get('print-templates/:id/render/:recordId')
   @Header('Content-Type', 'text/html; charset=utf-8')
   render(@Param('id') id: string, @Param('recordId') recordId: string) {
     return this.settings.renderTemplate(id, recordId);
+  }
+
+  @Get('print-templates/:id/docx/:recordId')
+  async renderDocx(@Param('id') id: string, @Param('recordId') recordId: string, @Res() response: Response) {
+    const result = await this.settings.renderDocxTemplate(id, recordId);
+    response.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    response.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(result.filename)}"`);
+    response.send(result.buffer);
   }
 }
 

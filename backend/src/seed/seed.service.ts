@@ -697,9 +697,13 @@ export class SeedService implements OnApplicationBootstrap {
   private async seedWorkSchedules(target: number, staff: Staff[], branches: Branch[], rooms: Room[]) {
     const current = await this.workSchedules.count();
     if (current >= target) return;
+    const existingStaffIds = new Set((await this.workSchedules.find({ select: { staffId: true } })).map((item) => item.staffId));
+    const staffWithoutSchedule = staff.filter((item) => !existingStaffIds.has(item.id));
+    const count = Math.min(target - current, staffWithoutSchedule.length);
+    if (count <= 0) return;
 
-    await this.insertGenerated(this.workSchedules, current + 1, target, (index) => {
-      const staffMember = staff[(index - 1) % staff.length];
+    await this.insertGenerated(this.workSchedules, current + 1, current + count, (index) => {
+      const staffMember = staffWithoutSchedule[index - current - 1];
       const branch = branches[(index - 1) % branches.length];
       const room = rooms[(index - 1) % Math.max(rooms.length, 1)];
       const start = timeValue(index % 3 === 0 ? 5 : 0, 0);
@@ -711,6 +715,14 @@ export class SeedService implements OnApplicationBootstrap {
         shiftLabel: ['CA SANG', 'CA CHIEU', 'CA TOI'][index % 3],
         startTime: start,
         endTime: end,
+        scheduleSchema: {
+          recurrenceType: 'WEEKLY',
+          recurrenceInterval: 1,
+          recurrenceWeekdays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
+          workDate: dateOnly(index % 365),
+          startTime: start.toISOString(),
+          endTime: end.toISOString(),
+        },
         roomId: room?.id,
         status: ['PLANNED', 'CONFIRMED', 'DONE'][index % 3],
         note: `Lich lam bulk ${index}`,

@@ -661,6 +661,11 @@ export class WorkSchedule extends ConfigurableEntity {
   @Column({ type: 'date', nullable: true })
   recurrenceUntil?: string;
 
+  // One roster profile per employee. Recurrence is stored as a rule instead
+  // of expanding it into a database record for every work day.
+  @Column({ type: 'simple-json', nullable: true })
+  scheduleSchema?: Record<string, unknown>;
+
   @Column({ nullable: true })
   roomId?: string;
 
@@ -1297,6 +1302,15 @@ export class PrintTemplate {
 
   @Column({ type: 'text' })
   htmlTemplate: string;
+
+  @Column({ default: 'HTML' })
+  templateType: string;
+
+  @Column({ nullable: true })
+  docxPath?: string;
+
+  @Column({ nullable: true })
+  originalFilename?: string;
 
   @Column({ default: true })
   isActive: boolean;

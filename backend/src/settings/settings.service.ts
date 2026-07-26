@@ -1,12 +1,15 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
+import { promises as fs } from 'fs';
 import Handlebars from 'handlebars';
+import { basename, join } from 'path';
 import { IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
 import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, DynamicRoleDefinition, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, User, ViewSetting } from '../entities/entities';
 import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
+import { renderDocxTemplate } from './docx-template';
 
 const DEFAULT_ROLE_SCOPE = 'ALL';
 const SYSTEM_ROLES = ['ADMIN', 'STAFF', 'DOCTOR'];
@@ -578,6 +581,28 @@ export class SettingsService {
     const record = await this.records.findRaw(template.entityType, recordId);
     const data = { ...record, ...(record.customFields || {}) };
     return Handlebars.compile(template.htmlTemplate)(data);
+  }
+
+  async saveDocxTemplate(file: any, payload: { entityType?: string; name?: string }, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    if (!file || !payload.entityType || !payload.name) throw new BadRequestException('Cần chọn model, tên mẫu và file DOCX');
+    if (!file.originalname.toLowerCase().endsWith('.docx')) throw new BadRequestException('Chỉ hỗ trợ file .docx');
+    const template = this.templates.create({ entityType: payload.entityType, name: payload.name, htmlTemplate: '', templateType: 'DOCX', originalFilename: basename(file.originalname) });
+    const saved = await this.templates.save(template);
+    const directory = join(process.cwd(), 'storage', 'print-templates');
+    await fs.mkdir(directory, { recursive: true });
+    const docxPath = join(directory, `${saved.id}.docx`);
+    await fs.writeFile(docxPath, file.buffer);
+    return this.templates.save(this.templates.merge(saved, { docxPath }));
+  }
+
+  async renderDocxTemplate(templateId: string, recordId: string) {
+    const template = await this.templates.findOne({ where: { id: templateId, isActive: true, templateType: 'DOCX' } });
+    if (!template?.docxPath) throw new NotFoundException('Không tìm thấy mẫu DOCX');
+    const record = await this.records.findRaw(template.entityType, recordId) as Record<string, unknown>;
+    const data = { ...record, ...(record.customFields || {}) };
+    const source = await fs.readFile(template.docxPath);
+    return { buffer: renderDocxTemplate(source, data), filename: `${template.name}-${recordId}.docx` };
   }
 
   private isAdmin(user?: AuthUser) {

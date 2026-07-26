@@ -58,7 +58,7 @@ export function RecordListPage() {
   const [pageSize, setPageSize] = useState(50)
   const [displayFields, setDisplayFields] = useState<FieldLayoutConfig[]>([])
   const [templates, setTemplates] = useState<
-    Array<{ id: string; name: string }>
+    Array<{ id: string; name: string; templateType?: string }>
   >([])
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -210,7 +210,7 @@ export function RecordListPage() {
                 <Button
                   icon={<PrinterOutlined />}
                   type="text"
-                  onClick={() => printRecord(templates[0].id, row.id)}
+                  onClick={() => printRecord(templates[0], row.id)}
                 />
               </Tooltip>
             )}
@@ -250,10 +250,20 @@ export function RecordListPage() {
     [lookups],
   )
 
-  async function printRecord(templateId: string, recordId: string) {
+  async function printRecord(template: { id: string; templateType?: string }, recordId: string) {
+    if (template.templateType === "DOCX") {
+      const response = await api.get(`/settings/print-templates/${template.id}/docx/${recordId}`, { responseType: "blob" })
+      const url = URL.createObjectURL(response.data)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = "mau-in.docx"
+      anchor.click()
+      URL.revokeObjectURL(url)
+      return
+    }
     const html = (
       await api.get(
-        `/settings/print-templates/${templateId}/render/${recordId}`,
+        `/settings/print-templates/${template.id}/render/${recordId}`,
         { responseType: "text" },
       )
     ).data
