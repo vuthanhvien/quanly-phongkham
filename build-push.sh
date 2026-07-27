@@ -8,6 +8,8 @@ DOCKER_USER="${DOCKER_USER:-vienvu}"
 IMAGE_PREFIX="${DOCKER_USER}/quanly-phongkham"
 TAG="${TAG:-latest}"
 APP_IMAGE="${IMAGE_PREFIX}:${TAG}"
+DEPLOY_HOST="${DEPLOY_HOST:-root@103.1.238.70}"
+DEPLOY_DIR="${DEPLOY_DIR:-clinic}"
 
 # ============================================================
 echo "=> Docker user : $DOCKER_USER"
@@ -19,7 +21,7 @@ docker login
 
 # Build app
 echo ""
-echo "[1/4] Building single app image..."
+echo "[1/3] Building single app image..."
 docker build \
   --platform linux/amd64 \
   --build-arg LANDING_API_URL="${LANDING_API_URL:-http://127.0.0.1:3001/api}" \
@@ -32,11 +34,23 @@ docker build \
 
 # Push
 echo ""
-echo "[2/4] Pushing image..."
+echo "[2/3] Pushing image..."
 docker push "$APP_IMAGE"
 
 echo ""
-echo "[3/3] Done!"
+echo "[3/3] Deploying to $DEPLOY_HOST..."
+ssh "$DEPLOY_HOST" "
+  set -e
+  echo '[server] Connected to \$(hostname)'
+  cd '$DEPLOY_DIR'
+  echo '[server] Pulling Docker image...'
+  docker compose pull
+  echo '[server] Starting containers...'
+  docker compose up -d
+  echo '[server] Container status:'
+  docker compose ps
+  echo '[server] Deploy succeeded.'
+"
+
 echo ""
-echo "Trên server chỉ cần file docker-compose.yml, rồi chạy:"
-echo "  docker compose pull && docker compose up -d"
+echo "=> Build, push, and server deploy completed successfully."
