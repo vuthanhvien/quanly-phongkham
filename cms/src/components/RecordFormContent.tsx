@@ -91,6 +91,8 @@ export function RecordFormContent({
   const [draftsOpen, setDraftsOpen] = useState(false)
   const [drafts, setDrafts] = useState<RecordDraft[]>([])
   const [draftBusy, setDraftBusy] = useState(false)
+  const [branchRoleOptions, setBranchRoleOptions] = useState<Array<{ value: string; label: string }>>([])
+  const [systemRoleOptions, setSystemRoleOptions] = useState<Array<{ value: string; label: string }>>([])
   const { mutate: create } = useCreate()
   const { mutate: update } = useUpdate()
   const isAppointmentForm = resource === "appointments"
@@ -121,6 +123,23 @@ export function RecordFormContent({
       })
       .then(setLookups)
   }, [resource])
+
+  useEffect(() => {
+    if (resource !== "user-accounts") return
+    Promise.all([
+      api.get("/records/branches", { params: { pageSize: 200 } }),
+      api.get("/settings/dynamic-roles"),
+      editing ? api.get("/settings/branch-role-assignments") : Promise.resolve({ data: { data: [] } }),
+    ]).then(([branches, roles, assignments]) => {
+      setBranchRoleOptions((branches.data.data || []).map((row: Record<string, unknown>) => ({ value: String(row.id), label: String(row.name || row.id) })))
+      setSystemRoleOptions((roles.data.data || []).filter((row: Record<string, unknown>) => row.isActive).map((row: Record<string, unknown>) => ({ value: String(row.key), label: `${row.name} (${row.key})` })))
+      if (editing) {
+        const rows = (assignments.data.data || []).filter((row: Record<string, unknown>) => String(row.userId) === String(id))
+          .map((row: Record<string, unknown>) => ({ branchId: row.branchId, roleKeys: row.roleKeys || [], isActive: row.isActive !== false }))
+        form.setFieldValue("branchRoleAssignments", rows)
+      }
+    })
+  }, [editing, form, id, resource])
 
   useEffect(() => {
     const data =
@@ -196,6 +215,7 @@ export function RecordFormContent({
 
   function buildPayload(values: Record<string, unknown>) {
     const mergedValues = { ...(initialValues || {}), ...values }
+    delete mergedValues.branchRoleAssignments
     if (isAppointmentForm) {
       applyAppointmentDateTimeValues(mergedValues)
     }
@@ -216,9 +236,25 @@ export function RecordFormContent({
     return payload
   }
 
+  async function syncBranchRoles(userId: string, rows: Array<{ branchId?: string; roleKeys?: string[]; isActive?: boolean }>) {
+    if (resource !== "user-accounts") return
+    const existing = (await api.get("/settings/branch-role-assignments")).data.data || []
+    const next = rows.filter((row) => row.branchId && (row.roleKeys || []).length)
+    for (const assignment of existing.filter((row: Record<string, unknown>) => String(row.userId) === userId)) {
+      const replacement = next.find((row) => row.branchId === assignment.branchId)
+      if (replacement) await api.patch(`/settings/branch-role-assignments/${assignment.id}`, { ...replacement, userId })
+      else await api.delete(`/settings/branch-role-assignments/${assignment.id}`)
+    }
+    for (const row of next.filter((row) => !existing.some((item: Record<string, unknown>) => String(item.userId) === userId && item.branchId === row.branchId))) {
+      await api.post("/settings/branch-role-assignments", { ...row, userId })
+    }
+  }
+
   function submit(values: Record<string, unknown>) {
     const payload = buildPayload(values)
-    const done = () => {
+    const done = async (result?: any) => {
+      const userId = editing ? id : result?.data?.id
+      if (resource === "user-accounts" && userId) await syncBranchRoles(String(userId), (values.branchRoleAssignments || []) as Array<{ branchId?: string; roleKeys?: string[]; isActive?: boolean }>)
       setSubmitError(null)
       if (notifyOnSuccess) toastSuccess("Đã lưu dữ liệu")
       onSuccess?.()
@@ -377,6 +413,23 @@ export function RecordFormContent({
             onChange={setActiveTab}
           />
         ) : renderFieldGrid(visibleFields, true)}
+        {resource === "user-accounts" ? (
+          <Form.List name="branchRoleAssignments">
+            {(items, { add, remove }) => (
+              <div style={{ marginBottom: 16 }}>
+                <Typography.Title level={5}>Phân quyền theo chi nhánh</Typography.Title>
+                {items.map(({ key, name }) => (
+                  <Space key={key} align="start" style={{ display: "flex", marginBottom: 8 }}>
+                    <Form.Item name={[name, "branchId"]} rules={[{ required: true, message: "Chọn chi nhánh" }]}><Select style={{ minWidth: 210 }} options={branchRoleOptions} placeholder="Chi nhánh" /></Form.Item>
+                    <Form.Item name={[name, "roleKeys"]} rules={[{ required: true, message: "Chọn role" }]}><Select mode="multiple" style={{ minWidth: 280 }} options={systemRoleOptions} placeholder="Roles" /></Form.Item>
+                    <Button danger onClick={() => remove(name)}>Bỏ</Button>
+                  </Space>
+                ))}
+                <Button onClick={() => add({ isActive: true, roleKeys: [] })}>+ Thêm chi nhánh / role</Button>
+              </div>
+            )}
+          </Form.List>
+        ) : null}
         {submitError ? (
           <Alert
             closable

@@ -470,6 +470,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'fullName', label: 'Tên nội bộ (tuỳ chọn)', width: '66', tableWidth: 220 },
     { key: 'role', label: 'Vai trò hệ thống', type: 'select', options: systemRoleSelectOptions, required: true, width: '33', tableWidth: 140 },
     { key: 'branchId', label: 'Chi nhánh mặc định', width: '50', tableWidth: 200 },
+    { key: 'branchRoleSummary', label: 'Phân quyền chi nhánh', width: '100', tableWidth: 320 },
     { key: 'staffId', label: 'Nhân viên', width: '50', tableWidth: 220 },
   ],
   customers: [

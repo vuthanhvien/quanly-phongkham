@@ -91,10 +91,11 @@ export class AuthService {
       branchPermissions.find((item) => item.branchId === user.branchId)?.roleKeys?.[0] ||
       branchPermissions[0]?.roleKeys?.[0] ||
       user.role;
-    const isAdmin = normalizeRole(user.role) === 'ADMIN';
-    const disabledModules = isAdmin ? [] : await this.resolveDisabledModules(activeRole, user.role);
-    const actionPermissions = isAdmin ? {} : await this.resolveActionPermissions(activeRole, user.role);
-    const screenPermissions = isAdmin ? SCREEN_KEYS : await this.resolveScreenPermissions(activeRole, user.role);
+    const roleMain = roleMap.get(activeRole)?.roleMain || user.role;
+    const isAdmin = normalizeRole(roleMain) === 'ADMIN';
+    const disabledModules = isAdmin ? [] : await this.resolveDisabledModules(activeRole, roleMain);
+    const actionPermissions = isAdmin ? {} : await this.resolveActionPermissions(activeRole, roleMain);
+    const screenPermissions = isAdmin ? SCREEN_KEYS : await this.resolveScreenPermissions(activeRole, roleMain);
     const profile = {
       tenantId: this.tenantContext.require().id,
       id: user.id,
@@ -103,7 +104,7 @@ export class AuthService {
       fullName: user.fullName,
       role: user.role,
       activeRole,
-      roleMain: user.role,
+      roleMain,
       branchId: user.branchId,
       staffId: staff?.id || user.staffId,
       disabledModules,

@@ -438,7 +438,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
               options={branchOptions}
               placeholder="Chọn chi nhánh"
               showSearch
-              value={selectedBranchIds}
+              loading={branchOptions.length === 0}
+              value={branchOptions.length > 0 ? selectedBranchIds : undefined}
               onChange={(values) => {
                 const nextValues = values.length > 0 ? values : (branchOptions[0] ? [branchOptions[0].value] : [])
                 setSelectedBranchIds(nextValues)

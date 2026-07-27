@@ -123,6 +123,12 @@ api.interceptors.response.use(
       clearAuthSession();
       redirectToLogin();
     }
+    if (error?.response?.status === 403 && error?.response?.data?.message === 'Token không thuộc domain hiện tại') {
+      // Tokens issued before multi-tenant support have no tenantId. They must
+      // be replaced by a fresh login instead of leaving the app in a 403 loop.
+      clearAuthSession();
+      redirectToLogin();
+    }
     if (isNotifiableMutation(error?.config?.url, error?.config?.method)) {
       toastError(getMutationErrorMessage(error));
     }

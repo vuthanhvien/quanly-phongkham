@@ -55,7 +55,7 @@ function ProtectedLayout() {
 
   return (
     <Authenticated key="authenticated" fallback={<CatchAllNavigate to="/login" />}>
-      <Shell key={branchScopeKey}><Outlet /></Shell>
+      <Shell><Outlet key={branchScopeKey} /></Shell>
     </Authenticated>
   );
 }

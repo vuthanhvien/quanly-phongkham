@@ -488,6 +488,15 @@ export class RecordsService {
   ) {
     await this.assertPermission(user, resource, 'view');
     const repository = this.repository(resource);
+    // The branch directory is global reference data. It must stay available
+    // for selectors and administration regardless of the user's branch roles.
+    if (resource === 'branches') {
+      const [rows, total] = await repository.findAndCount({
+        where: { isArchived: false },
+        order: { createdAt: 'DESC' },
+      });
+      return { data: rows.map((row) => this.protect(resource, row, request)), total };
+    }
     const normalizedFilters = { ...filters };
     delete normalizedFilters.branchIds;
     let where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[] = {};
@@ -545,6 +554,9 @@ export class RecordsService {
       total = result[1];
     }
     let hydrated = await this.hydrateCustomFields(resource, rows);
+    if (resource === 'user-accounts') {
+      hydrated = await this.attachUserBranchRoleMetadata(hydrated as unknown as User[]) as unknown as ConfigurableEntity[];
+    }
     if (resource === 'staff') {
       hydrated = await this.attachStaffRoleMetadata(hydrated as Staff[]);
     }
@@ -2726,6 +2738,21 @@ export class RecordsService {
         userRole: matchedUser?.role || undefined,
       } as Staff;
     });
+  }
+
+  private async attachUserBranchRoleMetadata(records: User[]) {
+    if (!records.length) return records;
+    const userIds = records.map((record) => record.id);
+    const assignments = await this.branchPermissions.find({ where: { userId: In(userIds), isArchived: false } });
+    const branchIds = Array.from(new Set(assignments.map((item) => item.branchId)));
+    const branches = branchIds.length ? await this.branches.find({ where: { id: In(branchIds) } }) : [];
+    return records.map((record) => ({
+      ...record,
+      branchRoleSummary: assignments
+        .filter((item) => item.userId === record.id)
+        .map((item) => `${branches.find((branch) => branch.id === item.branchId)?.name || item.branchId}: ${item.roleName || (item.roleKeys || []).join(', ')}`)
+        .join(' | '),
+    })) as User[];
   }
 
   private resolveStaffType(record: Pick<Staff, 'type'>) {
