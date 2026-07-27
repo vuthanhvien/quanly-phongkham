@@ -12,6 +12,7 @@ export class CategoriesService {
 
   async list() {
     const cats = await this.repo.find({
+      where: { isArchived: false },
       order: { level: 'ASC', sortOrder: 'ASC', name: 'ASC' },
     });
     return { data: cats, total: cats.length };
@@ -56,7 +57,10 @@ export class CategoriesService {
     if (children.length > 0) {
       throw new BadRequestException('Không thể xóa danh mục còn danh mục con');
     }
-    await this.repo.delete(id);
+    const category = await this.repo.findOne({ where: { id, isArchived: false } });
+    if (!category) throw new NotFoundException('Danh mục không tồn tại');
+    category.isArchived = true;
+    await this.repo.save(category);
     return { success: true };
   }
 

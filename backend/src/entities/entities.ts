@@ -18,6 +18,9 @@ export abstract class ConfigurableEntity {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Column({ default: false })
+  isArchived: boolean;
 }
 
 @Entity('branches')
@@ -67,6 +70,9 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ default: false })
+  isArchived: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 }
@@ -87,6 +93,9 @@ export class DynamicRoleDefinition {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({ default: false })
+  isArchived: boolean;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -1261,6 +1270,9 @@ export class CustomFieldDefinition {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ default: false })
+  isArchived: boolean;
+
   @Column({ default: 0 })
   sortOrder: number;
 
@@ -1284,6 +1296,9 @@ export class ViewSetting {
 
   @Column({ type: 'simple-json', nullable: true })
   config: Record<string, unknown> = {};
+
+  @Column({ default: false })
+  isArchived: boolean;
 
   @UpdateDateColumn()
   updatedAt: Date;
@@ -1335,6 +1350,9 @@ export class LandingPage {
 
   @Column()
   title: string;
+
+  @Column({ default: false })
+  isArchived: boolean;
 
   @Column({ type: 'text', nullable: true })
   description?: string;
@@ -1606,6 +1624,9 @@ export class ItemCategory {
 
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({ default: false })
+  isArchived: boolean;
 
   @CreateDateColumn()
   createdAt: Date;

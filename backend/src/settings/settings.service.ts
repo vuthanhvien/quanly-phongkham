@@ -172,7 +172,7 @@ export class SettingsService {
 
   listFields(entityType?: string, user?: AuthUser) {
     this.assertResourceReadable(user, entityType);
-    return this.fields.find({ where: entityType ? { entityType } : {}, order: { entityType: 'ASC', sortOrder: 'ASC' } });
+    return this.fields.find({ where: entityType ? { entityType, isArchived: false } : { isArchived: false }, order: { entityType: 'ASC', sortOrder: 'ASC' } });
   }
 
   async createField(payload: Partial<CustomFieldDefinition>, user?: AuthUser) {
@@ -213,13 +213,14 @@ export class SettingsService {
     this.assertSettingsAccess(user);
     const field = await this.fields.findOne({ where: { id } });
     if (!field) throw new NotFoundException('Khong tim thay custom field');
-    await this.fields.remove(field);
+    field.isArchived = true;
+    await this.fields.save(field);
     return { id };
   }
 
   listViews(entityType?: string, user?: AuthUser) {
     this.assertResourceReadable(user, entityType);
-    return this.views.find({ where: entityType ? { entityType } : {}, order: { entityType: 'ASC', viewType: 'ASC', role: 'ASC' } });
+    return this.views.find({ where: entityType ? { entityType, isArchived: false } : { isArchived: false }, order: { entityType: 'ASC', viewType: 'ASC', role: 'ASC' } });
   }
 
   async saveView(entityType: string, viewType: string, config: Record<string, unknown>, role?: string, user?: AuthUser) {
@@ -239,7 +240,7 @@ export class SettingsService {
     if (!settings.length) {
       return { entityType, role: normalizedRole, deleted: 0 };
     }
-    await this.views.remove(settings);
+    await this.views.save(settings.map((setting) => ({ ...setting, isArchived: true })));
     return { entityType, role: normalizedRole, deleted: settings.length };
   }
 
@@ -250,7 +251,7 @@ export class SettingsService {
 
   listLandingPages(user?: AuthUser) {
     this.assertSettingsAccess(user);
-    return this.landingPages.find({ order: { updatedAt: 'DESC', createdAt: 'DESC' } });
+    return this.landingPages.find({ where: { isArchived: false }, order: { updatedAt: 'DESC', createdAt: 'DESC' } });
   }
 
   async getAppUiSettings(user?: AuthUser) {
@@ -384,7 +385,8 @@ export class SettingsService {
     this.assertSettingsAccess(user);
     const page = await this.landingPages.findOne({ where: { id } });
     if (!page) throw new NotFoundException('Khong tim thay landing page');
-    await this.landingPages.remove(page);
+    page.isArchived = true;
+    await this.landingPages.save(page);
     await this.revalidateLandingCache();
     return { id };
   }
@@ -461,7 +463,7 @@ export class SettingsService {
 
   listRoles(user?: AuthUser) {
     this.assertRoleReadable(user);
-    return this.roles.find({ order: { roleMain: 'ASC', name: 'ASC' } });
+    return this.roles.find({ where: { isArchived: false }, order: { roleMain: 'ASC', name: 'ASC' } });
   }
 
   async createRole(payload: Partial<DynamicRoleDefinition>, user?: AuthUser) {
@@ -501,14 +503,15 @@ export class SettingsService {
     if (assignments.some((item) => (item.roleKeys || []).includes(role.key))) {
       throw new BadRequestException('Role dang duoc gan cho tai khoan, khong the xoa');
     }
-    await this.roles.remove(role);
+    role.isArchived = true;
+    await this.roles.save(role);
     return { id };
   }
 
   listBranchRoleAssignments(user?: AuthUser) {
     this.assertSettingsAccess(user);
     return this.branchRoles.find({
-      where: { userId: Not(IsNull()) },
+      where: { userId: Not(IsNull()), isArchived: false },
       order: { branchId: 'ASC', createdAt: 'DESC' },
     });
   }
@@ -556,7 +559,8 @@ export class SettingsService {
     this.assertSettingsAccess(user);
     const assignment = await this.branchRoles.findOne({ where: { id, userId: Not(IsNull()) } });
     if (!assignment) throw new NotFoundException('Khong tim thay gan role chi nhanh');
-    await this.branchRoles.remove(assignment);
+    assignment.isArchived = true;
+    await this.branchRoles.save(assignment);
     return { id };
   }
 

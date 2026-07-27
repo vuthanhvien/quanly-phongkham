@@ -59,7 +59,7 @@ export class ZaloService implements OnApplicationBootstrap {
 
   async listAccounts(user: AuthUser) {
     const rows = await this.accounts.find({
-      where: this.accountScope(user),
+      where: { ...this.accountScope(user), isArchived: false },
       order: { updatedAt: 'DESC' },
     });
     return {
@@ -118,9 +118,11 @@ export class ZaloService implements OnApplicationBootstrap {
     await this.stopListener(id, user).catch(() => undefined);
     this.loginStates.delete(id);
     this.apis.delete(id);
-    await this.messages.delete({ accountId: id });
-    await this.conversations.delete({ accountId: id });
-    await this.accounts.delete({ id });
+    const account = await this.getAccountOrFail(id);
+    account.isArchived = true;
+    account.listenerActive = false;
+    account.listenerEnabled = false;
+    await this.accounts.save(account);
     return { data: { id } };
   }
 

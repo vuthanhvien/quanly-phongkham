@@ -522,6 +522,7 @@ export class RecordsService {
       where = (searchable[resource] || []).map((field) => ({ [field]: ILike(`%${search}%`) })) as FindOptionsWhere<ConfigurableEntity>[];
     }
     where = await this.applyResourceFilters(resource, where, normalizedFilters);
+    where = this.mergeWhere(where, { isArchived: false } as FindOptionsWhere<ConfigurableEntity>);
     where = this.applySelectedBranchFilters(resource, where, filters);
     where = this.applyBranchScope(resource, where, user);
     let rows: ConfigurableEntity[];
@@ -566,7 +567,7 @@ export class RecordsService {
   }
 
   private async findStored(resource: string, id: string) {
-    const record = await this.repository(resource).findOne({ where: { id } });
+    const record = await this.repository(resource).findOne({ where: { id, isArchived: false } });
     if (!record) throw new NotFoundException('Khong tim thay du lieu');
     return record;
   }
@@ -773,23 +774,8 @@ export class RecordsService {
   async remove(resource: string, id: string, user: AuthUser) {
     const record = await this.findStored(resource, id);
     await this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
-    await this.ensureNoPostedAccountingVoucher(resource, id);
-    if (resource === 'files') {
-      await fs.unlink((record as ManagedFile).storagePath).catch(() => undefined);
-    }
-    if (resource === 'service-orders') {
-      await this.serviceOrderItems.delete({ orderId: id });
-    }
-    if (resource === 'accounting-vouchers') {
-      await this.accountingVoucherLines.delete({ voucherId: id });
-    }
-    await this.customFieldValues.delete({ entityType: resource, recordId: id });
-    await this.repository(resource).remove(record);
-    if (resource === 'accounting-voucher-lines') {
-      await this.recalculateAccountingVoucherTotals(String((record as Record<string, unknown>).voucherId || ''));
-    }
-    await this.removeDraftSourceVouchers(resource, id);
-    await this.audit(user, 'DELETE', resource, id);
+    await this.repository(resource).save({ ...record, isArchived: true });
+    await this.audit(user, 'ARCHIVE', resource, id);
     return { data: { id } };
   }
 
@@ -3670,7 +3656,6 @@ export class RecordsService {
       'accounting-fiscal-settings',
       'accounting-vouchers',
       'accounting-voucher-lines',
-      'user-accounts',
       'work-contracts',
       'staff-insurances',
       'attendances',
@@ -3690,7 +3675,6 @@ export class RecordsService {
 
   private branchField(resource: string) {
     const map: Record<string, string> = {
-      branches: 'id',
       rooms: 'branchId',
       equipments: 'branchId',
       'accounting-fiscal-settings': 'defaultBranchId',
@@ -3698,7 +3682,6 @@ export class RecordsService {
       'accounting-voucher-lines': 'branchId',
       'branch-role-assignments': 'branchId',
       'branch-permissions': 'branchId',
-      'user-accounts': 'branchId',
       'lead-activities': 'branchId',
       'medical-episodes': 'branchId',
       appointments: 'branchId',
