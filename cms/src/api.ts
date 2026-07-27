@@ -1,9 +1,44 @@
 import type { AuthProvider, CrudFilter, DataProvider, LogicalFilter } from '@refinedev/core';
-import axios from 'axios';
+import axios, { type AxiosResponse } from 'axios';
 import { toastError, toastSuccess } from './toast';
 
 export const API_URL = import.meta.env.VITE_API_URL || '/api';
 export const api = axios.create({ baseURL: API_URL });
+const UI_ARCHIVE_STORAGE_KEY = 'clinic-ui-archived-records';
+
+type ArchivedRecords = Record<string, string[]>;
+
+function readArchivedRecords(): ArchivedRecords {
+  try {
+    const value = JSON.parse(localStorage.getItem(UI_ARCHIVE_STORAGE_KEY) || '{}');
+    return value && typeof value === 'object' ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function archiveDescriptor(url: string) {
+  const pathname = url.split('?')[0].replace(/^\/+|\/+$/g, '');
+  const parts = pathname.split('/').filter(Boolean);
+  // A DELETE URL always ends with the record ID. Its parent path is also the
+  // matching list endpoint, so one archive key works for every CMS module.
+  if (parts.length < 2) return undefined;
+  return { scope: parts.slice(0, -1).join('/'), id: parts[parts.length - 1] };
+}
+
+function archiveUrl(url: string) {
+  const target = archiveDescriptor(url);
+  if (!target) return;
+  const archived = readArchivedRecords();
+  const ids = new Set(archived[target.scope] || []);
+  ids.add(target.id);
+  archived[target.scope] = [...ids];
+  localStorage.setItem(UI_ARCHIVE_STORAGE_KEY, JSON.stringify(archived));
+}
+
+function isArchived(scope: string, id: unknown) {
+  return readArchivedRecords()[scope]?.includes(String(id)) || false;
+}
 const APP_BASE_PATH = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '') || '/';
 const GLOBAL_BRANCH_FILTER_KEY = 'clinic-global-branch-ids';
 const GLOBAL_BRANCH_FILTER_EVENT = 'clinic-global-branch-filter-change';
@@ -68,7 +103,7 @@ function shouldAttachGlobalBranchFilter(url?: string) {
 
 function getMutationSuccessMessage(method?: string) {
   switch ((method || '').toLowerCase()) {
-    case 'delete': return 'Đã xóa thành công';
+    case 'delete': return 'Đã lưu trữ';
     case 'post': return 'Đã lưu thành công';
     default: return 'Đã cập nhật thành công';
   }
@@ -113,6 +148,20 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => {
+    if ((response.config.method || 'get').toLowerCase() === 'get' && Array.isArray(response.data?.data)) {
+      const scope = String(response.config.url || '').split('?')[0].replace(/^\/+|\/+$/g, '');
+      const rows = response.data.data;
+      const visibleRows = rows.filter((row: { id?: unknown }) => !isArchived(scope, row?.id));
+      if (visibleRows.length !== rows.length) {
+        response.data = {
+          ...response.data,
+          data: visibleRows,
+          total: typeof response.data.total === 'number'
+            ? Math.max(0, response.data.total - (rows.length - visibleRows.length))
+            : response.data.total,
+        };
+      }
+    }
     if (isNotifiableMutation(response.config.url, response.config.method)) {
       toastSuccess(getMutationSuccessMessage(response.config.method));
     }
@@ -129,6 +178,21 @@ api.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+// Deletion is intentionally UI-only.  It never reaches the backend or changes
+// the database; the item is hidden for this browser through localStorage.
+const archiveDelete = async (url: string, config?: unknown) => {
+  archiveUrl(url);
+  toastSuccess('Đã lưu trữ');
+  return {
+    data: { data: { archived: true } },
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    config: { ...(config as object), url, method: 'delete' },
+  } as AxiosResponse;
+};
+api.delete = archiveDelete as typeof api.delete;
 
 export const authProvider: AuthProvider = {
   login: async ({ email, identifier, password }) => {

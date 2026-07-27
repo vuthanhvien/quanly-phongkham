@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { compare } from 'bcryptjs';
 import { In, Repository } from 'typeorm';
 import { BranchRoleAssignment, DynamicRoleDefinition, Staff, User, ViewSetting } from '../entities/entities';
+import { TenantContextService } from '../tenant/tenant-context.service';
 
 const DEFAULT_ROLE_SCOPE = 'ALL';
 const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print'];
@@ -45,6 +46,7 @@ export class AuthService {
     @InjectRepository(DynamicRoleDefinition) private readonly dynamicRoles: Repository<DynamicRoleDefinition>,
     @InjectRepository(ViewSetting) private readonly viewSettings: Repository<ViewSetting>,
     private readonly jwtService: JwtService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
   async login(identifier: string, password: string) {
@@ -94,6 +96,7 @@ export class AuthService {
     const actionPermissions = isAdmin ? {} : await this.resolveActionPermissions(activeRole, user.role);
     const screenPermissions = isAdmin ? SCREEN_KEYS : await this.resolveScreenPermissions(activeRole, user.role);
     const profile = {
+      tenantId: this.tenantContext.require().id,
       id: user.id,
       email: user.email,
       username: user.username,

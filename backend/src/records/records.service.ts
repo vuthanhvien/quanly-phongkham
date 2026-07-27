@@ -38,6 +38,7 @@ import {
   Payroll,
   PerformanceReview,
   PositionHistory,
+  RecordDraft,
   Product,
   Room,
   ServiceOrder,
@@ -417,6 +418,7 @@ export class RecordsService {
     @InjectRepository(StaffTraining) private readonly staffTrainings: Repository<StaffTraining>,
     @InjectRepository(PerformanceReview) private readonly performanceReviews: Repository<PerformanceReview>,
     @InjectRepository(PositionHistory) private readonly positionHistories: Repository<PositionHistory>,
+    @InjectRepository(RecordDraft) private readonly recordDrafts: Repository<RecordDraft>,
   ) {}
 
   private repository(resource: string): ResourceRepository {
@@ -466,6 +468,13 @@ export class RecordsService {
     const repository = map[resource];
     if (!repository) throw new NotFoundException('Phan he khong ton tai');
     return repository;
+  }
+
+  private draftTitle(resource: string, payload: Record<string, unknown>) {
+    const meaningful = [payload.code, payload.name, payload.fullName, payload.title]
+      .map((value) => String(value || '').trim())
+      .find(Boolean);
+    return meaningful ? `Nháp: ${meaningful}` : `Nháp ${this.resourceLabel(resource)} ${new Date().toLocaleString('vi-VN')}`;
   }
 
   async list(
@@ -698,6 +707,36 @@ export class RecordsService {
     return { data: this.protect(resource, hydrated) };
   }
 
+  async listDrafts(resource: string, user: AuthUser) {
+    this.repository(resource); // validates the resource without touching its records
+    await this.assertPermission(user, resource, 'create');
+    const drafts = await this.recordDrafts.find({
+      where: { resource, ownerId: user.id },
+      order: { updatedAt: 'DESC' },
+    });
+    return { data: drafts };
+  }
+
+  async createDraft(resource: string, payload: Record<string, unknown>, user: AuthUser) {
+    this.repository(resource); // drafts intentionally skip normal field and business validation
+    await this.assertPermission(user, resource, 'create', this.branchIdOf(resource, payload));
+    const draft = await this.recordDrafts.save(this.recordDrafts.create({
+      resource,
+      ownerId: user.id,
+      title: this.draftTitle(resource, payload),
+      payload,
+    }));
+    return { data: draft };
+  }
+
+  async removeDraft(resource: string, id: string, user: AuthUser) {
+    this.repository(resource);
+    const draft = await this.recordDrafts.findOne({ where: { id, resource, ownerId: user.id } });
+    if (!draft) throw new NotFoundException('Ban nhap khong ton tai');
+    await this.recordDrafts.remove(draft);
+    return { data: { id } };
+  }
+
   async update(resource: string, id: string, payload: Record<string, unknown>, user: AuthUser) {
     const previous = await this.findStored(resource, id);
     const previousCustomFields = await this.loadCustomFieldsMap(resource, [id]);
@@ -804,10 +843,26 @@ export class RecordsService {
 
   private handlePersistenceError(resource: string, error: unknown): never | void {
     if (!(error instanceof QueryFailedError)) return;
-    const driverError = error.driverError as { code?: string; detail?: string; constraint?: string } | undefined;
-    if (driverError?.code !== '23505') return;
+    const driverError = error.driverError as {
+      code?: string;
+      errno?: number;
+      detail?: string;
+      constraint?: string;
+      sqlMessage?: string;
+      message?: string;
+    } | undefined;
+    // PostgreSQL reports unique violations as 23505, while MySQL reports
+    // ER_DUP_ENTRY/1062.  Production uses MySQL, so without this branch a
+    // duplicate email or username escapes Nest's validation flow as HTTP 500.
+    const isUniqueViolation = driverError?.code === '23505'
+      || driverError?.code === 'ER_DUP_ENTRY'
+      || driverError?.errno === 1062;
+    if (!isUniqueViolation) return;
 
-    const field = this.extractUniqueField(driverError.detail, driverError.constraint);
+    const field = this.extractUniqueField(
+      driverError?.detail || driverError?.sqlMessage || driverError?.message,
+      driverError?.constraint,
+    );
     const resourceLabel = this.resourceLabel(resource);
     if (field === 'code') {
       throw new BadRequestException(`Mã ${resourceLabel.toLowerCase()} đã tồn tại`);
@@ -817,6 +872,9 @@ export class RecordsService {
     }
     if (field === 'email') {
       throw new BadRequestException(`Email ${resourceLabel.toLowerCase()} đã tồn tại`);
+    }
+    if (field === 'username') {
+      throw new BadRequestException(`Username ${resourceLabel.toLowerCase()} đã tồn tại`);
     }
     if (field === 'barcode') {
       throw new BadRequestException(`Mã vạch ${resourceLabel.toLowerCase()} đã tồn tại`);
@@ -829,6 +887,13 @@ export class RecordsService {
     if (detailMatch?.[1]) return detailMatch[1];
     const constraintMatch = constraint?.match(/_([a-zA-Z0-9]+)_key$/)
     if (constraintMatch?.[1]) return constraintMatch[1];
+    // MySQL: "Duplicate entry '...' for key 'users.email'".
+    const mysqlKeyMatch = (constraint || detail)?.match(/(?:for key|key)\s+['`]?([^'`\s]+)['`]?/i);
+    const key = mysqlKeyMatch?.[1];
+    if (key) {
+      const field = key.split('.').pop()?.replace(/_unique$/i, '');
+      if (field) return field;
+    }
     return undefined;
   }
 

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TenantModule, TenantOrmModule } from '../tenant/tenant-orm.module';
 import { BranchRoleAssignment, DynamicRoleDefinition, Staff, User, ViewSetting } from '../entities/entities';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -9,7 +9,8 @@ import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Staff, BranchRoleAssignment, DynamicRoleDefinition, ViewSetting]),
+    TenantOrmModule.forFeature([User, Staff, BranchRoleAssignment, DynamicRoleDefinition, ViewSetting]),
+    TenantModule,
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'development-only-secret',

@@ -749,8 +749,8 @@ export function LandingPagesPage() {
           </Space>
           <Space wrap>
             {selectedId ? (
-              <Popconfirm title="Xóa landing page này?" onConfirm={() => void deletePage()}>
-                <Button danger icon={<DeleteOutlined />}>Xóa</Button>
+              <Popconfirm title="Lưu trữ landing page này?" onConfirm={() => void deletePage()}>
+                <Button danger icon={<DeleteOutlined />}>Lưu trữ</Button>
               </Popconfirm>
             ) : null}
             <Button icon={<SettingOutlined />} onClick={() => setGlobalOpen(true)}>Cài đặt site</Button>

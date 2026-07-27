@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TenantOrmModule } from '../tenant/tenant-orm.module';
 import {
   Appointment,
   AccountingCashFlowMapping,
@@ -32,6 +32,7 @@ import {
   Payroll,
   PerformanceReview,
   PositionHistory,
+  RecordDraft,
   Product,
   Room,
   ServiceOrder,
@@ -53,7 +54,7 @@ import { RecordsService } from './records.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
+    TenantOrmModule.forFeature([
       Branch,
       Department,
       Room,
@@ -100,6 +101,7 @@ import { RecordsService } from './records.service';
       StaffTraining,
       PerformanceReview,
       PositionHistory,
+      RecordDraft,
     ]),
   ],
   controllers: [RecordsController],

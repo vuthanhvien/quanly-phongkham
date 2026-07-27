@@ -852,7 +852,7 @@ export function SettingsPage() {
                       disabled={!hasRoleConfig}
                       onClick={() => void resetInheritedView()}
                     >
-                      Xóa config hiện tại để kế thừa lại
+                      Lưu trữ config hiện tại để ẩn trên giao diện
                     </Button>
                   </Space>
                 </div>

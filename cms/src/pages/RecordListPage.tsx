@@ -216,20 +216,20 @@ export function RecordListPage() {
             )}
             {hasActionAccess(resource, "delete") && (
               <Popconfirm
-                title="Xóa bản ghi này?"
+                title="Lưu trữ bản ghi này? Bản ghi chỉ bị ẩn trên giao diện này, không bị xóa khỏi cơ sở dữ liệu."
                 onConfirm={() =>
                   deleteRecord(
                     { resource, id: row.id },
                     {
                       onSuccess: () => {
-                        message.success("Đã xóa")
+                        message.success("Đã lưu trữ")
                         refresh()
                       },
                     },
                   )
                 }
               >
-                <Tooltip title="Xóa bản ghi">
+                <Tooltip title="Lưu trữ bản ghi">
                   <Button danger icon={<DeleteOutlined />} type="text" />
                 </Tooltip>
               </Popconfirm>

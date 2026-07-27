@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
 import { getFirstOptionValue } from "../utils/branchDefaults"
 import { getApiErrorMessage } from "../utils/apiError"
+import { RecordDraftControls } from "./RecordDraftControls"
 
 interface StockBatchFormProps {
   compact?: boolean
@@ -474,6 +475,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
 
         <Space>
           <Button className="primary-glow" htmlType="submit" loading={submitting} type="primary">Lưu phiếu</Button>
+          <RecordDraftControls resource="stock-batches" getPayload={() => ({ ...form.getFieldsValue(true), movementDate: dayjs.isDayjs(form.getFieldValue("movementDate")) ? form.getFieldValue("movementDate").format("YYYY-MM-DD") : form.getFieldValue("movementDate") })} onRestore={(payload) => form.setFieldsValue({ ...payload, movementDate: payload.movementDate ? dayjs(String(payload.movementDate)) : undefined })} />
           <Button onClick={onCancel}>Hủy</Button>
         </Space>
       </Form>

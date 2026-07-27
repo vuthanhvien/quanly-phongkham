@@ -12,6 +12,9 @@ services:
         VITE_LANDING_URL: ${VITE_LANDING_URL:-}
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      MANAGEMENT_DATABASE_URL: ${MANAGEMENT_DATABASE_URL:-}
+      TENANTS_JSON: ${TENANTS_JSON:-}
+      TYPEORM_SYNCHRONIZE: ${TYPEORM_SYNCHRONIZE:-true}
       JWT_SECRET: ${JWT_SECRET}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
@@ -26,3 +29,4 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ${UPLOADS_DIR:-./data/uploads}:/app/backend/storage/uploads
+      - ${LOGS_DIR:-./data/logs}:/app/backend/storage/logs

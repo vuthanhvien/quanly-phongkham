@@ -15,6 +15,7 @@ import {
   Image,
   Input,
   InputNumber,
+  List,
   Col,
   Modal,
   Row,
@@ -55,6 +56,13 @@ interface RecordFormContentProps {
   notifyOnSuccess?: boolean
 }
 
+type RecordDraft = {
+  id: string
+  title?: string
+  payload: Record<string, unknown>
+  updatedAt: string
+}
+
 const APPOINTMENT_DURATION_OPTIONS = [
   { value: 15, label: "15 phút" },
   { value: 30, label: "30 phút" },
@@ -80,6 +88,9 @@ export function RecordFormContent({
   const [lookups, setLookups] = useState<LookupMap>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<string | undefined>()
+  const [draftsOpen, setDraftsOpen] = useState(false)
+  const [drafts, setDrafts] = useState<RecordDraft[]>([])
+  const [draftBusy, setDraftBusy] = useState(false)
   const { mutate: create } = useCreate()
   const { mutate: update } = useUpdate()
   const isAppointmentForm = resource === "appointments"
@@ -183,7 +194,7 @@ export function RecordFormContent({
     }
   }, [editing, fields, form, initialValues, lookups])
 
-  function submit(values: Record<string, unknown>) {
+  function buildPayload(values: Record<string, unknown>) {
     const mergedValues = { ...(initialValues || {}), ...values }
     if (isAppointmentForm) {
       applyAppointmentDateTimeValues(mergedValues)
@@ -202,6 +213,11 @@ export function RecordFormContent({
       if (baseKeys.has(key)) payload[key] = value
       else (payload.customFields as Record<string, unknown>)[key] = value
     })
+    return payload
+  }
+
+  function submit(values: Record<string, unknown>) {
+    const payload = buildPayload(values)
     const done = () => {
       setSubmitError(null)
       if (notifyOnSuccess) toastSuccess("Đã lưu dữ liệu")
@@ -231,6 +247,59 @@ export function RecordFormContent({
           },
         },
       )
+  }
+
+  async function loadDrafts() {
+    setDraftBusy(true)
+    try {
+      const response = await api.get(`/records/${resource}/drafts`)
+      setDrafts(Array.isArray(response.data?.data) ? response.data.data : [])
+    } catch (error) {
+      toastError(getApiErrorMessage(error, "Không thể tải bản nháp"))
+    } finally {
+      setDraftBusy(false)
+    }
+  }
+
+  async function saveDraft() {
+    setDraftBusy(true)
+    try {
+      const response = await api.post(`/records/${resource}/drafts`, buildPayload(form.getFieldsValue(true)))
+      const draft = response.data?.data as RecordDraft | undefined
+      if (draft) setDrafts((current) => [draft, ...current])
+      toastSuccess("Đã lưu bản nháp")
+    } catch (error) {
+      toastError(getApiErrorMessage(error, "Không thể lưu bản nháp"))
+    } finally {
+      setDraftBusy(false)
+    }
+  }
+
+  async function openDrafts() {
+    setDraftsOpen(true)
+    await loadDrafts()
+  }
+
+  function restoreDraft(draft: RecordDraft) {
+    const restored = { ...draft.payload, ...((draft.payload.customFields || {}) as Record<string, unknown>) }
+    if (isAppointmentForm) Object.assign(restored, buildAppointmentEditorValues(restored))
+    if (isWorkScheduleForm) Object.assign(restored, buildWorkScheduleEditorValues(restored))
+    form.setFieldsValue(restored)
+    setDraftsOpen(false)
+    setSubmitError(null)
+    toastSuccess("Đã mở bản nháp")
+  }
+
+  async function removeDraft(id: string) {
+    setDraftBusy(true)
+    try {
+      await api.delete(`/records/${resource}/drafts/${id}`)
+      setDrafts((current) => current.filter((draft) => draft.id !== id))
+    } catch (error) {
+      toastError(getApiErrorMessage(error, "Không thể xóa bản nháp"))
+    } finally {
+      setDraftBusy(false)
+    }
   }
 
   const visibleFields = useMemo(
@@ -322,9 +391,33 @@ export function RecordFormContent({
           <Button className="primary-glow" htmlType="submit" type="primary">
             Lưu
           </Button>
+          {!editing ? <Button loading={draftBusy} onClick={() => void saveDraft()}>Lưu nháp</Button> : null}
+          {!editing ? <Button onClick={() => void openDrafts()}>Bản nháp{drafts.length ? ` (${drafts.length})` : ""}</Button> : null}
           <Button onClick={onCancel}>Hủy</Button>
         </Space>
       </Form>
+      {!editing ? (
+        <Modal footer={null} onCancel={() => setDraftsOpen(false)} open={draftsOpen} title={`Bản nháp ${entityLabels[resource] || resource}`}>
+          <List
+            dataSource={drafts}
+            loading={draftBusy}
+            locale={{ emptyText: "Chưa có bản nháp nào" }}
+            renderItem={(draft) => (
+              <List.Item
+                actions={[
+                  <Button key="open" size="small" type="primary" onClick={() => restoreDraft(draft)}>Mở</Button>,
+                  <Button danger key="delete" size="small" onClick={() => void removeDraft(draft.id)}>Lưu trữ</Button>,
+                ]}
+              >
+                <List.Item.Meta
+                  title={draft.title || "Bản nháp chưa đặt tên"}
+                  description={`Cập nhật ${dayjs(draft.updatedAt).format("DD/MM/YYYY HH:mm")}`}
+                />
+              </List.Item>
+            )}
+          />
+        </Modal>
+      ) : null}
     </>
   )
 }

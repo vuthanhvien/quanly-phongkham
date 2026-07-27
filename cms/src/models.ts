@@ -188,7 +188,7 @@ const DEFAULT_RESOURCE_ACTIONS: ResourceActionOption[] = [
   { key: 'view', label: 'Xem chi tiết' },
   { key: 'create', label: 'Tạo mới' },
   { key: 'update', label: 'Cập nhật' },
-  { key: 'delete', label: 'Xóa' },
+  { key: 'delete', label: 'Lưu trữ' },
   { key: 'print', label: 'In biểu mẫu' },
 ];
 

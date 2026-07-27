@@ -153,10 +153,10 @@ export function CategoriesPage() {
 
   function confirmDelete(cat: ItemCategory) {
     Modal.confirm({
-      title: `Xóa "${cat.name}"?`,
+      title: `Lưu trữ "${cat.name}"?`,
       content: "Không thể xóa nếu còn danh mục con.",
       okType: "danger",
-      okText: "Xóa",
+      okText: "Lưu trữ",
       cancelText: "Hủy",
       onOk: async () => {
         try {

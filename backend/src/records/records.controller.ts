@@ -121,6 +121,25 @@ export class RecordsController {
     return this.records.importUpsert(resource, payload, request.user);
   }
 
+  @Get('records/:resource/drafts')
+  listDrafts(@Param('resource') resource: string, @Request() request: { user: AuthUser }) {
+    return this.records.listDrafts(resource, request.user);
+  }
+
+  @Post('records/:resource/drafts')
+  createDraft(
+    @Param('resource') resource: string,
+    @Body() payload: Record<string, unknown>,
+    @Request() request: { user: AuthUser },
+  ) {
+    return this.records.createDraft(resource, payload, request.user);
+  }
+
+  @Delete('records/:resource/drafts/:id')
+  removeDraft(@Param('resource') resource: string, @Param('id') id: string, @Request() request: { user: AuthUser }) {
+    return this.records.removeDraft(resource, id, request.user);
+  }
+
   @Get('records/:resource/:id')
   find(@Param('resource') resource: string, @Param('id') id: string, @Request() request: ExpressRequest & { user: AuthUser }) {
     return this.records.find(resource, id, request.user, request);

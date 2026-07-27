@@ -2012,6 +2012,32 @@ export class AuditLog {
   createdAt: Date;
 }
 
+/** A user's unfinished create form. Drafts never participate in business records. */
+@Entity('record_drafts')
+export class RecordDraft {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Index(['ownerId', 'resource'])
+  @Column()
+  ownerId: string;
+
+  @Column()
+  resource: string;
+
+  @Column({ nullable: true })
+  title?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  payload: Record<string, unknown> = {};
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
 export const ENTITIES = [
   Branch,
   User,
@@ -2057,6 +2083,7 @@ export const ENTITIES = [
   AppUiSetting,
   LandingFormSubmission,
   AuditLog,
+  RecordDraft,
   ChatbotSetting,
   LandingThemeSetting,
   ItemCategory,

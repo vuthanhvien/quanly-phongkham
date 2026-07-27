@@ -515,7 +515,7 @@ export function ZaloInboxPage() {
                             Sửa
                           </Button>
                           <Popconfirm
-                            title="Xóa tài khoản Zalo này?"
+                            title="Lưu trữ tài khoản Zalo này?"
                             onConfirm={() => void deleteAccount(account.id)}
                           >
                             <Button
@@ -524,7 +524,7 @@ export function ZaloInboxPage() {
                               size="small"
                               onClick={(event) => event.stopPropagation()}
                             >
-                              Xóa
+                              Lưu trữ
                             </Button>
                           </Popconfirm>
                         </div>

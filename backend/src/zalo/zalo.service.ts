@@ -1,9 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ThreadType, Zalo, type AttachmentSource, type Message } from 'zca-js';
 import { ILike, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
 import { Branch, Customer, Lead, Staff, ZaloAccount, ZaloConversation, ZaloMessage } from '../entities/entities';
+import { TenantDataSourceService } from '../tenant/tenant-data-source.service';
 
 type LoginStateStatus = 'IDLE' | 'QR_PENDING' | 'QR_SCANNED' | 'CONNECTED' | 'ERROR';
 
@@ -28,7 +29,7 @@ interface UploadedBinaryFile {
 type ZaloRuntimeApi = Awaited<ReturnType<Zalo['loginQR']>>;
 
 @Injectable()
-export class ZaloService implements OnModuleInit {
+export class ZaloService implements OnApplicationBootstrap {
   private readonly loginStates = new Map<string, LoginStateSnapshot>();
   private readonly apis = new Map<string, ZaloRuntimeApi>();
   private readonly listeners = new Map<string, { stop: () => void }>();
@@ -41,13 +42,18 @@ export class ZaloService implements OnModuleInit {
     @InjectRepository(Branch) private readonly branches: Repository<Branch>,
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
     @InjectRepository(Lead) private readonly leads: Repository<Lead>,
+    private readonly tenants: TenantDataSourceService,
   ) {}
 
-  async onModuleInit() {
-    const accounts = await this.accounts.find({ where: { listenerEnabled: true } });
-    for (const account of accounts) {
-      if (!account.sessionData) continue;
-      void this.restoreAccountRuntime(account);
+  async onApplicationBootstrap() {
+    for (const tenant of await this.tenants.activeTenants()) {
+      await this.tenants.runWithTenant(tenant, async () => {
+        const accounts = await this.accounts.find({ where: { listenerEnabled: true } });
+        for (const account of accounts) {
+          if (!account.sessionData) continue;
+          void this.restoreAccountRuntime(account);
+        }
+      });
     }
   }
 

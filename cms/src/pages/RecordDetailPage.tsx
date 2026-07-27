@@ -479,13 +479,13 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                             )}
                             {hasActionAccess(block.resource, "delete") && (
                               <Popconfirm
-                                title="Xóa bản ghi này?"
+                                title="Lưu trữ bản ghi này? Bản ghi chỉ bị ẩn trên giao diện này, không bị xóa khỏi cơ sở dữ liệu."
                                 onConfirm={() =>
                                   deleteRecord(
                                     { resource: block.resource, id: row.id },
                                     {
                                       onSuccess: () => {
-                                        message.success("Đã xóa")
+                                        message.success("Đã lưu trữ")
                                         if (relatedDetail?.record?.id === row.id) {
                                           setRelatedDetail(null)
                                         }
@@ -495,7 +495,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                                   )
                                 }
                               >
-                                <Tooltip title="Xóa bản ghi">
+                                <Tooltip title="Lưu trữ bản ghi">
                                   <Button danger icon={<DeleteOutlined />} size="small" type="text" />
                                 </Tooltip>
                               </Popconfirm>

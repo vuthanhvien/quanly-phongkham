@@ -24,8 +24,8 @@ docker build \
   --platform linux/amd64 \
   --build-arg LANDING_API_URL="${LANDING_API_URL:-http://127.0.0.1:3001/api}" \
   --build-arg NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-/api}" \
-  --build-arg VITE_API_URL=/api \
-  --build-arg VITE_BASE_PATH=/admin/ \
+  --build-arg VITE_API_URL="${VITE_API_URL:-/api}" \
+  --build-arg VITE_BASE_PATH="${VITE_BASE_PATH:-/admin/}" \
   --build-arg VITE_LANDING_URL="${VITE_LANDING_URL:-}" \
   -t "$APP_IMAGE" \
   .

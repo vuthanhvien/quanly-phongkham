@@ -162,7 +162,7 @@ export function BranchRoleAssignmentsPage() {
                     danger
                     onClick={() => deleteAssignment(row.id)}
                   >
-                    Xóa
+                    Lưu trữ
                   </Button>
                 </Space>
               ),

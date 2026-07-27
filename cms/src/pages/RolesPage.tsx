@@ -313,9 +313,9 @@ export function RolesPage() {
                         onClick={(e) => openEditRole(role, e)}
                       />
                       <Popconfirm
-                        title={`Xóa "${role.name}"?`}
+                        title={`Lưu trữ "${role.name}"?`}
                         okType="danger"
-                        okText="Xóa"
+                        okText="Lưu trữ"
                         cancelText="Hủy"
                         onConfirm={() => void deleteRole(role)}
                         onPopupClick={(e) => e.stopPropagation()}
@@ -492,9 +492,9 @@ export function RolesPage() {
                                   onClick={(e) => openEditAssign(assign, e)}
                                 />
                                 <Popconfirm
-                                  title="Xóa phân quyền này?"
+                                  title="Lưu trữ phân quyền này?"
                                   okType="danger"
-                                  okText="Xóa"
+                                  okText="Lưu trữ"
                                   cancelText="Hủy"
                                   onConfirm={() => void removeRoleFromAssign(assign, { stopPropagation: () => {} } as React.MouseEvent)}
                                 >

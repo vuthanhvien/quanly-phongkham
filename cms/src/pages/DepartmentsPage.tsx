@@ -127,10 +127,10 @@ export function DepartmentsPage() {
 
   function confirmDelete(dept: Department) {
     Modal.confirm({
-      title: `Xóa "${dept.name}"?`,
+      title: `Lưu trữ "${dept.name}"?`,
       content: "Không thể xóa nếu còn phòng ban con.",
       okType: "danger",
-      okText: "Xóa",
+      okText: "Lưu trữ",
       cancelText: "Hủy",
       onOk: async () => {
         try {

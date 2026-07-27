@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
 import { DeepPartial, IsNull, Repository } from 'typeorm';
+import { TenantDataSourceService } from '../tenant/tenant-data-source.service';
 import {
   Appointment,
   Branch,
@@ -168,9 +169,16 @@ export class SeedService implements OnApplicationBootstrap {
     @InjectRepository(Treatment) private readonly treatments: Repository<Treatment>,
     @InjectRepository(Commission) private readonly commissions: Repository<Commission>,
     private readonly config: ConfigService,
+    private readonly tenants: TenantDataSourceService,
   ) {}
 
   async onApplicationBootstrap() {
+    for (const tenant of await this.tenants.activeTenants()) {
+      await this.tenants.runWithTenant(tenant, () => this.seedTenant());
+    }
+  }
+
+  private async seedTenant() {
     await this.cleanupLegacyBranchRoleAssignments();
     const context = await this.ensureCoreSeed();
     await this.ensureBaseSettings();

@@ -248,7 +248,7 @@ export function FileFoldersPage() {
             target="_blank"
           />
           {hasActionAccess("files", "delete") && (
-            <Popconfirm title="Xóa file này?" onConfirm={() => void removeFile(row)}>
+            <Popconfirm title="Lưu trữ file này?" onConfirm={() => void removeFile(row)}>
               <Button danger icon={<DeleteOutlined />} />
             </Popconfirm>
           )}
@@ -341,9 +341,9 @@ export function FileFoldersPage() {
                     </Button>
                   )}
                   {hasActionAccess("file-folders", "delete") && (
-                    <Popconfirm title="Xóa folder này?" onConfirm={() => void removeFolder(selectedFolder)}>
+                    <Popconfirm title="Lưu trữ folder này?" onConfirm={() => void removeFolder(selectedFolder)}>
                       <Button danger icon={<DeleteOutlined />}>
-                        Xóa folder
+                        Lưu trữ folder
                       </Button>
                     </Popconfirm>
                   )}

@@ -372,7 +372,7 @@ export function CustomFieldsPage() {
                     type="link"
                     onClick={() => deleteField(row.id)}
                   >
-                    Xóa
+                    Lưu trữ
                   </Button>
                 </Space>
               ),

@@ -6,6 +6,7 @@ import { api } from "../api"
 import { getFirstOptionValue } from "../utils/branchDefaults"
 import { getApiErrorMessage } from "../utils/apiError"
 import { toastError, toastSuccess } from "../toast"
+import { RecordDraftControls } from "./RecordDraftControls"
 
 interface ServiceOrderFormProps {
   id?: string
@@ -328,6 +329,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
 
         <Space>
           <Button className="primary-glow" htmlType="submit" loading={submitting} type="primary">Lưu</Button>
+          {!editing ? <RecordDraftControls resource="service-orders" getPayload={() => ({ ...form.getFieldsValue(true), items: normalizeItems(form.getFieldValue("items")) })} onRestore={(payload) => form.setFieldsValue({ ...payload, items: normalizeItems(payload.items) })} /> : null}
           <Button onClick={onCancel}>Hủy</Button>
         </Space>
       </Form>

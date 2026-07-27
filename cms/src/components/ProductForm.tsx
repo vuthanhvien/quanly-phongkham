@@ -4,6 +4,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
 import { getApiErrorMessage } from "../utils/apiError"
+import { RecordDraftControls } from "./RecordDraftControls"
 
 interface ProductFormProps {
   id?: string
@@ -88,7 +89,7 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
         <Typography.Paragraph type="secondary">Khi chọn combo trong đơn, các thành phần này sẽ tự được thêm vào. Giá bán vẫn lấy theo giá của combo.</Typography.Paragraph>
         <Table columns={columns} dataSource={rows} pagination={false} rowKey="key" />
       </Card>}
-      <Space><Button className="primary-glow" htmlType="submit" loading={submitting} type="primary">Lưu</Button><Button onClick={onCancel}>Hủy</Button></Space>
+      <Space><Button className="primary-glow" htmlType="submit" loading={submitting} type="primary">Lưu</Button>{!editing ? <RecordDraftControls resource="products" getPayload={() => ({ ...form.getFieldsValue(true), bundleItems: normalizeBundleItems(form.getFieldValue("bundleItems")) })} onRestore={(payload) => form.setFieldsValue({ ...payload, bundleItems: normalizeBundleItems(payload.bundleItems) })} /> : null}<Button onClick={onCancel}>Hủy</Button></Space>
     </Form>
   </>
 }
