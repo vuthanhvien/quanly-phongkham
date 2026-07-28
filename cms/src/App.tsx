@@ -3,7 +3,7 @@ import routerProvider, { CatchAllNavigate } from '@refinedev/react-router';
 import { App as AntdApp, ConfigProvider, theme } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
-import { hasResourceAccess, hasScreenAccess } from './access';
+import { hasResourceAccess, hasScreenAccess, isCurrentUserAdmin } from './access';
 import { authProvider, dataProvider, api, getGlobalBranchFilterIds, onGlobalBranchFilterChange } from './api';
 import { AppUiContext, cardPaddingBySize, controlHeightBySize, defaultAppUiSettings, loadCachedAppUiSettings, normalizeAppUiSettings, persistAppUiSettings, syncDocumentBranding, tablePaddingBySize, useAppUi, type AppUiSettings } from './app-ui';
 import { isModuleEnabled } from './company-types';
@@ -17,6 +17,8 @@ import { CalendarPage } from './pages/CalendarPage';
 import { FileFoldersPage } from './pages/FileFoldersPage';
 import { LoginPage } from './pages/LoginPage';
 import { LandingPagesPage } from './pages/LandingPagesPage';
+import { LandingPageListPage } from './pages/LandingPageListPage';
+import { LandingFormsPage } from './pages/LandingFormsPage';
 import { RecordDetailPage } from './pages/RecordDetailPage';
 import { RecordFormPage } from './pages/RecordFormPage';
 import { RecordImportPage } from './pages/RecordImportPage';
@@ -66,20 +68,20 @@ function ScreenGuard({ screen }: { screen: string }) {
 
 function ModuleGuard({ moduleKey }: { moduleKey: string }) {
   const { settings } = useAppUi();
-  return isModuleEnabled(moduleKey, settings.enabledModules, settings.companyType) ? <Outlet /> : <Navigate to="/" replace />;
+  return isCurrentUserAdmin() || isModuleEnabled(moduleKey, settings.enabledModules, settings.companyType) ? <Outlet /> : <Navigate to="/" replace />;
 }
 
 function ResourceGuard() {
   const { resource = '' } = useParams();
   const { settings } = useAppUi();
-  return hasResourceAccess(resource) && isModuleEnabled(resource, settings.enabledModules, settings.companyType)
+  return hasResourceAccess(resource) && (isCurrentUserAdmin() || isModuleEnabled(resource, settings.enabledModules, settings.companyType))
     ? <Outlet />
     : <Navigate to="/" replace />;
 }
 
 function StaticResourceGuard({ resource }: { resource: string }) {
   const { settings } = useAppUi();
-  return hasResourceAccess(resource) && isModuleEnabled(resource, settings.enabledModules, settings.companyType)
+  return hasResourceAccess(resource) && (isCurrentUserAdmin() || isModuleEnabled(resource, settings.enabledModules, settings.companyType))
     ? <Outlet />
     : <Navigate to="/" replace />;
 }
@@ -222,7 +224,11 @@ export function App() {
               <Route element={<ScreenGuard screen="settings" />}>
                 <Route path="/custom-fields" element={<CustomFieldsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/landing-pages" element={<LandingPagesPage />} />
+                <Route path="/landing/pages" element={<LandingPageListPage />} />
+                <Route path="/landing/pages/:id" element={<LandingPagesPage />} />
+                <Route path="/landing/forms" element={<LandingFormsPage />} />
+                <Route path="/landing/configs" element={<LandingPagesPage />} />
+                <Route path="/landing-pages" element={<Navigate to="/landing/pages" replace />} />
                 <Route path="/chatbot-settings" element={<ChatbotSettingsPage />} />
                 <Route path="/landing-theme" element={<LandingThemePage />} />
                 <Route path="/roles" element={<RolesPage />} />

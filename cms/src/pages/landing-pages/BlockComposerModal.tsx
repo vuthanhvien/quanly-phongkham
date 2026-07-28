@@ -207,6 +207,17 @@ export function BlockComposerModal() {
               <Form.Item label="Thông báo thành công" style={{ marginBottom: 0 }}>
                 <Input value={composer.block.successMessage} onChange={(event) => onUpdateBlock({ successMessage: event.target.value })} />
               </Form.Item>
+              <Form.Item label="Dữ liệu tạo sau khi khách gửi form" style={{ marginBottom: 0 }}>
+                <Select
+                  value={composer.block.targetResource || 'leads'}
+                  options={[
+                    { value: 'leads', label: 'Tạo Lead' },
+                    { value: 'appointments', label: 'Tạo lịch hẹn' },
+                    { value: 'service-orders', label: 'Tạo đơn hàng' },
+                  ]}
+                  onChange={(targetResource) => onUpdateBlock({ targetResource })}
+                />
+              </Form.Item>
               <Flex justify="space-between" align="center">
                 <Typography.Text strong>Trường nhập liệu</Typography.Text>
                 <Button size="small" icon={<PlusOutlined />} onClick={onAddField}>Thêm trường</Button>

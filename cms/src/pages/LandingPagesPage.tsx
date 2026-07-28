@@ -32,6 +32,7 @@ import {
 } from 'antd'
 import { createId } from '../utils/createId'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { ImagePickerInput } from '../components/ImagePickerInput'
 import type { LandingBlock, LandingBlockType, LandingFormField, LandingPage, LandingSectionWidth, LandingSlide } from '../models'
@@ -112,6 +113,8 @@ function buildInternalSlug(path: string, title: string) {
 
 
 export function LandingPagesPage() {
+  const { id: pageId } = useParams()
+  const location = useLocation()
   const [pages, setPages] = useState<LandingPage[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Omit<LandingPage, 'id' | 'createdAt' | 'updatedAt'>>(emptyPage())
@@ -147,6 +150,15 @@ export function LandingPagesPage() {
     void loadGlobalSettings()
     void loadMenuSettings()
   }, [])
+
+  useEffect(() => {
+    if (pageId && pageId !== 'new') setSelectedId(pageId)
+    if (pageId === 'new') startCreatePage()
+  }, [pageId])
+
+  useEffect(() => {
+    if (location.pathname === '/landing/configs') setGlobalOpen(true)
+  }, [location.pathname])
 
   async function loadGlobalSettings() {
     try {
@@ -753,7 +765,6 @@ export function LandingPagesPage() {
                 <Button danger icon={<DeleteOutlined />}>Lưu trữ</Button>
               </Popconfirm>
             ) : null}
-            <Button icon={<SettingOutlined />} onClick={() => setGlobalOpen(true)}>Cài đặt site</Button>
           </Space>
         </Flex>
       </div>

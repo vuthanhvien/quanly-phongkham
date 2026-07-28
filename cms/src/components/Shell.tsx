@@ -36,7 +36,7 @@ import { Avatar, Button, Dropdown, Grid, Layout, Menu, Modal, Select, Space, Typ
 import type { MenuProps } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { hasResourceAccess, hasScreenAccess } from "../access"
+import { hasResourceAccess, hasScreenAccess, isCurrentUserAdmin } from "../access"
 import { api, getGlobalBranchFilterIds, onGlobalBranchFilterChange, setGlobalBranchFilterIds } from "../api"
 import { useAppUi } from "../app-ui"
 import {
@@ -206,13 +206,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   const currentResource = location.pathname.split("/")[1]
   const activeCompanyType = settings.companyType || "clinic"
+  const isAdmin = isCurrentUserAdmin()
   const visibleGroups = appModuleGroups
     .map((group) => ({
       ...group,
       label: resolveMenuGroupLabel(group.key, group.label, activeCompanyType),
       resources: group.modules.filter((resource) => {
         if (!entityLabels[resource]) return false
-        if (!isModuleEnabled(resource, settings.enabledModules, activeCompanyType)) return false
+        if (!isAdmin && !isModuleEnabled(resource, settings.enabledModules, activeCompanyType)) return false
         return hasResourceAccess(resource)
       }),
     }))
@@ -228,15 +229,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
       icon: menuIcons.calendar,
       label: <Link to="/calendar">Lịch tổng</Link>,
     },
-    ...(hasScreenAccess("accounting-reports") && isModuleEnabled("accounting-reports", settings.enabledModules, activeCompanyType)
-      ? [
-          {
-            key: "/accounting-reports",
-            icon: menuIcons["accounting-reports"],
-            label: <Link to="/accounting-reports">Báo cáo kế toán</Link>,
-          },
-        ]
-      : []),
     ...visibleGroups.map((group) => ({
       key: group.key,
       icon: menuGroupIcons[group.key] || <SolutionOutlined />,
@@ -247,12 +239,21 @@ export function Shell({ children }: { children: React.ReactNode }) {
           icon: menuIcons[key] || <SolutionOutlined />,
           label: <Link to={`/${key}`}>{entityLabels[key]}</Link>,
         })),
-        ...(group.key === "front-office" && hasScreenAccess("zalo-inbox") && isModuleEnabled("zalo-inbox", settings.enabledModules, activeCompanyType)
+        ...(group.key === "front-office" && hasScreenAccess("zalo-inbox") && (isAdmin || isModuleEnabled("zalo-inbox", settings.enabledModules, activeCompanyType))
           ? [
               {
                 key: "/zalo-inbox",
                 icon: menuIcons["zalo-inbox"],
                 label: <Link to="/zalo-inbox">Hộp thư Zalo</Link>,
+              },
+            ]
+          : []),
+        ...(group.key === "finance" && hasScreenAccess("accounting-reports") && (isAdmin || isModuleEnabled("accounting-reports", settings.enabledModules, activeCompanyType))
+          ? [
+              {
+                key: "/accounting-reports",
+                icon: menuIcons["accounting-reports"],
+                label: <Link to="/accounting-reports">Báo cáo kế toán</Link>,
               },
             ]
           : []),
@@ -268,6 +269,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ],
     })),
     {
+      key: "landing",
+      icon: <GlobalOutlined />,
+      label: "Landing",
+      children: hasScreenAccess("settings") ? [
+        { key: "/landing/pages", icon: <GlobalOutlined />, label: <Link to="/landing/pages">Pages</Link> },
+        { key: "/landing/forms", icon: <FileDoneOutlined />, label: <Link to="/landing/forms">Forms</Link> },
+        { key: "/landing/configs", icon: <SettingOutlined />, label: <Link to="/landing/configs">Configs</Link> },
+      ] : [],
+    },
+    {
       key: "system-tools",
       icon: <GoldOutlined />,
       label: "Công cụ hệ thống",
@@ -277,13 +288,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
               key: "/ui-settings",
               icon: <SettingOutlined />,
               label: <Link to="/ui-settings">Giao diện CMS</Link>,
-            }
-          : null,
-        hasScreenAccess("settings")
-          ? {
-              key: "/landing-pages",
-              icon: menuIcons["landing-pages"],
-              label: <Link to="/landing-pages">Trang landing</Link>,
             }
           : null,
         hasScreenAccess("settings")
@@ -314,17 +318,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
               label: <Link to="/audit-logs">Nhật ký hệ thống</Link>,
             }
           : null,
-        hasScreenAccess("accounting-reports") && isModuleEnabled("accounting-reports", settings.enabledModules, activeCompanyType)
-          ? {
-              key: "/accounting-reports-system",
-              icon: menuIcons["accounting-reports"],
-              label: <Link to="/accounting-reports">Báo cáo kế toán</Link>,
-            }
-          : null,
       ].filter(Boolean),
     },
   ]
-    .filter((item) => item.key !== "/calendar" || isModuleEnabled("calendar", settings.enabledModules, activeCompanyType))
+    .filter((item) => item.key !== "/calendar" || isAdmin || isModuleEnabled("calendar", settings.enabledModules, activeCompanyType))
     .filter((item) => item && (item.key !== "system-tools" || ((item.children as []) || []).length > 0))
   const selected =
     location.pathname === "/"

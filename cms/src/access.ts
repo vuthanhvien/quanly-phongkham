@@ -25,6 +25,10 @@ function isAdmin(user: StoredUserAccess | null) {
   return !user || (user.roleMain || user.role) === "ADMIN"
 }
 
+export function isCurrentUserAdmin() {
+  return isAdmin(readStoredUser())
+}
+
 export function hasResourceAccess(resource: string) {
   const user = readStoredUser()
   if (!user || isAdmin(user)) return true

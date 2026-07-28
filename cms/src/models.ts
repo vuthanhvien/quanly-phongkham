@@ -132,6 +132,7 @@ export interface LandingBlock {
   description?: string;
   submitLabel?: string;
   successMessage?: string;
+  targetResource?: 'leads' | 'appointments' | 'service-orders';
   fields?: LandingFormField[];
   slides?: LandingSlide[];
 }
