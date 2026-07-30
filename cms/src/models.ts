@@ -28,7 +28,7 @@ export function getFieldLabel (resource: string, fieldKey: string, value: string
 export interface FieldSpec {
   key: string;
   label: string;
-  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative' | 'file';
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative' | 'file' | 'dynamic-table';
   displayFormat?: 'currency' | 'number' | 'percent' | 'time';
   required?: boolean;
   options?: SelectOption[];
@@ -39,6 +39,7 @@ export interface FieldSpec {
   description?: string;
   placeholder?: string;
   relation?: RelationSpec;
+  customTableId?: string;
 }
 
 export interface RelationSpec {
@@ -57,6 +58,7 @@ export interface CustomField {
   required: boolean;
   options?: string[];
   relationResource?: string;
+  customTableId?: string;
   isActive: boolean;
   sortOrder?: number;
 }
@@ -481,7 +483,6 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'email', label: 'Email', width: '50', tableWidth: 220 },
     { key: 'gender', label: 'Giới tính', type: 'select', options: [{ value: 'NAM', label: 'Nam' }, { value: 'NỮ', label: 'Nữ' }, { value: 'KHÁC', label: 'Khác' }], width: '33', tableWidth: 120 },
     { key: 'idNumber', label: 'CCCD', width: '50', tableWidth: 180 },
-    { key: 'address', label: 'Địa chỉ', width: '100', tableWidth: 300 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'CONSULTING', label: 'Đang tư vấn' }, { value: 'WAITING_SURGERY', label: 'Chờ phẫu thuật' }, { value: 'IN_TREATMENT', label: 'Đang điều trị' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'INACTIVE', label: 'Ngừng hoạt động' }], width: '33', tableWidth: 160 },
     { key: 'totalSpent', label: 'Tổng chi tiêu', type: 'number', width: '33', tableWidth: 160 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },

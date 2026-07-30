@@ -740,6 +740,10 @@ function buildRelationResolvers(lookups: LookupMap) {
     Object.entries(lookups).map(([resource, labelsById]) => {
       const aliasMap: Record<string, string> = {}
       Object.entries(labelsById).forEach(([id, label]) => {
+        // `loadRelationOptions` also exposes `${resource}__meta` maps. Their
+        // values are record objects, not display labels, so they cannot be
+        // tokenized as import aliases.
+        if (typeof label !== "string") return
         const aliases = new Set([
           id,
           label,

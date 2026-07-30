@@ -4,9 +4,9 @@ import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import Handlebars from 'handlebars';
 import { basename, join } from 'path';
-import { IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, DynamicRoleDefinition, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, User, ViewSetting } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, User, ViewSetting } from '../entities/entities';
 import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
 import { renderDocxTemplate } from './docx-template';
@@ -127,6 +127,9 @@ export class SettingsService {
 
   constructor(
     @InjectRepository(CustomFieldDefinition) private readonly fields: Repository<CustomFieldDefinition>,
+    @InjectRepository(CustomTable) private readonly customTables: Repository<CustomTable>,
+    @InjectRepository(CustomTableColumn) private readonly customTableColumns: Repository<CustomTableColumn>,
+    @InjectRepository(CustomTableRow) private readonly customTableRows: Repository<CustomTableRow>,
     @InjectRepository(ViewSetting) private readonly views: Repository<ViewSetting>,
     @InjectRepository(PrintTemplate) private readonly templates: Repository<PrintTemplate>,
     @InjectRepository(LandingPage) private readonly landingPages: Repository<LandingPage>,
@@ -187,21 +190,35 @@ export class SettingsService {
     if (payload.dataType === 'file') {
       payload.relationResource = 'files';
     }
+    if (payload.dataType === 'dynamic-table') {
+      if (!payload.customTableId || !await this.customTables.exists({ where: { id: payload.customTableId, isActive: true, isArchived: false } })) {
+        throw new BadRequestException('Chọn bảng dữ liệu động hợp lệ');
+      }
+      payload.relationResource = null as unknown as string;
+    }
     const exists = await this.fields.findOne({ where: { entityType: payload.entityType, key } });
-    if (exists) throw new BadRequestException('Key da ton tai tren model nay');
+    if (exists) throw new BadRequestException('Key đã tồn tại trên model này');
     return this.fields.save(this.fields.create({ ...payload, key, required: false }));
   }
 
   async updateField(id: string, payload: Partial<CustomFieldDefinition>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const field = await this.fields.findOne({ where: { id } });
-    if (!field) throw new NotFoundException('Khong tim thay custom field');
+    if (!field) throw new NotFoundException('Không tìm thấy custom field');
     const next = this.fields.merge(field, payload, { required: false });
     if (next.dataType === 'relative' && !next.relationResource) {
       throw new BadRequestException('Field relative can relationResource');
     }
     if (next.dataType === 'file') {
       next.relationResource = 'files';
+    }
+    if (next.dataType === 'dynamic-table') {
+      if (!next.customTableId || !await this.customTables.exists({ where: { id: next.customTableId, isActive: true, isArchived: false } })) {
+        throw new BadRequestException('Chọn bảng dữ liệu động hợp lệ');
+      }
+      next.relationResource = null as unknown as string;
+    } else {
+      next.customTableId = null as unknown as string;
     }
     if (!['relative', 'file'].includes(next.dataType)) {
       next.relationResource = null as unknown as string;
@@ -212,10 +229,115 @@ export class SettingsService {
   async deleteField(id: string, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const field = await this.fields.findOne({ where: { id } });
-    if (!field) throw new NotFoundException('Khong tim thay custom field');
+    if (!field) throw new NotFoundException('Không tìm thấy custom field');
     field.isArchived = true;
     await this.fields.save(field);
     return { id };
+  }
+
+  async listCustomTables(user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const tables = await this.customTables.find({ where: { isArchived: false }, order: { name: 'ASC' } });
+    const tableIds = tables.map((item) => item.id);
+    const [columns, rows] = tables.length ? await Promise.all([
+      this.customTableColumns.find({ where: { tableId: In(tableIds) }, order: { sortOrder: 'ASC' } }),
+      this.customTableRows.find({ where: { tableId: In(tableIds), isArchived: false }, order: { createdAt: 'DESC' } }),
+    ]) : [[], []];
+    return tables.map((table) => ({ ...table, columns: columns.filter((column) => column.tableId === table.id), rows: rows.filter((row) => row.tableId === table.id) }));
+  }
+
+  async createCustomTable(payload: Partial<CustomTable> & { columns?: Partial<CustomTableColumn>[] }, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const key = String(payload.key || '').trim().replace(/[^a-zA-Z0-9_]/g, '_');
+    const name = String(payload.name || '').trim();
+    if (!key || !name) throw new BadRequestException('key và name là bắt buộc');
+    if (await this.customTables.exists({ where: { key } })) throw new BadRequestException('Key bảng đã tồn tại');
+    const table = await this.customTables.save(this.customTables.create({ key, name, description: payload.description, isActive: payload.isActive !== false }));
+    await this.replaceCustomTableColumns(table.id, payload.columns || []);
+    return this.getCustomTable(table.id);
+  }
+
+  async updateCustomTable(id: string, payload: Partial<CustomTable> & { columns?: Partial<CustomTableColumn>[] }, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const table = await this.customTables.findOne({ where: { id, isArchived: false } });
+    if (!table) throw new NotFoundException('Không tìm thấy bảng dữ liệu động');
+    if (payload.name !== undefined) table.name = String(payload.name).trim();
+    if (payload.description !== undefined) table.description = String(payload.description || '').trim() || undefined;
+    if (payload.isActive !== undefined) table.isActive = Boolean(payload.isActive);
+    await this.customTables.save(table);
+    if (payload.columns) await this.replaceCustomTableColumns(id, payload.columns);
+    return this.getCustomTable(id);
+  }
+
+  async deleteCustomTable(id: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const table = await this.customTables.findOne({ where: { id } });
+    if (!table) throw new NotFoundException('Không tìm thấy bảng dữ liệu động');
+    table.isArchived = true;
+    await this.customTables.save(table);
+    return { id };
+  }
+
+  async listCustomTableRows(tableId: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    await this.getCustomTable(tableId);
+    return this.customTableRows.find({ where: { tableId, isArchived: false }, order: { createdAt: 'DESC' } });
+  }
+
+  async createCustomTableRow(tableId: string, values: Record<string, unknown>, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    await this.validateCustomTableValues(tableId, values);
+    return this.customTableRows.save(this.customTableRows.create({ tableId, values }));
+  }
+
+  async updateCustomTableRow(tableId: string, id: string, values: Record<string, unknown>, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const row = await this.customTableRows.findOne({ where: { id, tableId, isArchived: false } });
+    if (!row) throw new NotFoundException('Không tìm thấy dòng dữ liệu');
+    await this.validateCustomTableValues(tableId, values);
+    row.values = values;
+    return this.customTableRows.save(row);
+  }
+
+  async deleteCustomTableRow(tableId: string, id: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const row = await this.customTableRows.findOne({ where: { id, tableId, isArchived: false } });
+    if (!row) throw new NotFoundException('Không tìm thấy dòng dữ liệu');
+    row.isArchived = true;
+    await this.customTableRows.save(row);
+    return { id };
+  }
+
+  private async getCustomTable(id: string) {
+    const table = await this.customTables.findOne({ where: { id, isArchived: false } });
+    if (!table) throw new NotFoundException('Không tìm thấy bảng dữ liệu động');
+    const columns = await this.customTableColumns.find({ where: { tableId: id }, order: { sortOrder: 'ASC' } });
+    return { ...table, columns };
+  }
+
+  private async replaceCustomTableColumns(tableId: string, input: Partial<CustomTableColumn>[]) {
+    const keys = new Set<string>();
+    const columns = input.map((item, index) => {
+      const key = String(item.key || '').trim().replace(/[^a-zA-Z0-9_]/g, '_');
+      const label = String(item.label || '').trim();
+      if (!key || !label || keys.has(key)) throw new BadRequestException('Cột cần key, tên hiển thị và key không trùng');
+      keys.add(key);
+      return this.customTableColumns.create({ tableId, key, label, dataType: item.dataType || 'text', required: Boolean(item.required), options: item.dataType === 'select' ? (item.options || []).map(String) : undefined, sortOrder: Number(item.sortOrder ?? index) });
+    });
+    await this.customTableColumns.delete({ tableId });
+    if (columns.length) await this.customTableColumns.save(columns);
+  }
+
+  private async validateCustomTableValues(tableId: string, values: Record<string, unknown>) {
+    const columns = await this.customTableColumns.find({ where: { tableId }, order: { sortOrder: 'ASC' } });
+    for (const column of columns) {
+      const value = values?.[column.key];
+      if (column.required && (value === undefined || value === null || value === '')) throw new BadRequestException(`Cột bắt buộc: ${column.label}`);
+      if (value === undefined || value === null || value === '') continue;
+      if (column.dataType === 'number' && Number.isNaN(Number(value))) throw new BadRequestException(`Giá trị số không hợp lệ: ${column.label}`);
+      if (column.dataType === 'boolean' && typeof value !== 'boolean') throw new BadRequestException(`Giá trị bật/tắt không hợp lệ: ${column.label}`);
+      if (column.dataType === 'select' && column.options?.length && !column.options.includes(String(value))) throw new BadRequestException(`Lựa chọn không hợp lệ: ${column.label}`);
+    }
   }
 
   listViews(entityType?: string, user?: AuthUser) {
@@ -373,7 +495,7 @@ export class SettingsService {
   async updateLandingPage(id: string, payload: Partial<LandingPage>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const page = await this.landingPages.findOne({ where: { id } });
-    if (!page) throw new NotFoundException('Khong tim thay landing page');
+    if (!page) throw new NotFoundException('Không tìm thấy landing page');
     const normalized = this.normalizeLandingPagePayload({ ...page, ...payload }, false);
     await this.assertLandingPageUnique(normalized.slug, normalized.path, id);
     const saved = await this.landingPages.save(this.landingPages.merge(page, normalized));
@@ -384,7 +506,7 @@ export class SettingsService {
   async deleteLandingPage(id: string, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const page = await this.landingPages.findOne({ where: { id } });
-    if (!page) throw new NotFoundException('Khong tim thay landing page');
+    if (!page) throw new NotFoundException('Không tìm thấy landing page');
     page.isArchived = true;
     await this.landingPages.save(page);
     await this.revalidateLandingCache();
@@ -415,7 +537,7 @@ export class SettingsService {
     const normalizedPath = normalizeLandingPath(path);
     const page = await this.landingPages.findOne({ where: { path: normalizedPath, isPublished: true } });
     if (!page) {
-      throw new NotFoundException('Khong tim thay landing page');
+      throw new NotFoundException('Không tìm thấy landing page');
     }
     return page;
   }
@@ -423,7 +545,7 @@ export class SettingsService {
   async submitLandingForm(slug: string, blockId: string, payload: Record<string, unknown>) {
     const page = await this.landingPages.findOne({ where: { slug: slugify(slug), isPublished: true } });
     if (!page) {
-      throw new NotFoundException('Khong tim thay landing page');
+      throw new NotFoundException('Không tìm thấy landing page');
     }
 
     const block = Array.isArray(page.blocks)
@@ -431,7 +553,7 @@ export class SettingsService {
       : undefined;
 
     if (!block) {
-      throw new NotFoundException('Khong tim thay form block');
+      throw new NotFoundException('Không tìm thấy form block');
     }
 
     const fields = Array.isArray(block.fields) ? block.fields : [];
@@ -443,7 +565,7 @@ export class SettingsService {
       const key = String(field?.name || '').trim();
       if (!key) continue;
       if (field?.required && (values[key] === undefined || values[key] === null || String(values[key]).trim() === '')) {
-        throw new BadRequestException(`Truong ${field.label || key} la bat buoc`);
+        throw new BadRequestException(`Trường ${field.label || key} là bắt buộc`);
       }
     }
 
@@ -469,14 +591,14 @@ export class SettingsService {
   async createRole(payload: Partial<DynamicRoleDefinition>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     if (!payload.key || !payload.name || !payload.roleMain) {
-      throw new BadRequestException('key, name va roleMain la bat buoc');
+      throw new BadRequestException('key, name và roleMain là bắt buộc');
     }
     if (!SYSTEM_ROLES.includes(payload.roleMain)) {
-      throw new BadRequestException('roleMain khong hop le');
+      throw new BadRequestException('roleMain không hợp lệ');
     }
     const key = payload.key.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
     const exists = await this.roles.findOne({ where: { key } });
-    if (exists) throw new BadRequestException('Key role da ton tai');
+    if (exists) throw new BadRequestException('Key role đã tồn tại');
     return this.roles.save(this.roles.create({
       ...payload,
       key,
@@ -487,10 +609,10 @@ export class SettingsService {
   async updateRole(id: string, payload: Partial<DynamicRoleDefinition>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const role = await this.roles.findOne({ where: { id } });
-    if (!role) throw new NotFoundException('Khong tim thay role');
+    if (!role) throw new NotFoundException('Không tìm thấy role');
     const next = this.roles.merge(role, payload);
     if (!SYSTEM_ROLES.includes(next.roleMain)) {
-      throw new BadRequestException('roleMain khong hop le');
+      throw new BadRequestException('roleMain không hợp lệ');
     }
     return this.roles.save(next);
   }
@@ -498,10 +620,10 @@ export class SettingsService {
   async deleteRole(id: string, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const role = await this.roles.findOne({ where: { id } });
-    if (!role) throw new NotFoundException('Khong tim thay role');
+    if (!role) throw new NotFoundException('Không tìm thấy role');
     const assignments = await this.branchRoles.find();
     if (assignments.some((item) => (item.roleKeys || []).includes(role.key))) {
-      throw new BadRequestException('Role dang duoc gan cho tai khoan, khong the xoa');
+      throw new BadRequestException('Role đang được gán cho tài khoản, không thể xóa');
     }
     role.isArchived = true;
     await this.roles.save(role);
@@ -519,13 +641,16 @@ export class SettingsService {
   async createBranchRoleAssignment(payload: Partial<BranchRoleAssignment>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     if (!payload.userId || !payload.branchId) {
-      throw new BadRequestException('userId va branchId la bat buoc');
+      throw new BadRequestException('userId và branchId là bắt buộc');
     }
     const roleKeys = await this.resolveRoleKeys(payload.roleKeys || []);
     const staffId = await this.resolveAssignmentStaffId(payload.userId);
     await this.assertAssignmentCompatible(payload.userId, roleKeys);
-    const exists = await this.branchRoles.findOne({ where: { userId: payload.userId, branchId: payload.branchId } });
-    if (exists) throw new BadRequestException('User da co role tai chi nhanh nay');
+    const exists = await this.branchRoles.findOne({
+      where: { userId: payload.userId, branchId: payload.branchId, isArchived: false },
+    });
+    // Assigning an existing user/branch pair is intentionally idempotent.
+    if (exists) return exists;
     return this.branchRoles.save(
       this.branchRoles.create({
         userId: payload.userId,
@@ -541,7 +666,7 @@ export class SettingsService {
   async updateBranchRoleAssignment(id: string, payload: Partial<BranchRoleAssignment>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const assignment = await this.branchRoles.findOne({ where: { id, userId: Not(IsNull()) } });
-    if (!assignment) throw new NotFoundException('Khong tim thay gan role chi nhanh');
+    if (!assignment) throw new NotFoundException('Không tìm thấy gán role chi nhánh');
     const userId = String(payload.userId || assignment.userId || '');
     const roleKeys = await this.resolveRoleKeys(payload.roleKeys ?? assignment.roleKeys ?? []);
     const staffId = await this.resolveAssignmentStaffId(userId);
@@ -558,7 +683,7 @@ export class SettingsService {
   async deleteBranchRoleAssignment(id: string, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const assignment = await this.branchRoles.findOne({ where: { id, userId: Not(IsNull()) } });
-    if (!assignment) throw new NotFoundException('Khong tim thay gan role chi nhanh');
+    if (!assignment) throw new NotFoundException('Không tìm thấy gán role chi nhánh');
     assignment.isArchived = true;
     await this.branchRoles.save(assignment);
     return { id };
@@ -567,7 +692,7 @@ export class SettingsService {
   saveTemplate(payload: Partial<PrintTemplate>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     if (!payload.entityType || !payload.name || !payload.htmlTemplate) {
-      throw new BadRequestException('Model, ten va HTML template la bat buoc');
+      throw new BadRequestException('Model, tên và HTML template là bắt buộc');
     }
     return this.templates.save(this.templates.create(payload));
   }
@@ -575,13 +700,13 @@ export class SettingsService {
   async updateTemplate(id: string, payload: Partial<PrintTemplate>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const template = await this.templates.findOne({ where: { id } });
-    if (!template) throw new NotFoundException('Khong tim thay mau in');
+    if (!template) throw new NotFoundException('Không tìm thấy mẫu in');
     return this.templates.save(this.templates.merge(template, payload));
   }
 
   async renderTemplate(templateId: string, recordId: string) {
     const template = await this.templates.findOne({ where: { id: templateId, isActive: true } });
-    if (!template) throw new NotFoundException('Khong tim thay mau in');
+    if (!template) throw new NotFoundException('Không tìm thấy mẫu in');
     const record = await this.records.findRaw(template.entityType, recordId);
     const data = { ...record, ...(record.customFields || {}) };
     return Handlebars.compile(template.htmlTemplate)(data);
@@ -615,7 +740,7 @@ export class SettingsService {
 
   private assertSettingsAccess(user?: AuthUser) {
     if (!user || this.isAdmin(user)) return;
-    throw new BadRequestException('Chi ADMIN moi duoc thay doi cau hinh');
+    throw new BadRequestException('Chỉ ADMIN mới được thay đổi cấu hình');
   }
 
   private assertResourceReadable(user?: AuthUser, resource?: string) {
@@ -625,18 +750,18 @@ export class SettingsService {
 
   private assertRoleReadable(user?: AuthUser) {
     if (!user || this.isAdmin(user)) return;
-    throw new BadRequestException('Chi ADMIN moi duoc xem danh sach role');
+    throw new BadRequestException('Chỉ ADMIN mới được xem danh sách role');
   }
 
   private normalizeLandingPagePayload(payload: Partial<LandingPage>, isCreate: boolean) {
     const title = String(payload.title || '').trim();
     if (!title) {
-      throw new BadRequestException('title la bat buoc');
+      throw new BadRequestException('title là bắt buộc');
     }
 
     const slug = slugify(payload.slug || title);
     if (!slug) {
-      throw new BadRequestException('slug khong hop le');
+      throw new BadRequestException('slug không hợp lệ');
     }
 
     const path = normalizeLandingPath(payload.path, slug);
@@ -660,7 +785,7 @@ export class SettingsService {
   private normalizeLandingBlocks(blocks?: Record<string, unknown>[]) {
     if (!blocks) return [];
     if (!Array.isArray(blocks)) {
-      throw new BadRequestException('blocks phai la mang');
+      throw new BadRequestException('blocks phải là mảng');
     }
 
     return blocks.map((block, index) => {
@@ -778,30 +903,30 @@ export class SettingsService {
   private async assertLandingPageUnique(slug: string, path: string, excludeId?: string) {
     const sameSlug = await this.landingPages.findOne({ where: { slug } });
     if (sameSlug && sameSlug.id !== excludeId) {
-      throw new BadRequestException('slug da ton tai');
+      throw new BadRequestException('slug đã tồn tại');
     }
 
     const samePath = await this.landingPages.findOne({ where: { path } });
     if (samePath && samePath.id !== excludeId) {
-      throw new BadRequestException('path da ton tai');
+      throw new BadRequestException('path đã tồn tại');
     }
   }
 
   private async resolveRoleKeys(roleKeys: string[]) {
     const normalized = Array.from(new Set(roleKeys.map((key) => key.trim().toUpperCase()).filter(Boolean)));
     if (!normalized.length) {
-      throw new BadRequestException('Phai chon it nhat 1 role');
+      throw new BadRequestException('Phải chọn ít nhất 1 role');
     }
     const roles = await this.roles.find({ where: normalized.map((key) => ({ key, isActive: true })) });
     if (roles.length !== normalized.length) {
-      throw new BadRequestException('Co role khong hop le hoac da tat');
+      throw new BadRequestException('Có role không hợp lệ hoặc đã tắt');
     }
     return normalized;
   }
 
   private async assertAssignmentCompatible(userId: string, roleKeys: string[]) {
     const account = await this.users.findOne({ where: { id: userId } });
-    if (!account) throw new NotFoundException('Khong tim thay user');
+    if (!account) throw new NotFoundException('Không tìm thấy user');
     if (account.role === 'ADMIN') return;
     const roles = await this.roles.find({ where: roleKeys.map((key) => ({ key })) });
     const incompatible = roles.find((role) => role.roleMain !== account.role);
@@ -812,7 +937,7 @@ export class SettingsService {
 
   private async resolveAssignmentStaffId(userId: string) {
     const account = await this.users.findOne({ where: { id: userId } });
-    if (!account) throw new NotFoundException('Khong tim thay user');
+    if (!account) throw new NotFoundException('Không tìm thấy user');
     return account.staffId || undefined;
   }
 
@@ -833,7 +958,7 @@ export class SettingsService {
     const enabledModules = this.normalizeEnabledModules(payload.enabledModules ?? fallback?.enabledModules ?? []);
     const appName = String(payload.appName ?? fallback?.appName ?? 'Thien Chanh CMS').trim();
     if (!appName) {
-      throw new BadRequestException('appName la bat buoc');
+      throw new BadRequestException('appName là bắt buộc');
     }
 
     const appDescription = payload.appDescription !== undefined
@@ -918,7 +1043,7 @@ export class SettingsService {
   private normalizeUiTheme(value: unknown) {
     const normalized = String(value || '').trim().toLowerCase();
     if (!UI_THEME_OPTIONS.includes(normalized)) {
-      throw new BadRequestException('theme khong hop le');
+      throw new BadRequestException('theme không hợp lệ');
     }
     return normalized;
   }
@@ -926,7 +1051,7 @@ export class SettingsService {
   private normalizeCompanyType(value: unknown) {
     const normalized = String(value || '').trim().toLowerCase();
     if (!['clinic', 'retail', 'cafe', 'agriculture', 'general'].includes(normalized)) {
-      throw new BadRequestException('companyType khong hop le');
+      throw new BadRequestException('companyType không hợp lệ');
     }
     return normalized;
   }
@@ -934,7 +1059,7 @@ export class SettingsService {
   private normalizeUiSize(value: unknown) {
     const normalized = String(value || '').trim().toLowerCase();
     if (!UI_SIZE_OPTIONS.includes(normalized)) {
-      throw new BadRequestException('size khong hop le');
+      throw new BadRequestException('size không hợp lệ');
     }
     return normalized;
   }
@@ -950,7 +1075,7 @@ export class SettingsService {
   private normalizeFontFamily(value: unknown) {
     const normalized = String(value || '').trim();
     if (!UI_FONT_FAMILIES.includes(normalized)) {
-      throw new BadRequestException('fontFamily khong hop le');
+      throw new BadRequestException('fontFamily không hợp lệ');
     }
     return normalized;
   }
@@ -958,7 +1083,7 @@ export class SettingsService {
   private normalizeBorderRadius(value: unknown) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) {
-      throw new BadRequestException('borderRadius khong hop le');
+      throw new BadRequestException('borderRadius không hợp lệ');
     }
     return Math.max(0, Math.min(32, Math.round(numeric)));
   }
@@ -966,7 +1091,7 @@ export class SettingsService {
   private normalizeOpacity(value: unknown) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) {
-      throw new BadRequestException('shadowOpacity khong hop le');
+      throw new BadRequestException('shadowOpacity không hợp lệ');
     }
     return Math.max(0, Math.min(100, Math.round(numeric)));
   }
@@ -974,7 +1099,7 @@ export class SettingsService {
   private normalizeShadowBlur(value: unknown) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) {
-      throw new BadRequestException('shadowBlur khong hop le');
+      throw new BadRequestException('shadowBlur không hợp lệ');
     }
     return Math.max(0, Math.min(60, Math.round(numeric)));
   }
@@ -982,7 +1107,7 @@ export class SettingsService {
   private normalizeShadowOffset(value: unknown) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) {
-      throw new BadRequestException('shadowOffsetY khong hop le');
+      throw new BadRequestException('shadowOffsetY không hợp lệ');
     }
     return Math.max(0, Math.min(24, Math.round(numeric)));
   }

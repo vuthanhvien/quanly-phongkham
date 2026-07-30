@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, 
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { AuthUser, Public } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, DynamicRoleDefinition, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, DynamicRoleDefinition, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
 import { SettingsService } from './settings.service';
 
 @Controller('settings')
@@ -28,6 +28,30 @@ export class SettingsController {
   async removeField(@Param('id') id: string, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.deleteField(id, request?.user) };
   }
+
+  @Get('custom-tables')
+  async customTables(@Request() request?: { user: AuthUser }) { return { data: await this.settings.listCustomTables(request?.user) }; }
+
+  @Post('custom-tables')
+  async createCustomTable(@Body() payload: Partial<CustomTable> & { columns?: Partial<CustomTableColumn>[] }, @Request() request?: { user: AuthUser }) { return { data: await this.settings.createCustomTable(payload, request?.user) }; }
+
+  @Patch('custom-tables/:id')
+  async updateCustomTable(@Param('id') id: string, @Body() payload: Partial<CustomTable> & { columns?: Partial<CustomTableColumn>[] }, @Request() request?: { user: AuthUser }) { return { data: await this.settings.updateCustomTable(id, payload, request?.user) }; }
+
+  @Delete('custom-tables/:id')
+  async removeCustomTable(@Param('id') id: string, @Request() request?: { user: AuthUser }) { return { data: await this.settings.deleteCustomTable(id, request?.user) }; }
+
+  @Get('custom-tables/:id/rows')
+  async customTableRows(@Param('id') id: string, @Request() request?: { user: AuthUser }) { return { data: await this.settings.listCustomTableRows(id, request?.user) }; }
+
+  @Post('custom-tables/:id/rows')
+  async createCustomTableRow(@Param('id') id: string, @Body('values') values: Record<string, unknown>, @Request() request?: { user: AuthUser }) { return { data: await this.settings.createCustomTableRow(id, values || {}, request?.user) }; }
+
+  @Patch('custom-tables/:tableId/rows/:id')
+  async updateCustomTableRow(@Param('tableId') tableId: string, @Param('id') id: string, @Body('values') values: Record<string, unknown>, @Request() request?: { user: AuthUser }) { return { data: await this.settings.updateCustomTableRow(tableId, id, values || {}, request?.user) }; }
+
+  @Delete('custom-tables/:tableId/rows/:id')
+  async removeCustomTableRow(@Param('tableId') tableId: string, @Param('id') id: string, @Request() request?: { user: AuthUser }) { return { data: await this.settings.deleteCustomTableRow(tableId, id, request?.user) }; }
 
   @Get('views')
   async views(@Query('entityType') entityType?: string, @Request() request?: { user: AuthUser }) {

@@ -16,15 +16,20 @@ cp .env.example .env
 docker compose up --build
 ```
 
-- Landing: [http://localhost](http://localhost)
-- CMS: [http://localhost/admin](http://localhost/admin)
-- API: [http://localhost/api](http://localhost/api)
+- Landing: [http://localhost:9997](http://localhost:9997)
+- API: [http://localhost:9998/api](http://localhost:9998/api)
+- CMS: [http://localhost:9999](http://localhost:9999)
 
-Production compose đã gom `backend`, `cms`, `landing` vào 1 image duy nhất với service `app`.
+Production compose dùng một service/container `gis-clinic`; PM2 chạy ba source code độc lập trong container này: Landing (9997), API (9998), và CMS (9999). Không có gateway/proxy nội bộ.
 
-### Gateway
+Đặt `PUBLIC_API_URL` là URL API mà trình duyệt truy cập được trước khi build. Không dùng `127.0.0.1` nếu người dùng truy cập từ máy khác:
 
-Gateway dùng một domain và một port ngoài: `/` → Landing, `/admin/` → CMS, `/api/` và `/uploads/` → API. Trỏ reverse proxy/domain vào port `APP_PORT` (dev: `9999`, production: `80`); không trỏ trực tiếp đến các port nội bộ `3001`, `3002`, hoặc `3003`.
+```env
+PUBLIC_API_URL=http://YOUR_SERVER_IP:9998/api
+LANDING_PUBLIC_URL=http://YOUR_SERVER_IP:9997
+```
+
+URL này được nhúng vào bundle của Landing và CMS; chạy lại `docker compose up -d --build` sau khi đổi nó.
 
 ### Nhiều domain, mỗi domain một database
 
@@ -45,32 +50,9 @@ Khi `TYPEORM_SYNCHRONIZE=true`, lần khởi động đầu tiên sẽ tạo b�
 
 Nếu `MANAGEMENT_DATABASE_URL` để trống, hệ thống giữ chế độ cũ: một `DATABASE_URL` dùng cho tất cả domain.
 
-## Docker Dev
+## Cấu hình database
 
-Compose mac dinh la production-like runtime, khong hot reload. Neu muon code va thay doi ngay lap tuc, dung compose dev 1 container Node:
-
-```bash
-cp .env.example .env
-docker compose -f docker-compose.dev.yml up -d 
-```
-
-Dev stack se chay trong 1 service `app`, ben trong gom:
-
-- Gateway: [http://localhost:9999](http://localhost:9999)
-- CMS: [http://localhost:9999/admin](http://localhost:9999/admin)
-- API: [http://localhost:9999/api](http://localhost:9999/api)
-- Backend watch mode noi bo: `3001`
-- Vite dev server noi bo: `3003`
-- Next dev server noi bo: `3002`
-
-Luu y:
-
-- Source code duoc mount truc tiep vao container.
-- `backend`, `cms`, `landing` deu chay watch/dev mode trong cung 1 container Node.
-- Neu dang chay production compose tren cung port `9999`, hay dung `docker compose down` truoc.
-
-Can cau hinh `DATABASE_URL` tro den MySQL cua server truoc khi `docker compose up`.
-Vi du:
+Cấu hình `DATABASE_URL` trỏ đến MySQL trước khi chạy. Ví dụ:
 
 ```env
 DATABASE_URL=mysql://clinic_user:strong_password@127.0.0.1:3306/clinic
@@ -105,7 +87,7 @@ cms/                     Refine CMS
 docker/                  Gateway + PM2 config cho single-container runtime
 docs/FEATURE_SCOPE.md    Phạm vi rút từ PDF
 docs/WORKLOG.md          Đã làm / cần làm tiếp
-docker-compose.yml       Single-container production stack
+docker-compose.yml       Single-container production stack (`gis-clinic`)
 ```
 
 ## API Chính

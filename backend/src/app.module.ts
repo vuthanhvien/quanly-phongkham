@@ -9,6 +9,7 @@ import { SettingsModule } from './settings/settings.module';
 import { ZaloModule } from './zalo/zalo.module';
 import { CategoriesModule } from './categories/categories.module';
 import { PayrollModule } from './payroll/payroll.module';
+import { LocationsModule } from './locations/locations.module';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { TenantModule } from './tenant/tenant-orm.module';
 
@@ -23,6 +24,7 @@ import { TenantModule } from './tenant/tenant-orm.module';
     ZaloModule,
     CategoriesModule,
     PayrollModule,
+    LocationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

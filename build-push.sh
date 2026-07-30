@@ -5,7 +5,7 @@ set -e
 # Config — đổi DOCKER_USER thành username Docker Hub của bạn
 # ============================================================
 DOCKER_USER="${DOCKER_USER:-vienvu}"
-IMAGE_PREFIX="${DOCKER_USER}/quanly-phongkham"
+IMAGE_PREFIX="${DOCKER_USER}/gis-clinic"
 TAG="${TAG:-latest}"
 APP_IMAGE="${IMAGE_PREFIX}:${TAG}"
 DEPLOY_HOST="${DEPLOY_HOST:-root@103.1.238.70}"
@@ -19,16 +19,16 @@ echo ""
 # Đăng nhập Docker Hub
 docker login
 
-# Build app
+# Build one runtime image. The three apps are exposed on ports 9997–9999.
 echo ""
-echo "[1/3] Building single app image..."
+echo "[1/3] Building gis-clinic image..."
 docker build \
   --platform linux/amd64 \
-  --build-arg LANDING_API_URL="${LANDING_API_URL:-http://127.0.0.1:3001/api}" \
-  --build-arg NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-/api}" \
-  --build-arg VITE_API_URL="${VITE_API_URL:-/api}" \
-  --build-arg VITE_BASE_PATH="${VITE_BASE_PATH:-/admin/}" \
-  --build-arg VITE_LANDING_URL="${VITE_LANDING_URL:-}" \
+  --build-arg LANDING_API_URL="http://127.0.0.1:9998/api" \
+  --build-arg NEXT_PUBLIC_API_URL="${PUBLIC_API_URL:?Set PUBLIC_API_URL, e.g. https://api.example.com/api}" \
+  --build-arg VITE_API_URL="${PUBLIC_API_URL:?Set PUBLIC_API_URL, e.g. https://api.example.com/api}" \
+  --build-arg VITE_BASE_PATH="/" \
+  --build-arg VITE_LANDING_URL="${LANDING_PUBLIC_URL:-}" \
   -t "$APP_IMAGE" \
   .
 

@@ -30,7 +30,7 @@ RUN npm install
 
 FROM node:22-alpine AS landing-build
 WORKDIR /app
-ARG LANDING_API_URL=http://127.0.0.1:3001/api
+ARG LANDING_API_URL=http://127.0.0.1:9998/api
 ARG NEXT_PUBLIC_API_URL=/api
 ENV LANDING_API_URL=$LANDING_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
@@ -60,6 +60,6 @@ RUN mkdir -p ./landing/public
 
 COPY docker ./docker
 
-EXPOSE 80
+EXPOSE 9997 9998 9999
 
 CMD ["tini", "--", "/opt/runtime/node_modules/.bin/pm2-runtime", "/app/docker/ecosystem.config.cjs"]

@@ -38,6 +38,7 @@ const CUSTOM_FIELD_TYPES = [
   { value: "textarea", label: "Đoạn văn bản (textarea)" },
   { value: "relative", label: "Liên kết bản ghi (relative)" },
   { value: "file", label: "Tệp đính kèm (file)" },
+  { value: "dynamic-table", label: "Bảng dữ liệu động" },
 ]
 
 const RELATIVE_RESOURCE_OPTIONS = Object.entries(entityLabels).map(
@@ -75,6 +76,7 @@ function buildCustomFieldEntityOptions() {
 export function CustomFieldsPage() {
   const [entityType, setEntityType] = useState("customers")
   const [fields, setFields] = useState<CustomField[]>([])
+  const [customTables, setCustomTables] = useState<Array<{ id: string; name: string; key: string }>>([])
   const [fieldModal, setFieldModal] = useState(false)
   const [editingField, setEditingField] = useState<CustomField | null>(null)
   const [batchModal, setBatchModal] = useState(false)
@@ -92,6 +94,10 @@ export function CustomFieldsPage() {
   useEffect(() => {
     void load()
   }, [entityType])
+
+  useEffect(() => {
+    api.get("/settings/custom-tables").then((response) => setCustomTables(response.data.data || [])).catch(() => setCustomTables([]))
+  }, [])
 
   async function load() {
     const response = await api.get("/settings/custom-fields", {
@@ -422,6 +428,15 @@ export function CustomFieldsPage() {
               <Select options={RELATIVE_RESOURCE_OPTIONS} />
             </Form.Item>
           )}
+          {currentFieldType === "dynamic-table" && (
+            <Form.Item
+              name="customTableId"
+              label="Bảng dữ liệu liên kết"
+              rules={[{ required: true, message: "Chọn bảng dữ liệu động" }]}
+            >
+              <Select options={customTables.map((table) => ({ value: table.id, label: `${table.name} (${table.key})` }))} />
+            </Form.Item>
+          )}
           <Form.Item name="sortOrder" label="Thứ tự" initialValue={0}>
             <InputNumber />
           </Form.Item>
@@ -626,6 +641,7 @@ function normalizeFieldPayload(
         : values.dataType === "relative"
           ? values.relationResource
           : undefined,
+    customTableId: values.dataType === "dynamic-table" ? values.customTableId : undefined,
   }
 }
 

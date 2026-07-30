@@ -296,6 +296,13 @@ export class Customer extends ConfigurableEntity {
   @Column({ nullable: true })
   address?: string;
 
+  @Column({ default: 'VN' }) countryCode: string;
+  @Column({ nullable: true }) provinceCode?: string;
+  @Column({ nullable: true }) provinceName?: string;
+  @Column({ nullable: true }) wardCode?: string;
+  @Column({ nullable: true }) wardName?: string;
+  @Column({ type: 'text', nullable: true }) addressLine?: string;
+
   @Column({ default: 'CONSULTING' })
   status: string;
 
@@ -326,6 +333,15 @@ export class Lead extends ConfigurableEntity {
   @Column({ nullable: true })
   email?: string;
 
+  @Column({ type: 'text', nullable: true })
+  address?: string;
+  @Column({ default: 'VN' }) countryCode: string;
+  @Column({ nullable: true }) provinceCode?: string;
+  @Column({ nullable: true }) provinceName?: string;
+  @Column({ nullable: true }) wardCode?: string;
+  @Column({ nullable: true }) wardName?: string;
+  @Column({ type: 'text', nullable: true }) addressLine?: string;
+
   @Column({ nullable: true })
   source?: string;
 
@@ -344,6 +360,14 @@ export class Lead extends ConfigurableEntity {
   @Column({ type: 'text', nullable: true })
   note?: string;
 }
+
+@Entity('location_countries')
+export class LocationCountry { @PrimaryGeneratedColumn('uuid') id: string; @Column({ unique: true }) code: string; @Column() name: string; }
+@Entity('location_provinces')
+export class LocationProvince { @PrimaryGeneratedColumn('uuid') id: string; @Column({ unique: true }) code: string; @Column() countryCode: string; @Column() name: string; @Column({ nullable: true }) divisionType?: string; }
+@Entity('location_wards')
+@Index(['provinceCode', 'code'], { unique: true })
+export class LocationWard { @PrimaryGeneratedColumn('uuid') id: string; @Column() code: string; @Column() provinceCode: string; @Column() name: string; @Column({ nullable: true }) divisionType?: string; }
 
 @Entity('lead_activities')
 export class LeadActivity extends ConfigurableEntity {
@@ -1267,6 +1291,9 @@ export class CustomFieldDefinition {
   @Column({ nullable: true })
   relationResource?: string;
 
+  @Column({ nullable: true })
+  customTableId?: string;
+
   @Column({ default: true })
   isActive: boolean;
 
@@ -1278,6 +1305,83 @@ export class CustomFieldDefinition {
 
   @CreateDateColumn()
   createdAt: Date;
+}
+
+@Entity('custom_tables')
+export class CustomTable {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ unique: true })
+  key: string;
+
+  @Column()
+  name: string;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @Column({ default: false })
+  isArchived: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
+@Entity('custom_table_columns')
+@Index(['tableId', 'key'], { unique: true })
+export class CustomTableColumn {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  tableId: string;
+
+  @Column()
+  key: string;
+
+  @Column()
+  label: string;
+
+  @Column({ default: 'text' })
+  dataType: string;
+
+  @Column({ default: false })
+  required: boolean;
+
+  @Column({ type: 'simple-json', nullable: true })
+  options?: string[];
+
+  @Column({ default: 0 })
+  sortOrder: number;
+}
+
+@Entity('custom_table_rows')
+@Index(['tableId', 'isArchived'])
+export class CustomTableRow {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  tableId: string;
+
+  @Column({ type: 'simple-json' })
+  values: Record<string, unknown>;
+
+  @Column({ default: false })
+  isArchived: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }
 
 @Entity('view_settings')
@@ -2069,6 +2173,9 @@ export const ENTITIES = [
   Staff,
   BranchRoleAssignment,
   Customer,
+  LocationCountry,
+  LocationProvince,
+  LocationWard,
   Lead,
   LeadActivity,
   ZaloAccount,
@@ -2097,6 +2204,9 @@ export const ENTITIES = [
   Treatment,
   Commission,
   CustomFieldDefinition,
+  CustomTable,
+  CustomTableColumn,
+  CustomTableRow,
   CustomFieldValue,
   ViewSetting,
   PrintTemplate,

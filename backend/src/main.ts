@@ -1,5 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import express from 'express';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
@@ -15,6 +16,16 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: false }));
   app.useGlobalFilters(new ErrorLogExceptionFilter());
   app.use('/uploads', express.static(uploadsRoot));
+
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('GIS Clinic API')
+    .setDescription('API documentation for the GIS Clinic application.')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('docs', app, swaggerDocument, { useGlobalPrefix: true });
+
   await app.listen(process.env.PORT || 3000);
 }
 

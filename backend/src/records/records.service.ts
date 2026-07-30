@@ -23,6 +23,7 @@ import {
   ConfigurableEntity,
   CustomFieldDefinition,
   CustomFieldValue,
+  CustomTableRow,
   CustomerImage,
   Customer,
   Department,
@@ -407,6 +408,7 @@ export class RecordsService {
     @InjectRepository(Commission) private readonly commissions: Repository<Commission>,
     @InjectRepository(CustomFieldDefinition) private readonly fieldDefinitions: Repository<CustomFieldDefinition>,
     @InjectRepository(CustomFieldValue) private readonly customFieldValues: Repository<CustomFieldValue>,
+    @InjectRepository(CustomTableRow) private readonly customTableRows: Repository<CustomTableRow>,
     @InjectRepository(ViewSetting) private readonly viewSettings: Repository<ViewSetting>,
     @InjectRepository(AuditLog) private readonly auditLogs: Repository<AuditLog>,
     @InjectRepository(WorkContract) private readonly workContracts: Repository<WorkContract>,
@@ -466,7 +468,7 @@ export class RecordsService {
       'position-histories': this.positionHistories,
     };
     const repository = map[resource];
-    if (!repository) throw new NotFoundException('Phan he khong ton tai');
+    if (!repository) throw new NotFoundException('Phân hệ không tồn tại');
     return repository;
   }
 
@@ -580,7 +582,7 @@ export class RecordsService {
 
   private async findStored(resource: string, id: string) {
     const record = await this.repository(resource).findOne({ where: { id, isArchived: false } });
-    if (!record) throw new NotFoundException('Khong tim thay du lieu');
+    if (!record) throw new NotFoundException('Không tìm thấy dữ liệu');
     return record;
   }
 
@@ -674,7 +676,7 @@ export class RecordsService {
   async importUpsert(resource: string, payload: Record<string, unknown>, user: AuthUser) {
     const keyField = this.importKeyField(resource);
     if (!keyField) {
-      throw new BadRequestException('Module nay chua ho tro import upsert theo code');
+      throw new BadRequestException('Module này chưa hỗ trợ import upsert theo code');
     }
 
     const rawKey = payload[keyField];
@@ -697,7 +699,7 @@ export class RecordsService {
 
   async create(resource: string, payload: Record<string, unknown>, user: AuthUser) {
     if (resource === 'files') {
-      throw new BadRequestException('Hay dung endpoint upload file de tao tep moi');
+      throw new BadRequestException('Hãy dùng endpoint upload file để tạo tệp mới');
     }
     await this.assertPermission(user, resource, 'create', this.branchIdOf(resource, payload));
     await this.validateCustomFields(resource, payload, true);
@@ -745,7 +747,7 @@ export class RecordsService {
   async removeDraft(resource: string, id: string, user: AuthUser) {
     this.repository(resource);
     const draft = await this.recordDrafts.findOne({ where: { id, resource, ownerId: user.id } });
-    if (!draft) throw new NotFoundException('Ban nhap khong ton tai');
+    if (!draft) throw new NotFoundException('Bản nháp không tồn tại');
     await this.recordDrafts.remove(draft);
     return { data: { id } };
   }
@@ -813,6 +815,13 @@ export class RecordsService {
         fullName: lead.fullName,
         phone: lead.phone,
         email: lead.email,
+        address: lead.address,
+        countryCode: lead.countryCode,
+        provinceCode: lead.provinceCode,
+        provinceName: lead.provinceName,
+        wardCode: lead.wardCode,
+        wardName: lead.wardName,
+        addressLine: lead.addressLine,
         assignedStaff: lead.assignedStaffId,
         status: 'CONSULTING',
         note: lead.note,
@@ -930,7 +939,7 @@ export class RecordsService {
 
   private bundleConfig(resource: string) {
     const config = IMPORT_BUNDLE_CONFIGS[resource as BundleRootResource];
-    if (!config) throw new BadRequestException('Module nay chua ho tro import/export bundle');
+    if (!config) throw new BadRequestException('Module này chưa hỗ trợ import/export bundle');
     return config;
   }
 
@@ -1598,15 +1607,15 @@ export class RecordsService {
   async uploadFiles(files: any[], payload: { folderId?: string; title?: string; note?: string }, user: AuthUser, request?: RequestContext) {
     await this.assertPermission(user, 'files', 'create');
     if (!payload.folderId) {
-      throw new BadRequestException('Phai chon folder truoc khi upload file');
+      throw new BadRequestException('Phải chọn folder trước khi upload file');
     }
     if (!Array.isArray(files) || files.length === 0) {
-      throw new BadRequestException('Chua co file hop le de upload');
+      throw new BadRequestException('Chưa có file hợp lệ để upload');
     }
 
     const folder = await this.fileFolders.findOne({ where: { id: payload.folderId } });
     if (!folder) {
-      throw new NotFoundException('Khong tim thay folder upload');
+      throw new NotFoundException('Không tìm thấy folder upload');
     }
 
     const uploaded = await Promise.all(
@@ -1650,7 +1659,7 @@ export class RecordsService {
   async receiptStock(payload: Record<string, unknown>, user: AuthUser) {
     await this.assertAnyActionPermission(user, 'stock-batches', ['create', 'update']);
     const branchId = String(payload.branchId || '');
-    if (!branchId) throw new BadRequestException('Phieu nhap kho phai co chi nhanh');
+    if (!branchId) throw new BadRequestException('Phiếu nhập kho phải có chi nhánh');
     await this.assertPermission(user, 'stock-batches', 'create', branchId);
 
     const items = await this.normalizeStockReceiptItems(payload.items, branchId, payload.supplierId ? String(payload.supplierId) : undefined);
@@ -1703,7 +1712,7 @@ export class RecordsService {
 
     for (const item of items) {
       const batch = await this.stockBatches.findOne({ where: { id: item.batchId } });
-      if (!batch) throw new NotFoundException('Khong tim thay lo hang de xuat kho');
+      if (!batch) throw new NotFoundException('Không tìm thấy lô hàng để xuất kho');
       await this.assertPermission(user, 'stock-batches', 'update', batch.branchId);
       const nextQuantity = Number(batch.remainingQuantity || 0) - item.quantity;
       if (nextQuantity < 0) {
@@ -1732,7 +1741,7 @@ export class RecordsService {
 
   async postAccountingVoucher(id: string, user: AuthUser) {
     const voucher = await this.accountingVouchers.findOne({ where: { id } });
-    if (!voucher) throw new NotFoundException('Khong tim thay chung tu ke toan');
+    if (!voucher) throw new NotFoundException('Không tìm thấy chứng từ kế toán');
     await this.assertPermission(user, 'accounting-vouchers', 'post', voucher.branchId);
     if (voucher.status === 'POSTED') {
       return { data: await this.findRaw('accounting-vouchers', id) };
@@ -1740,23 +1749,23 @@ export class RecordsService {
 
     const lines = await this.accountingVoucherLines.find({ where: { voucherId: id } });
     if (lines.length < 2) {
-      throw new BadRequestException('Chung tu ke toan phai co it nhat 2 dong hach toan');
+      throw new BadRequestException('Chứng từ kế toán phải có ít nhất 2 dòng hạch toán');
     }
 
     await this.recalculateAccountingVoucherTotals(id);
     const refreshed = await this.accountingVouchers.findOne({ where: { id } });
-    if (!refreshed) throw new NotFoundException('Khong tim thay chung tu ke toan');
+    if (!refreshed) throw new NotFoundException('Không tìm thấy chứng từ kế toán');
     if (Number(refreshed.totalDebit || 0) <= 0 || Number(refreshed.totalCredit || 0) <= 0) {
-      throw new BadRequestException('Tong No va Co phai lon hon 0');
+      throw new BadRequestException('Tổng Nợ và Có phải lớn hơn 0');
     }
     if (Number(refreshed.totalDebit || 0) !== Number(refreshed.totalCredit || 0)) {
-      throw new BadRequestException('Tong No va Co phai can bang truoc khi ghi so');
+      throw new BadRequestException('Tổng Nợ và Có phải cân bằng trước khi ghi sổ');
     }
 
     if (refreshed.periodId) {
       const period = await this.accountingPeriods.findOne({ where: { id: refreshed.periodId } });
       if (period?.status === 'CLOSED') {
-        throw new BadRequestException('Khong the ghi so vao ky da khoa');
+        throw new BadRequestException('Không thể ghi sổ vào kỳ đã khóa');
       }
     }
 
@@ -1773,7 +1782,7 @@ export class RecordsService {
 
   async unpostAccountingVoucher(id: string, user: AuthUser) {
     const voucher = await this.accountingVouchers.findOne({ where: { id } });
-    if (!voucher) throw new NotFoundException('Khong tim thay chung tu ke toan');
+    if (!voucher) throw new NotFoundException('Không tìm thấy chứng từ kế toán');
     await this.assertPermission(user, 'accounting-vouchers', 'unpost', voucher.branchId);
     if (voucher.status !== 'POSTED') {
       return { data: await this.findRaw('accounting-vouchers', id) };
@@ -2507,7 +2516,7 @@ export class RecordsService {
   private async getFiscalSetting() {
     const fiscalSetting = await this.accountingFiscalSettings.findOne({ order: { createdAt: 'ASC' } });
     if (!fiscalSetting) {
-      throw new BadRequestException('Chua cau hinh accounting-fiscal-settings');
+      throw new BadRequestException('Chưa cấu hình accounting-fiscal-settings');
     }
     return fiscalSetting;
   }
@@ -2522,7 +2531,7 @@ export class RecordsService {
       ] as never,
     });
     if (posted.length > 0) {
-      throw new BadRequestException('Nguon nay da co chung tu da ghi so, hay bo ghi so truoc khi thay doi');
+      throw new BadRequestException('Nguồn này đã có chứng từ đã ghi sổ, hãy bỏ ghi sổ trước khi thay đổi');
     }
   }
 
@@ -2656,7 +2665,7 @@ export class RecordsService {
     useCustomTitle: boolean,
   ) {
     if (!file?.buffer || !file.originalname) {
-      throw new BadRequestException('Chua co file hop le de upload');
+      throw new BadRequestException('Chưa có file hợp lệ để upload');
     }
 
     const fileExt = extname(String(file.originalname || '')).replace(/^\./, '');
@@ -3151,7 +3160,7 @@ export class RecordsService {
     delete value.updatedAt;
     delete value.customFields;
     if (typeof value.role === 'string' && !['ADMIN', 'STAFF', 'DOCTOR'].includes(value.role)) {
-      throw new BadRequestException('Vai tro khong hop le');
+      throw new BadRequestException('Vai trò không hợp lệ');
     }
     if (typeof value.email === 'string') {
       value.email = value.email.trim().toLowerCase();
@@ -3163,36 +3172,36 @@ export class RecordsService {
       value.passwordHash = await hash(value.password, 10);
     }
     delete value.password;
-    if (creating && !value.passwordHash) throw new BadRequestException('Mat khau tai khoan la bat buoc');
+    if (creating && !value.passwordHash) throw new BadRequestException('Mật khẩu tài khoản là bắt buộc');
     if (!value.passwordHash) delete value.passwordHash;
     if (!value.username) delete value.username;
     if (typeof value.fullName !== 'string' || !value.fullName.trim()) {
       value.fullName = typeof value.email === 'string' ? value.email.trim() : '';
     }
     if (!value.fullName) {
-      throw new BadRequestException('Email tai khoan la bat buoc');
+      throw new BadRequestException('Email tài khoản là bắt buộc');
     }
     return value;
   }
 
   private async validateAccountingResource(resource: string, value: Record<string, unknown>, creating: boolean) {
     if (resource === 'accounting-vouchers') {
-      if (!String(value.code || '').trim()) throw new BadRequestException('Chung tu ke toan bat buoc co ma');
-      if (!String(value.voucherDate || '').trim()) throw new BadRequestException('Chung tu ke toan bat buoc co ngay chung tu');
-      if (!String(value.description || '').trim()) throw new BadRequestException('Chung tu ke toan bat buoc co dien giai');
+      if (!String(value.code || '').trim()) throw new BadRequestException('Chứng từ kế toán bắt buộc có mã');
+      if (!String(value.voucherDate || '').trim()) throw new BadRequestException('Chứng từ kế toán bắt buộc có ngày chứng từ');
+      if (!String(value.description || '').trim()) throw new BadRequestException('Chứng từ kế toán bắt buộc có diễn giải');
       if (value.periodId) {
         const period = await this.accountingPeriods.findOne({ where: { id: String(value.periodId) } });
-        if (!period) throw new BadRequestException('Ky ke toan khong hop le');
+        if (!period) throw new BadRequestException('Kỳ kế toán không hợp lệ');
         const accountingDate = String(value.accountingDate || value.voucherDate || '');
         if (accountingDate && (accountingDate < period.startDate || accountingDate > period.endDate)) {
-          throw new BadRequestException('Ngay hach toan nam ngoai ky ke toan da chon');
+          throw new BadRequestException('Ngày hạch toán nằm ngoài kỳ kế toán đã chọn');
         }
         if (period.status === 'CLOSED') {
-          throw new BadRequestException('Ky ke toan da khoa');
+          throw new BadRequestException('Kỳ kế toán đã khóa');
         }
       }
       if (creating && value.status === 'POSTED') {
-        throw new BadRequestException('Khong the tao chung tu o trang thai da ghi so');
+        throw new BadRequestException('Không thể tạo chứng từ ở trạng thái đã ghi sổ');
       }
     }
 
@@ -3201,30 +3210,30 @@ export class RecordsService {
       const accountId = String(value.accountId || '').trim();
       const debitAmount = Number(value.debitAmount || 0);
       const creditAmount = Number(value.creditAmount || 0);
-      if (!voucherId) throw new BadRequestException('Dong hach toan bat buoc co chung tu');
-      if (!accountId) throw new BadRequestException('Dong hach toan bat buoc co tai khoan');
+      if (!voucherId) throw new BadRequestException('Dòng hạch toán bắt buộc có chứng từ');
+      if (!accountId) throw new BadRequestException('Dòng hạch toán bắt buộc có tài khoản');
       if ((debitAmount <= 0 && creditAmount <= 0) || (debitAmount > 0 && creditAmount > 0)) {
-        throw new BadRequestException('Moi dong hach toan chi duoc ghi No hoac Co');
+        throw new BadRequestException('Mỗi dòng hạch toán chỉ được ghi Nợ hoặc Có');
       }
       const [voucher, account] = await Promise.all([
         this.accountingVouchers.findOne({ where: { id: voucherId } }),
         this.accountingChartAccounts.findOne({ where: { id: accountId } }),
       ]);
-      if (!voucher) throw new BadRequestException('Chung tu ke toan khong hop le');
-      if (!account) throw new BadRequestException('Tai khoan ke toan khong hop le');
-      if (!account.allowPosting) throw new BadRequestException('Tai khoan tong hop khong duoc hach toan truc tiep');
-      if (voucher.status === 'POSTED') throw new BadRequestException('Khong the sua dong cua chung tu da ghi so');
+      if (!voucher) throw new BadRequestException('Chứng từ kế toán không hợp lệ');
+      if (!account) throw new BadRequestException('Tài khoản kế toán không hợp lệ');
+      if (!account.allowPosting) throw new BadRequestException('Tài khoản tổng hợp không được hạch toán trực tiếp');
+      if (voucher.status === 'POSTED') throw new BadRequestException('Không thể sửa dòng của chứng từ đã ghi sổ');
       if (!value.branchId && voucher.branchId) {
         value.branchId = voucher.branchId;
       }
     }
 
     if (resource === 'accounting-chart-accounts') {
-      if (!String(value.accountNumber || '').trim()) throw new BadRequestException('Tai khoan ke toan bat buoc co so tai khoan');
-      if (!String(value.name || '').trim()) throw new BadRequestException('Tai khoan ke toan bat buoc co ten');
+      if (!String(value.accountNumber || '').trim()) throw new BadRequestException('Tài khoản kế toán bắt buộc có số tài khoản');
+      if (!String(value.name || '').trim()) throw new BadRequestException('Tài khoản kế toán bắt buộc có tên');
       if (value.parentAccountId) {
         const parent = await this.accountingChartAccounts.findOne({ where: { id: String(value.parentAccountId) } });
-        if (!parent) throw new BadRequestException('Tai khoan cha khong hop le');
+        if (!parent) throw new BadRequestException('Tài khoản cha không hợp lệ');
         value.level = Number(parent.level || 1) + 1;
       }
     }
@@ -3232,28 +3241,28 @@ export class RecordsService {
     if (resource === 'accounting-periods') {
       const startDate = String(value.startDate || '');
       const endDate = String(value.endDate || '');
-      if (!startDate || !endDate) throw new BadRequestException('Ky ke toan bat buoc co ngay bat dau va ngay ket thuc');
-      if (startDate > endDate) throw new BadRequestException('Ngay bat dau phai nho hon hoac bang ngay ket thuc');
+      if (!startDate || !endDate) throw new BadRequestException('Kỳ kế toán bắt buộc có ngày bắt đầu và ngày kết thúc');
+      if (startDate > endDate) throw new BadRequestException('Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc');
     }
 
     if (resource === 'invoices') {
-      if (Number(value.totalAmount || 0) <= 0) throw new BadRequestException('Hoa don bat buoc co tong tien lon hon 0');
-      if (Number(value.paidAmount || 0) < 0) throw new BadRequestException('So tien da thu khong hop le');
+      if (Number(value.totalAmount || 0) <= 0) throw new BadRequestException('Hóa đơn bắt buộc có tổng tiền lớn hơn 0');
+      if (Number(value.paidAmount || 0) < 0) throw new BadRequestException('Số tiền đã thu không hợp lệ');
       if (Number(value.paidAmount || 0) > Number(value.totalAmount || 0)) {
-        throw new BadRequestException('So tien da thu khong duoc lon hon tong tien');
+        throw new BadRequestException('Số tiền đã thu không được lớn hơn tổng tiền');
       }
     }
 
     if (resource === 'expenses') {
-      if (Number(value.amount || 0) <= 0) throw new BadRequestException('Phieu chi bat buoc co so tien lon hon 0');
-      if (!String(value.paidAt || '').trim()) throw new BadRequestException('Phieu chi bat buoc co ngay chi');
+      if (Number(value.amount || 0) <= 0) throw new BadRequestException('Phiếu chi bắt buộc có số tiền lớn hơn 0');
+      if (!String(value.paidAt || '').trim()) throw new BadRequestException('Phiếu chi bắt buộc có ngày chi');
     }
 
     if (resource === 'payrolls') {
-      if (!String(value.staffId || '').trim()) throw new BadRequestException('Bang luong bat buoc co nhan vien');
-      if (Number(value.month || 0) < 1 || Number(value.month || 0) > 12) throw new BadRequestException('Thang bang luong khong hop le');
-      if (Number(value.year || 0) < 2000) throw new BadRequestException('Nam bang luong khong hop le');
-      if (Number(value.netSalary || 0) < 0) throw new BadRequestException('Thuc lanh khong hop le');
+      if (!String(value.staffId || '').trim()) throw new BadRequestException('Bảng lương bắt buộc có nhân viên');
+      if (Number(value.month || 0) < 1 || Number(value.month || 0) > 12) throw new BadRequestException('Tháng bảng lương không hợp lệ');
+      if (Number(value.year || 0) < 2000) throw new BadRequestException('Năm bảng lương không hợp lệ');
+      if (Number(value.netSalary || 0) < 0) throw new BadRequestException('Thực lãnh không hợp lệ');
     }
   }
 
@@ -3275,6 +3284,9 @@ export class RecordsService {
           (await this.files.count({ where: { id: In(valueItems.map((item) => String(item))), isActive: true } })) === valueItems.length,
         ) :
         field.dataType === 'relative' ? typeof value === 'string' && value.length > 0 :
+        field.dataType === 'dynamic-table' ? Boolean(
+          field.customTableId && (await this.customTableRows.count({ where: { tableId: field.customTableId, id: In(valueItems.map((item) => String(item))), isArchived: false } })) === valueItems.length,
+        ) :
         true;
       if (!valid) throw new BadRequestException(`Gia tri khong hop le cho ${field.label}`);
     }
@@ -3340,7 +3352,7 @@ export class RecordsService {
 
   private async normalizeServiceOrderItems(value: unknown) {
     if (!Array.isArray(value) || value.length === 0) {
-      throw new BadRequestException('Don hang phai co it nhat 1 san pham');
+      throw new BadRequestException('Đơn hàng phải có ít nhất 1 sản phẩm');
     }
     const productIds = Array.from(new Set(value.map((item) => String((item as Record<string, unknown>)?.productId || '')).filter(Boolean)));
     const products = await this.products.find({ where: { id: In(productIds) } });
@@ -3350,7 +3362,7 @@ export class RecordsService {
       const item = rawItem as Record<string, unknown>;
       const productId = String(item.productId || '');
       const product = productsById.get(productId);
-      if (!product) throw new BadRequestException('San pham trong don hang khong hop le');
+      if (!product) throw new BadRequestException('Sản phẩm trong đơn hàng không hợp lệ');
       const quantity = Number(item.quantity || 0);
       const unitPrice = Number(item.unitPrice ?? product.sellingPrice ?? 0);
       if (quantity <= 0) {
@@ -3375,31 +3387,31 @@ export class RecordsService {
     }
 
     if (!Array.isArray(value.bundleItems) || value.bundleItems.length === 0) {
-      throw new BadRequestException('Combo phai co it nhat 1 san pham/dich vu thanh phan');
+      throw new BadRequestException('Combo phải có ít nhất 1 sản phẩm/dịch vụ thành phần');
     }
     const rawItems = value.bundleItems as Array<Record<string, unknown>>;
     const productIds = Array.from(new Set(rawItems.map((item) => String(item.productId || '')).filter(Boolean)));
     if (productIds.length !== rawItems.length) {
-      throw new BadRequestException('Moi san pham trong combo chi duoc cau hinh mot lan');
+      throw new BadRequestException('Mỗi sản phẩm trong combo chỉ được cấu hình một lần');
     }
     if (bundleProductId && productIds.includes(bundleProductId)) {
-      throw new BadRequestException('Combo khong the chua chinh no');
+      throw new BadRequestException('Combo không thể chứa chính nó');
     }
     const products = await this.products.find({ where: { id: In(productIds) } });
-    if (products.length !== productIds.length) throw new BadRequestException('San pham thanh phan cua combo khong hop le');
+    if (products.length !== productIds.length) throw new BadRequestException('Sản phẩm thành phần của combo không hợp lệ');
     if (products.some((product) => String(product.productType).toUpperCase() === 'COMBO')) {
-      throw new BadRequestException('Chua ho tro long combo trong combo');
+      throw new BadRequestException('Chưa hỗ trợ lồng combo trong combo');
     }
     value.bundleItems = rawItems.map((item) => {
       const quantity = Number(item.quantity || 0);
-      if (quantity <= 0) throw new BadRequestException('So luong thanh phan combo phai lon hon 0');
+      if (quantity <= 0) throw new BadRequestException('Số lượng thành phần combo phải lớn hơn 0');
       return { productId: String(item.productId), quantity };
     });
   }
 
   private async normalizeStockReceiptItems(value: unknown, branchId: string, defaultSupplierId?: string) {
     if (!Array.isArray(value) || value.length === 0) {
-      throw new BadRequestException('Phieu nhap kho phai co it nhat 1 san pham');
+      throw new BadRequestException('Phiếu nhập kho phải có ít nhất 1 sản phẩm');
     }
     const productIds = Array.from(new Set(value.map((item) => String((item as Record<string, unknown>)?.productId || '')).filter(Boolean)));
     const products = await this.products.find({ where: { id: In(productIds) } });
@@ -3409,7 +3421,7 @@ export class RecordsService {
       const item = rawItem as Record<string, unknown>;
       const productId = String(item.productId || '');
       const product = productsById.get(productId);
-      if (!product) throw new BadRequestException('San pham trong phieu nhap khong hop le');
+      if (!product) throw new BadRequestException('Sản phẩm trong phiếu nhập không hợp lệ');
       const quantity = Number(item.quantity || 0);
       if (quantity <= 0) throw new BadRequestException(`So luong nhap khong hop le cho ${product.name}`);
       const batchNumber = String(item.batchNumber || '').trim();
@@ -3428,14 +3440,14 @@ export class RecordsService {
 
   private async normalizeStockIssueItems(value: unknown) {
     if (!Array.isArray(value) || value.length === 0) {
-      throw new BadRequestException('Phieu xuat kho phai co it nhat 1 lo san pham');
+      throw new BadRequestException('Phiếu xuất kho phải có ít nhất 1 lô sản phẩm');
     }
     return value.map((rawItem) => {
       const item = rawItem as Record<string, unknown>;
       const batchId = String(item.batchId || '');
       const quantity = Number(item.quantity || 0);
-      if (!batchId) throw new BadRequestException('Phieu xuat kho phai chon lo hang');
-      if (quantity <= 0) throw new BadRequestException('So luong xuat kho phai lon hon 0');
+      if (!batchId) throw new BadRequestException('Phiếu xuất kho phải chọn lô hàng');
+      if (quantity <= 0) throw new BadRequestException('Số lượng xuất kho phải lớn hơn 0');
       return { batchId, quantity };
     });
   }
@@ -3599,13 +3611,13 @@ export class RecordsService {
     if (!user) return;
     const allowedActions = await this.resolveAllowedActions(resource, user.activeRole || user.role, user.roleMain || user.role);
     if (!allowedActions.includes(action)) {
-      throw new ForbiddenException('Role hien tai khong duoc su dung thao tac nay');
+      throw new ForbiddenException('Role hiện tại không được sử dụng thao tác này');
     }
     if (this.isAdmin(user)) return;
     const branches = this.allowedBranches(user) || [];
     const matched = !branchId ? branches.length > 0 : branches.includes(branchId);
     if (!matched) {
-      throw new ForbiddenException('Ban khong co quyen thuc hien thao tac nay tai chi nhanh hien tai');
+      throw new ForbiddenException('Bạn không có quyền thực hiện thao tác này tại chi nhánh hiện tại');
     }
   }
 
@@ -3614,7 +3626,7 @@ export class RecordsService {
     if (!user) return;
     const allowedActions = await this.resolveAllowedActions(resource, user.activeRole || user.role, user.roleMain || user.role);
     if (!actions.some((action) => allowedActions.includes(action))) {
-      throw new ForbiddenException('Role hien tai khong duoc su dung thao tac nay');
+      throw new ForbiddenException('Role hiện tại không được sử dụng thao tác này');
     }
   }
 
@@ -3740,14 +3752,14 @@ export class RecordsService {
   private assertResourceAccess(user: AuthUser | undefined, resource: string) {
     if (!user) return;
     if ((user.disabledModules || []).includes(resource)) {
-      throw new ForbiddenException('Role hien tai khong duoc su dung module nay');
+      throw new ForbiddenException('Role hiện tại không được sử dụng module này');
     }
   }
 
   private assertScreenAccess(user: AuthUser | undefined, screen: string) {
     void screen;
     if (!user || this.isAdmin(user)) return;
-    throw new ForbiddenException('Chi ADMIN moi duoc truy cap man hinh he thong');
+    throw new ForbiddenException('Chỉ ADMIN mới được truy cập màn hình hệ thống');
   }
 
   private async audit(

@@ -226,6 +226,7 @@ export function getFieldCatalog(resource: string, customFields: CustomField[]) {
           type: field.dataType as FieldSpec['type'],
           required: field.required,
           options: field.options,
+          customTableId: field.customTableId,
           relation:
             field.dataType === 'file'
               ? { resource: 'files', labelFields: ['title', 'originalName'] }

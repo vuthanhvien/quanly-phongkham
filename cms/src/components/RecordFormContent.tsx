@@ -38,6 +38,7 @@ import { getFirstLookupValue } from "../utils/branchDefaults"
 import { toastError, toastSuccess } from "../toast"
 import { buildLocalDateTime, currentLocalDate, currentLocalDateTime, normalizeDateTimeValueForInput, normalizeDateValueForInput, parseClinicDateTime } from "../utils/datetime"
 import { buildFolderPathMap, buildFolderTree, FolderTreeNode, normalizeFileFolderRows } from "../utils/fileFolders"
+import { VietnamAddressFields } from './VietnamAddressFields'
 import {
   getFieldCatalog,
   getStoredUserRole,
@@ -97,6 +98,7 @@ export function RecordFormContent({
   const { mutate: update } = useUpdate()
   const isAppointmentForm = resource === "appointments"
   const isWorkScheduleForm = resource === "work-schedules"
+  const isAddressForm = resource === "customers" || resource === "leads"
   const recordQuery = useOne({
     resource,
     id: id || "",
@@ -107,11 +109,25 @@ export function RecordFormContent({
     Promise.all([
       api.get("/settings/custom-fields", { params: { entityType: resource } }),
       api.get("/settings/views", { params: { entityType: resource } }),
+      api.get("/settings/custom-tables"),
     ])
-      .then(([fieldResponse, viewResponse]) => {
+      .then(([fieldResponse, viewResponse, tableResponse]) => {
+        const tables = new Map((tableResponse.data.data || []).map((table: Record<string, unknown>) => [String(table.id), table]))
         const customFields = fieldResponse.data.data.filter(
           (field: CustomField) => field.isActive,
-        )
+        ).map((field: CustomField) => {
+          if (field.dataType !== "dynamic-table") return field
+          const table = tables.get(String(field.customTableId)) as Record<string, unknown> | undefined
+          const columns = (table?.columns || []) as Array<Record<string, unknown>>
+          const rows = (table?.rows || []) as Array<Record<string, unknown>>
+          return {
+            ...field,
+            options: rows.map((row) => {
+              const values = (row.values || {}) as Record<string, unknown>
+              return { value: String(row.id), label: columns.map((column) => String(values[String(column.key)] || "")).filter(Boolean).join(" · ") || String(row.id) }
+            }),
+          }
+        })
         const nextFields = getVisibleFieldConfigs(
           getFieldCatalog(resource, customFields),
           viewResponse.data.data as ViewSettingRecord[],
@@ -225,6 +241,13 @@ export function RecordFormContent({
     const baseKeys = new Set(
       getFieldCatalog(resource, []).map((field) => field.key),
     )
+    if (isAddressForm) ["countryCode", "provinceCode", "provinceName", "wardCode", "wardName", "addressLine", "address"].forEach((key) => baseKeys.add(key))
+    if (isAddressForm) {
+      const province = String(mergedValues.provinceName || "").trim()
+      const ward = String(mergedValues.wardName || "").trim()
+      const line = String(mergedValues.addressLine || "").trim()
+      mergedValues.address = [line, ward, province, "Việt Nam"].filter(Boolean).join(", ")
+    }
     if (isWorkScheduleForm) {
       ;["seriesId", "recurrenceType", "recurrenceInterval", "recurrenceWeekdays", "recurrenceUntil"].forEach((key) => baseKeys.add(key))
     }
@@ -342,9 +365,10 @@ export function RecordFormContent({
     () => fields.filter((field) => {
       if (isAppointmentForm && (field.key === "startTime" || field.key === "endTime")) return false
       if (isWorkScheduleForm && (field.key === "workDate" || field.key === "startTime" || field.key === "endTime" || field.key === "recurrenceUntil")) return false
+      if (isAddressForm && field.key === "address") return false
       return true
     }),
-    [fields, isAppointmentForm, isWorkScheduleForm],
+    [fields, isAddressForm, isAppointmentForm, isWorkScheduleForm],
   )
   const fieldTabs = useMemo(() => groupFieldsByTab(visibleFields), [visibleFields])
   const usesTabs = fieldTabs.length > 1 || Boolean(fieldTabs[0]?.tab)
@@ -382,6 +406,7 @@ export function RecordFormContent({
       ))}
       {includeSpecialFields && isAppointmentForm ? <AppointmentDateTimeFields form={form} /> : null}
       {includeSpecialFields && isWorkScheduleForm ? <WorkSchedulePeriodFields /> : null}
+      {includeSpecialFields && isAddressForm ? <VietnamAddressFields form={form} /> : null}
     </Row>
   )
 
@@ -719,6 +744,18 @@ function FieldInput({
         onChange={onChange}
       />
     )
+  if (field.type === "dynamic-table")
+    return (
+      <Select
+        allowClear
+        disabled={field.disabled}
+        mode="multiple"
+        options={(field.options || []).map((opt) => typeof opt === "string" ? { value: opt, label: opt } : opt)}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+      />
+    )
   if (field.type === "file") {
     return (
       <FileSelectInput
@@ -806,7 +843,7 @@ function FieldInput({
 
 function getDefaultFieldPlaceholder(field: FieldSpec) {
   const label = field.label.trim().toLowerCase()
-  if (field.type === "select" || field.type === "multi-select" || field.type === "relative" || field.type === "file" || field.relation || relationFields[field.key] || field.key === "imageUrl") {
+  if (field.type === "select" || field.type === "multi-select" || field.type === "dynamic-table" || field.type === "relative" || field.type === "file" || field.relation || relationFields[field.key] || field.key === "imageUrl") {
     return `Chọn ${label}`
   }
   if (field.type === "date" || field.type === "datetime") return `Chọn ${label}`

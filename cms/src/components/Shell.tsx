@@ -306,6 +306,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
           : null,
         hasScreenAccess("settings")
           ? {
+              key: "/custom-tables",
+              icon: <AppstoreOutlined />,
+              label: <Link to="/custom-tables">Bảng dữ liệu động</Link>,
+            }
+          : null,
+        hasScreenAccess("settings")
+          ? {
               key: "/settings",
               icon: <SettingOutlined />,
               label: <Link to="/settings">Cấu hình động</Link>,
