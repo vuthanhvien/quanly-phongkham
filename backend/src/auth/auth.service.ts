@@ -1,7 +1,7 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
-import { compare } from 'bcryptjs';
+import { compare, hash } from 'bcryptjs';
 import { In, Repository } from 'typeorm';
 import { BranchRoleAssignment, DynamicRoleDefinition, Staff, User, ViewSetting } from '../entities/entities';
 import { TenantContextService } from '../tenant/tenant-context.service';
@@ -122,6 +122,23 @@ export class AuthService {
       accessToken: this.jwtService.sign(profile),
       user: profile,
     };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.users.findOne({ where: { id: userId, isActive: true } });
+    if (!user) throw new UnauthorizedException('Tài khoản không còn hoạt động');
+
+    if (!(await compare(currentPassword, user.passwordHash))) {
+      throw new BadRequestException('Mật khẩu hiện tại không đúng');
+    }
+
+    if (currentPassword === newPassword) {
+      throw new BadRequestException('Mật khẩu mới cần khác mật khẩu hiện tại');
+    }
+
+    user.passwordHash = await hash(newPassword, 10);
+    await this.users.save(user);
+    return { message: 'Đổi mật khẩu thành công' };
   }
 
   private async resolveActionPermissions(role?: string, mainRole?: string) {

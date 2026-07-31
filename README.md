@@ -138,18 +138,20 @@ docker compose up -d
 Neu MySQL chay tren may host cung server Docker, `127.0.0.1` se dung khi app chay native.
 Neu backend chay trong Docker va MySQL chay tren host, hay dung IP that cua host hoac `host.docker.internal` neu server ho tro ten nay.
 
-sh build-push.sh
+Chay deploy tu may local:
 
-Ssh root@161.97.181.63
-con server này
-Root/QG5oZjRSn1OH793Q0x53H
+```bash
+./deploy.sh
+```
 
-cd phongkham && docker compose pull && docker compose up -d
+Mac dinh script chi build/push image va chay `docker compose pull && docker compose up -d` tren server. File `.env` va `docker-compose.yml` hien co tren server se duoc giu nguyen.
 
+Chi khi can cap nhat ro rang cac file cau hinh, truyen mot hoac ca hai tham so sau:
 
-////
+```bash
+./deploy.sh --upload-env
+./deploy.sh --upload-compose
+./deploy.sh --upload-env --upload-compose
+```
 
-
-ssh root@103.1.238.70
-
-cd clinic && docker compose pull && docker compose up -d
+Luu thong tin dang nhap server o trinh quan ly bi mat, khong ghi vao README.

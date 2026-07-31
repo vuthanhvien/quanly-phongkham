@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Request } from '@nestjs/common';
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Public, AuthUser } from '../common/auth';
 import { AuthService } from './auth.service';
 
@@ -16,6 +16,16 @@ class LoginDto {
   password: string;
 }
 
+class ChangePasswordDto {
+  @IsString()
+  currentPassword: string;
+
+  @IsString()
+  @MinLength(8, { message: 'Mật khẩu mới phải có ít nhất 8 ký tự' })
+  @MaxLength(128, { message: 'Mật khẩu mới không được vượt quá 128 ký tự' })
+  newPassword: string;
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -29,5 +39,10 @@ export class AuthController {
   @Get('me')
   me(@Request() request: { user: AuthUser }) {
     return { data: request.user };
+  }
+
+  @Post('change-password')
+  changePassword(@Request() request: { user: AuthUser }, @Body() payload: ChangePasswordDto) {
+    return this.authService.changePassword(request.user.id, payload.currentPassword, payload.newPassword);
   }
 }

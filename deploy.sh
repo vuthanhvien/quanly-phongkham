@@ -1,5 +1,41 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+UPLOAD_ENV=false
+UPLOAD_COMPOSE=false
+
+usage() {
+  cat <<'EOF'
+Usage: ./deploy.sh [options]
+
+Build, push, and deploy the Docker image. The server's existing Docker Compose
+and environment files are preserved by default.
+
+Options:
+  --upload-env       Upload ENV_FILE to the server as .env.
+  --upload-compose   Upload docker-compose.yml to the server.
+  -h, --help         Show this help message.
+
+Examples:
+  ./deploy.sh
+  ./deploy.sh --upload-env --upload-compose
+  ENV_FILE=.env.staging ./deploy.sh --upload-env
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --upload-env) UPLOAD_ENV=true ;;
+    --upload-compose) UPLOAD_COMPOSE=true ;;
+    -h|--help) usage; exit 0 ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
 
 # Nạp cấu hình production. Có thể đổi bằng ENV_FILE=/path/to/file.
 ENV_FILE="${ENV_FILE:-.env.production}"
@@ -24,6 +60,8 @@ DEPLOY_DIR="${DEPLOY_DIR:-clinic}"
 # ============================================================
 echo "=> Docker user : $DOCKER_USER"
 echo "=> Tag         : $TAG"
+echo "=> Upload env  : $UPLOAD_ENV"
+echo "=> Upload compose: $UPLOAD_COMPOSE"
 echo ""
 
 # Đăng nhập Docker Hub
@@ -49,10 +87,15 @@ docker push "$APP_IMAGE"
 
 echo ""
 echo "[3/3] Deploying to $DEPLOY_HOST..."
-echo '[3/3] Uploading deployment configuration...'
 ssh "$DEPLOY_HOST" "mkdir -p '$DEPLOY_DIR'"
-scp docker-compose.yml "$DEPLOY_HOST:$DEPLOY_DIR/docker-compose.yml"
-scp "$ENV_FILE" "$DEPLOY_HOST:$DEPLOY_DIR/.env"
+if [[ "$UPLOAD_COMPOSE" == true ]]; then
+  echo '[3/3] Uploading docker-compose.yml...'
+  scp docker-compose.yml "$DEPLOY_HOST:$DEPLOY_DIR/docker-compose.yml"
+fi
+if [[ "$UPLOAD_ENV" == true ]]; then
+  echo '[3/3] Uploading environment file...'
+  scp "$ENV_FILE" "$DEPLOY_HOST:$DEPLOY_DIR/.env"
+fi
 ssh "$DEPLOY_HOST" "
   set -e
   echo '[server] Connected to \$(hostname)'

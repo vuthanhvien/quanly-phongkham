@@ -2,13 +2,14 @@ import {
   ApartmentOutlined,
   BankOutlined,
   IdcardOutlined,
+  LockOutlined,
   MailOutlined,
   PhoneOutlined,
   SafetyCertificateOutlined,
   UserOutlined,
 } from "@ant-design/icons"
 import { useGetIdentity } from "@refinedev/core"
-import { Avatar, Card, Col, Empty, Row, Space, Tabs, Tag, Typography } from "antd"
+import { Avatar, Button, Card, Col, Empty, Form, Input, Row, Space, Tabs, Tag, Typography, message } from "antd"
 import type { TabsProps } from "antd"
 import type { ReactNode } from "react"
 import { useEffect, useMemo, useState } from "react"
@@ -66,6 +67,12 @@ type DepartmentProfile = {
   id: string
   name?: string
   code?: string
+}
+
+type ChangePasswordValues = {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
 }
 
 const SYSTEM_ROLE_LABELS: Record<string, string> = {
@@ -131,10 +138,32 @@ function ProfileInfoItem({
 
 export function ProfilePage() {
   const { data: identity } = useGetIdentity<Identity>()
+  const [passwordForm] = Form.useForm<ChangePasswordValues>()
   const [staff, setStaff] = useState<StaffProfile | null>(null)
   const [branch, setBranch] = useState<BranchProfile | null>(null)
   const [department, setDepartment] = useState<DepartmentProfile | null>(null)
   const [branchMap, setBranchMap] = useState<Record<string, string>>({})
+  const [changingPassword, setChangingPassword] = useState(false)
+
+  async function changePassword(values: ChangePasswordValues) {
+    setChangingPassword(true)
+    try {
+      await api.post("/auth/change-password", {
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword,
+      })
+      passwordForm.resetFields()
+      void message.success("Đổi mật khẩu thành công")
+    } catch (error) {
+      const responseMessage = (error as { response?: { data?: { message?: unknown } } })?.response?.data?.message
+      const errorMessage = Array.isArray(responseMessage)
+        ? responseMessage.filter(Boolean).join(". ")
+        : typeof responseMessage === "string" ? responseMessage : "Không thể đổi mật khẩu"
+      void message.error(errorMessage)
+    } finally {
+      setChangingPassword(false)
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -359,6 +388,29 @@ export function ProfilePage() {
                   <ProfileInfoItem key={item.key} icon={item.icon} label={item.label} value={item.value} />
                 ))}
               </div>
+            </Card>
+
+            <Card className="glass-card detail-card" title={<Space><LockOutlined />Đổi mật khẩu</Space>}>
+              <Form form={passwordForm} layout="vertical" onFinish={(values) => void changePassword(values)}>
+                <Form.Item name="currentPassword" label="Mật khẩu hiện tại" rules={[{ required: true, message: "Nhập mật khẩu hiện tại" }]}>
+                  <Input.Password autoComplete="current-password" />
+                </Form.Item>
+                <Form.Item name="newPassword" label="Mật khẩu mới" rules={[{ required: true, message: "Nhập mật khẩu mới" }, { min: 8, message: "Mật khẩu mới phải có ít nhất 8 ký tự" }]}>
+                  <Input.Password autoComplete="new-password" />
+                </Form.Item>
+                <Form.Item
+                  name="confirmPassword"
+                  label="Xác nhận mật khẩu mới"
+                  dependencies={["newPassword"]}
+                  rules={[
+                    { required: true, message: "Xác nhận mật khẩu mới" },
+                    ({ getFieldValue }) => ({ validator(_, value) { return !value || getFieldValue("newPassword") === value ? Promise.resolve() : Promise.reject(new Error("Mật khẩu xác nhận không khớp")) } }),
+                  ]}
+                >
+                  <Input.Password autoComplete="new-password" />
+                </Form.Item>
+                <Button type="primary" htmlType="submit" loading={changingPassword} icon={<LockOutlined />}>Đổi mật khẩu</Button>
+              </Form>
             </Card>
           </div>
         </Col>
