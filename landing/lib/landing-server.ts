@@ -79,7 +79,9 @@ export async function getLandingPage(pathname: string): Promise<LandingPageData 
 
   try {
     const apiUrl = await getServerApiUrl()
-    const endpoint = `${apiUrl}/public/landing-pages/resolve?path=${encodeURIComponent(pathname)}`
+    const requestHeaders = await headers()
+    const domain = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').split(',')[0].trim()
+    const endpoint = `${apiUrl}/public/landing-pages/resolve?path=${encodeURIComponent(pathname)}&domain=${encodeURIComponent(domain)}`
     console.info('[landing] Fetching page', { pathname, endpoint })
     const response = await fetch(endpoint, { cache: 'no-store' })
     console.info('[landing] Page response', { pathname, endpoint, status: response.status })

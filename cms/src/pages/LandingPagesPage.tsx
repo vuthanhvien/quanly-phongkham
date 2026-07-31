@@ -324,6 +324,7 @@ export function LandingPagesPage() {
       description: selectedPage.description || '',
       seoTitle: selectedPage.seoTitle || '',
       seoDescription: selectedPage.seoDescription || '',
+      domains: selectedPage.domains || [],
       blocks: normalizeBlocks(selectedPage.blocks || []),
       isPublished: selectedPage.isPublished,
     })
@@ -791,6 +792,15 @@ export function LandingPagesPage() {
                         </Form.Item>
                         <Form.Item label="Đường dẫn" style={{ marginBottom: 8 }}>
                           <Input value={draft.path} onChange={(event) => updateDraft({ path: normalizePath(event.target.value) })} placeholder="/" />
+                        </Form.Item>
+                        <Form.Item label="Domains" extra="Nhập domain rồi nhấn Enter hoặc dấu phẩy. Để trống để dùng làm trang mặc định.">
+                          <Select
+                            mode="tags"
+                            tokenSeparators={[',', ' ']}
+                            value={draft.domains || []}
+                            onChange={(domains) => updateDraft({ domains })}
+                            placeholder="example.com"
+                          />
                         </Form.Item>
                         <Form.Item label="Mô tả ngắn" style={{ marginBottom: 8 }}>
                           <Input.TextArea rows={2} value={draft.description} onChange={(event) => updateDraft({ description: event.target.value })} />

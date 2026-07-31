@@ -38,6 +38,8 @@ const CUSTOM_FIELD_TYPES = [
   { value: "textarea", label: "Đoạn văn bản (textarea)" },
   { value: "relative", label: "Liên kết bản ghi (relative)" },
   { value: "file", label: "Tệp đính kèm (file)" },
+  { value: "image", label: "Một hình ảnh (image)" },
+  { value: "images", label: "Nhiều hình ảnh (images)" },
   { value: "dynamic-table", label: "Bảng dữ liệu động" },
 ]
 

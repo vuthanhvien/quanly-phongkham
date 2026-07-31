@@ -313,6 +313,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
           : null,
         hasScreenAccess("settings")
           ? {
+              key: "/locations",
+              icon: <AppstoreOutlined />,
+              label: <Link to="/locations">Master Data Địa chỉ</Link>,
+            }
+          : null,
+        hasScreenAccess("settings")
+          ? {
               key: "/settings",
               icon: <SettingOutlined />,
               label: <Link to="/settings">Cấu hình động</Link>,
@@ -357,6 +364,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
     location.pathname.startsWith("/landing-theme") ||
     location.pathname.startsWith("/chatbot-settings") ||
     location.pathname.startsWith("/custom-fields") ||
+    location.pathname.startsWith("/custom-tables") ||
+    location.pathname.startsWith("/locations") ||
     location.pathname.startsWith("/audit-logs")
       ? "system-tools"
       : undefined,

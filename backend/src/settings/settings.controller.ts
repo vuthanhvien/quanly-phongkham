@@ -30,7 +30,7 @@ export class SettingsController {
   }
 
   @Get('custom-tables')
-  async customTables(@Request() request?: { user: AuthUser }) { return { data: await this.settings.listCustomTables(request?.user) }; }
+  async customTables(@Query('includeRows') includeRows?: string, @Request() request?: { user: AuthUser }) { return { data: await this.settings.listCustomTables(request?.user, includeRows === 'true') }; }
 
   @Post('custom-tables')
   async createCustomTable(@Body() payload: Partial<CustomTable> & { columns?: Partial<CustomTableColumn>[] }, @Request() request?: { user: AuthUser }) { return { data: await this.settings.createCustomTable(payload, request?.user) }; }
@@ -262,8 +262,9 @@ export class PublicLandingPagesController {
 
   @Public()
   @Get('resolve')
-  async resolve(@Query('path') path?: string) {
-    return { data: await this.settings.findPublishedLandingPageByPath(path) };
+  async resolve(@Query('path') path?: string, @Query('domain') domain?: string, @Request() request?: { headers?: Record<string, string | string[] | undefined> }) {
+    const requestDomain = String(request?.headers?.['x-forwarded-host'] || request?.headers?.host || '').split(',')[0];
+    return { data: await this.settings.findPublishedLandingPageByPath(path, domain || requestDomain) };
   }
 
   @Public()

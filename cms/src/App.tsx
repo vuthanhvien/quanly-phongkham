@@ -13,6 +13,8 @@ import { AuditPage } from './pages/AuditPage';
 import { AccountingReportsPage } from './pages/AccountingReportsPage';
 import { CustomFieldsPage } from './pages/CustomFieldsPage';
 import { CustomTablesPage } from './pages/CustomTablesPage';
+import { CustomTableDataPage } from './pages/CustomTableDataPage';
+import { LocationsPage } from './pages/LocationsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { FileFoldersPage } from './pages/FileFoldersPage';
@@ -225,6 +227,8 @@ export function App() {
               <Route element={<ScreenGuard screen="settings" />}>
                 <Route path="/custom-fields" element={<CustomFieldsPage />} />
                 <Route path="/custom-tables" element={<CustomTablesPage />} />
+                <Route path="/custom-tables/:id/data" element={<CustomTableDataPage />} />
+                <Route path="/locations" element={<LocationsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/landing/pages" element={<LandingPageListPage />} />
                 <Route path="/landing/pages/:id" element={<LandingPagesPage />} />

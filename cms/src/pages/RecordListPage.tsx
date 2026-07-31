@@ -26,7 +26,7 @@ import {
   message,
 } from "antd"
 import type { ColumnsType } from "antd/es/table"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type Key } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { hasActionAccess, hasResourceAccess } from "../access"
@@ -69,6 +69,7 @@ export function RecordListPage() {
   const [relatedQuickView, setRelatedQuickView] = useState<{ resource: string; id: string } | null>(null)
   const [staffTypeFilter, setStaffTypeFilter] = useState<string | undefined>(undefined)
   const [doctorFilter, setDoctorFilter] = useState<string | undefined>(undefined)
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
   const query = useList({
     resource,
     pagination: { currentPage, pageSize },
@@ -94,6 +95,7 @@ export function RecordListPage() {
     setDuplicatingId(null)
     setStaffTypeFilter(undefined)
     setDoctorFilter(undefined)
+    setSelectedRowKeys([])
     if (detailId) {
       const nextParams = new URLSearchParams(searchParams)
       nextParams.delete("detail")
@@ -322,6 +324,24 @@ export function RecordListPage() {
     refresh()
   }
 
+  function archiveSelected() {
+    const ids = selectedRowKeys.map(String)
+    if (!ids.length) return
+    Modal.confirm({
+      title: `Lưu trữ ${ids.length} bản ghi đã chọn?`,
+      content: "Các bản ghi chỉ bị ẩn, không bị xóa khỏi cơ sở dữ liệu.",
+      okText: "Lưu trữ",
+      okButtonProps: { danger: true },
+      cancelText: "Hủy",
+      onOk: async () => {
+        await Promise.all(ids.map((id) => api.delete(`/records/${resource}/${id}`)))
+        setSelectedRowKeys([])
+        message.success(`Đã lưu trữ ${ids.length} bản ghi`)
+        refresh()
+      },
+    })
+  }
+
   function openDetail(recordId: string) {
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set("detail", recordId)
@@ -382,6 +402,11 @@ export function RecordListPage() {
               }}
             />
           ) : null}
+          {hasActionAccess(resource, "delete") && selectedRowKeys.length > 0 ? (
+            <Button danger icon={<DeleteOutlined />} onClick={archiveSelected}>
+              Lưu trữ đã chọn ({selectedRowKeys.length})
+            </Button>
+          ) : null}
           {hasActionAccess(resource, "create") && !["files", "service-orders"].includes(resource) && (
             <Tooltip title="Mở màn hình import">
               <Button
@@ -424,6 +449,11 @@ export function RecordListPage() {
             },
           }}
           rowKey="id"
+          rowSelection={hasActionAccess(resource, "delete") ? {
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+            preserveSelectedRowKeys: true,
+          } : undefined}
           scroll={{ x: "max-content" }}
         />
       </Card>

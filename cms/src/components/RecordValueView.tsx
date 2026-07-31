@@ -23,6 +23,10 @@ interface RecordValueViewProps {
 export function RecordValueView({ field, value, lookups, fileLookups, compact, onRelationClick }: RecordValueViewProps) {
   if (value === null || value === undefined || value === "") return <span>-</span>
 
+  if (isAvatarField(field)) {
+    return <Avatar size={compact ? 32 : 64} src={resolveFileUrl(String(value))} />
+  }
+
   if (isImageUrlField(field, value)) {
     return renderImageUrlValue(value, compact)
   }
@@ -206,6 +210,7 @@ function renderFileValue(value: unknown, lookups: LookupMap, fileLookups: FileLo
 
 function isImageUrlField(field: string | FieldSpec, value: unknown) {
   const fieldKey = typeof field === "string" ? field : field.key
+  if (typeof field !== "string" && (field.type === "image" || field.type === "images")) return true
   if (["imageUrl", "avatarUrl", "appIconUrl", "logoUrl", "thumbnailUrl"].includes(fieldKey)) return true
   const fieldLabel = typeof field === "string" ? "" : String(field.label || "").toLowerCase()
   const values = normalizeStringArray(value)
@@ -213,6 +218,10 @@ function isImageUrlField(field: string | FieldSpec, value: unknown) {
     return values.every((item) => isImageUrl(item))
   }
   return values.length > 0 && values.every((item) => isImageUrl(item)) && fieldKey.toLowerCase().includes("image")
+}
+
+function isAvatarField(field: string | FieldSpec) {
+  return typeof field !== "string" && field.key === "avatarUrl"
 }
 
 function isFileField(field: string | FieldSpec) {

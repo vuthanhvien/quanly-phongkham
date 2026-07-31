@@ -1,6 +1,16 @@
 #!/bin/bash
 set -e
 
+# Nạp cấu hình production. Có thể đổi bằng ENV_FILE=/path/to/file.
+ENV_FILE="${ENV_FILE:-.env.production}"
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "Missing environment file: $ENV_FILE" >&2
+  exit 1
+fi
+set -a
+source "$ENV_FILE"
+set +a
+
 # ============================================================
 # Config — đổi DOCKER_USER thành username Docker Hub của bạn
 # ============================================================
@@ -39,6 +49,10 @@ docker push "$APP_IMAGE"
 
 echo ""
 echo "[3/3] Deploying to $DEPLOY_HOST..."
+echo '[3/3] Uploading deployment configuration...'
+ssh "$DEPLOY_HOST" "mkdir -p '$DEPLOY_DIR'"
+scp docker-compose.yml "$DEPLOY_HOST:$DEPLOY_DIR/docker-compose.yml"
+scp "$ENV_FILE" "$DEPLOY_HOST:$DEPLOY_DIR/.env"
 ssh "$DEPLOY_HOST" "
   set -e
   echo '[server] Connected to \$(hostname)'

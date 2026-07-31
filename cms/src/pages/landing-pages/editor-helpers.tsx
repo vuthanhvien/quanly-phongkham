@@ -250,6 +250,7 @@ export function emptyPage(): Omit<LandingPage, 'id' | 'createdAt' | 'updatedAt'>
     description: '',
     seoTitle: '',
     seoDescription: '',
+    domains: [],
     blocks: [],
     isPublished: false,
   }

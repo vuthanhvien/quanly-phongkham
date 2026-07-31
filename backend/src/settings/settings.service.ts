@@ -235,13 +235,13 @@ export class SettingsService {
     return { id };
   }
 
-  async listCustomTables(user?: AuthUser) {
+  async listCustomTables(user?: AuthUser, includeRows = false) {
     this.assertSettingsAccess(user);
     const tables = await this.customTables.find({ where: { isArchived: false }, order: { name: 'ASC' } });
     const tableIds = tables.map((item) => item.id);
     const [columns, rows] = tables.length ? await Promise.all([
       this.customTableColumns.find({ where: { tableId: In(tableIds) }, order: { sortOrder: 'ASC' } }),
-      this.customTableRows.find({ where: { tableId: In(tableIds), isArchived: false }, order: { createdAt: 'DESC' } }),
+      includeRows ? this.customTableRows.find({ where: { tableId: In(tableIds), isArchived: false }, order: { createdAt: 'DESC' } }) : Promise.resolve([]),
     ]) : [[], []];
     return tables.map((table) => ({ ...table, columns: columns.filter((column) => column.tableId === table.id), rows: rows.filter((row) => row.tableId === table.id) }));
   }
@@ -486,7 +486,7 @@ export class SettingsService {
   async createLandingPage(payload: Partial<LandingPage>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const normalized = this.normalizeLandingPagePayload(payload, true);
-    await this.assertLandingPageUnique(normalized.slug, normalized.path);
+    await this.assertLandingPageUnique(normalized.slug, normalized.path, normalized.domains);
     const saved = await this.landingPages.save(this.landingPages.create(normalized));
     await this.revalidateLandingCache();
     return saved;
@@ -497,7 +497,7 @@ export class SettingsService {
     const page = await this.landingPages.findOne({ where: { id } });
     if (!page) throw new NotFoundException('Không tìm thấy landing page');
     const normalized = this.normalizeLandingPagePayload({ ...page, ...payload }, false);
-    await this.assertLandingPageUnique(normalized.slug, normalized.path, id);
+    await this.assertLandingPageUnique(normalized.slug, normalized.path, normalized.domains, id);
     const saved = await this.landingPages.save(this.landingPages.merge(page, normalized));
     await this.revalidateLandingCache();
     return saved;
@@ -533,9 +533,13 @@ export class SettingsService {
     }
   }
 
-  async findPublishedLandingPageByPath(path?: string) {
+  async findPublishedLandingPageByPath(path?: string, domain?: string) {
     const normalizedPath = normalizeLandingPath(path);
-    const page = await this.landingPages.findOne({ where: { path: normalizedPath, isPublished: true } });
+    const normalizedDomain = String(domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+    const pages = await this.landingPages.find({ where: { path: normalizedPath, isPublished: true, isArchived: false } });
+    const page = normalizedDomain
+      ? pages.find((item) => (item.domains || []).map((value) => String(value).toLowerCase()).includes(normalizedDomain)) || pages.find((item) => !(item.domains || []).length)
+      : pages.find((item) => !(item.domains || []).length) || pages[0];
     if (!page) {
       throw new NotFoundException('Không tìm thấy landing page');
     }
@@ -769,6 +773,7 @@ export class SettingsService {
     const description = payload.description ? String(payload.description).trim() : undefined;
     const seoTitle = payload.seoTitle ? String(payload.seoTitle).trim() : undefined;
     const seoDescription = payload.seoDescription ? String(payload.seoDescription).trim() : undefined;
+    const domains = Array.from(new Set((Array.isArray(payload.domains) ? payload.domains : []).map((domain) => String(domain).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '')).filter(Boolean)));
 
     return {
       slug,
@@ -777,6 +782,7 @@ export class SettingsService {
       description,
       seoTitle,
       seoDescription,
+      domains,
       blocks,
       isPublished: isCreate ? Boolean(payload.isPublished) : Boolean(payload.isPublished),
     };
@@ -900,15 +906,21 @@ export class SettingsService {
     };
   }
 
-  private async assertLandingPageUnique(slug: string, path: string, excludeId?: string) {
+  private async assertLandingPageUnique(slug: string, path: string, domains: string[], excludeId?: string) {
     const sameSlug = await this.landingPages.findOne({ where: { slug } });
     if (sameSlug && sameSlug.id !== excludeId) {
       throw new BadRequestException('slug đã tồn tại');
     }
 
-    const samePath = await this.landingPages.findOne({ where: { path } });
-    if (samePath && samePath.id !== excludeId) {
-      throw new BadRequestException('path đã tồn tại');
+    const samePathPages = await this.landingPages.find({ where: { path, isArchived: false } });
+    const normalizedDomains = new Set(domains);
+    const hasPathConflict = samePathPages.some((page) => {
+      if (page.id === excludeId) return false;
+      const existingDomains = page.domains || [];
+      return !normalizedDomains.size || !existingDomains.length || existingDomains.some((domain) => normalizedDomains.has(String(domain).toLowerCase()));
+    });
+    if (hasPathConflict) {
+      throw new BadRequestException('Đường dẫn đã được dùng cho domain này');
     }
   }
 

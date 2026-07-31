@@ -50,6 +50,8 @@ RUN cd /opt/runtime && npm install
 COPY --from=backend-prod-deps /app/node_modules ./backend/node_modules
 COPY --from=backend-build /app/package*.json ./backend/
 COPY --from=backend-build /app/dist ./backend/dist
+COPY --from=backend-build /app/src/locations/vietnam-admin-v2.json ./backend/dist/locations/vietnam-admin-v2.json
+COPY --from=backend-build /app/src/locations/countries.json ./backend/dist/locations/countries.json
 COPY --from=backend-build /app/storage ./backend/storage
 
 COPY --from=cms-build /app/dist ./cms-dist

@@ -28,7 +28,7 @@ export function getFieldLabel (resource: string, fieldKey: string, value: string
 export interface FieldSpec {
   key: string;
   label: string;
-  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative' | 'file' | 'dynamic-table';
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative' | 'file' | 'image' | 'images' | 'dynamic-table';
   displayFormat?: 'currency' | 'number' | 'percent' | 'time';
   required?: boolean;
   options?: SelectOption[];
@@ -147,6 +147,7 @@ export interface LandingPage {
   description?: string;
   seoTitle?: string;
   seoDescription?: string;
+  domains?: string[];
   blocks: LandingBlock[];
   isPublished: boolean;
   createdAt: string;
@@ -441,7 +442,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'idCardIssuedDate', label: 'Ngày cấp', type: 'date', width: '33', tableWidth: 140 },
     { key: 'idCardIssuedPlace', label: 'Nơi cấp', width: '66', tableWidth: 200 },
     { key: 'address', label: 'Địa chỉ thường trú', type: 'textarea', width: '100', tableWidth: 300 },
-    { key: 'avatarUrl', label: 'Ảnh đại diện (URL)', width: '100', tableWidth: 260 },
+    { key: 'avatarUrl', label: 'Hình đại diện', type: 'image', width: '33', tableWidth: 96 },
     // Liên hệ khẩn cấp
     { key: 'emergencyContactName', label: 'Liên hệ khẩn — Họ tên', width: '33', tableWidth: 180 },
     { key: 'emergencyContactPhone', label: 'Liên hệ khẩn — SĐT', width: '33', tableWidth: 170 },
@@ -471,6 +472,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'username', label: 'Username', width: '50', tableWidth: 180 },
     { key: 'password', label: 'Mật khẩu mới', width: '50', tableWidth: 180 },
     { key: 'fullName', label: 'Tên nội bộ (tuỳ chọn)', width: '66', tableWidth: 220 },
+    { key: 'avatarUrl', label: 'Hình đại diện', type: 'image', width: '33', tableWidth: 96 },
     { key: 'role', label: 'Vai trò hệ thống', type: 'select', options: systemRoleSelectOptions, required: true, width: '33', tableWidth: 140 },
     { key: 'branchId', label: 'Chi nhánh mặc định', width: '50', tableWidth: 200 },
     { key: 'branchRoleSummary', label: 'Phân quyền chi nhánh', width: '100', tableWidth: 320 },
@@ -478,6 +480,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
   ],
   customers: [
     { key: 'code', label: 'Mã KH', required: true, width: '33', tableWidth: 130 },
+    { key: 'avatarUrl', label: 'Hình đại diện', type: 'image', width: '33', tableWidth: 96 },
     { key: 'fullName', label: 'Họ tên', required: true, width: '66', tableWidth: 220 },
     { key: 'phone', label: 'Điện thoại', required: true, width: '33', tableWidth: 170 },
     { key: 'email', label: 'Email', width: '50', tableWidth: 220 },
@@ -489,6 +492,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
   ],
   leads: [
     { key: 'code', label: 'Mã lead', required: true, width: '33', tableWidth: 130 },
+    { key: 'avatarUrl', label: 'Hình đại diện', type: 'image', width: '33', tableWidth: 96 },
     { key: 'fullName', label: 'Họ tên', required: true, width: '66', tableWidth: 220 },
     { key: 'phone', label: 'Điện thoại', required: true, width: '33', tableWidth: 170 },
     { key: 'email', label: 'Email', width: '50', tableWidth: 220 },

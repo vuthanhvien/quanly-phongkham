@@ -58,6 +58,9 @@ export class User {
   @Column()
   fullName: string;
 
+  @Column({ nullable: true })
+  avatarUrl?: string;
+
   @Column({ default: 'ADMIN' })
   role: string;
 
@@ -281,6 +284,9 @@ export class Customer extends ConfigurableEntity {
   @Column()
   fullName: string;
 
+  @Column({ nullable: true })
+  avatarUrl?: string;
+
   @Column()
   phone: string;
 
@@ -326,6 +332,9 @@ export class Lead extends ConfigurableEntity {
 
   @Column()
   fullName: string;
+
+  @Column({ nullable: true })
+  avatarUrl?: string;
 
   @Column()
   phone: string;
@@ -1449,7 +1458,7 @@ export class LandingPage {
   @Column({ unique: true })
   slug: string;
 
-  @Column({ unique: true })
+  @Column()
   path: string;
 
   @Column()
@@ -1469,6 +1478,9 @@ export class LandingPage {
 
   @Column({ type: 'simple-json', nullable: true })
   blocks: Record<string, unknown>[] = [];
+
+  @Column({ type: 'simple-json', nullable: true })
+  domains: string[] = [];
 
   @Column({ default: false })
   isPublished: boolean;

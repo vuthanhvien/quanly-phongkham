@@ -109,7 +109,7 @@ export function RecordFormContent({
     Promise.all([
       api.get("/settings/custom-fields", { params: { entityType: resource } }),
       api.get("/settings/views", { params: { entityType: resource } }),
-      api.get("/settings/custom-tables"),
+      api.get("/settings/custom-tables", { params: { includeRows: true } }),
     ])
       .then(([fieldResponse, viewResponse, tableResponse]) => {
         const tables = new Map((tableResponse.data.data || []).map((table: Record<string, unknown>) => [String(table.id), table]))
@@ -766,10 +766,21 @@ function FieldInput({
       />
     )
   }
-  if (field.key === "imageUrl") {
+  if (field.type === "image" || field.key === "imageUrl") {
     return (
       <ImageLibrarySelectInput
         disabled={field.disabled}
+        onChange={onChange}
+        placeholder={placeholder}
+        value={value}
+      />
+    )
+  }
+  if (field.type === "images") {
+    return (
+      <ImageLibrarySelectInput
+        disabled={field.disabled}
+        multiple
         onChange={onChange}
         placeholder={placeholder}
         value={value}
@@ -843,7 +854,7 @@ function FieldInput({
 
 function getDefaultFieldPlaceholder(field: FieldSpec) {
   const label = field.label.trim().toLowerCase()
-  if (field.type === "select" || field.type === "multi-select" || field.type === "dynamic-table" || field.type === "relative" || field.type === "file" || field.relation || relationFields[field.key] || field.key === "imageUrl") {
+  if (field.type === "select" || field.type === "multi-select" || field.type === "dynamic-table" || field.type === "relative" || field.type === "file" || field.type === "image" || field.type === "images" || field.relation || relationFields[field.key] || field.key === "imageUrl") {
     return `Chọn ${label}`
   }
   if (field.type === "date" || field.type === "datetime") return `Chọn ${label}`
@@ -1208,11 +1219,13 @@ function ImageLibrarySelectInput({
   onChange,
   disabled,
   placeholder,
+  multiple = false,
 }: {
   value?: unknown
   onChange?: (value: unknown) => void
   disabled?: boolean
   placeholder?: string
+  multiple?: boolean
 }) {
   const screens = Grid.useBreakpoint()
   const [openPicker, setOpenPicker] = useState(false)
@@ -1221,7 +1234,7 @@ function ImageLibrarySelectInput({
   const [treeData, setTreeData] = useState<FolderTreeNode[]>([])
   const [search, setSearch] = useState("")
   const [selectedFolderId, setSelectedFolderId] = useState<string>()
-  const [draftValue, setDraftValue] = useState<string>()
+  const [draftValues, setDraftValues] = useState<string[]>([])
   const [folderChildrenMap, setFolderChildrenMap] = useState<Record<string, string[]>>({})
   const [folderPathMap, setFolderPathMap] = useState<Record<string, string>>({})
 
@@ -1231,7 +1244,7 @@ function ImageLibrarySelectInput({
 
   useEffect(() => {
     if (openPicker) {
-      setDraftValue(typeof value === "string" ? value : undefined)
+      setDraftValues(Array.isArray(value) ? value.map(String) : typeof value === "string" && value ? [value] : [])
     }
   }, [openPicker, value])
 
@@ -1263,8 +1276,9 @@ function ImageLibrarySelectInput({
     setOptions(nextOptions)
   }
 
-  const selected = options.find((option) => option.value === value)
-  const selectedDraft = options.find((option) => option.value === draftValue)
+  const selectedValues = Array.isArray(value) ? value.map(String) : typeof value === "string" && value ? [value] : []
+  const selectedOptions = options.filter((option) => selectedValues.includes(option.value))
+  const selectedDraft = options.find((option) => draftValues.includes(option.value))
   const visibleOptions = options.filter((option) => {
     const keyword = search.trim().toLowerCase()
     const matchesSearch = !keyword
@@ -1278,31 +1292,22 @@ function ImageLibrarySelectInput({
 
   return (
     <Space direction="vertical" size={10} style={{ width: "100%" }}>
-      {typeof value === "string" && value ? (
-        <div
-          style={{
-            border: "1px solid var(--app-line)",
-            borderRadius: "var(--app-radius)",
-            padding: 12,
-            background: "rgba(255,255,255,0.8)",
-          }}
-        >
-          <Image
-            alt={selected?.title || "Hình ảnh đã chọn"}
-            src={value}
-            style={{ width: "100%", maxHeight: 240, objectFit: "contain", borderRadius: "var(--app-radius)" }}
-          />
-          <Typography.Text style={{ display: "block", marginTop: 8 }}>
-            {selected?.title || value}
-          </Typography.Text>
-        </div>
+      {selectedValues.length ? (
+        <Image.PreviewGroup>
+          <Space wrap>
+            {selectedValues.map((imageUrl) => {
+              const selected = selectedOptions.find((option) => option.value === imageUrl)
+              return <Image key={imageUrl} alt={selected?.title || "Hình ảnh đã chọn"} src={imageUrl} style={{ width: multiple ? 92 : "100%", maxHeight: multiple ? 92 : 240, objectFit: "cover", borderRadius: multiple ? "50%" : "var(--app-radius)" }} />
+            })}
+          </Space>
+        </Image.PreviewGroup>
       ) : null}
       <Space.Compact style={{ width: "100%" }}>
         <Input
           disabled
           placeholder={placeholder}
           style={{ width: "100%" }}
-          value={selected?.title || (value as string | undefined)}
+          value={selectedValues.length ? `${selectedValues.length} hình ảnh đã chọn` : undefined}
         />
         <Button disabled={disabled} onClick={() => setOpenPicker(true)}>
           Chọn ảnh
@@ -1316,7 +1321,7 @@ function ImageLibrarySelectInput({
         width={screens.lg ? 1080 : "calc(100vw - 16px)"}
         onCancel={() => setOpenPicker(false)}
         footer={[
-          <Button key="clear" onClick={() => { setDraftValue(undefined); onChange?.(undefined) }}>
+          <Button key="clear" onClick={() => { setDraftValues([]); onChange?.(multiple ? [] : undefined) }}>
             Bỏ chọn
           </Button>,
           <Button key="cancel" onClick={() => setOpenPicker(false)}>
@@ -1325,10 +1330,10 @@ function ImageLibrarySelectInput({
           <Button
             key="select"
             className="primary-glow"
-            disabled={!draftValue}
+            disabled={!draftValues.length}
             type="primary"
             onClick={() => {
-              onChange?.(draftValue)
+              onChange?.(multiple ? draftValues : draftValues[0])
               setOpenPicker(false)
             }}
           >
@@ -1380,16 +1385,18 @@ function ImageLibrarySelectInput({
                   </div>
                 ) : (
                   visibleOptions.map((option) => {
-                    const active = draftValue === option.value
+                    const active = draftValues.includes(option.value)
                     return (
                       <button
                         key={option.fileId}
                         className={`image-library-card${active ? " active" : ""}`}
                         type="button"
-                        onClick={() => setDraftValue(option.value)}
+                        onClick={() => setDraftValues((current) => multiple ? (current.includes(option.value) ? current.filter((item) => item !== option.value) : [...current, option.value]) : [option.value])}
                         onDoubleClick={() => {
-                          onChange?.(option.value)
-                          setOpenPicker(false)
+                          if (!multiple) {
+                            onChange?.(option.value)
+                            setOpenPicker(false)
+                          }
                         }}
                       >
                         <img alt={option.title} src={option.previewUrl} />
@@ -1415,7 +1422,7 @@ function ImageLibrarySelectInput({
                         borderRadius: "var(--app-radius)",
                       }}
                     />
-                    <Typography.Title level={5}>{selectedDraft.title.replace(` ${selectedDraft.folderLabel || ""}`, "")}</Typography.Title>
+                    <Typography.Title level={5}>{multiple ? `${draftValues.length} hình ảnh đang chọn` : selectedDraft.title.replace(` ${selectedDraft.folderLabel || ""}`, "")}</Typography.Title>
                     <Typography.Text type="secondary">{selectedDraft.folderLabel || "Không có folder"}</Typography.Text>
                   </>
                 ) : (
@@ -1444,7 +1451,7 @@ function ImageLibrarySelectInput({
             const uploadedUrl = resolveFileUrl(files[0]?.publicUrl)
             void loadOptions()
             if (uploadedUrl) {
-              setDraftValue(uploadedUrl)
+              setDraftValues((current) => multiple ? Array.from(new Set([...current, uploadedUrl])) : [uploadedUrl])
             }
             setOpenUpload(false)
           }}

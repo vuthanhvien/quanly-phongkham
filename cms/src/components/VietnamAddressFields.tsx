@@ -8,10 +8,12 @@ export function VietnamAddressFields({
 }: {
   form: ReturnType<typeof Form.useForm>[0]
 }) {
+  const [countries, setCountries] = useState<Option[]>([])
   const [provinces, setProvinces] = useState<Option[]>([])
   const [wards, setWards] = useState<Option[]>([])
   const provinceCode = Form.useWatch("provinceCode", form) as string | undefined
   useEffect(() => {
+    api.get("/locations/countries").then((r) => setCountries(r.data.data || [])).catch(() => setCountries([]))
     api
       .get("/locations/provinces")
       .then((r) => setProvinces(r.data.data || []))
@@ -31,7 +33,7 @@ export function VietnamAddressFields({
     <>
       <Col xs={24} md={8}>
         <Form.Item label="Quốc gia" name="countryCode" initialValue="VN">
-          <Select options={[{ value: "VN", label: "Việt Nam" }]} />
+          <Select showSearch optionFilterProp="label" options={countries.map((x) => ({ value: x.code, label: x.name }))} onChange={() => form.setFieldsValue({ provinceCode: undefined, provinceName: undefined, wardCode: undefined, wardName: undefined })} />
         </Form.Item>
       </Col>
       <Col xs={24} md={8}>

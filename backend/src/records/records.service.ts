@@ -3283,6 +3283,8 @@ export class RecordsService {
         field.dataType === 'file' ? Boolean(
           (await this.files.count({ where: { id: In(valueItems.map((item) => String(item))), isActive: true } })) === valueItems.length,
         ) :
+        field.dataType === 'image' ? typeof value === 'string' && value.trim().length > 0 :
+        field.dataType === 'images' ? Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === 'string' && item.trim().length > 0) :
         field.dataType === 'relative' ? typeof value === 'string' && value.length > 0 :
         field.dataType === 'dynamic-table' ? Boolean(
           field.customTableId && (await this.customTableRows.count({ where: { tableId: field.customTableId, id: In(valueItems.map((item) => String(item))), isArchived: false } })) === valueItems.length,
