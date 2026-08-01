@@ -9,7 +9,7 @@ import {
   UserOutlined,
 } from "@ant-design/icons"
 import { useGetIdentity } from "@refinedev/core"
-import { Avatar, Button, Card, Col, Empty, Form, Input, Row, Space, Tabs, Tag, Typography, message } from "antd"
+import { Avatar, Button, Card, Col, Empty, Form, Input, Modal, Row, Space, Tabs, Tag, Typography, message } from "antd"
 import type { TabsProps } from "antd"
 import type { ReactNode } from "react"
 import { useEffect, useMemo, useState } from "react"
@@ -143,6 +143,7 @@ export function ProfilePage() {
   const [branch, setBranch] = useState<BranchProfile | null>(null)
   const [department, setDepartment] = useState<DepartmentProfile | null>(null)
   const [branchMap, setBranchMap] = useState<Record<string, string>>({})
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
 
   async function changePassword(values: ChangePasswordValues) {
@@ -153,6 +154,7 @@ export function ProfilePage() {
         newPassword: values.newPassword,
       })
       passwordForm.resetFields()
+      setChangePasswordOpen(false)
       void message.success("Đổi mật khẩu thành công")
     } catch (error) {
       const responseMessage = (error as { response?: { data?: { message?: unknown } } })?.response?.data?.message
@@ -356,6 +358,11 @@ export function ProfilePage() {
             Bên trái là thông tin tài khoản, bên phải là các tab hồ sơ liên kết theo nhân viên và phân quyền.
           </Typography.Paragraph>
         </div>
+        <div className="page-header-actions">
+          <Button type="primary" icon={<LockOutlined />} onClick={() => setChangePasswordOpen(true)}>
+            Đổi mật khẩu
+          </Button>
+        </div>
       </div>
 
       <Row gutter={[16, 16]}>
@@ -390,28 +397,6 @@ export function ProfilePage() {
               </div>
             </Card>
 
-            <Card className="glass-card detail-card" title={<Space><LockOutlined />Đổi mật khẩu</Space>}>
-              <Form form={passwordForm} layout="vertical" onFinish={(values) => void changePassword(values)}>
-                <Form.Item name="currentPassword" label="Mật khẩu hiện tại" rules={[{ required: true, message: "Nhập mật khẩu hiện tại" }]}>
-                  <Input.Password autoComplete="current-password" />
-                </Form.Item>
-                <Form.Item name="newPassword" label="Mật khẩu mới" rules={[{ required: true, message: "Nhập mật khẩu mới" }, { min: 8, message: "Mật khẩu mới phải có ít nhất 8 ký tự" }]}>
-                  <Input.Password autoComplete="new-password" />
-                </Form.Item>
-                <Form.Item
-                  name="confirmPassword"
-                  label="Xác nhận mật khẩu mới"
-                  dependencies={["newPassword"]}
-                  rules={[
-                    { required: true, message: "Xác nhận mật khẩu mới" },
-                    ({ getFieldValue }) => ({ validator(_, value) { return !value || getFieldValue("newPassword") === value ? Promise.resolve() : Promise.reject(new Error("Mật khẩu xác nhận không khớp")) } }),
-                  ]}
-                >
-                  <Input.Password autoComplete="new-password" />
-                </Form.Item>
-                <Button type="primary" htmlType="submit" loading={changingPassword} icon={<LockOutlined />}>Đổi mật khẩu</Button>
-              </Form>
-            </Card>
           </div>
         </Col>
 
@@ -421,6 +406,39 @@ export function ProfilePage() {
           </Card>
         </Col>
       </Row>
+
+      <Modal
+        title={<Space><LockOutlined />Đổi mật khẩu</Space>}
+        open={changePasswordOpen}
+        confirmLoading={changingPassword}
+        okText="Cập nhật mật khẩu"
+        cancelText="Hủy"
+        onOk={() => passwordForm.submit()}
+        onCancel={() => {
+          passwordForm.resetFields()
+          setChangePasswordOpen(false)
+        }}
+      >
+        <Form form={passwordForm} layout="vertical" onFinish={(values) => void changePassword(values)}>
+          <Form.Item name="currentPassword" label="Mật khẩu hiện tại" rules={[{ required: true, message: "Nhập mật khẩu hiện tại" }]}>
+            <Input.Password autoComplete="current-password" />
+          </Form.Item>
+          <Form.Item name="newPassword" label="Mật khẩu mới" rules={[{ required: true, message: "Nhập mật khẩu mới" }, { min: 8, message: "Mật khẩu mới phải có ít nhất 8 ký tự" }]}>
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item
+            name="confirmPassword"
+            label="Xác nhận mật khẩu mới"
+            dependencies={["newPassword"]}
+            rules={[
+              { required: true, message: "Xác nhận mật khẩu mới" },
+              ({ getFieldValue }) => ({ validator(_, value) { return !value || getFieldValue("newPassword") === value ? Promise.resolve() : Promise.reject(new Error("Mật khẩu xác nhận không khớp")) } }),
+            ]}
+          >
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Space>
   )
 }
