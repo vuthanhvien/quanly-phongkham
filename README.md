@@ -16,6 +16,16 @@ cp .env.example .env
 docker compose up --build
 ```
 
+### Chạy development với tự reload
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+Mã nguồn của Backend, CMS và Landing được mount vào container. Các lệnh dev có
+watch/polling nên thay đổi file sẽ tự reload; truy cập Landing tại cổng `9997`,
+API tại `9998` và CMS tại `9999`.
+
 - Landing: [http://localhost:9997](http://localhost:9997)
 - API: [http://localhost:9998/api](http://localhost:9998/api)
 - CMS: [http://localhost:9999](http://localhost:9999)

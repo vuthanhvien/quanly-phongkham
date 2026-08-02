@@ -459,6 +459,7 @@ export function RecordListPage() {
       </Card>
       <Modal
         className="quick-drawer"
+        centered
         destroyOnHidden
         maskClosable={false}
         open={Boolean(detailId)}
@@ -538,6 +539,7 @@ export function RecordListPage() {
       </Modal>
       <Modal
         className="quick-drawer"
+        centered
         destroyOnHidden
         maskClosable={false}
         open={creating || Boolean(editingId)}

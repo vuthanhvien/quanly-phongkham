@@ -306,7 +306,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
         {/* Left: related tabs */}
         <Col xs={24} xl={18} className="detail-tabs-col">
           {(() => {
-            const serviceOrderItemsTab = resource === "service-orders" && Array.isArray(record?.items) && record.items.length > 0
+            const serviceOrderItemsTab = resource === "service-orders"
               ? [{
                   key: "__service-order-items",
                   label: "Sản phẩm trong đơn",
@@ -318,9 +318,9 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                         { title: "Đơn giá", dataIndex: "unitPrice", key: "unitPrice", width: 140 },
                         { title: "Thành tiền", dataIndex: "lineTotal", key: "lineTotal", width: 160 },
                       ]}
-                      dataSource={record.items}
+                      dataSource={Array.isArray(record?.items) ? record.items : []}
                       pagination={false}
-                      rowKey="id"
+                      rowKey={(item, index) => item.id || `${item.productId || "product"}-${index}`}
                       scroll={{ x: "max-content" }}
                       size="small"
                     />

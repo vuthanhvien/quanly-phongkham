@@ -733,6 +733,33 @@ body {
   background: #ffffff !important;
 }
 
+/* Keep quick-view and quick-create modals inside the viewport.  The modal
+ * shell stays fixed while only its body can scroll, so the title and actions
+ * never disappear outside the screen. */
+.quick-drawer.ant-modal {
+  top: 16px;
+  padding-bottom: 0;
+}
+
+.quick-drawer.ant-modal.ant-modal-centered {
+  top: 0;
+}
+
+.quick-drawer .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
+}
+
+.quick-drawer .ant-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .quick-drawer .ant-drawer-header {
   border-bottom-color: rgba(15, 23, 42, 0.08) !important;
 }

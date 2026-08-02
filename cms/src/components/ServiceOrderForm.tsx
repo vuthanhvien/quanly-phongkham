@@ -215,7 +215,9 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       width: 280,
       render: (_value, row) => (
         <Select
-          getPopupContainer={(triggerNode) => triggerNode.parentElement || document.body}
+          // Render at document level: the table's horizontal-scroll wrapper clips
+          // any popup mounted inside a cell.
+          getPopupContainer={() => document.body}
           loading={lookupLoading}
           notFoundContent={lookupLoading ? "Đang tải sản phẩm..." : "Không có sản phẩm"}
           options={productOptions}

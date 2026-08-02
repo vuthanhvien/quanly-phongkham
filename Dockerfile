@@ -38,6 +38,30 @@ COPY --from=landing-deps /app/node_modules ./node_modules
 COPY landing ./
 RUN npm run build
 
+# Development targets keep each app's dependencies in the image.  Source code
+# is mounted by docker-compose.dev.yml, while the node_modules directories are
+# preserved in named volumes for fast hot reloads.
+FROM node:22-alpine AS backend-dev
+WORKDIR /app/backend
+COPY backend/package*.json ./
+RUN npm install
+COPY backend ./
+CMD ["npm", "run", "start:dev"]
+
+FROM node:22-alpine AS cms-dev
+WORKDIR /app/cms
+COPY cms/package*.json ./
+RUN npm install
+COPY cms ./
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "9999"]
+
+FROM node:22-alpine AS landing-dev
+WORKDIR /app/landing
+COPY landing/package*.json ./
+RUN npm install
+COPY landing ./
+CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "9997"]
+
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production

@@ -1,0 +1,74 @@
+name: gis-clinic-dev
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend-dev
+    command: npm run start:dev
+    environment:
+      NODE_ENV: development
+      PORT: 9998
+      DATABASE_URL: ${DATABASE_URL}
+      MANAGEMENT_DATABASE_URL: ${MANAGEMENT_DATABASE_URL:-}
+      TENANTS_JSON: ${TENANTS_JSON:-}
+      TYPEORM_SYNCHRONIZE: ${TYPEORM_SYNCHRONIZE:-true}
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "300"
+    ports:
+      - "${API_PORT:-9998}:9998"
+    volumes:
+      - ./backend:/app/backend
+      - backend_node_modules:/app/backend/node_modules
+      - ${UPLOADS_DIR:-./data/uploads}:/app/backend/storage/uploads
+      - ${LOGS_DIR:-./data/logs}:/app/backend/storage/logs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  cms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cms-dev
+    command: npm run dev -- --host 0.0.0.0 --port 9999
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:9998/api}
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "300"
+    depends_on:
+      - backend
+    ports:
+      - "${ADMIN_PORT:-9999}:9999"
+    volumes:
+      - ./cms:/app/cms
+      - cms_node_modules:/app/cms/node_modules
+
+  landing:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: landing-dev
+    command: npm run dev -- --hostname 0.0.0.0 --port 9997
+    environment:
+      NODE_ENV: development
+      LANDING_API_URL: http://backend:9998/api
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:9998/api}
+      LANDING_REVALIDATE_SECRET: ${LANDING_REVALIDATE_SECRET:-${JWT_SECRET}}
+      WATCHPACK_POLLING: "true"
+    depends_on:
+      - backend
+    ports:
+      - "${LANDING_PORT:-9997}:9997"
+    volumes:
+      - ./landing:/app/landing
+      - landing_node_modules:/app/landing/node_modules
+
+volumes:
+  backend_node_modules:
+  cms_node_modules:
+  landing_node_modules:
