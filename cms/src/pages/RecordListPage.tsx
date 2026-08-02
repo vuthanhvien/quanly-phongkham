@@ -75,7 +75,6 @@ export function RecordListPage() {
   const [lookups, setLookups] = useState<LookupMap>({})
   const [fileLookups, setFileLookups] = useState<FileLookupMap>({})
   const [relatedQuickView, setRelatedQuickView] = useState<{ resource: string; id: string } | null>(null)
-  const [staffTypeFilter, setStaffTypeFilter] = useState<string | undefined>(undefined)
   const [doctorFilter, setDoctorFilter] = useState<string | undefined>(undefined)
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
   const [archiveSelectedOpen, setArchiveSelectedOpen] = useState(false)
@@ -87,7 +86,6 @@ export function RecordListPage() {
     filters: [
       { field: "search", operator: "contains" as const, value: search },
       { field: "isArchived", operator: "eq" as const, value: recordStatus === "archived" },
-      ...(resource === "staff" && staffTypeFilter ? [{ field: "type", operator: "eq" as const, value: staffTypeFilter }] : []),
       ...(resource === "appointments" && doctorFilter ? [{ field: "doctorStaffId", operator: "eq" as const, value: doctorFilter }] : []),
     ],
   }) as any
@@ -105,7 +103,6 @@ export function RecordListPage() {
     setEditingId(null)
     setDuplicateValues(undefined)
     setDuplicatingId(null)
-    setStaffTypeFilter(undefined)
     setDoctorFilter(undefined)
     setRecordStatus("active")
     setSelectedRowKeys([])
@@ -432,23 +429,6 @@ export function RecordListPage() {
               setSearch(value)
             }}
           />
-          {resource === "staff" ? (
-            <Select
-              allowClear
-              options={[
-                { value: "ADMIN", label: "Admin" },
-                { value: "DOCTOR", label: "Bác sĩ" },
-                { value: "STAFF", label: "Nhân viên" },
-              ]}
-              placeholder="Lọc phân loại"
-              style={{ minWidth: 170 }}
-              value={staffTypeFilter}
-              onChange={(value) => {
-                setCurrentPage(1)
-                setStaffTypeFilter(value)
-              }}
-            />
-          ) : null}
           {resource === "appointments" ? (
             <Select
               allowClear
