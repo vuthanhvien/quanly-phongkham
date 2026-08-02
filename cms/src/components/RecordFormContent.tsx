@@ -34,6 +34,7 @@ import { FileUploadPanel } from "./FileUploadPanel"
 import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
 import { getRelationMetaMap, loadRelationOptions, LookupMap, RelationLookupRecord } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
+import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
 import { getFirstLookupValue } from "../utils/branchDefaults"
 import { toastError, toastSuccess } from "../toast"
 import { buildLocalDateTime, currentLocalDate, currentLocalDateTime, normalizeDateTimeValueForInput, normalizeDateValueForInput, parseClinicDateTime } from "../utils/datetime"
@@ -713,6 +714,8 @@ function FieldInput({
     return (
       <InputNumber
         disabled={field.disabled}
+        formatter={formatNumberInput}
+        parser={parseNumberInput}
         placeholder={placeholder}
         style={{ width: "100%" }}
         value={value as number | undefined}

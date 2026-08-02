@@ -2,7 +2,9 @@ import {
   AppstoreOutlined,
   DeleteOutlined,
   DownloadOutlined,
+  EditOutlined,
   ImportOutlined,
+  MoreOutlined,
   PlusOutlined,
   UploadOutlined,
 } from "@ant-design/icons"
@@ -10,6 +12,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -17,13 +20,14 @@ import {
   Select,
   Space,
   Table,
+  Tooltip,
   Typography,
   Upload,
   message,
 } from "antd"
 import type { UploadProps } from "antd"
 import type { ColumnsType } from "antd/es/table"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type Key } from "react"
 import * as XLSX from "xlsx"
 import { api } from "../api"
 import { appModuleGroups } from "../company-types"
@@ -86,6 +90,7 @@ export function CustomFieldsPage() {
   const [batchRows, setBatchRows] = useState<BatchFieldRow[]>([])
   const [importModal, setImportModal] = useState(false)
   const [importPayload, setImportPayload] = useState<ParsedFieldInput[]>([])
+  const [selectedFieldIds, setSelectedFieldIds] = useState<Key[]>([])
   const [fieldForm] = Form.useForm()
   const currentFieldType = Form.useWatch("dataType", fieldForm)
   const fieldKeys = useMemo(
@@ -106,6 +111,7 @@ export function CustomFieldsPage() {
       params: { entityType },
     })
     setFields(response.data.data)
+    setSelectedFieldIds([])
   }
 
   async function saveField(values: Record<string, unknown>) {
@@ -143,6 +149,23 @@ export function CustomFieldsPage() {
     await api.delete(`/settings/custom-fields/${id}`)
     message.success("Đã xóa field")
     await load()
+  }
+
+  function archiveSelectedFields() {
+    const ids = selectedFieldIds.map(String)
+    if (!ids.length) return
+    Modal.confirm({
+      title: `Lưu trữ ${ids.length} trường tuỳ biến?`,
+      content: "Các trường đã lưu trữ sẽ không còn hiển thị trên form.",
+      okButtonProps: { danger: true },
+      okText: "Lưu trữ",
+      cancelText: "Hủy",
+      onOk: async () => {
+        await Promise.all(ids.map((id) => api.delete(`/settings/custom-fields/${id}`)))
+        message.success(`Đã lưu trữ ${ids.length} trường tuỳ biến`)
+        await load()
+      },
+    })
   }
 
   function openBatch(mode: "create" | "upsert") {
@@ -316,6 +339,11 @@ export function CustomFieldsPage() {
             style={{ width: 280 }}
             options={CUSTOM_FIELD_ENTITY_OPTIONS}
           />
+          {selectedFieldIds.length > 0 ? (
+            <Button danger icon={<DeleteOutlined />} onClick={archiveSelectedFields}>
+              Lưu trữ đã chọn ({selectedFieldIds.length})
+            </Button>
+          ) : null}
           <Button
             className="primary-glow"
             icon={<AppstoreOutlined />}
@@ -324,21 +352,22 @@ export function CustomFieldsPage() {
           >
             Thêm field
           </Button>
-          <Button icon={<UploadOutlined />} onClick={() => openBatch("create")}>
-            Add multi
-          </Button>
-          <Button icon={<UploadOutlined />} onClick={() => openBatch("upsert")}>
-            Update multi
-          </Button>
-          <Button icon={<DownloadOutlined />} onClick={exportFields}>
-            Export cấu hình
-          </Button>
-          <Button icon={<DownloadOutlined />} onClick={exportSampleFields}>
-            Tải data test
-          </Button>
-          <Upload {...uploadProps}>
-            <Button icon={<ImportOutlined />}>Nhập file</Button>
-          </Upload>
+          <Dropdown
+            dropdownRender={() => (
+              <Card size="small" styles={{ body: { display: "grid", gap: 4, minWidth: 190 } }}>
+                <Button icon={<UploadOutlined />} type="text" onClick={() => openBatch("create")}>Add multi</Button>
+                <Button icon={<UploadOutlined />} type="text" onClick={() => openBatch("upsert")}>Update multi</Button>
+                <Button icon={<DownloadOutlined />} type="text" onClick={exportFields}>Export cấu hình</Button>
+                <Button icon={<DownloadOutlined />} type="text" onClick={exportSampleFields}>Tải data test</Button>
+                <Upload {...uploadProps}>
+                  <Button block icon={<ImportOutlined />} type="text">Nhập file</Button>
+                </Upload>
+              </Card>
+            )}
+            trigger={["click"]}
+          >
+            <Button icon={<MoreOutlined />}>Thao tác</Button>
+          </Dropdown>
         </Space>
       </div>
       <Card className="glass-card settings-card">
@@ -351,6 +380,11 @@ export function CustomFieldsPage() {
           pagination={false}
           rowKey="id"
           dataSource={fields}
+          rowSelection={{
+            selectedRowKeys: selectedFieldIds,
+            onChange: setSelectedFieldIds,
+            preserveSelectedRowKeys: true,
+          }}
           scroll={{ x: "max-content" }}
           columns={[
             { title: "Nhãn", dataIndex: "label" },
@@ -370,18 +404,15 @@ export function CustomFieldsPage() {
             },
             {
               title: "",
+              width: 96,
               render: (_, row) => (
-                <Space>
-                  <Button type="link" onClick={() => openEditField(row)}>
-                    Sửa
-                  </Button>
-                  <Button
-                    danger
-                    type="link"
-                    onClick={() => deleteField(row.id)}
-                  >
-                    Lưu trữ
-                  </Button>
+                <Space size={2}>
+                  <Tooltip title="Sửa trường">
+                    <Button icon={<EditOutlined />} type="text" onClick={() => openEditField(row)} />
+                  </Tooltip>
+                  <Tooltip title="Lưu trữ">
+                    <Button danger icon={<DeleteOutlined />} type="text" onClick={() => deleteField(row.id)} />
+                  </Tooltip>
                 </Space>
               ),
             },

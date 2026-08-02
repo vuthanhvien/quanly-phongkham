@@ -88,7 +88,7 @@ export function relationLabel(record: Record<string, unknown>, spec: RelationSpe
   return parts.length ? parts.join(' - ') : String(record.id || '');
 }
 
-export async function loadRelationOptions(fields: Array<string | FieldSpec>) {
+export async function loadRelationOptions(fields: Array<string | FieldSpec>, options?: { includeArchived?: boolean }) {
   const relationSpecs = fields
     .map((field) => resolveRelationSpec(field))
     .filter(Boolean) as RelationSpec[];
@@ -107,7 +107,7 @@ export async function loadRelationOptions(fields: Array<string | FieldSpec>) {
     uniqueKeys.map(async (key) => {
       const spec = requestSpecs.find((item) => (item.lookupKey || item.resource) === key)!;
       const response = await api
-        .get(`/records/${spec.resource}`, { params: { pageSize: 500, ...spec.params } })
+        .get(`/records/${spec.resource}`, { params: { pageSize: 500, includeArchived: options?.includeArchived || undefined, ...spec.params } })
         .catch(() => ({ data: { data: [] } }));
       if (spec.resource === 'file-folders') {
         const rows = normalizeFileFolderRows(response.data.data || []);

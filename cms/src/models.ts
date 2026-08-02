@@ -525,7 +525,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'name', label: 'Tên sản phẩm', required: true, width: '66', tableWidth: 240 },
     { key: 'barcode', label: 'Mã vạch', width: '50', tableWidth: 180 },
     { key: 'productType', label: 'Loại', type: 'select', options: [{ value: 'CONSUMABLE', label: 'Vật tư tiêu hao' }, { value: 'REUSABLE', label: 'Thiết bị tái dùng' }, { value: 'RETAIL', label: 'Sản phẩm bán lẻ' }, { value: 'SERVICE', label: 'Dịch vụ' }, { value: 'COMBO', label: 'Combo / Gói dịch vụ' }], width: '33', tableWidth: 150 },
-    { key: 'category', label: 'Ngành / nhóm / loại', width: '50', tableWidth: 180 },
+    { key: 'category', label: 'Ngành / nhóm / loại', type: 'select', width: '50', tableWidth: 180 },
     { key: 'purchaseUnit', label: 'Đơn vị nhập', width: '33', tableWidth: 140 },
     { key: 'usageUnit', label: 'Đơn vị xuất', width: '33', tableWidth: 140 },
     { key: 'conversionFactor', label: 'Quy đổi', type: 'number', width: '33', tableWidth: 140 },

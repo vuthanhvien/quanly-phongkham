@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
 import { getFirstOptionValue } from "../utils/branchDefaults"
 import { getApiErrorMessage } from "../utils/apiError"
+import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
 import { RecordDraftControls } from "./RecordDraftControls"
 
 interface StockBatchFormProps {
@@ -343,7 +344,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
       key: "quantity",
       width: 110,
       render: (_value, row) => (
-        <InputNumber min={1} style={{ width: "100%" }} value={row.quantity} onChange={(value) => handleReceiptFieldChange(row.index, "quantity", Number(value || 0))} />
+        <InputNumber formatter={formatNumberInput} min={1} parser={parseNumberInput} style={{ width: "100%" }} value={row.quantity} onChange={(value) => handleReceiptFieldChange(row.index, "quantity", Number(value || 0))} />
       ),
     },
     {
@@ -407,7 +408,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
       key: "quantity",
       width: 120,
       render: (_value, row) => (
-        <InputNumber min={1} style={{ width: "100%" }} value={row.quantity} onChange={(value) => handleIssueFieldChange(row.index, "quantity", Number(value || 0))} />
+        <InputNumber formatter={formatNumberInput} min={1} parser={parseNumberInput} style={{ width: "100%" }} value={row.quantity} onChange={(value) => handleIssueFieldChange(row.index, "quantity", Number(value || 0))} />
       ),
     },
     {

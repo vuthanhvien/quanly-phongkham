@@ -174,7 +174,7 @@ body {
 }
 
 .side-menu .ant-menu-sub {
-  background: color-mix(in srgb, var(--app-surface) 88%, var(--app-primary)) !important;
+  background: color-mix(in srgb, var(--app-sider-bg) 72%, var(--app-menu-hover-bg)) !important;
   border: 1px solid var(--app-line);
   border-radius: calc(var(--app-radius) + 2px);
   margin: 0 2px 6px !important;
@@ -671,6 +671,19 @@ body {
   padding: 8px;
 }
 
+.record-status-tabs {
+  margin-bottom: 0;
+}
+
+.record-status-tabs > .ant-tabs-nav {
+  margin-bottom: 0 !important;
+}
+
+.record-status-tabs + .table-card {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
 .form-card {
   max-width: 920px;
   margin-inline: auto;
@@ -741,7 +754,7 @@ body {
   padding-bottom: 0;
 }
 
-.quick-drawer.ant-modal.ant-modal-centered {
+.ant-modal-centered .quick-drawer.ant-modal {
   top: 0;
 }
 
@@ -2252,6 +2265,7 @@ textarea.ant-input {
   grid-template-columns: 24px minmax(0, 1fr);
   max-width: 100%;
   min-width: 0;
+  text-align: left;
 }
 
 .relation-entity-card__avatar {
@@ -2260,10 +2274,17 @@ textarea.ant-input {
   flex-shrink: 0;
 }
 
+.relation-entity-card__avatar-wrap {
+  height: 24px;
+  position: relative;
+  width: 24px;
+}
+
 .relation-entity-card__copy {
   display: grid;
   gap: 1px;
   min-width: 0;
+  text-align: left;
 }
 
 .relation-entity-card__copy strong,
@@ -2288,6 +2309,22 @@ textarea.ant-input {
   line-height: 1.2;
 }
 
+.archived-record-avatar-badge {
+  align-items: center;
+  background: var(--app-surface, #fff);
+  border: 1px solid var(--app-line);
+  border-radius: 50%;
+  bottom: -5px;
+  color: var(--app-text-soft);
+  display: inline-flex;
+  font-size: 8px;
+  height: 13px;
+  justify-content: center;
+  position: absolute;
+  right: -5px;
+  width: 13px;
+}
+
 .service-order-grid {
   display: grid;
   gap: 0 16px;
@@ -2296,6 +2333,26 @@ textarea.ant-input {
 
 .service-order-items-card {
   margin-bottom: 16px;
+}
+
+.service-order-item--component > td {
+  background: rgba(15, 23, 42, 0.025) !important;
+  padding-bottom: 5px !important;
+  padding-top: 5px !important;
+}
+
+.service-order-item--component > td:first-child {
+  padding-left: 28px !important;
+  position: relative;
+}
+
+.service-order-item--component > td:first-child::before {
+  color: var(--app-text-soft);
+  content: "↳";
+  left: 12px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .service-order-summary {

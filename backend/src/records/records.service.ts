@@ -490,17 +490,21 @@ export class RecordsService {
   ) {
     await this.assertPermission(user, resource, 'view');
     const repository = this.repository(resource);
+    const isArchived = String(filters.isArchived || '').toLowerCase() === 'true';
+    const includeArchived = String(filters.includeArchived || '').toLowerCase() === 'true';
     // The branch directory is global reference data. It must stay available
     // for selectors and administration regardless of the user's branch roles.
     if (resource === 'branches') {
       const [rows, total] = await repository.findAndCount({
-        where: { isArchived: false },
+        where: includeArchived ? {} : { isArchived },
         order: { createdAt: 'DESC' },
       });
       return { data: rows.map((row) => this.protect(resource, row, request)), total };
     }
     const normalizedFilters = { ...filters };
     delete normalizedFilters.branchIds;
+    delete normalizedFilters.isArchived;
+    delete normalizedFilters.includeArchived;
     let where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[] = {};
     if (search) {
       const searchable: Record<string, string[]> = {
@@ -533,7 +537,9 @@ export class RecordsService {
       where = (searchable[resource] || []).map((field) => ({ [field]: ILike(`%${search}%`) })) as FindOptionsWhere<ConfigurableEntity>[];
     }
     where = await this.applyResourceFilters(resource, where, normalizedFilters);
-    where = this.mergeWhere(where, { isArchived: false } as FindOptionsWhere<ConfigurableEntity>);
+    if (!includeArchived) {
+      where = this.mergeWhere(where, { isArchived } as FindOptionsWhere<ConfigurableEntity>);
+    }
     where = this.applySelectedBranchFilters(resource, where, filters);
     where = this.applyBranchScope(resource, where, user);
     let rows: ConfigurableEntity[];
@@ -581,7 +587,7 @@ export class RecordsService {
   }
 
   private async findStored(resource: string, id: string) {
-    const record = await this.repository(resource).findOne({ where: { id, isArchived: false } });
+    const record = await this.repository(resource).findOne({ where: { id } });
     if (!record) throw new NotFoundException('Không tìm thấy dữ liệu');
     return record;
   }
@@ -3366,7 +3372,8 @@ export class RecordsService {
       const product = productsById.get(productId);
       if (!product) throw new BadRequestException('Sản phẩm trong đơn hàng không hợp lệ');
       const quantity = Number(item.quantity || 0);
-      const unitPrice = Number(item.unitPrice ?? product.sellingPrice ?? 0);
+      const isComboComponent = Boolean(item.isComboComponent);
+      const unitPrice = isComboComponent ? 0 : Number(item.unitPrice ?? product.sellingPrice ?? 0);
       if (quantity <= 0) {
         throw new BadRequestException(`So luong khong hop le cho san pham ${product.name}`);
       }
@@ -3376,6 +3383,10 @@ export class RecordsService {
         quantity,
         unitPrice,
         lineTotal: quantity * unitPrice,
+        isComboComponent,
+        parentComboProductId: isComboComponent && item.parentComboProductId
+          ? String(item.parentComboProductId)
+          : undefined,
       });
     });
   }

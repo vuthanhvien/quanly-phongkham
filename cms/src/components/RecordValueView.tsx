@@ -1,5 +1,6 @@
 import {
   UserOutlined,
+  InboxOutlined,
   FileImageOutlined,
   FileOutlined,
   FilePdfOutlined,
@@ -59,12 +60,15 @@ function renderRelationCardValue(
   const itemId = Array.isArray(value) ? String(value[0] || "") : String(value)
   const content = (
     <span className={`relation-entity-card${compact ? " compact" : ""}`}>
-      <Avatar
-        className="relation-entity-card__avatar"
-        icon={<UserOutlined />}
-        size={24}
-        src={relationMeta.avatarUrl ? resolveFileUrl(String(relationMeta.avatarUrl)) : undefined}
-      />
+      <span className="relation-entity-card__avatar-wrap">
+        <Avatar
+          className="relation-entity-card__avatar"
+          icon={<UserOutlined />}
+          size={24}
+          src={relationMeta.avatarUrl ? resolveFileUrl(String(relationMeta.avatarUrl)) : undefined}
+        />
+        {relationMeta.isArchived ? <span className="archived-record-avatar-badge" title="Đã lưu trữ"><InboxOutlined /></span> : null}
+      </span>
       <span className="relation-entity-card__copy">
         <strong>{relationMeta.code || relationMeta.display_title || displayValue(field, value, lookups)}</strong>
         <span>{relationMeta.fullName || relationMeta.name || relationMeta.display_title || displayValue(field, value, lookups)}</span>

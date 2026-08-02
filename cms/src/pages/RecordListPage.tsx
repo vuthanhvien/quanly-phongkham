@@ -2,10 +2,14 @@ import { useDelete, useList } from "@refinedev/core"
 import {
   AuditOutlined,
   CopyOutlined,
+  ClearOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   EyeOutlined,
+  FullscreenOutlined,
   ImportOutlined,
+  MoreOutlined,
   PhoneOutlined,
   PrinterOutlined,
   SwapOutlined,
@@ -14,6 +18,7 @@ import {
 import {
   Button,
   Card,
+  Dropdown,
   Grid,
   Input,
   Modal,
@@ -21,6 +26,7 @@ import {
   Select,
   Space,
   Table,
+  Tabs,
   Tooltip,
   Typography,
   message,
@@ -38,8 +44,9 @@ import { ProductForm } from "../components/ProductForm"
 import { StockBatchForm } from "../components/StockBatchForm"
 import { CustomField, entityLabels } from "../models"
 import { RecordDetailPage } from "./RecordDetailPage"
-import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
+import { displayValue, FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
+import * as XLSX from "xlsx"
 import {
   FieldLayoutConfig,
   getFieldCatalog,
@@ -54,6 +61,7 @@ export function RecordListPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState("")
+  const [recordStatus, setRecordStatus] = useState<"active" | "archived">("active")
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
   const [displayFields, setDisplayFields] = useState<FieldLayoutConfig[]>([])
@@ -70,16 +78,20 @@ export function RecordListPage() {
   const [staffTypeFilter, setStaffTypeFilter] = useState<string | undefined>(undefined)
   const [doctorFilter, setDoctorFilter] = useState<string | undefined>(undefined)
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
+  const [archiveSelectedOpen, setArchiveSelectedOpen] = useState(false)
+  const [archivingSelected, setArchivingSelected] = useState(false)
+  const [cloningSelected, setCloningSelected] = useState(false)
   const query = useList({
     resource,
     pagination: { currentPage, pageSize },
     filters: [
       { field: "search", operator: "contains" as const, value: search },
+      { field: "isArchived", operator: "eq" as const, value: recordStatus === "archived" },
       ...(resource === "staff" && staffTypeFilter ? [{ field: "type", operator: "eq" as const, value: staffTypeFilter }] : []),
       ...(resource === "appointments" && doctorFilter ? [{ field: "doctorStaffId", operator: "eq" as const, value: doctorFilter }] : []),
     ],
   }) as any
-  const response = query.result || query.query?.data || query.data?.data
+  const response = query.query?.data || query.data?.data || query.result
   const rows = response?.data || []
   const total = response?.total || 0
   const loading = query.query?.isLoading || query.isLoading
@@ -95,6 +107,7 @@ export function RecordListPage() {
     setDuplicatingId(null)
     setStaffTypeFilter(undefined)
     setDoctorFilter(undefined)
+    setRecordStatus("active")
     setSelectedRowKeys([])
     if (detailId) {
       const nextParams = new URLSearchParams(searchParams)
@@ -127,7 +140,7 @@ export function RecordListPage() {
         const lookupFields = resource === "appointments"
           ? [...tableFields, "doctorStaffId"]
           : tableFields
-        return Promise.all([loadRelationOptions(lookupFields), loadFileLookupMap()])
+        return Promise.all([loadRelationOptions(lookupFields, { includeArchived: true }), loadFileLookupMap()])
       })
       .then(([nextLookups, nextFileLookups]) => {
         setLookups(nextLookups)
@@ -142,24 +155,27 @@ export function RecordListPage() {
         dataIndex: field.key,
         key: field.key,
         width: field.tableWidth,
-        render: (_: unknown, row: Record<string, any>) =>
-          <RecordValueView
-            compact
-            field={field}
-            fileLookups={fileLookups}
-            lookups={lookups}
-            onRelationClick={(targetResource, id) => {
-              if (!hasResourceAccess(targetResource)) return
-              setRelatedQuickView({ resource: targetResource, id })
-            }}
-            value={row[field.key] ?? row.customFields?.[field.key]}
-          />,
+        render: (_: unknown, row: Record<string, any>) => (
+          <Space size={4} wrap>
+            <RecordValueView
+              compact
+              field={field}
+              fileLookups={fileLookups}
+              lookups={lookups}
+              onRelationClick={(targetResource, id) => {
+                if (!hasResourceAccess(targetResource)) return
+                setRelatedQuickView({ resource: targetResource, id })
+              }}
+              value={row[field.key] ?? row.customFields?.[field.key]}
+            />
+          </Space>
+        ),
       })),
       {
         title: "",
         key: "action",
         fixed: "right" as const,
-        width: 160,
+        width: 200,
         render: (_: unknown, row: Record<string, any>) => (
           <Space size={2}>
             {hasActionAccess(resource, "view") && (
@@ -167,12 +183,17 @@ export function RecordListPage() {
                 <Button icon={<EyeOutlined />} type="text" onClick={() => openDetail(String(row.id))} />
               </Tooltip>
             )}
-            {hasActionAccess(resource, "update") && (
+            {hasActionAccess(resource, "view") && (
+              <Tooltip title="Xem đầy đủ">
+                <Button icon={<FullscreenOutlined />} type="text" onClick={() => navigate(`/${resource}/${row.id}/full`)} />
+              </Tooltip>
+            )}
+            {recordStatus === "active" && hasActionAccess(resource, "update") && (
               <Tooltip title="Chỉnh sửa">
                 <Button icon={<EditOutlined />} type="text" onClick={() => setEditingId(String(row.id))} />
               </Tooltip>
             )}
-            {hasActionAccess(resource, "create") && resource !== "files" && (
+            {recordStatus === "active" && hasActionAccess(resource, "create") && resource !== "files" && (
               <Tooltip title="Nhân bản">
                 <Button
                   icon={<CopyOutlined />}
@@ -216,7 +237,7 @@ export function RecordListPage() {
                 />
               </Tooltip>
             )}
-            {hasActionAccess(resource, "delete") && (
+            {recordStatus === "active" && hasActionAccess(resource, "delete") && (
               <Popconfirm
                 title="Lưu trữ bản ghi này? Bản ghi chỉ bị ẩn trên giao diện này, không bị xóa khỏi cơ sở dữ liệu."
                 onConfirm={() =>
@@ -240,7 +261,7 @@ export function RecordListPage() {
         ),
       },
     ],
-    [displayFields, resource, templates, lookups, fileLookups],
+    [displayFields, resource, recordStatus, templates, lookups, fileLookups],
   )
 
   const doctorOptions = useMemo(
@@ -324,22 +345,61 @@ export function RecordListPage() {
     refresh()
   }
 
-  function archiveSelected() {
+  async function archiveSelected() {
     const ids = selectedRowKeys.map(String)
     if (!ids.length) return
-    Modal.confirm({
-      title: `Lưu trữ ${ids.length} bản ghi đã chọn?`,
-      content: "Các bản ghi chỉ bị ẩn, không bị xóa khỏi cơ sở dữ liệu.",
-      okText: "Lưu trữ",
-      okButtonProps: { danger: true },
-      cancelText: "Hủy",
-      onOk: async () => {
-        await Promise.all(ids.map((id) => api.delete(`/records/${resource}/${id}`)))
-        setSelectedRowKeys([])
-        message.success(`Đã lưu trữ ${ids.length} bản ghi`)
+    setArchivingSelected(true)
+    try {
+      const results = await Promise.allSettled(ids.map((id) => api.delete(`/records/${resource}/${id}`)))
+      const failedIds = ids.filter((_id, index) => results[index].status === "rejected")
+      const archivedCount = ids.length - failedIds.length
+      setSelectedRowKeys(failedIds)
+      if (archivedCount > 0) {
+        message.success(`Đã lưu trữ ${archivedCount} bản ghi`)
         refresh()
-      },
-    })
+      }
+      if (failedIds.length > 0) {
+        message.error(`Không thể lưu trữ ${failedIds.length} bản ghi. Vui lòng thử lại.`)
+      }
+      if (failedIds.length === 0) setArchiveSelectedOpen(false)
+    } finally {
+      setArchivingSelected(false)
+    }
+  }
+
+  async function exportSelectedRecords() {
+    const visibleRowsById = new Map(rows.map((row: Record<string, any>) => [String(row.id), row]))
+    const selectedRows = await Promise.all(selectedRowKeys.map(async (selectedId) => {
+      const id = String(selectedId)
+      if (visibleRowsById.has(id)) return visibleRowsById.get(id)!
+      return (await api.get(`/records/${resource}/${id}`)).data.data
+    }))
+    const exportRows = selectedRows.map((row: Record<string, any>) =>
+      Object.fromEntries(displayFields.map((field) => [field.label, displayValue(field, row[field.key] ?? row.customFields?.[field.key], lookups)])),
+    )
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(exportRows), entityLabels[resource] || resource)
+    XLSX.writeFile(workbook, `${resource}-selected.xlsx`)
+  }
+
+  async function cloneSelectedRecords() {
+    const ids = selectedRowKeys.map(String)
+    if (!ids.length) return
+    setCloningSelected(true)
+    try {
+      const results = await Promise.allSettled(ids.map(async (id) => {
+        const response = await api.get(`/records/${resource}/${id}`)
+        await api.post(`/records/${resource}`, buildDuplicateValues(response.data.data))
+      }))
+      const succeeded = results.filter((result) => result.status === "fulfilled").length
+      if (succeeded > 0) {
+        message.success(`Đã clone ${succeeded} bản ghi`)
+        refresh()
+      }
+      if (succeeded < ids.length) message.error(`Không thể clone ${ids.length - succeeded} bản ghi`)
+    } finally {
+      setCloningSelected(false)
+    }
   }
 
   function openDetail(recordId: string) {
@@ -402,10 +462,29 @@ export function RecordListPage() {
               }}
             />
           ) : null}
-          {hasActionAccess(resource, "delete") && selectedRowKeys.length > 0 ? (
-            <Button danger icon={<DeleteOutlined />} onClick={archiveSelected}>
-              Lưu trữ đã chọn ({selectedRowKeys.length})
-            </Button>
+          {recordStatus === "active" && hasActionAccess(resource, "delete") && selectedRowKeys.length > 0 ? (
+            <Dropdown
+              menu={{
+                items: [
+                  { key: "archive", danger: true, icon: <DeleteOutlined />, label: "Lưu trữ" },
+                  { key: "export", icon: <DownloadOutlined />, label: "Xuất Excel" },
+                  ...(hasActionAccess(resource, "create") ? [{ key: "clone", icon: <CopyOutlined />, label: "Clone" }] : []),
+                  { type: "divider" },
+                  { key: "clear", icon: <ClearOutlined />, label: "Bỏ chọn tất cả" },
+                ],
+                onClick: ({ key }) => {
+                  if (key === "archive") setArchiveSelectedOpen(true)
+                  if (key === "export") void exportSelectedRecords()
+                  if (key === "clone") void cloneSelectedRecords()
+                  if (key === "clear") setSelectedRowKeys([])
+                },
+              }}
+              trigger={["click"]}
+            >
+              <Button danger icon={<MoreOutlined />} loading={cloningSelected}>
+                Đã chọn ({selectedRowKeys.length})
+              </Button>
+            </Dropdown>
           ) : null}
           {hasActionAccess(resource, "create") && !["files", "service-orders"].includes(resource) && (
             <Tooltip title="Mở màn hình import">
@@ -431,10 +510,24 @@ export function RecordListPage() {
           )}
         </Space>
       </div>
+      <Tabs
+        activeKey={recordStatus}
+        className="record-status-tabs"
+        items={[
+          { key: "active", label: "Đang hoạt động" },
+          { key: "archived", label: "Lưu trữ" },
+        ]}
+        onChange={(key) => {
+          setRecordStatus(key as "active" | "archived")
+          setCurrentPage(1)
+          setSelectedRowKeys([])
+        }}
+      />
       <Card className="table-card">
         <Table
           columns={columns}
           dataSource={rows}
+          key={`${resource}-${recordStatus}`}
           loading={loading}
           pagination={{
             current: currentPage,
@@ -449,7 +542,7 @@ export function RecordListPage() {
             },
           }}
           rowKey="id"
-          rowSelection={hasActionAccess(resource, "delete") ? {
+          rowSelection={recordStatus === "active" && hasActionAccess(resource, "delete") ? {
             selectedRowKeys,
             onChange: setSelectedRowKeys,
             preserveSelectedRowKeys: true,
@@ -457,6 +550,18 @@ export function RecordListPage() {
           scroll={{ x: "max-content" }}
         />
       </Card>
+      <Modal
+        cancelText="Hủy"
+        confirmLoading={archivingSelected}
+        okButtonProps={{ danger: true }}
+        okText="Lưu trữ"
+        open={archiveSelectedOpen}
+        title={`Lưu trữ ${selectedRowKeys.length} bản ghi đã chọn?`}
+        onCancel={() => setArchiveSelectedOpen(false)}
+        onOk={() => void archiveSelected()}
+      >
+        Các bản ghi chỉ bị ẩn, không bị xóa khỏi cơ sở dữ liệu.
+      </Modal>
       <Modal
         className="quick-drawer"
         centered

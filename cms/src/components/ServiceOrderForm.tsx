@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
 import { getFirstOptionValue } from "../utils/branchDefaults"
 import { getApiErrorMessage } from "../utils/apiError"
+import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
 import { toastError, toastSuccess } from "../toast"
 import { RecordDraftControls } from "./RecordDraftControls"
 
@@ -36,6 +37,8 @@ interface OrderLineValue {
   itemName?: string
   quantity?: number
   unitPrice?: number
+  isComboComponent?: boolean
+  parentComboProductId?: string
 }
 
 export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSuccess, notifyOnSuccess = true }: ServiceOrderFormProps) {
@@ -150,6 +153,8 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
             itemName: componentProduct.name,
             quantity: selectedQuantity * Number(component.quantity || 1),
             unitPrice: 0,
+            isComboComponent: true,
+            parentComboProductId: product.value,
           } : null
         })
         .filter(Boolean) as OrderLineValue[]
@@ -175,7 +180,9 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
           productId: item.productId,
           itemName: item.itemName,
           quantity: Number(item.quantity || 0),
-          unitPrice: Number(item.unitPrice || 0),
+          unitPrice: item.isComboComponent ? 0 : Number(item.unitPrice || 0),
+          isComboComponent: Boolean(item.isComboComponent),
+          parentComboProductId: item.parentComboProductId,
         }))
         .filter((item) => item.productId)
 
@@ -218,12 +225,14 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
           // Render at document level: the table's horizontal-scroll wrapper clips
           // any popup mounted inside a cell.
           getPopupContainer={() => document.body}
+          disabled={row.isComboComponent}
           loading={lookupLoading}
           notFoundContent={lookupLoading ? "Đang tải sản phẩm..." : "Không có sản phẩm"}
           options={productOptions}
           optionFilterProp="label"
           placeholder="Chọn sản phẩm"
           popupMatchSelectWidth={false}
+          size={row.isComboComponent ? "small" : "middle"}
           showSearch
           style={{ width: "100%" }}
           value={row.productId}
@@ -237,7 +246,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       key: "itemName",
       width: 220,
       render: (_value, row) => (
-        <Input placeholder="Tên sản phẩm" value={row.itemName} onChange={(event) => handleItemFieldChange(row.index, "itemName", event.target.value)} />
+        <Input disabled={row.isComboComponent} placeholder="Tên sản phẩm" size={row.isComboComponent ? "small" : "middle"} value={row.itemName} onChange={(event) => handleItemFieldChange(row.index, "itemName", event.target.value)} />
       ),
     },
     {
@@ -246,7 +255,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       key: "quantity",
       width: 100,
       render: (_value, row) => (
-        <InputNumber min={1} style={{ width: "100%" }} value={row.quantity} onChange={(value) => handleItemFieldChange(row.index, "quantity", Number(value || 0))} />
+        <InputNumber formatter={formatNumberInput} min={1} parser={parseNumberInput} size={row.isComboComponent ? "small" : "middle"} style={{ width: "100%" }} value={row.quantity} onChange={(value) => handleItemFieldChange(row.index, "quantity", Number(value || 0))} />
       ),
     },
     {
@@ -254,9 +263,9 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       dataIndex: "unitPrice",
       key: "unitPrice",
       width: 150,
-      render: (_value, row) => (
-        <InputNumber min={0} style={{ width: "100%" }} value={row.unitPrice} onChange={(value) => handleItemFieldChange(row.index, "unitPrice", Number(value || 0))} />
-      ),
+      render: (_value, row) => row.isComboComponent
+        ? <Typography.Text type="secondary">—</Typography.Text>
+        : <InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} value={row.unitPrice} onChange={(value) => handleItemFieldChange(row.index, "unitPrice", Number(value || 0))} />,
     },
     {
       title: "Thành tiền",
@@ -265,7 +274,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       render: (_value, row) => {
         const currentItems = normalizeItems(form.getFieldValue("items"))
         const item = currentItems[row.index] || {}
-        return <Typography.Text>{formatNumber(Number(item.quantity || 0) * Number(item.unitPrice || 0))}</Typography.Text>
+        return <Typography.Text type={row.isComboComponent ? "secondary" : undefined}>{row.isComboComponent ? "—" : formatNumber(Number(item.quantity || 0) * Number(item.unitPrice || 0))}</Typography.Text>
       },
     },
     {
@@ -318,7 +327,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
         </div>
 
         <Card className="glass-card service-order-items-card" title="Sản phẩm trong đơn" extra={<Button icon={<PlusOutlined />} onClick={addItem}>Thêm sản phẩm</Button>}>
-          <Table columns={itemColumns} dataSource={dataSource} pagination={false} rowKey="key" scroll={{ x: 900 }} />
+          <Table columns={itemColumns} dataSource={dataSource} pagination={false} rowClassName={(row) => row.isComboComponent ? "service-order-item--component" : ""} rowKey="key" scroll={{ x: 900 }} />
           <div className="service-order-summary">
             <Typography.Text type="secondary">Tổng tiền</Typography.Text>
             <Typography.Title level={4}>{formatNumber(totalAmount)}</Typography.Title>
@@ -350,6 +359,8 @@ function normalizeItems(value: unknown): OrderLineValue[] {
     itemName: (item as Record<string, unknown>)?.itemName ? String((item as Record<string, unknown>).itemName) : undefined,
     quantity: Number((item as Record<string, unknown>)?.quantity || 0),
     unitPrice: Number((item as Record<string, unknown>)?.unitPrice || 0),
+    isComboComponent: Boolean((item as Record<string, unknown>)?.isComboComponent),
+    parentComboProductId: (item as Record<string, unknown>)?.parentComboProductId ? String((item as Record<string, unknown>)?.parentComboProductId) : undefined,
   }))
 }
 

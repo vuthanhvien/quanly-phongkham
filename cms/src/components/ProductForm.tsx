@@ -4,6 +4,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
 import { getApiErrorMessage } from "../utils/apiError"
+import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
 import { RecordDraftControls } from "./RecordDraftControls"
 
 interface ProductFormProps {
@@ -16,16 +17,18 @@ interface ProductFormProps {
 
 type BundleItem = { productId?: string; quantity?: number }
 type ProductOption = { value: string; label: string; productType: string }
+type ProductCategory = { id: string; name: string; parentId?: string; level: number; isActive: boolean }
 
 export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }: ProductFormProps) {
   const editing = Boolean(id)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
   const [products, setProducts] = useState<ProductOption[]>([])
+  const [categories, setCategories] = useState<ProductCategory[]>([])
   const productType = Form.useWatch("productType", form)
-  const bundleItems = Form.useWatch("bundleItems", form) as BundleItem[] | undefined
+  const bundleItems = Form.useWatch("bundleItems", { form, preserve: true }) as BundleItem[] | undefined
 
-  useEffect(() => { void loadProducts() }, [])
+  useEffect(() => { void Promise.all([loadProducts(), loadCategories()]) }, [])
   useEffect(() => {
     if (editing) { void loadRecord(); return }
     form.setFieldsValue({ productType: "CONSUMABLE", purchaseUnit: "hộp", usageUnit: "cái", conversionFactor: 1, sellingPrice: 0, minStockLevel: 0, bundleItems: [], ...(initialValues || {}) })
@@ -38,6 +41,19 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
         value: String(item.id), label: `${item.code || ""} - ${item.name || item.id}`, productType: String(item.productType || ""),
       })))
     } catch (error) { message.error(getApiErrorMessage(error, "Không tải được danh sách sản phẩm")) }
+  }
+
+  async function loadCategories() {
+    try {
+      const response = await api.get("/product-categories")
+      setCategories((response.data.data || []).map((item: Record<string, unknown>) => ({
+        id: String(item.id),
+        name: String(item.name || ""),
+        parentId: item.parentId ? String(item.parentId) : undefined,
+        level: Number(item.level || 1),
+        isActive: item.isActive !== false,
+      })))
+    } catch (error) { message.error(getApiErrorMessage(error, "Không tải được danh mục sản phẩm")) }
   }
 
   async function loadRecord() {
@@ -63,10 +79,30 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
 
   function setBundleItems(items: BundleItem[]) { form.setFieldsValue({ bundleItems: items }) }
   const componentOptions = useMemo(() => products.filter((product) => product.value !== id && product.productType !== "COMBO"), [products, id])
+  const categoryOptions = useMemo(() => {
+    const categoriesById = new Map(categories.map((category) => [category.id, category]))
+    const getPath = (category: ProductCategory) => {
+      const names = [category.name]
+      const seen = new Set([category.id])
+      let parentId = category.parentId
+      while (parentId && !seen.has(parentId)) {
+        seen.add(parentId)
+        const parent = categoriesById.get(parentId)
+        if (!parent) break
+        names.unshift(parent.name)
+        parentId = parent.parentId
+      }
+      return names.filter(Boolean).join(" / ")
+    }
+    return categories
+      .filter((category) => category.isActive)
+      .map((category) => ({ value: getPath(category), label: getPath(category) }))
+      .sort((left, right) => left.label.localeCompare(right.label, "vi"))
+  }, [categories])
   const rows = normalizeBundleItems(bundleItems).map((item, index) => ({ ...item, key: index, index }))
   const columns: ColumnsType<BundleItem & { key: number; index: number }> = [
-    { title: "Sản phẩm / dịch vụ", dataIndex: "productId", render: (_value, row) => <Select showSearch optionFilterProp="label" options={componentOptions} placeholder="Chọn thành phần" value={row.productId} onChange={(productId) => { const items = normalizeBundleItems(form.getFieldValue("bundleItems")); items[row.index] = { ...items[row.index], productId }; setBundleItems(items) }} /> },
-    { title: "SL / số buổi", dataIndex: "quantity", width: 150, render: (_value, row) => <InputNumber min={1} style={{ width: "100%" }} value={row.quantity} onChange={(quantity) => { const items = normalizeBundleItems(form.getFieldValue("bundleItems")); items[row.index] = { ...items[row.index], quantity: Number(quantity || 0) }; setBundleItems(items) }} /> },
+    { title: "Sản phẩm / dịch vụ", dataIndex: "productId", render: (_value, row) => <Select showSearch optionFilterProp="label" options={componentOptions} placeholder="Chọn thành phần" style={{ width: "100%" }} value={row.productId} onChange={(productId) => { const items = normalizeBundleItems(form.getFieldValue("bundleItems")); items[row.index] = { ...items[row.index], productId }; setBundleItems(items) }} /> },
+    { title: "SL / số buổi", dataIndex: "quantity", width: 150, render: (_value, row) => <InputNumber formatter={formatNumberInput} min={1} parser={parseNumberInput} style={{ width: "100%" }} value={row.quantity} onChange={(quantity) => { const items = normalizeBundleItems(form.getFieldValue("bundleItems")); items[row.index] = { ...items[row.index], quantity: Number(quantity || 0) }; setBundleItems(items) }} /> },
     { title: "", width: 52, render: (_value, row) => <Button danger type="text" icon={<DeleteOutlined />} onClick={() => { const items = normalizeBundleItems(form.getFieldValue("bundleItems")); items.splice(row.index, 1); setBundleItems(items) }} /> },
   ]
 
@@ -78,14 +114,23 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
         <Form.Item label="Tên sản phẩm" name="name" rules={[{ required: true, message: "Nhập tên sản phẩm" }]}><Input /></Form.Item>
         <Form.Item label="Mã vạch" name="barcode"><Input /></Form.Item>
         <Form.Item label="Loại" name="productType"><Select options={[{ value: "CONSUMABLE", label: "Vật tư tiêu hao" }, { value: "REUSABLE", label: "Thiết bị tái dùng" }, { value: "RETAIL", label: "Sản phẩm bán lẻ" }, { value: "SERVICE", label: "Dịch vụ" }, { value: "COMBO", label: "Combo / Gói dịch vụ" }]} /></Form.Item>
-        <Form.Item label="Ngành / nhóm / loại" name="category"><Input /></Form.Item>
+        <Form.Item label="Ngành / nhóm / loại" name="category">
+          <Select
+            allowClear
+            getPopupContainer={() => document.body}
+            optionFilterProp="label"
+            options={categoryOptions}
+            placeholder="Chọn Ngành / Nhóm / Loại"
+            showSearch
+          />
+        </Form.Item>
         <Form.Item label="Đơn vị nhập" name="purchaseUnit"><Input /></Form.Item>
         <Form.Item label="Đơn vị xuất" name="usageUnit"><Input /></Form.Item>
-        <Form.Item label="Quy đổi" name="conversionFactor"><InputNumber min={0} style={{ width: "100%" }} /></Form.Item>
-        <Form.Item label="Giá bán gói / SP" name="sellingPrice"><InputNumber min={0} style={{ width: "100%" }} /></Form.Item>
-        <Form.Item label="Tồn tối thiểu" name="minStockLevel"><InputNumber min={0} style={{ width: "100%" }} /></Form.Item>
+        <Form.Item label="Quy đổi" name="conversionFactor"><InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} /></Form.Item>
+        <Form.Item label="Giá bán gói / SP" name="sellingPrice"><InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} /></Form.Item>
+        <Form.Item label="Tồn tối thiểu" name="minStockLevel"><InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} /></Form.Item>
       </div>
-      {productType === "COMBO" && <Card className="glass-card service-order-items-card" title="Thành phần của combo" extra={<Button icon={<PlusOutlined />} onClick={() => setBundleItems([...normalizeBundleItems(form.getFieldValue("bundleItems")), { quantity: 1 }])}>Thêm thành phần</Button>}>
+      {productType === "COMBO" && <Card className="glass-card service-order-items-card" title="Thành phần của combo" extra={<Button htmlType="button" icon={<PlusOutlined />} onClick={() => setBundleItems([...normalizeBundleItems(form.getFieldValue("bundleItems")), { quantity: 1 }])}>Thêm thành phần</Button>}>
         <Typography.Paragraph type="secondary">Khi chọn combo trong đơn, các thành phần này sẽ tự được thêm vào. Giá bán vẫn lấy theo giá của combo.</Typography.Paragraph>
         <Table columns={columns} dataSource={rows} pagination={false} rowKey="key" />
       </Card>}

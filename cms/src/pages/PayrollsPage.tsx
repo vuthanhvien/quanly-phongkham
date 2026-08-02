@@ -26,6 +26,7 @@ import {
 import { useEffect, useState } from "react"
 import { api } from "../api"
 import { getApiErrorMessage } from "../utils/apiError"
+import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
 
 interface Staff {
   id: string
@@ -279,12 +280,12 @@ export function PayrollsPage() {
             <Row gutter={12}>
               <Col span={12}>
                 <Form.Item name="bonus" label="Thưởng thêm" initialValue={0}>
-                  <InputNumber style={{ width: "100%" }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")} min={0} addonAfter="₫" />
+                  <InputNumber style={{ width: "100%" }} formatter={formatNumberInput} parser={parseNumberInput} min={0} addonAfter="₫" />
                 </Form.Item>
               </Col>
               <Col span={12}>
                 <Form.Item name="deduction" label="Khấu trừ thêm (ngoài BH)" initialValue={0}>
-                  <InputNumber style={{ width: "100%" }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")} min={0} addonAfter="₫" />
+                  <InputNumber style={{ width: "100%" }} formatter={formatNumberInput} parser={parseNumberInput} min={0} addonAfter="₫" />
                 </Form.Item>
               </Col>
             </Row>

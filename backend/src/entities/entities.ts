@@ -807,6 +807,12 @@ export class ServiceOrderItem {
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   lineTotal: number;
 
+  @Column({ default: false })
+  isComboComponent: boolean;
+
+  @Column({ nullable: true })
+  parentComboProductId?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
