@@ -93,6 +93,8 @@ export interface LandingElementStyle {
   padding?: LandingSpacing;
   margin?: LandingSpacing;
   background?: LandingBackgroundStyle;
+  border?: string;
+  borderRadius?: number;
 }
 
 export interface LandingFormField {

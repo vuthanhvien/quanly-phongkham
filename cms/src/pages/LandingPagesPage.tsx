@@ -77,7 +77,10 @@ import { PAGE_TEMPLATES } from './landing-pages/templates'
 function getLandingBaseUrl() {
   const configuredUrl = import.meta.env.VITE_LANDING_URL?.trim()
   if (configuredUrl) return configuredUrl.replace(/\/+$/, '')
-  return window.location.origin.replace(/\/$/, '')
+  const current = new URL(window.location.origin)
+  // Local CMS runs on :9999 while the public landing app runs on :9997.
+  if (current.hostname === 'localhost' && current.port === '9999') current.port = '9997'
+  return current.origin.replace(/\/$/, '')
 }
 
 function isYoutubeUrl(url: string) {
@@ -132,20 +135,26 @@ export function LandingPagesPage() {
   const [globalSaving, setGlobalSaving] = useState(false)
   const [menuSaving, setMenuSaving] = useState(false)
   const [previewDevice, setPreviewDevice] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
+  const [previewDomain, setPreviewDomain] = useState<string>()
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const autoSaveTimerRef = useRef<number | undefined>(undefined)
 
   const selectedPage = useMemo(
     () => pages.find((item) => item.id === selectedId) || null,
     [pages, selectedId],
   )
   const previewUrl = useMemo(() => {
-    const base = getLandingBaseUrl()
+    const domain = previewDomain || draft.domains?.[0]
+    const fallbackBase = getLandingBaseUrl()
+    const protocol = fallbackBase.startsWith('https://') ? 'https://' : 'http://'
+    const base = domain ? `${protocol}${domain}` : fallbackBase
     const path = draft.path === '/' ? '' : draft.path
     const url = `${base}${path || '/'}`
     if (!selectedId) return url
     const sep = url.includes('?') ? '&' : '?'
-    return `${url}${sep}pageId=${selectedId}`
-  }, [draft.path, selectedId])
+    const params = new URLSearchParams({ pageId: selectedId })
+    return `${url}${sep}${params.toString()}`
+  }, [draft.path, draft.domains?.join(','), selectedId, previewDomain])
 
   useEffect(() => {
     void loadPages()
@@ -167,6 +176,11 @@ export function LandingPagesPage() {
     if (pageId && pageId !== 'new') setSelectedId(pageId)
     if (pageId === 'new') startCreatePage()
   }, [pageId])
+
+  useEffect(() => {
+    const domains = draft.domains || []
+    if (!previewDomain || !domains.includes(previewDomain)) setPreviewDomain(domains[0])
+  }, [draft.domains, previewDomain])
 
   useEffect(() => {
     if (location.pathname === '/configs') setGlobalOpen(true)
@@ -366,8 +380,18 @@ export function LandingPagesPage() {
     }
   }
 
+  function queueAutoSave(nextDraft: Omit<LandingPage, 'id' | 'createdAt' | 'updatedAt'>) {
+    if (!selectedId) return
+    window.clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = window.setTimeout(() => { void saveDraftSnapshot(nextDraft, '') }, 700)
+  }
+
   function updateDraft(patch: Partial<typeof draft>) {
-    setDraft((current) => ({ ...current, ...patch }))
+    setDraft((current) => {
+      const next = { ...current, ...patch }
+      queueAutoSave(next)
+      return next
+    })
   }
 
   function startCreatePage() {
@@ -638,7 +662,7 @@ export function LandingPagesPage() {
         const response = await api.post('/settings/landing-pages', payload)
         saved = response.data.data as LandingPage
       }
-      message.success(successMessage)
+      if (successMessage) message.success(successMessage)
       await loadPages(saved.id)
       setIframeKey((k) => k + 1)
       return saved
@@ -677,6 +701,13 @@ export function LandingPagesPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  async function togglePublished(checked: boolean) {
+    const nextDraft = { ...draft, isPublished: checked }
+    setDraft(nextDraft)
+    const saved = await saveDraftSnapshot(nextDraft, checked ? 'Đã xuất bản landing page' : 'Đã chuyển landing page về bản nháp')
+    if (!saved) setDraft(draft)
   }
 
   async function saveAndOpen() {
@@ -756,28 +787,12 @@ export function LandingPagesPage() {
       <div className="page-header" style={{ flexShrink: 0 }}>
         <Flex align="center" justify="space-between" gap={12} wrap="wrap">
           <Space wrap size={12}>
-            <Typography.Title level={3} style={{ margin: 0 }}>Trang landing</Typography.Title>
-            <Select
-              style={{ minWidth: 240 }}
-              placeholder="Chọn page..."
-              value={selectedId}
-              onChange={(id) => setSelectedId(id)}
-              loading={loading}
-              options={pages.map((p) => ({ value: p.id, label: p.title || p.path || p.slug }))}
-            />
-            <Tag color={draft.isPublished ? 'green' : 'default'}>
-              {draft.isPublished ? 'Đã xuất bản' : 'Nháp'}
-            </Tag>
-            <Button icon={<PlusOutlined />} onClick={startCreatePage}>Trang mới</Button>
+            <Typography.Title level={3} style={{ margin: 0 }}>{draft.title || 'Trang landing'}</Typography.Title>
             <Button icon={<SaveOutlined />} loading={saving} onClick={savePage}>Lưu</Button>
-            <Button icon={<EyeOutlined />} loading={saving} type="primary" onClick={() => void saveAndOpen()}>Lưu & Mở</Button>
-          </Space>
-          <Space wrap>
-            {selectedId ? (
-              <Popconfirm title="Lưu trữ landing page này?" onConfirm={() => void deletePage()}>
-                <Button danger icon={<DeleteOutlined />}>Lưu trữ</Button>
-              </Popconfirm>
-            ) : null}
+            <Flex align="center" gap={8}>
+              <Typography.Text type="secondary">Xuất bản</Typography.Text>
+              <Switch checked={draft.isPublished} loading={saving} onChange={(checked) => void togglePublished(checked)} />
+            </Flex>
           </Space>
         </Flex>
       </div>
@@ -796,48 +811,6 @@ export function LandingPagesPage() {
                 label: 'Nội dung',
                 children: (
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                    {/* Page meta */}
-                    <Card className="glass-card" size="small" title="Thông tin trang">
-                      <Form layout="vertical" size="small">
-                        <Form.Item label="Tên trang" style={{ marginBottom: 8 }}>
-                          <Input value={draft.title} onChange={(event) => syncPageTitle(event.target.value)} placeholder="Ví dụ: Trang chủ" />
-                        </Form.Item>
-                        <Form.Item label="Đường dẫn" style={{ marginBottom: 8 }}>
-                          <Input value={draft.path} onChange={(event) => updateDraft({ path: normalizePath(event.target.value) })} placeholder="/" />
-                        </Form.Item>
-                        <Form.Item label="Domains" extra="Chọn một hoặc nhiều domain đã tạo trong mục Domain Landing.">
-                          <Select
-                            mode="multiple"
-                            value={draft.domains || []}
-                            onChange={(domains) => updateDraft({ domains })}
-                            options={landingDomains.map((item) => ({ value: item.domain, label: `${item.name} (${item.domain})` }))}
-                            placeholder="Chọn domain"
-                          />
-                        </Form.Item>
-                        <Form.Item label="Mô tả ngắn" style={{ marginBottom: 8 }}>
-                          <Input.TextArea rows={2} value={draft.description} onChange={(event) => updateDraft({ description: event.target.value })} />
-                        </Form.Item>
-                        <Row gutter={8}>
-                          <Col span={12}>
-                            <Form.Item label="Tiêu đề SEO" style={{ marginBottom: 8 }}>
-                              <Input value={draft.seoTitle} onChange={(event) => updateDraft({ seoTitle: event.target.value })} />
-                            </Form.Item>
-                          </Col>
-                          <Col span={12}>
-                            <Form.Item label="Mô tả SEO" style={{ marginBottom: 8 }}>
-                              <Input value={draft.seoDescription} onChange={(event) => updateDraft({ seoDescription: event.target.value })} />
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                        <Form.Item label="Xuất bản" style={{ marginBottom: 0 }}>
-                          <Flex align="center" gap={8}>
-                            <Switch size="small" checked={draft.isPublished} onChange={(checked) => updateDraft({ isPublished: checked })} />
-                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>{draft.isPublished ? 'Đang xuất bản' : 'Bản nháp'}</Typography.Text>
-                          </Flex>
-                        </Form.Item>
-                      </Form>
-                    </Card>
-
                     <SectionsTreeCard
                       sections={sections}
                       selectedBlockId={selectedBlockId}
@@ -860,7 +833,18 @@ export function LandingPagesPage() {
               {
                 key: 'theme',
                 label: 'Giao diện',
-                children: <LandingThemeEditor />,
+                children: <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                  <Card className="glass-card" size="small" title="Thông tin trang">
+                    <Form layout="vertical" size="small">
+                      <Form.Item label="Tên trang" style={{ marginBottom: 8 }}><Input value={draft.title} onChange={(event) => syncPageTitle(event.target.value)} placeholder="Ví dụ: Trang chủ" /></Form.Item>
+                      <Form.Item label="Đường dẫn" style={{ marginBottom: 8 }}><Input value={draft.path} onChange={(event) => updateDraft({ path: normalizePath(event.target.value) })} placeholder="/" /></Form.Item>
+                      <Form.Item label="Domains" extra="Chọn một hoặc nhiều domain đã tạo trong mục Domain Landing."><Select mode="multiple" value={draft.domains || []} onChange={(domains) => updateDraft({ domains })} options={landingDomains.map((item) => ({ value: item.domain, label: `${item.name} (${item.domain})` }))} placeholder="Chọn domain" /></Form.Item>
+                      <Form.Item label="Mô tả ngắn" style={{ marginBottom: 8 }}><Input.TextArea rows={2} value={draft.description} onChange={(event) => updateDraft({ description: event.target.value })} /></Form.Item>
+                      <Row gutter={8}><Col span={12}><Form.Item label="Tiêu đề SEO" style={{ marginBottom: 8 }}><Input value={draft.seoTitle} onChange={(event) => updateDraft({ seoTitle: event.target.value })} /></Form.Item></Col><Col span={12}><Form.Item label="Mô tả SEO" style={{ marginBottom: 8 }}><Input value={draft.seoDescription} onChange={(event) => updateDraft({ seoDescription: event.target.value })} /></Form.Item></Col></Row>
+                    </Form>
+                  </Card>
+                  <LandingThemeEditor />
+                </Space>,
               },
             ]}
           />
@@ -899,6 +883,7 @@ export function LandingPagesPage() {
                 onClick={() => setPreviewDevice('mobile')}
               >Điện thoại</Button>
             </Space.Compact>
+            {(draft.domains || []).length > 0 ? <Select value={previewDomain || draft.domains?.[0]} onChange={setPreviewDomain} options={(draft.domains || []).map((domain) => ({ value: domain, label: domain }))} style={{ minWidth: 180 }} /> : null}
             <Typography.Text type="secondary" style={{ fontSize: 11 }}>{previewUrl}</Typography.Text>
           </Flex>
           <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', overflow: 'auto', background: previewDevice !== 'desktop' ? '#f0f0f0' : 'transparent', borderRadius: 8, minHeight: 0 }}>

@@ -74,13 +74,13 @@ export async function getMenuSettings(): Promise<NavItem[]> {
   }
 }
 
-export async function getLandingPage(pathname: string): Promise<LandingPageData | null> {
+export async function getLandingPage(pathname: string, previewDomain?: string): Promise<LandingPageData | null> {
   if (!pathname || pathname.startsWith('/_')) return null
 
   try {
     const apiUrl = await getServerApiUrl()
     const requestHeaders = await headers()
-    const domain = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').split(',')[0].trim()
+    const domain = previewDomain || (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').split(',')[0].trim()
     const endpoint = `${apiUrl}/public/landing-pages/resolve?path=${encodeURIComponent(pathname)}&domain=${encodeURIComponent(domain)}`
     console.info('[landing] Fetching page', { pathname, endpoint })
     const response = await fetch(endpoint, { cache: 'no-store' })

@@ -22,6 +22,8 @@ export interface LandingElementStyle {
   padding?: LandingSpacing
   margin?: LandingSpacing
   background?: LandingBackgroundStyle
+  border?: string
+  borderRadius?: number
 }
 
 export interface LandingFormField {
@@ -182,8 +184,10 @@ function normalizeElementStyle(value?: LandingElementStyle): LandingElementStyle
             imageUrl: value.background?.imageUrl || '',
             videoUrl: value.background?.videoUrl || '',
           },
+    border: String(value.border || '').trim() || undefined,
+    borderRadius: Math.max(0, Number(value.borderRadius || 0) || 0) || undefined,
   }
-  return next.padding || next.margin || next.background ? next : undefined
+  return next.padding || next.margin || next.background || next.border || next.borderRadius ? next : undefined
 }
 
 export function deriveLandingSections(blocks: LandingBlock[]) {

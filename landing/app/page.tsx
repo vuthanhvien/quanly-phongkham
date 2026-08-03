@@ -16,8 +16,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  const page = await getLandingPage('/')
   const resolvedSearch = await searchParams
+  const page = await getLandingPage('/', resolvedSearch?.domain)
   const editMode = resolvedSearch?.cms_edit === '1'
 
   if (!page) {

@@ -619,7 +619,7 @@ export class SettingsService {
 
   async findPublishedLandingPageByPath(path?: string, domain?: string) {
     const normalizedPath = normalizeLandingPath(path);
-    const normalizedDomain = String(domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+    const normalizedDomain = String(domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
     const pages = await this.landingPages.find({ where: { path: normalizedPath, isPublished: true, isArchived: false } });
     const page = normalizedDomain
       ? pages.find((item) => (item.domains || []).map((value) => String(value).toLowerCase()).includes(normalizedDomain)) || pages.find((item) => !(item.domains || []).length)
@@ -912,7 +912,7 @@ export class SettingsService {
   }
 
   private normalizeLandingDomain(value: unknown) {
-    const domain = String(value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+    const domain = String(value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
     if (!domain) throw new BadRequestException('Domain không hợp lệ');
     return domain;
   }
@@ -1015,8 +1015,10 @@ export class SettingsService {
     const padding = this.normalizeLandingSpacing(value.padding);
     const margin = this.normalizeLandingSpacing(value.margin);
     const background = this.normalizeLandingBackground(value.background);
-    if (!padding && !margin && !background) return undefined;
-    return { padding, margin, background };
+    const border = String(value.border || '').trim();
+    const borderRadius = Math.max(0, Math.floor(Number(value.borderRadius || 0) || 0));
+    if (!padding && !margin && !background && !border && !borderRadius) return undefined;
+    return { padding, margin, background, border: border || undefined, borderRadius: borderRadius || undefined };
   }
 
   private normalizeLandingSpacing(input: unknown) {

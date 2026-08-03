@@ -71,6 +71,7 @@ export function BlockComposerModal() {
   return (
     <Modal title={isEditMode ? 'Cấu hình block' : 'Thêm block vào section'} open={open} onCancel={onCancel} onOk={onSave} okText={isEditMode ? 'Cập nhật block' : 'Lưu block'} confirmLoading={saving} width={760}>
       {composer ? (
+        <Form layout="vertical" size="small">
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Row gutter={12}>
             <Col span={12}>
@@ -271,6 +272,7 @@ export function BlockComposerModal() {
             </Space>
           ) : null}
         </Space>
+        </Form>
       ) : null}
     </Modal>
   )

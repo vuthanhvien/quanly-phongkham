@@ -81,7 +81,7 @@ export function LandingDomainsPage() {
     <Modal destroyOnHidden footer={null} open={open} title={editing ? "Cập nhật domain" : "Thêm domain"} onCancel={() => setOpen(false)}>
       <Form form={form} layout="vertical" onFinish={(values) => void save(values)}>
         <Form.Item label="Tên" name="name" rules={[{ required: true, message: "Nhập tên" }]}><Input placeholder="Website chính" /></Form.Item>
-        <Form.Item label="Domain" name="domain" rules={[{ required: true, message: "Nhập domain" }]} extra="Chỉ nhập domain, ví dụ clinic.example.com."><Input placeholder="clinic.example.com" /></Form.Item>
+        <Form.Item label="Domain" name="domain" rules={[{ required: true, message: "Nhập domain" }]} extra="Có thể kèm port, ví dụ clinic.example.com:8080."><Input placeholder="clinic.example.com:8080" /></Form.Item>
         <Space><Button className="primary-glow" htmlType="submit" type="primary">Lưu</Button><Button onClick={() => setOpen(false)}>Hủy</Button></Space>
       </Form>
     </Modal>

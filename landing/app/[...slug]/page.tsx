@@ -26,7 +26,7 @@ export default async function DynamicLandingPage({
   const resolvedParams = await params
   const resolvedSearch = await searchParams
   const pathname = `/${(resolvedParams.slug || []).join('/')}`
-  const page = await getLandingPage(pathname)
+  const page = await getLandingPage(pathname, resolvedSearch?.domain)
   const editMode = resolvedSearch?.cms_edit === '1'
 
   if (!page) {

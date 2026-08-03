@@ -45,6 +45,8 @@ function buildSpacingStyle(style?: LandingElementStyle) {
   return {
     margin: spacingToCss(style?.margin),
     padding: spacingToCss(style?.padding),
+    border: style?.border,
+    borderRadius: style?.borderRadius,
   }
 }
 
@@ -116,6 +118,8 @@ export function LandingPageView({ page, editMode = false }: { page: LandingPageD
                 className={`landing-section__surface landing-section__surface--${section.width}${section.style?.background?.type && section.style.background.type !== 'none' ? ' landing-section__surface--styled' : ''}`}
                 style={{
                   ...buildBackgroundStyle(section.style?.background),
+                  border: section.style?.border,
+                  borderRadius: section.style?.borderRadius,
                   padding: spacingToCss(section.style?.padding),
                 }}
               >
@@ -160,7 +164,7 @@ export function LandingPageView({ page, editMode = false }: { page: LandingPageD
                               className={`landing-block__surface${block.type === 'form' ? ' landing-block__surface--panel' : ''}${block.blockStyle?.background?.type && block.blockStyle.background.type !== 'none' ? ' landing-block__surface--styled' : ''}`}
                               style={{
                                 ...buildBackgroundStyle(block.blockStyle?.background),
-                                padding: buildSpacingStyle(block.blockStyle).padding,
+                                ...buildSpacingStyle(block.blockStyle),
                               }}
                             >
                               {block.blockStyle?.background?.type === 'video' && block.blockStyle.background.videoUrl ? (

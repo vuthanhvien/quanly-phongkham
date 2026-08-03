@@ -46,11 +46,15 @@ function cleanupStyle(value?: LandingElementStyle): LandingElementStyle | undefi
           imageUrl: value.background?.imageUrl || '',
           videoUrl: value.background?.videoUrl || '',
         }
-  if (!hasPadding && !hasMargin && !background) return undefined
+  const border = String(value.border || '').trim()
+  const borderRadius = Math.max(0, Number(value.borderRadius || 0) || 0)
+  if (!hasPadding && !hasMargin && !background && !border && !borderRadius) return undefined
   return {
     padding: hasPadding ? padding : undefined,
     margin: hasMargin ? margin : undefined,
     background,
+    border: border || undefined,
+    borderRadius: borderRadius || undefined,
   }
 }
 
@@ -114,6 +118,10 @@ function StylePanel({
       <Form layout="vertical" size="small">
         <SpacingEditor label="Padding (px)" value={value?.padding} onChange={(side, next) => onChange(updateSpacing(value, 'padding', side, next))} />
         <SpacingEditor label="Margin (px)" value={value?.margin} onChange={(side, next) => onChange(updateSpacing(value, 'margin', side, next))} />
+        <Row gutter={8}>
+          <Col span={14}><Form.Item label="Border" style={{ marginBottom: 8 }}><Input value={value?.border} placeholder="VD: 1px solid #d9d9d9" onChange={(event) => onChange(cleanupStyle({ ...value, border: event.target.value }))} /></Form.Item></Col>
+          <Col span={10}><Form.Item label="Border radius (px)" style={{ marginBottom: 8 }}><InputNumber min={0} value={value?.borderRadius || 0} onChange={(next) => onChange(cleanupStyle({ ...value, borderRadius: Number(next || 0) }))} style={{ width: '100%' }} /></Form.Item></Col>
+        </Row>
         <Form.Item label="Background" style={{ marginBottom: 8 }}>
           <Select
             value={backgroundType}

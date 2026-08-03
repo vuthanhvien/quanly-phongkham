@@ -5,7 +5,6 @@ import {
   LayoutOutlined,
 } from "@ant-design/icons"
 import {
-  Alert,
   Button,
   Card,
   Col,
@@ -247,11 +246,6 @@ export function LandingThemeEditor() {
     }
   }
 
-  const apiBase =
-    (import.meta as unknown as { env: Record<string, string> }).env
-      ?.VITE_API_URL ?? "http://localhost:3000/api"
-  const cssUrl = `${apiBase}/public/landing-theme/style.css`
-
   return (
     <Form form={form} layout="vertical" onFinish={save}>
       <Card
@@ -265,22 +259,6 @@ export function LandingThemeEditor() {
         }
         style={{ marginBottom: 20 }}
       >
-        <Alert
-          type="info"
-          showIcon
-          message="CSS được tải động từ CMS"
-          description={
-            <>
-              Landing page tải stylesheet từ{" "}
-              <a href={cssUrl} target="_blank" rel="noreferrer">
-                {cssUrl}
-              </a>
-              . Sau khi lưu, reload landing page để thấy thay đổi.
-            </>
-          }
-          style={{ marginBottom: 20 }}
-        />
-
         <Row gutter={[16, 16]}>
           {presets.map((p) => (
             <Col key={p.key} xs={24} sm={12} md={8} lg={8} xl={8}>
@@ -406,22 +384,6 @@ export function LandingThemeEditor() {
         </Form.Item>
       </Card>
 
-      <Card className="glass-card">
-        <Space>
-          <Button
-            className="primary-glow"
-            htmlType="submit"
-            loading={saving}
-            type="primary"
-            size="large"
-          >
-            Lưu & áp dụng
-          </Button>
-          <Button size="large" onClick={() => window.open(cssUrl, "_blank")}>
-            Xem CSS đang dùng
-          </Button>
-        </Space>
-      </Card>
     </Form>
   )
 }
