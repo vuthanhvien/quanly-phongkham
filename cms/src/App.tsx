@@ -231,12 +231,16 @@ export function App() {
                 <Route path="/custom-tables/:id/data" element={<CustomTableDataPage />} />
                 <Route path="/locations" element={<LocationsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/landing/pages" element={<LandingPageListPage />} />
-                <Route path="/landing/pages/:id" element={<LandingPagesPage />} />
-                <Route path="/landing/forms" element={<LandingFormsPage />} />
-                <Route path="/landing/domains" element={<LandingDomainsPage />} />
-                <Route path="/landing/configs" element={<LandingPagesPage />} />
-                <Route path="/landing-pages" element={<Navigate to="/landing/pages" replace />} />
+                <Route path="/pages" element={<LandingPageListPage />} />
+                <Route path="/pages/:id" element={<LandingPagesPage />} />
+                <Route path="/forms" element={<LandingFormsPage />} />
+                <Route path="/domains" element={<LandingDomainsPage />} />
+                <Route path="/configs" element={<LandingPagesPage />} />
+                <Route path="/landing/pages/*" element={<Navigate to="/pages" replace />} />
+                <Route path="/landing/forms" element={<Navigate to="/forms" replace />} />
+                <Route path="/landing/domains" element={<Navigate to="/domains" replace />} />
+                <Route path="/landing/configs" element={<Navigate to="/configs" replace />} />
+                <Route path="/landing-pages" element={<Navigate to="/pages" replace />} />
                 <Route path="/chatbot-settings" element={<ChatbotSettingsPage />} />
                 <Route path="/landing-theme" element={<LandingThemePage />} />
                 <Route path="/roles" element={<RolesPage />} />

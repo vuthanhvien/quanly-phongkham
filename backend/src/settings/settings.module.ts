@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TenantOrmModule } from '../tenant/tenant-orm.module';
-import { Appointment, AppUiSetting, BranchRoleAssignment, ChatbotSetting, Customer, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, Staff, Treatment, User, ViewSetting, WorkSchedule } from '../entities/entities';
+import { Appointment, AppUiSetting, BranchRoleAssignment, ChatbotSetting, Customer, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, LandingDomain, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, Staff, Treatment, User, ViewSetting, WorkSchedule } from '../entities/entities';
 import { RecordsModule } from '../records/records.module';
 import { ChatbotController } from './chatbot.controller';
 import { PublicLandingPagesController, PublicLandingThemeController, SettingsController } from './settings.controller';
 import { SettingsService } from './settings.service';
 
 @Module({
-  imports: [TenantOrmModule.forFeature([CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, ViewSetting, PrintTemplate, DynamicRoleDefinition, User, BranchRoleAssignment, LandingPage, LandingForm, LandingFormSubmission, AppUiSetting, ChatbotSetting, LandingThemeSetting, LandingGlobalSetting, Treatment, Appointment, WorkSchedule, Customer, Staff]), RecordsModule],
+  imports: [TenantOrmModule.forFeature([CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, ViewSetting, PrintTemplate, DynamicRoleDefinition, User, BranchRoleAssignment, LandingPage, LandingDomain, LandingForm, LandingFormSubmission, AppUiSetting, ChatbotSetting, LandingThemeSetting, LandingGlobalSetting, Treatment, Appointment, WorkSchedule, Customer, Staff]), RecordsModule],
   controllers: [SettingsController, PublicLandingPagesController, PublicLandingThemeController, ChatbotController],
   providers: [SettingsService],
 })

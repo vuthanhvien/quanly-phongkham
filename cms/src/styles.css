@@ -3191,20 +3191,24 @@ textarea.ant-input {
 }
 
 .app-sider.ant-layout-sider-collapsed {
-  padding-inline: 8px;
+  padding-inline: 4px;
 }
 
 .app-sider.ant-layout-sider-collapsed .brand-card {
+  background: transparent;
+  border: 0;
   justify-content: center;
-  padding: 6px;
+  padding: 4px 0;
   gap: 0;
 }
 
 .app-sider.ant-layout-sider-collapsed .brand-mark {
-  width: 44px;
-  height: 44px;
+  background: transparent;
+  box-shadow: none;
+  width: 40px;
+  height: 40px;
   font-size: 15px;
-  border-radius: 10px;
+  border-radius: 0;
 }
 
 .app-sider.ant-layout-sider-collapsed .brand-copy {

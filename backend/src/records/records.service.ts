@@ -41,6 +41,7 @@ import {
   PositionHistory,
   RecordDraft,
   Product,
+  Unit,
   Room,
   ServiceOrder,
   ServiceOrderItem,
@@ -392,6 +393,7 @@ export class RecordsService {
     @InjectRepository(LeadActivity) private readonly leadActivities: Repository<LeadActivity>,
     @InjectRepository(Supplier) private readonly suppliers: Repository<Supplier>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
+    @InjectRepository(Unit) private readonly units: Repository<Unit>,
     @InjectRepository(ServiceOrderItem) private readonly serviceOrderItems: Repository<ServiceOrderItem>,
     @InjectRepository(MedicalEpisode) private readonly episodes: Repository<MedicalEpisode>,
     @InjectRepository(Appointment) private readonly appointments: Repository<Appointment>,
@@ -444,6 +446,7 @@ export class RecordsService {
       'lead-activities': this.leadActivities,
       suppliers: this.suppliers,
       products: this.products,
+      units: this.units,
       'medical-episodes': this.episodes,
       appointments: this.appointments,
       'work-schedules': this.workSchedules,
@@ -927,6 +930,7 @@ export class RecordsService {
       leads: 'lead',
       suppliers: 'nhà cung cấp',
       products: 'sản phẩm',
+      units: 'đơn vị tính',
       consultations: 'phiếu thăm khám',
       'service-orders': 'đơn hàng',
       invoices: 'hóa đơn',
@@ -3343,7 +3347,7 @@ export class RecordsService {
   }
 
   private computeServiceOrderTotals(payload: Record<string, unknown>, items: ServiceOrderItem[]) {
-    const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    const totalQuantity = items.reduce((sum, item) => sum + Number(item.baseQuantity || item.quantity || 0), 0);
     const totalAmount = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
     payload.quantity = totalQuantity;
     payload.totalAmount = totalAmount;
@@ -3365,6 +3369,8 @@ export class RecordsService {
     const productIds = Array.from(new Set(value.map((item) => String((item as Record<string, unknown>)?.productId || '')).filter(Boolean)));
     const products = await this.products.find({ where: { id: In(productIds) } });
     const productsById = new Map(products.map((item) => [item.id, item]));
+    const unitIds = Array.from(new Set([...products.map((product) => String(product.baseUnitId || '')).filter(Boolean), ...value.map((item) => String((item as Record<string, unknown>)?.transferUnitId || '')).filter(Boolean)]));
+    const unitsById = new Map((await this.units.find({ where: { id: In(unitIds) } })).map((unit) => [unit.id, unit]));
 
     return value.map((rawItem) => {
       const item = rawItem as Record<string, unknown>;
@@ -3372,6 +3378,8 @@ export class RecordsService {
       const product = productsById.get(productId);
       if (!product) throw new BadRequestException('Sản phẩm trong đơn hàng không hợp lệ');
       const quantity = Number(item.quantity || 0);
+      const transferUnitId = String(item.transferUnitId || product.baseUnitId || '') || undefined;
+      const conversionFactor = this.unitConversionFactor(product.baseUnitId, transferUnitId, unitsById);
       const isComboComponent = Boolean(item.isComboComponent);
       const unitPrice = isComboComponent ? 0 : Number(item.unitPrice ?? product.sellingPrice ?? 0);
       if (quantity <= 0) {
@@ -3381,6 +3389,9 @@ export class RecordsService {
         productId: product.id,
         itemName: String(item.itemName || product.name),
         quantity,
+        baseQuantity: quantity * conversionFactor,
+        transferUnitId,
+        conversionFactor,
         unitPrice,
         lineTotal: quantity * unitPrice,
         isComboComponent,
@@ -3389,6 +3400,18 @@ export class RecordsService {
           : undefined,
       });
     });
+  }
+
+  private unitConversionFactor(baseUnitId: string | undefined, transferUnitId: string | undefined, units: Map<string, Unit>) {
+    if (!baseUnitId || !transferUnitId || baseUnitId === transferUnitId) return 1;
+    const base = units.get(baseUnitId);
+    const transfer = units.get(transferUnitId);
+    if (!base || !transfer) throw new BadRequestException('Đơn vị tính không hợp lệ');
+    const familyRoot = (unit: Unit) => unit.baseUnitId || unit.id;
+    if (familyRoot(base) !== familyRoot(transfer)) throw new BadRequestException('Đơn vị quy đổi không cùng nhóm với đơn vị cơ sở');
+    const factor = Number(transfer.conversionFactor || 1) / Number(base.conversionFactor || 1);
+    if (!Number.isFinite(factor) || factor <= 0) throw new BadRequestException('Tỷ lệ quy đổi không hợp lệ');
+    return factor;
   }
 
   private async normalizeProductBundle(value: Record<string, unknown>, bundleProductId = '') {

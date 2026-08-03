@@ -6,7 +6,7 @@ import Handlebars from 'handlebars';
 import { basename, join } from 'path';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, User, ViewSetting } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, LandingDomain, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, User, ViewSetting } from '../entities/entities';
 import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
 import { renderDocxTemplate } from './docx-template';
@@ -70,6 +70,7 @@ const APP_MODULE_KEYS = [
   'equipments',
   'suppliers',
   'products',
+  'units',
   'product-categories',
   'stock-batches',
   'file-folders',
@@ -133,6 +134,7 @@ export class SettingsService {
     @InjectRepository(ViewSetting) private readonly views: Repository<ViewSetting>,
     @InjectRepository(PrintTemplate) private readonly templates: Repository<PrintTemplate>,
     @InjectRepository(LandingPage) private readonly landingPages: Repository<LandingPage>,
+    @InjectRepository(LandingDomain) private readonly landingDomains: Repository<LandingDomain>,
     @InjectRepository(LandingForm) private readonly landingForms: Repository<LandingForm>,
     @InjectRepository(LandingFormSubmission) private readonly landingFormSubmissions: Repository<LandingFormSubmission>,
     @InjectRepository(AppUiSetting) private readonly appUiSettings: Repository<AppUiSetting>,
@@ -420,54 +422,41 @@ export class SettingsService {
   }
 
   async listLandingDomains(user?: AuthUser) {
-    const pages = await this.listLandingPages(user);
-    return pages.flatMap((page) => (page.domains || []).map((domain) => ({
-      domain: String(domain),
-      landingPageId: page.id,
-      landingPageTitle: page.title,
-      landingPath: page.path,
-      isPublished: page.isPublished,
-    }))).sort((left, right) => left.domain.localeCompare(right.domain));
+    this.assertSettingsAccess(user);
+    return this.landingDomains.find({ order: { name: 'ASC' } });
   }
 
-  async createLandingDomain(payload: { domain?: string; landingPageId?: string }, user?: AuthUser) {
+  async createLandingDomain(payload: { name?: string; domain?: string }, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const domain = this.normalizeLandingDomain(payload.domain);
-    const page = await this.landingPages.findOne({ where: { id: String(payload.landingPageId || ''), isArchived: false } });
-    if (!page) throw new NotFoundException('Chọn landing page hợp lệ');
-    await this.ensureLandingDomainAvailable(domain);
-    page.domains = Array.from(new Set([...(page.domains || []), domain]));
-    await this.landingPages.save(page);
-    await this.revalidateLandingCache();
-    return { domain, landingPageId: page.id };
+    const name = String(payload.name || '').trim();
+    if (!name) throw new BadRequestException('Tên domain là bắt buộc');
+    return this.landingDomains.save(this.landingDomains.create({ name, domain }));
   }
 
-  async updateLandingDomain(currentDomain: string, payload: { domain?: string; landingPageId?: string }, user?: AuthUser) {
+  async updateLandingDomain(currentDomain: string, payload: { name?: string; domain?: string }, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const oldDomain = this.normalizeLandingDomain(currentDomain);
     const domain = this.normalizeLandingDomain(payload.domain);
-    const pages = await this.landingPages.find({ where: { isArchived: false } });
-    const source = pages.find((page) => (page.domains || []).includes(oldDomain));
-    if (!source) throw new NotFoundException('Không tìm thấy domain');
-    const target = pages.find((page) => page.id === String(payload.landingPageId || ''));
-    if (!target) throw new NotFoundException('Chọn landing page hợp lệ');
-    await this.ensureLandingDomainAvailable(domain, oldDomain);
-    source.domains = (source.domains || []).filter((item) => item !== oldDomain);
-    target.domains = Array.from(new Set([...(target.domains || []), domain]));
-    if (source.id === target.id) await this.landingPages.save(target);
-    else await this.landingPages.save([source, target]);
+    const record = await this.landingDomains.findOne({ where: { domain: oldDomain } });
+    if (!record) throw new NotFoundException('Không tìm thấy domain');
+    record.name = String(payload.name || '').trim() || record.name;
+    record.domain = domain;
+    await this.landingDomains.save(record);
+    if (domain !== oldDomain) {
+      const pages = await this.landingPages.find({ where: { isArchived: false } });
+      await this.landingPages.save(pages.filter((page) => (page.domains || []).includes(oldDomain)).map((page) => ({ ...page, domains: page.domains.map((item) => item === oldDomain ? domain : item) })));
+    }
     await this.revalidateLandingCache();
-    return { domain, landingPageId: target.id };
+    return record;
   }
 
   async deleteLandingDomain(value: string, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const domain = this.normalizeLandingDomain(value);
-    const page = (await this.landingPages.find({ where: { isArchived: false } })).find((item) => (item.domains || []).includes(domain));
-    if (!page) throw new NotFoundException('Không tìm thấy domain');
-    page.domains = (page.domains || []).filter((item) => item !== domain);
-    await this.landingPages.save(page);
-    await this.revalidateLandingCache();
+    const record = await this.landingDomains.findOne({ where: { domain } });
+    if (!record) throw new NotFoundException('Không tìm thấy domain');
+    await this.landingDomains.remove(record);
     return { domain };
   }
 

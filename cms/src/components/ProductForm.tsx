@@ -18,6 +18,7 @@ interface ProductFormProps {
 type BundleItem = { productId?: string; quantity?: number }
 type ProductOption = { value: string; label: string; productType: string }
 type ProductCategory = { id: string; name: string; parentId?: string; level: number; isActive: boolean }
+type UnitOption = { value: string; label: string }
 
 export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }: ProductFormProps) {
   const editing = Boolean(id)
@@ -25,13 +26,14 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
   const [submitting, setSubmitting] = useState(false)
   const [products, setProducts] = useState<ProductOption[]>([])
   const [categories, setCategories] = useState<ProductCategory[]>([])
+  const [units, setUnits] = useState<UnitOption[]>([])
   const productType = Form.useWatch("productType", form)
   const bundleItems = Form.useWatch("bundleItems", { form, preserve: true }) as BundleItem[] | undefined
 
-  useEffect(() => { void Promise.all([loadProducts(), loadCategories()]) }, [])
+  useEffect(() => { void Promise.all([loadProducts(), loadCategories(), loadUnits()]) }, [])
   useEffect(() => {
     if (editing) { void loadRecord(); return }
-    form.setFieldsValue({ productType: "CONSUMABLE", purchaseUnit: "hộp", usageUnit: "cái", conversionFactor: 1, sellingPrice: 0, minStockLevel: 0, bundleItems: [], ...(initialValues || {}) })
+    form.setFieldsValue({ productType: "CONSUMABLE", sellingPrice: 0, minStockLevel: 0, bundleItems: [], ...(initialValues || {}) })
   }, [editing, form, id, initialValues])
 
   async function loadProducts() {
@@ -54,6 +56,13 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
         isActive: item.isActive !== false,
       })))
     } catch (error) { message.error(getApiErrorMessage(error, "Không tải được danh mục sản phẩm")) }
+  }
+
+  async function loadUnits() {
+    try {
+      const response = await api.get("/records/units", { params: { pageSize: 500 } })
+      setUnits((response.data.data || []).map((item: Record<string, unknown>) => ({ value: String(item.id), label: `${item.code || ""} - ${item.name || ""}` })))
+    } catch (error) { message.error(getApiErrorMessage(error, "Không tải được đơn vị tính")) }
   }
 
   async function loadRecord() {
@@ -124,9 +133,7 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
             showSearch
           />
         </Form.Item>
-        <Form.Item label="Đơn vị nhập" name="purchaseUnit"><Input /></Form.Item>
-        <Form.Item label="Đơn vị xuất" name="usageUnit"><Input /></Form.Item>
-        <Form.Item label="Quy đổi" name="conversionFactor"><InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} /></Form.Item>
+        <Form.Item label="Đơn vị cơ sở" name="baseUnitId" rules={[{ required: true, message: "Chọn đơn vị cơ sở" }]}><Select showSearch optionFilterProp="label" options={units} placeholder="Chọn đơn vị cơ sở" /></Form.Item>
         <Form.Item label="Giá bán gói / SP" name="sellingPrice"><InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} /></Form.Item>
         <Form.Item label="Tồn tối thiểu" name="minStockLevel"><InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} /></Form.Item>
       </div>

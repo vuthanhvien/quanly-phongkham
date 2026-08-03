@@ -232,14 +232,6 @@ export function DashboardPage() {
 
   return (
     <>
-      <Card className="glass-card spacious-card" style={{ marginBottom: 16 }}>
-        <Typography.Title level={3} style={{ marginBottom: 6 }}>
-          {dashboardCopy.title}
-        </Typography.Title>
-        <Typography.Paragraph style={{ margin: 0 }}>
-          {dashboardCopy.description}
-        </Typography.Paragraph>
-      </Card>
       {staffDashboard ? (
         <DashboardStaffSection
           actionLoading={staffActionLoading}

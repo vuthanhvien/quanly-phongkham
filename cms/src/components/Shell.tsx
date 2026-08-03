@@ -77,6 +77,7 @@ const menuIcons: Record<string, React.ReactNode> = {
   suppliers: <ShopOutlined />,
   products: <ProductOutlined />,
   "product-categories": <ApartmentOutlined />,
+  units: <DeploymentUnitOutlined />,
   "stock-batches": <DatabaseOutlined />,
   treatments: <ExperimentOutlined />,
   invoices: <FileDoneOutlined />,
@@ -272,10 +273,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
       icon: <GlobalOutlined />,
       label: "Landing",
       children: hasScreenAccess("settings") ? [
-        { key: "/landing/pages", icon: <GlobalOutlined />, label: <Link to="/landing/pages">Pages</Link> },
-        { key: "/landing/forms", icon: <FileDoneOutlined />, label: <Link to="/landing/forms">Forms</Link> },
-        { key: "/landing/domains", icon: <GlobalOutlined />, label: <Link to="/landing/domains">Domains</Link> },
-        { key: "/landing/configs", icon: <SettingOutlined />, label: <Link to="/landing/configs">Configs</Link> },
+        { key: "/pages", icon: <GlobalOutlined />, label: <Link to="/pages">Pages</Link> },
+        { key: "/forms", icon: <FileDoneOutlined />, label: <Link to="/forms">Forms</Link> },
+        { key: "/domains", icon: <GlobalOutlined />, label: <Link to="/domains">Domains</Link> },
+        { key: "/configs", icon: <SettingOutlined />, label: <Link to="/configs">Configs</Link> },
       ] : [],
     },
     {
@@ -355,6 +356,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
     (location.pathname.startsWith("/zalo-inbox")
       ? "front-office"
       : undefined) ||
+    (["/pages", "/forms", "/domains", "/configs"].some((path) => location.pathname.startsWith(path))
+      ? "landing"
+      : undefined) ||
     (location.pathname === "/roles"
       ? "admin"
       : undefined),
@@ -407,7 +411,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         breakpoint="lg"
         className="app-sider"
         collapsed={collapsed}
-        collapsedWidth={88}
+        collapsedWidth={60}
         theme="light"
         trigger={null}
         width={282}

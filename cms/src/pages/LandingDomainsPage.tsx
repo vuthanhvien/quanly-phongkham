@@ -1,15 +1,13 @@
 import { DeleteOutlined, EditOutlined, GlobalOutlined, PlusOutlined } from "@ant-design/icons"
-import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Tooltip, Typography, message } from "antd"
+import { Button, Card, Form, Input, Modal, Popconfirm, Space, Table, Tooltip, Typography, message } from "antd"
 import { useEffect, useState } from "react"
 import { api } from "../api"
 import { getApiErrorMessage } from "../utils/apiError"
 
-type LandingPageOption = { id: string; title: string; path: string; isPublished: boolean }
-type LandingDomain = { domain: string; landingPageId: string; landingPageTitle: string; landingPath: string; isPublished: boolean }
+type LandingDomain = { id: string; name: string; domain: string }
 
 export function LandingDomainsPage() {
   const [rows, setRows] = useState<LandingDomain[]>([])
-  const [pages, setPages] = useState<LandingPageOption[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<LandingDomain | null>(null)
   const [open, setOpen] = useState(false)
@@ -20,9 +18,8 @@ export function LandingDomainsPage() {
   async function load() {
     setLoading(true)
     try {
-      const [domainsResponse, pagesResponse] = await Promise.all([api.get("/settings/landing-domains"), api.get("/settings/landing-pages")])
+      const domainsResponse = await api.get("/settings/landing-domains")
       setRows(domainsResponse.data.data || [])
-      setPages(pagesResponse.data.data || [])
     } catch (error) {
       message.error(getApiErrorMessage(error, "Không tải được danh sách domain"))
     } finally { setLoading(false) }
@@ -36,11 +33,11 @@ export function LandingDomainsPage() {
 
   function openEdit(row: LandingDomain) {
     setEditing(row)
-    form.setFieldsValue({ domain: row.domain, landingPageId: row.landingPageId })
+    form.setFieldsValue({ name: row.name, domain: row.domain })
     setOpen(true)
   }
 
-  async function save(values: { domain: string; landingPageId: string }) {
+  async function save(values: { name: string; domain: string }) {
     try {
       if (editing) await api.patch(`/settings/landing-domains/${encodeURIComponent(editing.domain)}`, values)
       else await api.post("/settings/landing-domains", values)
@@ -70,10 +67,8 @@ export function LandingDomainsPage() {
         pagination={false}
         rowKey="domain"
         columns={[
+          { title: "Tên", dataIndex: "name" },
           { title: "Domain", dataIndex: "domain", render: (domain: string) => <Space><GlobalOutlined /><strong>{domain}</strong></Space> },
-          { title: "Landing page", dataIndex: "landingPageTitle" },
-          { title: "Đường dẫn", dataIndex: "landingPath", render: (path: string) => <code>{path}</code> },
-          { title: "Trạng thái page", render: (_value, row) => <Tag color={row.isPublished ? "green" : "default"}>{row.isPublished ? "Đã xuất bản" : "Nháp"}</Tag> },
           { title: "", width: 90, render: (_value, row) => <Space size={2}>
             <Tooltip title="Sửa"><Button icon={<EditOutlined />} type="text" onClick={() => openEdit(row)} /></Tooltip>
             <Popconfirm cancelText="Hủy" okButtonProps={{ danger: true }} okText="Gỡ" title={`Gỡ domain ${row.domain}?`} onConfirm={() => void remove(row.domain)}>
@@ -85,8 +80,8 @@ export function LandingDomainsPage() {
     </Card>
     <Modal destroyOnHidden footer={null} open={open} title={editing ? "Cập nhật domain" : "Thêm domain"} onCancel={() => setOpen(false)}>
       <Form form={form} layout="vertical" onFinish={(values) => void save(values)}>
+        <Form.Item label="Tên" name="name" rules={[{ required: true, message: "Nhập tên" }]}><Input placeholder="Website chính" /></Form.Item>
         <Form.Item label="Domain" name="domain" rules={[{ required: true, message: "Nhập domain" }]} extra="Chỉ nhập domain, ví dụ clinic.example.com."><Input placeholder="clinic.example.com" /></Form.Item>
-        <Form.Item label="Landing page" name="landingPageId" rules={[{ required: true, message: "Chọn landing page" }]}><Select showSearch optionFilterProp="label" options={pages.map((page) => ({ value: page.id, label: `${page.title} (${page.path})` }))} /></Form.Item>
         <Space><Button className="primary-glow" htmlType="submit" type="primary">Lưu</Button><Button onClick={() => setOpen(false)}>Hủy</Button></Space>
       </Form>
     </Modal>

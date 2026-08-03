@@ -117,6 +117,7 @@ export function LandingPagesPage() {
   const location = useLocation()
   const [pages, setPages] = useState<LandingPage[]>([])
   const [landingForms, setLandingForms] = useState<Array<{ id: string; name: string; title: string; targetResource: string }>>([])
+  const [landingDomains, setLandingDomains] = useState<Array<{ domain: string; name: string }>>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Omit<LandingPage, 'id' | 'createdAt' | 'updatedAt'>>(emptyPage())
   const [loading, setLoading] = useState(false)
@@ -149,6 +150,7 @@ export function LandingPagesPage() {
   useEffect(() => {
     void loadPages()
     void loadLandingForms()
+    void loadLandingDomains()
     void loadGlobalSettings()
     void loadMenuSettings()
   }, [])
@@ -157,13 +159,17 @@ export function LandingPagesPage() {
     try { setLandingForms((await api.get('/settings/landing-forms')).data.data || []) } catch { setLandingForms([]) }
   }
 
+  async function loadLandingDomains() {
+    try { setLandingDomains((await api.get('/settings/landing-domains')).data.data || []) } catch { setLandingDomains([]) }
+  }
+
   useEffect(() => {
     if (pageId && pageId !== 'new') setSelectedId(pageId)
     if (pageId === 'new') startCreatePage()
   }, [pageId])
 
   useEffect(() => {
-    if (location.pathname === '/landing/configs') setGlobalOpen(true)
+    if (location.pathname === '/configs') setGlobalOpen(true)
   }, [location.pathname])
 
   async function loadGlobalSettings() {
@@ -799,13 +805,13 @@ export function LandingPagesPage() {
                         <Form.Item label="Đường dẫn" style={{ marginBottom: 8 }}>
                           <Input value={draft.path} onChange={(event) => updateDraft({ path: normalizePath(event.target.value) })} placeholder="/" />
                         </Form.Item>
-                        <Form.Item label="Domains" extra="Nhập domain rồi nhấn Enter hoặc dấu phẩy. Để trống để dùng làm trang mặc định.">
+                        <Form.Item label="Domains" extra="Chọn một hoặc nhiều domain đã tạo trong mục Domain Landing.">
                           <Select
-                            mode="tags"
-                            tokenSeparators={[',', ' ']}
+                            mode="multiple"
                             value={draft.domains || []}
                             onChange={(domains) => updateDraft({ domains })}
-                            placeholder="example.com"
+                            options={landingDomains.map((item) => ({ value: item.domain, label: `${item.name} (${item.domain})` }))}
+                            placeholder="Chọn domain"
                           />
                         </Form.Item>
                         <Form.Item label="Mô tả ngắn" style={{ marginBottom: 8 }}>

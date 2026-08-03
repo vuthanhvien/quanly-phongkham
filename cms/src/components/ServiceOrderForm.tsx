@@ -30,6 +30,7 @@ interface ProductOption {
   sellingPrice: number
   productType: string
   bundleItems: Array<{ productId: string; quantity: number }>
+  baseUnitId?: string
 }
 
 interface OrderLineValue {
@@ -39,6 +40,7 @@ interface OrderLineValue {
   unitPrice?: number
   isComboComponent?: boolean
   parentComboProductId?: string
+  transferUnitId?: string
 }
 
 export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSuccess, notifyOnSuccess = true }: ServiceOrderFormProps) {
@@ -50,6 +52,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
   const [branchOptions, setBranchOptions] = useState<OptionItem[]>([])
   const [staffOptions, setStaffOptions] = useState<OptionItem[]>([])
   const [productOptions, setProductOptions] = useState<ProductOption[]>([])
+  const [unitOptions, setUnitOptions] = useState<OptionItem[]>([])
   const items = Form.useWatch("items", { form, preserve: true }) as OrderLineValue[] | undefined
 
   useEffect(() => {
@@ -78,11 +81,12 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
   async function loadLookups() {
     setLookupLoading(true)
     try {
-      const [customersResponse, branchesResponse, staffResponse, productsResponse] = await Promise.all([
+      const [customersResponse, branchesResponse, staffResponse, productsResponse, unitsResponse] = await Promise.all([
         api.get("/records/customers", { params: { pageSize: 200 } }),
         api.get("/records/branches", { params: { pageSize: 200 } }),
         api.get("/records/staff", { params: { pageSize: 200 } }),
         api.get("/records/service-orders/product-options"),
+        api.get("/records/units", { params: { pageSize: 500 } }),
       ])
 
       setCustomerOptions(
@@ -110,8 +114,10 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
           sellingPrice: Number(row.sellingPrice || 0),
           productType: String(row.productType || ""),
           bundleItems: normalizeBundleItems(row.bundleItems),
+          baseUnitId: row.baseUnitId ? String(row.baseUnitId) : undefined,
         })),
       )
+      setUnitOptions((unitsResponse.data.data || []).map((row: Record<string, unknown>) => ({ value: String(row.id), label: `${row.code || ""} - ${row.name || row.id}` })))
       if (!editing && !form.getFieldValue("branchId")) {
         form.setFieldsValue({ branchId: getFirstOptionValue(nextBranchOptions) })
       }
@@ -143,6 +149,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       itemName: product?.name,
       unitPrice: product ? Number(nextItems[index]?.unitPrice || product.sellingPrice) : nextItems[index]?.unitPrice,
       quantity: selectedQuantity,
+      transferUnitId: product?.baseUnitId,
     }
     if (product?.productType === "COMBO" && product.bundleItems.length > 0) {
       const componentLines = product.bundleItems
@@ -155,6 +162,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
             unitPrice: 0,
             isComboComponent: true,
             parentComboProductId: product.value,
+            transferUnitId: componentProduct.baseUnitId,
           } : null
         })
         .filter(Boolean) as OrderLineValue[]
@@ -215,6 +223,13 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
   }
 
   const itemColumns: ColumnsType<OrderLineValue & { key: number; index: number }> = [
+    {
+      title: "Đơn vị",
+      dataIndex: "transferUnitId",
+      key: "transferUnitId",
+      width: 160,
+      render: (_value, row) => <Select disabled={row.isComboComponent} options={unitOptions} placeholder="Đơn vị" style={{ width: "100%" }} value={row.transferUnitId} onChange={(value) => handleItemFieldChange(row.index, "transferUnitId", value)} />,
+    },
     {
       title: "Sản phẩm",
       dataIndex: "productId",
@@ -361,6 +376,7 @@ function normalizeItems(value: unknown): OrderLineValue[] {
     unitPrice: Number((item as Record<string, unknown>)?.unitPrice || 0),
     isComboComponent: Boolean((item as Record<string, unknown>)?.isComboComponent),
     parentComboProductId: (item as Record<string, unknown>)?.parentComboProductId ? String((item as Record<string, unknown>)?.parentComboProductId) : undefined,
+    transferUnitId: (item as Record<string, unknown>)?.transferUnitId ? String((item as Record<string, unknown>)?.transferUnitId) : undefined,
   }))
 }
 

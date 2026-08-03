@@ -577,6 +577,9 @@ export class Product extends ConfigurableEntity {
   @Column({ nullable: true })
   category?: string;
 
+  @Column({ nullable: true })
+  baseUnitId?: string;
+
   @Column({ default: 'hop' })
   purchaseUnit: string;
 
@@ -600,6 +603,23 @@ export class Product extends ConfigurableEntity {
 
   @Column({ nullable: true })
   supplierId?: string;
+}
+
+@Entity('units')
+export class Unit extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  name: string;
+
+  // Empty for the root/base unit of a conversion family.
+  @Column({ nullable: true })
+  baseUnitId?: string;
+
+  // 1 current unit = conversionFactor of the root/base unit.
+  @Column({ type: 'decimal', precision: 15, scale: 6, default: 1 })
+  conversionFactor: number;
 }
 
 @Entity('medical_episodes')
@@ -800,6 +820,15 @@ export class ServiceOrderItem {
 
   @Column({ default: 1 })
   quantity: number;
+
+  @Column({ type: 'decimal', precision: 15, scale: 6, default: 0 })
+  baseQuantity: number;
+
+  @Column({ nullable: true })
+  transferUnitId?: string;
+
+  @Column({ type: 'decimal', precision: 15, scale: 6, default: 1 })
+  conversionFactor: number;
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   unitPrice: number;
@@ -1496,6 +1525,15 @@ export class LandingPage {
 
   @UpdateDateColumn()
   updatedAt: Date;
+}
+
+@Entity('landing_domains')
+export class LandingDomain {
+  @PrimaryGeneratedColumn('uuid') id: string;
+  @Column() name: string;
+  @Column({ unique: true }) domain: string;
+  @CreateDateColumn() createdAt: Date;
+  @UpdateDateColumn() updatedAt: Date;
 }
 
 @Entity('app_ui_settings')
@@ -2255,6 +2293,7 @@ export const ENTITIES = [
   ZaloMessage,
   Supplier,
   Product,
+  Unit,
   MedicalEpisode,
   Appointment,
   WorkSchedule,
@@ -2283,6 +2322,7 @@ export const ENTITIES = [
   ViewSetting,
   PrintTemplate,
   LandingPage,
+  LandingDomain,
   LandingForm,
   AppUiSetting,
   LandingFormSubmission,
