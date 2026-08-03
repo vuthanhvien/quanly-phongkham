@@ -51,7 +51,7 @@ export function FormBlock({ block, pageSlug }: { block: LandingBlock; pageSlug: 
           const value = values[field.name] || ''
           const commonProps = {
             name: field.name,
-            onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+            onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
               setValues((current) => ({ ...current, [field.name]: event.target.value }))
             },
             placeholder: field.placeholder || field.label,
@@ -64,8 +64,16 @@ export function FormBlock({ block, pageSlug }: { block: LandingBlock; pageSlug: 
               <label htmlFor={field.id}>{field.label}</label>
               {field.type === 'textarea' ? (
                 <textarea id={field.id} {...commonProps} />
+              ) : field.type === 'select' ? (
+                <select id={field.id} {...commonProps}>
+                  <option value="">{field.placeholder || `Chọn ${field.label}`}</option>
+                  {(field.options || []).map((option) => {
+                    const normalized = typeof option === 'string' ? { value: option, label: option } : option
+                    return <option key={normalized.value} value={normalized.value}>{normalized.label}</option>
+                  })}
+                </select>
               ) : (
-                <input id={field.id} type={field.type || 'text'} {...commonProps} />
+                <input id={field.id} type={field.type === 'datetime' ? 'datetime-local' : field.type || 'text'} {...commonProps} />
               )}
             </div>
           )

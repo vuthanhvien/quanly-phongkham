@@ -99,10 +99,11 @@ export interface LandingFormField {
   id: string;
   name: string;
   label: string;
-  type: 'text' | 'textarea' | 'email' | 'tel' | 'number';
+  type: 'text' | 'textarea' | 'email' | 'tel' | 'number' | 'date' | 'datetime' | 'select';
   placeholder?: string;
   required: boolean;
   span: number;
+  options?: SelectOption[];
 }
 
 export interface LandingSlide {
@@ -134,6 +135,7 @@ export interface LandingBlock {
   description?: string;
   submitLabel?: string;
   successMessage?: string;
+  formId?: string;
   targetResource?: 'leads' | 'appointments' | 'service-orders';
   fields?: LandingFormField[];
   slides?: LandingSlide[];

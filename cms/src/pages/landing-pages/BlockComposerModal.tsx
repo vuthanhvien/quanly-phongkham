@@ -11,6 +11,7 @@ export type BlockComposerModalContextValue = {
   composer: BlockComposerState | null
   sections: LandingSectionDraft[]
   blockTypeOptions: Array<{ value: LandingBlock['type']; label: string }>
+  landingForms: Array<{ id: string; name: string; title: string; targetResource: string }>
   onCancel: () => void
   onSave: () => void
   onChangeType: (type: LandingBlock['type']) => void
@@ -51,6 +52,7 @@ export function BlockComposerModal() {
     composer,
     sections,
     blockTypeOptions,
+    landingForms,
     onCancel,
     onSave,
     onChangeType,
@@ -189,6 +191,9 @@ export function BlockComposerModal() {
 
           {composer.block.type === 'form' ? (
             <Space direction="vertical" size={10} style={{ width: '100%' }}>
+              <Form.Item label="Landing Form" extra="Form được tạo trong mục Landing Forms" style={{ marginBottom: 0 }}>
+                <Select allowClear placeholder="Chọn Landing Form" value={composer.block.formId} options={landingForms.map((form) => ({ value: form.id, label: `${form.title} — ${form.name}` }))} onChange={(formId) => onUpdateBlock({ formId })} />
+              </Form.Item>
               <Row gutter={12}>
                 <Col span={12}>
                   <Form.Item label="Tiêu đề form" style={{ marginBottom: 0 }}>

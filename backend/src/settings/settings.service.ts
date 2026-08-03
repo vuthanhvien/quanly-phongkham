@@ -6,7 +6,7 @@ import Handlebars from 'handlebars';
 import { basename, join } from 'path';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, User, ViewSetting } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, User, ViewSetting } from '../entities/entities';
 import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
 import { renderDocxTemplate } from './docx-template';
@@ -133,6 +133,7 @@ export class SettingsService {
     @InjectRepository(ViewSetting) private readonly views: Repository<ViewSetting>,
     @InjectRepository(PrintTemplate) private readonly templates: Repository<PrintTemplate>,
     @InjectRepository(LandingPage) private readonly landingPages: Repository<LandingPage>,
+    @InjectRepository(LandingForm) private readonly landingForms: Repository<LandingForm>,
     @InjectRepository(LandingFormSubmission) private readonly landingFormSubmissions: Repository<LandingFormSubmission>,
     @InjectRepository(AppUiSetting) private readonly appUiSettings: Repository<AppUiSetting>,
     @InjectRepository(ChatbotSetting) private readonly chatbotSettings: Repository<ChatbotSetting>,
@@ -376,6 +377,100 @@ export class SettingsService {
     return this.landingPages.find({ where: { isArchived: false }, order: { updatedAt: 'DESC', createdAt: 'DESC' } });
   }
 
+  listLandingForms(user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    return this.landingForms.find({ where: { isArchived: false }, order: { updatedAt: 'DESC', createdAt: 'DESC' } });
+  }
+
+  async createLandingForm(payload: Partial<LandingForm>, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const form = this.normalizeLandingForm(payload);
+    return this.landingForms.save(this.landingForms.create(form));
+  }
+
+  async updateLandingForm(id: string, payload: Partial<LandingForm>, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const current = await this.landingForms.findOne({ where: { id, isArchived: false } });
+    if (!current) throw new NotFoundException('Không tìm thấy landing form');
+    const saved = await this.landingForms.save(this.landingForms.merge(current, this.normalizeLandingForm({ ...current, ...payload })));
+    await this.revalidateLandingCache();
+    return saved;
+  }
+
+  async listLandingFormSubmissions(formId: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    return this.landingFormSubmissions.find({ where: { formId }, order: { createdAt: 'DESC' } });
+  }
+
+  async approveLandingFormSubmission(id: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const submission = await this.landingFormSubmissions.findOne({ where: { id } });
+    if (!submission) throw new NotFoundException('Không tìm thấy dữ liệu gửi form');
+    if (submission.status === 'APPROVED') throw new BadRequestException('Submission này đã được duyệt');
+    const resource = String(submission.targetResource || '');
+    if (!resource) throw new BadRequestException('Form chưa có model đích');
+    const result = await this.records.create(resource, submission.payload || {}, user as AuthUser);
+    const record = result.data as { id?: string };
+    submission.status = 'APPROVED';
+    submission.approvedRecordId = record?.id;
+    submission.approvedById = user?.id;
+    submission.approvedAt = new Date();
+    await this.landingFormSubmissions.save(submission);
+    return submission;
+  }
+
+  async listLandingDomains(user?: AuthUser) {
+    const pages = await this.listLandingPages(user);
+    return pages.flatMap((page) => (page.domains || []).map((domain) => ({
+      domain: String(domain),
+      landingPageId: page.id,
+      landingPageTitle: page.title,
+      landingPath: page.path,
+      isPublished: page.isPublished,
+    }))).sort((left, right) => left.domain.localeCompare(right.domain));
+  }
+
+  async createLandingDomain(payload: { domain?: string; landingPageId?: string }, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const domain = this.normalizeLandingDomain(payload.domain);
+    const page = await this.landingPages.findOne({ where: { id: String(payload.landingPageId || ''), isArchived: false } });
+    if (!page) throw new NotFoundException('Chọn landing page hợp lệ');
+    await this.ensureLandingDomainAvailable(domain);
+    page.domains = Array.from(new Set([...(page.domains || []), domain]));
+    await this.landingPages.save(page);
+    await this.revalidateLandingCache();
+    return { domain, landingPageId: page.id };
+  }
+
+  async updateLandingDomain(currentDomain: string, payload: { domain?: string; landingPageId?: string }, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const oldDomain = this.normalizeLandingDomain(currentDomain);
+    const domain = this.normalizeLandingDomain(payload.domain);
+    const pages = await this.landingPages.find({ where: { isArchived: false } });
+    const source = pages.find((page) => (page.domains || []).includes(oldDomain));
+    if (!source) throw new NotFoundException('Không tìm thấy domain');
+    const target = pages.find((page) => page.id === String(payload.landingPageId || ''));
+    if (!target) throw new NotFoundException('Chọn landing page hợp lệ');
+    await this.ensureLandingDomainAvailable(domain, oldDomain);
+    source.domains = (source.domains || []).filter((item) => item !== oldDomain);
+    target.domains = Array.from(new Set([...(target.domains || []), domain]));
+    if (source.id === target.id) await this.landingPages.save(target);
+    else await this.landingPages.save([source, target]);
+    await this.revalidateLandingCache();
+    return { domain, landingPageId: target.id };
+  }
+
+  async deleteLandingDomain(value: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const domain = this.normalizeLandingDomain(value);
+    const page = (await this.landingPages.find({ where: { isArchived: false } })).find((item) => (item.domains || []).includes(domain));
+    if (!page) throw new NotFoundException('Không tìm thấy domain');
+    page.domains = (page.domains || []).filter((item) => item !== domain);
+    await this.landingPages.save(page);
+    await this.revalidateLandingCache();
+    return { domain };
+  }
+
   async getAppUiSettings(user?: AuthUser) {
     this.assertSettingsAccess(user);
     return this.ensureAppUiSettings();
@@ -543,7 +638,17 @@ export class SettingsService {
     if (!page) {
       throw new NotFoundException('Không tìm thấy landing page');
     }
-    return page;
+    const formIds = (page.blocks || []).filter((block) => String(block?.type || '') === 'form' && block?.formId).map((block) => String(block.formId));
+    if (!formIds.length) return page;
+    const forms = await this.landingForms.find({ where: { id: In(formIds), isArchived: false } });
+    const formById = new Map(forms.map((form) => [form.id, form]));
+    return {
+      ...page,
+      blocks: page.blocks.map((block) => {
+        const form = formById.get(String(block?.formId || ''));
+        return form ? { ...block, formId: form.id, title: form.title, description: form.description || '', submitLabel: form.submitLabel, successMessage: form.successMessage, targetResource: form.targetResource, fields: form.fields } : block;
+      }),
+    };
   }
 
   async submitLandingForm(slug: string, blockId: string, payload: Record<string, unknown>) {
@@ -560,7 +665,8 @@ export class SettingsService {
       throw new NotFoundException('Không tìm thấy form block');
     }
 
-    const fields = Array.isArray(block.fields) ? block.fields : [];
+    const form = block?.formId ? await this.landingForms.findOne({ where: { id: String(block.formId), isArchived: false } }) : undefined;
+    const fields = form?.fields || (Array.isArray(block.fields) ? block.fields : []);
     const values = payload && typeof payload === 'object' && payload.values && typeof payload.values === 'object'
       ? payload.values as Record<string, unknown>
       : payload;
@@ -579,7 +685,9 @@ export class SettingsService {
         pageSlug: page.slug,
         pagePath: page.path,
         blockId,
-        formName: String(block.title || block.label || '' || undefined),
+        formId: form?.id,
+        targetResource: form?.targetResource || String(block.targetResource || ''),
+        formName: String(form?.name || block.title || block.label || '' || undefined),
         payload: values,
       }),
     );
@@ -757,6 +865,32 @@ export class SettingsService {
     throw new BadRequestException('Chỉ ADMIN mới được xem danh sách role');
   }
 
+  private normalizeLandingForm(payload: Partial<LandingForm>) {
+    const name = String(payload.name || '').trim();
+    const title = String(payload.title || '').trim();
+    const targetResource = String(payload.targetResource || '').trim();
+    if (!name || !title || !targetResource) throw new BadRequestException('Tên, tiêu đề và model đích là bắt buộc');
+    if (!Array.isArray(payload.fields) || !payload.fields.length) throw new BadRequestException('Form cần có ít nhất một trường');
+    return {
+      name,
+      title,
+      targetResource,
+      description: String(payload.description || ''),
+      submitLabel: String(payload.submitLabel || 'Gửi thông tin'),
+      successMessage: String(payload.successMessage || 'Đã gửi thành công'),
+      fields: payload.fields.map((field, index) => ({
+        id: String(field?.id || randomUUID()),
+        name: String(field?.name || '').trim(),
+        label: String(field?.label || field?.name || `Trường ${index + 1}`).trim(),
+        type: ['text', 'textarea', 'email', 'tel', 'number', 'date', 'datetime', 'select'].includes(String(field?.type || '')) ? field.type : 'text',
+        required: Boolean(field?.required),
+        placeholder: String(field?.placeholder || ''),
+        span: Math.max(1, Math.min(12, Number(field?.span ?? 12) || 12)),
+        options: Array.isArray(field?.options) ? field.options : [],
+      })).filter((field) => field.name),
+    };
+  }
+
   private normalizeLandingPagePayload(payload: Partial<LandingPage>, isCreate: boolean) {
     const title = String(payload.title || '').trim();
     if (!title) {
@@ -773,7 +907,7 @@ export class SettingsService {
     const description = payload.description ? String(payload.description).trim() : undefined;
     const seoTitle = payload.seoTitle ? String(payload.seoTitle).trim() : undefined;
     const seoDescription = payload.seoDescription ? String(payload.seoDescription).trim() : undefined;
-    const domains = Array.from(new Set((Array.isArray(payload.domains) ? payload.domains : []).map((domain) => String(domain).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '')).filter(Boolean)));
+    const domains = Array.from(new Set((Array.isArray(payload.domains) ? payload.domains : []).map((domain) => this.normalizeLandingDomain(domain))));
 
     return {
       slug,
@@ -786,6 +920,18 @@ export class SettingsService {
       blocks,
       isPublished: isCreate ? Boolean(payload.isPublished) : Boolean(payload.isPublished),
     };
+  }
+
+  private normalizeLandingDomain(value: unknown) {
+    const domain = String(value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+    if (!domain) throw new BadRequestException('Domain không hợp lệ');
+    return domain;
+  }
+
+  private async ensureLandingDomainAvailable(domain: string, exceptDomain?: string) {
+    const pages = await this.landingPages.find({ where: { isArchived: false } });
+    const used = pages.some((page) => (page.domains || []).some((item) => item === domain && item !== exceptDomain));
+    if (used) throw new BadRequestException('Domain đã được gán cho landing page khác');
   }
 
   private normalizeLandingBlocks(blocks?: Record<string, unknown>[]) {
@@ -851,6 +997,8 @@ export class SettingsService {
       }
 
       if (type === 'form') {
+        normalized.formId = String(block?.formId || '');
+        normalized.targetResource = String(block?.targetResource || '');
         normalized.title = String(block?.title || '');
         normalized.description = String(block?.description || '');
         normalized.submitLabel = String(block?.submitLabel || 'Gửi thông tin');
@@ -860,10 +1008,11 @@ export class SettingsService {
           id: String(field?.id || randomUUID()),
           name: slugify(String(field?.name || field?.label || `field_${fieldIndex + 1}`)).replace(/-/g, '_'),
           label: String(field?.label || `Trường ${fieldIndex + 1}`),
-          type: ['text', 'textarea', 'email', 'tel', 'number'].includes(String(field?.type || '')) ? field.type : 'text',
+          type: ['text', 'textarea', 'email', 'tel', 'number', 'date', 'datetime', 'select'].includes(String(field?.type || '')) ? field.type : 'text',
           placeholder: String(field?.placeholder || ''),
           required: Boolean(field?.required),
           span: Math.max(1, Math.min(12, Number(field?.span ?? 12) || 12)),
+          options: Array.isArray(field?.options) ? field.options : [],
         }));
       }
 

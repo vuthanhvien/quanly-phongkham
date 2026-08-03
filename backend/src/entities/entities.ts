@@ -1627,13 +1627,67 @@ export class LandingFormSubmission {
   blockId: string;
 
   @Column({ nullable: true })
+  formId?: string;
+
+  @Column({ nullable: true })
+  targetResource?: string;
+
+  @Column({ nullable: true })
   formName?: string;
 
   @Column({ type: 'simple-json', nullable: true })
   payload: Record<string, unknown> = {};
 
+  @Column({ default: 'PENDING' })
+  status: string;
+
+  @Column({ nullable: true })
+  approvedRecordId?: string;
+
+  @Column({ nullable: true })
+  approvedById?: string;
+
+  @Column({ type: 'datetime', nullable: true })
+  approvedAt?: Date;
+
   @CreateDateColumn()
   createdAt: Date;
+}
+
+@Entity('landing_forms')
+export class LandingForm {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  name: string;
+
+  @Column()
+  title: string;
+
+  @Column()
+  targetResource: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  fields: Record<string, unknown>[] = [];
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ default: 'Gửi thông tin' })
+  submitLabel: string;
+
+  @Column({ default: 'Đã gửi thành công' })
+  successMessage: string;
+
+  @Column({ default: false })
+  isArchived: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }
 
 @Entity('custom_field_values')
@@ -2229,6 +2283,7 @@ export const ENTITIES = [
   ViewSetting,
   PrintTemplate,
   LandingPage,
+  LandingForm,
   AppUiSetting,
   LandingFormSubmission,
   AuditLog,

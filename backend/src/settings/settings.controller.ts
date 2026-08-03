@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, 
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { AuthUser, Public } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, DynamicRoleDefinition, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, DynamicRoleDefinition, LandingForm, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
 import { SettingsService } from './settings.service';
 
 @Controller('settings')
@@ -125,6 +125,51 @@ export class SettingsController {
   @Get('landing-pages')
   async landingPages(@Request() request?: { user: AuthUser }) {
     return { data: await this.settings.listLandingPages(request?.user) };
+  }
+
+  @Get('landing-forms')
+  async landingForms(@Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.listLandingForms(request?.user) };
+  }
+
+  @Post('landing-forms')
+  async createLandingForm(@Body() payload: Partial<LandingForm>, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.createLandingForm(payload, request?.user) };
+  }
+
+  @Patch('landing-forms/:id')
+  async updateLandingForm(@Param('id') id: string, @Body() payload: Partial<LandingForm>, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.updateLandingForm(id, payload, request?.user) };
+  }
+
+  @Get('landing-forms/:id/submissions')
+  async landingFormSubmissions(@Param('id') id: string, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.listLandingFormSubmissions(id, request?.user) };
+  }
+
+  @Post('landing-form-submissions/:id/approve')
+  async approveLandingFormSubmission(@Param('id') id: string, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.approveLandingFormSubmission(id, request?.user) };
+  }
+
+  @Get('landing-domains')
+  async landingDomains(@Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.listLandingDomains(request?.user) };
+  }
+
+  @Post('landing-domains')
+  async createLandingDomain(@Body() payload: { domain?: string; landingPageId?: string }, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.createLandingDomain(payload, request?.user) };
+  }
+
+  @Patch('landing-domains/:domain')
+  async updateLandingDomain(@Param('domain') domain: string, @Body() payload: { domain?: string; landingPageId?: string }, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.updateLandingDomain(domain, payload, request?.user) };
+  }
+
+  @Delete('landing-domains/:domain')
+  async removeLandingDomain(@Param('domain') domain: string, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.deleteLandingDomain(domain, request?.user) };
   }
 
   @Public()

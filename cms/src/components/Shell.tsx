@@ -41,7 +41,6 @@ import { api, getGlobalBranchFilterIds, onGlobalBranchFilterChange, setGlobalBra
 import { useAppUi } from "../app-ui"
 import {
   appModuleGroups,
-  companyTypeLabels,
   isModuleEnabled,
   resolveMenuGroupLabel,
   type AppModuleGroup,
@@ -275,6 +274,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       children: hasScreenAccess("settings") ? [
         { key: "/landing/pages", icon: <GlobalOutlined />, label: <Link to="/landing/pages">Pages</Link> },
         { key: "/landing/forms", icon: <FileDoneOutlined />, label: <Link to="/landing/forms">Forms</Link> },
+        { key: "/landing/domains", icon: <GlobalOutlined />, label: <Link to="/landing/domains">Domains</Link> },
         { key: "/landing/configs", icon: <SettingOutlined />, label: <Link to="/landing/configs">Configs</Link> },
       ] : [],
     },
@@ -421,14 +421,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="brand-copy">
             <Typography.Title level={4}>{settings.appName}</Typography.Title>
-            <Typography.Text className="brand-kicker" style={{ fontSize: 11, fontWeight: 700 }}>
-              {companyTypeLabels[activeCompanyType] || activeCompanyType}
-            </Typography.Text>
-            {settings.appDescription ? (
-              <Typography.Text className="brand-kicker" style={{fontSize: 12}}>
-                {settings.appDescription}
-              </Typography.Text>
-            ) : null}
           </div>
         </div>
         <div className="side-menu-scroll">
@@ -510,14 +502,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="brand-copy">
             <Typography.Title level={4}>{settings.appName}</Typography.Title>
-            <Typography.Text className="brand-kicker" style={{ fontSize: 11, fontWeight: 700 }}>
-              {companyTypeLabels[activeCompanyType] || activeCompanyType}
-            </Typography.Text>
-            {settings.appDescription ? (
-              <Typography.Text className="brand-kicker" style={{fontSize: 12}}>
-                {settings.appDescription}
-              </Typography.Text>
-            ) : null}
           </div>
         </div>
         <div className="mobile-menu-scroll">{menuNode}</div>

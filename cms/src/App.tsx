@@ -22,6 +22,7 @@ import { LoginPage } from './pages/LoginPage';
 import { LandingPagesPage } from './pages/LandingPagesPage';
 import { LandingPageListPage } from './pages/LandingPageListPage';
 import { LandingFormsPage } from './pages/LandingFormsPage';
+import { LandingDomainsPage } from './pages/LandingDomainsPage';
 import { RecordDetailPage } from './pages/RecordDetailPage';
 import { RecordFormPage } from './pages/RecordFormPage';
 import { RecordImportPage } from './pages/RecordImportPage';
@@ -233,6 +234,7 @@ export function App() {
                 <Route path="/landing/pages" element={<LandingPageListPage />} />
                 <Route path="/landing/pages/:id" element={<LandingPagesPage />} />
                 <Route path="/landing/forms" element={<LandingFormsPage />} />
+                <Route path="/landing/domains" element={<LandingDomainsPage />} />
                 <Route path="/landing/configs" element={<LandingPagesPage />} />
                 <Route path="/landing-pages" element={<Navigate to="/landing/pages" replace />} />
                 <Route path="/chatbot-settings" element={<ChatbotSettingsPage />} />

@@ -283,6 +283,64 @@ body {
   white-space: nowrap;
 }
 
+.record-row-actions-mobile {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .record-list-page-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .record-list-page-header > :first-child,
+  .record-list-page-header .record-list-actions {
+    flex-basis: 100%;
+  }
+
+  .page-header-actions.record-list-actions {
+    flex-wrap: nowrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .page-header-actions.record-list-actions .ant-space-item {
+    width: auto;
+  }
+
+  .page-header-actions.record-list-actions .page-search,
+  .page-header-actions.record-list-actions .page-search .ant-input-search,
+  .page-header-actions.record-list-actions .page-search .ant-input-affix-wrapper,
+  .page-header-actions.record-list-actions .page-search .ant-input-group-wrapper {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .record-list-actions .mobile-icon-button {
+    align-items: center;
+    display: inline-flex;
+    font-size: 0;
+    gap: 0 !important;
+    justify-content: center;
+    min-width: 38px;
+    padding-inline: 10px;
+  }
+
+  .record-list-actions .mobile-icon-button .anticon {
+    font-size: 15px;
+    margin-inline-end: 0 !important;
+  }
+
+  .record-row-actions-desktop {
+    display: none !important;
+  }
+
+  .record-row-actions-mobile {
+    display: inline-flex;
+  }
+}
+
 .app-content {
   padding: 18px;
 }
@@ -3117,6 +3175,14 @@ textarea.ant-input {
 }
 
 @media (max-width: 576px) {
+  .profile-trigger {
+    padding: 4px;
+  }
+
+  .profile-trigger .profile-name {
+    display: none;
+  }
+
   .profile-account-header,
   .profile-hero-main {
     align-items: flex-start;

@@ -28,10 +28,11 @@ export interface LandingFormField {
   id: string
   name: string
   label: string
-  type: 'text' | 'textarea' | 'email' | 'tel' | 'number'
+  type: 'text' | 'textarea' | 'email' | 'tel' | 'number' | 'date' | 'datetime' | 'select'
   placeholder?: string
   required: boolean
   span: number
+  options?: Array<string | { value: string; label: string }>
 }
 
 export interface LandingSlide {
@@ -63,6 +64,7 @@ export interface LandingBlock {
   description?: string
   submitLabel?: string
   successMessage?: string
+  formId?: string
   fields?: LandingFormField[]
   slides?: LandingSlide[]
 }

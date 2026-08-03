@@ -116,6 +116,7 @@ export function LandingPagesPage() {
   const { id: pageId } = useParams()
   const location = useLocation()
   const [pages, setPages] = useState<LandingPage[]>([])
+  const [landingForms, setLandingForms] = useState<Array<{ id: string; name: string; title: string; targetResource: string }>>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Omit<LandingPage, 'id' | 'createdAt' | 'updatedAt'>>(emptyPage())
   const [loading, setLoading] = useState(false)
@@ -147,9 +148,14 @@ export function LandingPagesPage() {
 
   useEffect(() => {
     void loadPages()
+    void loadLandingForms()
     void loadGlobalSettings()
     void loadMenuSettings()
   }, [])
+
+  async function loadLandingForms() {
+    try { setLandingForms((await api.get('/settings/landing-forms')).data.data || []) } catch { setLandingForms([]) }
+  }
 
   useEffect(() => {
     if (pageId && pageId !== 'new') setSelectedId(pageId)
@@ -944,6 +950,7 @@ export function LandingPagesPage() {
           composer: blockComposer,
           sections,
           blockTypeOptions,
+          landingForms,
           onCancel: () => setBlockComposer(null),
           onSave: () => void saveComposerBlock(),
           onChangeType: changeComposerType,

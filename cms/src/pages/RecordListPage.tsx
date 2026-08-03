@@ -172,31 +172,46 @@ export function RecordListPage() {
         title: "",
         key: "action",
         fixed: "right" as const,
-        width: 200,
-        render: (_: unknown, row: Record<string, any>) => (
-          <Space size={2}>
+        width: screens.md ? 200 : 56,
+        render: (_: unknown, row: Record<string, any>) => {
+          const recordId = String(row.id)
+          const menuItems: any[] = []
+          if (hasActionAccess(resource, "view")) menuItems.push({ key: "quick-view", icon: <EyeOutlined />, label: "Xem chi tiết", onClick: () => openDetail(recordId) })
+          if (hasActionAccess(resource, "view")) menuItems.push({ key: "full-view", icon: <FullscreenOutlined />, label: "Xem đầy đủ", onClick: () => navigate(`/${resource}/${recordId}/full`) })
+          if (recordStatus === "active" && hasActionAccess(resource, "update")) menuItems.push({ key: "edit", icon: <EditOutlined />, label: "Chỉnh sửa", onClick: () => setEditingId(recordId) })
+          if (recordStatus === "active" && hasActionAccess(resource, "create") && resource !== "files") menuItems.push({ key: "copy", icon: <CopyOutlined />, label: "Nhân bản", onClick: () => void duplicateRecord(recordId) })
+          if (resource === "customers" && hasActionAccess(resource, "reveal-phone")) menuItems.push({ key: "phone", icon: <PhoneOutlined />, label: "Xem số điện thoại", onClick: () => void revealPhone(recordId) })
+          if (resource === "leads" && !row.convertedCustomerId && hasActionAccess(resource, "convert-to-customer")) menuItems.push({ key: "convert", icon: <SwapOutlined />, label: "Chuyển thành khách hàng", onClick: () => void convertLead(recordId) })
+          if (["invoices", "expenses", "payrolls"].includes(resource) && hasActionAccess(resource, "generate-accounting-voucher")) menuItems.push({ key: "voucher", icon: <AuditOutlined />, label: "Tạo chứng từ kế toán", onClick: () => void generateAccountingVoucher(resource, recordId) })
+          if (resource === "accounting-vouchers" && row.status !== "POSTED" && hasActionAccess(resource, "post")) menuItems.push({ key: "post", icon: <AuditOutlined />, label: "Ghi sổ", onClick: () => void postAccountingVoucher(recordId) })
+          if (resource === "accounting-vouchers" && row.status === "POSTED" && hasActionAccess(resource, "unpost")) menuItems.push({ key: "unpost", icon: <SwapOutlined />, label: "Bỏ ghi sổ", onClick: () => void unpostAccountingVoucher(recordId) })
+          if (templates[0] && hasActionAccess(resource, "print")) menuItems.push({ key: "print", icon: <PrinterOutlined />, label: "In biểu mẫu", onClick: () => void printRecord(templates[0], recordId) })
+          if (recordStatus === "active" && hasActionAccess(resource, "delete")) menuItems.push({ key: "archive", danger: true, icon: <DeleteOutlined />, label: "Lưu trữ", onClick: () => Modal.confirm({ title: "Lưu trữ bản ghi này?", content: "Bản ghi sẽ được chuyển vào tab Lưu trữ.", okText: "Lưu trữ", okButtonProps: { danger: true }, onOk: () => new Promise<void>((resolve) => deleteRecord({ resource, id: row.id }, { onSuccess: () => { message.success("Đã lưu trữ"); refresh(); resolve() }, onError: () => resolve() })) }) })
+          return <>
+          <span className="record-row-actions-mobile"><Dropdown menu={{ items: menuItems }} trigger={["click"]}><Button type="text" icon={<MoreOutlined />} aria-label="Thao tác" /></Dropdown></span>
+          <Space className="record-row-actions-desktop" size={2}>
             {hasActionAccess(resource, "view") && (
               <Tooltip title="Xem chi tiết">
-                <Button icon={<EyeOutlined />} type="text" onClick={() => openDetail(String(row.id))} />
+                <Button icon={<EyeOutlined />} type="text" onClick={() => openDetail(recordId)} />
               </Tooltip>
             )}
             {hasActionAccess(resource, "view") && (
               <Tooltip title="Xem đầy đủ">
-                <Button icon={<FullscreenOutlined />} type="text" onClick={() => navigate(`/${resource}/${row.id}/full`)} />
+                <Button icon={<FullscreenOutlined />} type="text" onClick={() => navigate(`/${resource}/${recordId}/full`)} />
               </Tooltip>
             )}
             {recordStatus === "active" && hasActionAccess(resource, "update") && (
               <Tooltip title="Chỉnh sửa">
-                <Button icon={<EditOutlined />} type="text" onClick={() => setEditingId(String(row.id))} />
+                <Button icon={<EditOutlined />} type="text" onClick={() => setEditingId(recordId)} />
               </Tooltip>
             )}
             {recordStatus === "active" && hasActionAccess(resource, "create") && resource !== "files" && (
               <Tooltip title="Nhân bản">
                 <Button
                   icon={<CopyOutlined />}
-                  loading={duplicatingId === String(row.id)}
+                  loading={duplicatingId === recordId}
                   type="text"
-                  onClick={() => void duplicateRecord(String(row.id))}
+                  onClick={() => void duplicateRecord(recordId)}
                 />
               </Tooltip>
             )}
@@ -254,11 +269,11 @@ export function RecordListPage() {
                 </Tooltip>
               </Popconfirm>
             )}
-          </Space>
-        ),
+          </Space></>
+        },
       },
     ],
-    [displayFields, resource, recordStatus, templates, lookups, fileLookups],
+    [displayFields, resource, recordStatus, templates, lookups, fileLookups, screens.md],
   )
 
   const doctorOptions = useMemo(
@@ -413,13 +428,13 @@ export function RecordListPage() {
 
   return (
     <>
-      <div className="page-header">
+      <div className="page-header record-list-page-header">
         <div>
           <Typography.Title level={3}>
             {entityLabels[resource] || resource}
           </Typography.Title>
         </div>
-        <Space wrap className="page-header-actions">
+        <Space wrap className="page-header-actions record-list-actions">
           <Input.Search
             allowClear
             className="page-search"
@@ -461,7 +476,7 @@ export function RecordListPage() {
               }}
               trigger={["click"]}
             >
-              <Button danger icon={<MoreOutlined />} loading={cloningSelected}>
+              <Button aria-label="Bản ghi đã chọn" className="mobile-icon-button" danger icon={<MoreOutlined />} loading={cloningSelected}>
                 Đã chọn ({selectedRowKeys.length})
               </Button>
             </Dropdown>
@@ -470,6 +485,7 @@ export function RecordListPage() {
             <Tooltip title="Mở màn hình import">
               <Button
                 icon={<ImportOutlined />}
+                className="mobile-icon-button"
                 onClick={() => navigate(`/${resource}/import`)}
               >
                 Import
@@ -479,7 +495,8 @@ export function RecordListPage() {
           {hasActionAccess(resource, "create") && (
             <Tooltip title="Tạo bản ghi mới">
               <Button
-                className="primary-glow"
+                className="primary-glow mobile-icon-button"
+                aria-label={resource === "files" ? "Upload file" : "Thêm nhanh"}
                 icon={<PlusOutlined />}
                 type="primary"
                 onClick={() => setCreating(true)}
