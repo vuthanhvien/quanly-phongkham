@@ -2,6 +2,7 @@ import { DeleteOutlined, EditOutlined, GlobalOutlined, PlusOutlined } from "@ant
 import { Button, Card, Form, Input, Modal, Popconfirm, Space, Table, Tooltip, Typography, message } from "antd"
 import { useEffect, useState } from "react"
 import { api } from "../api"
+import { ModalTitleBar } from "../components/ModalTitleBar"
 import { getApiErrorMessage } from "../utils/apiError"
 
 type LandingDomain = { id: string; name: string; domain: string }
@@ -11,6 +12,7 @@ export function LandingDomainsPage() {
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<LandingDomain | null>(null)
   const [open, setOpen] = useState(false)
+  const [fullscreenPopup, setFullscreenPopup] = useState(false)
   const [form] = Form.useForm()
 
   useEffect(() => { void load() }, [])
@@ -43,6 +45,7 @@ export function LandingDomainsPage() {
       else await api.post("/settings/landing-domains", values)
       message.success(editing ? "Đã cập nhật domain" : "Đã thêm domain")
       setOpen(false)
+      setFullscreenPopup(false)
       await load()
     } catch (error) { message.error(getApiErrorMessage(error, "Không thể lưu domain")) }
   }
@@ -78,11 +81,22 @@ export function LandingDomainsPage() {
         ]}
       />
     </Card>
-    <Modal destroyOnHidden footer={null} open={open} title={editing ? "Cập nhật domain" : "Thêm domain"} onCancel={() => setOpen(false)}>
+    <Modal
+      className={`quick-drawer${fullscreenPopup ? " quick-drawer-fullscreen" : ""}`}
+      destroyOnHidden
+      footer={null}
+      open={open}
+      title={<ModalTitleBar fullscreen={fullscreenPopup} title={editing ? "Cập nhật domain" : "Thêm domain"} onToggleFullscreen={() => setFullscreenPopup((current) => !current)} />}
+      width={fullscreenPopup ? "calc(100vw - 24px)" : 560}
+      onCancel={() => {
+        setOpen(false)
+        setFullscreenPopup(false)
+      }}
+    >
       <Form form={form} layout="vertical" onFinish={(values) => void save(values)}>
         <Form.Item label="Tên" name="name" rules={[{ required: true, message: "Nhập tên" }]}><Input placeholder="Website chính" /></Form.Item>
         <Form.Item label="Domain" name="domain" rules={[{ required: true, message: "Nhập domain" }]} extra="Có thể kèm port, ví dụ clinic.example.com:8080."><Input placeholder="clinic.example.com:8080" /></Form.Item>
-        <Space><Button className="primary-glow" htmlType="submit" type="primary">Lưu</Button><Button onClick={() => setOpen(false)}>Hủy</Button></Space>
+        <Space><Button className="primary-glow" htmlType="submit" type="primary">Lưu</Button><Button onClick={() => { setOpen(false); setFullscreenPopup(false) }}>Hủy</Button></Space>
       </Form>
     </Modal>
   </>

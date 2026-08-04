@@ -26,6 +26,7 @@ import type { UploadFile } from "antd"
 import { useEffect, useState } from "react"
 import * as XLSX from "xlsx"
 import { api } from "../api"
+import { ModalTitleBar } from "../components/ModalTitleBar"
 import { getApiErrorMessage } from "../utils/apiError"
 
 interface ItemCategory {
@@ -90,6 +91,7 @@ export function CategoriesPage() {
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<ItemCategory | null>(null)
+  const [fullscreenPopup, setFullscreenPopup] = useState<string | null>(null)
   const [form] = Form.useForm()
 
   // Import state
@@ -145,6 +147,7 @@ export function CategoriesPage() {
       }
       setModalOpen(false)
       setEditing(null)
+      setFullscreenPopup((current) => current === "category" ? null : current)
       await load()
     } catch (err: unknown) {
       void message.error(getApiErrorMessage(err, "Có lỗi xảy ra"))
@@ -342,13 +345,22 @@ export function CategoriesPage() {
 
       {/* Create / Edit modal */}
       <Modal
-        title={editing ? "Chỉnh sửa danh mục" : "Thêm danh mục"}
+        className={`quick-drawer${fullscreenPopup === "category" ? " quick-drawer-fullscreen" : ""}`}
+        title={
+          <ModalTitleBar
+            fullscreen={fullscreenPopup === "category"}
+            title={editing ? "Chỉnh sửa danh mục" : "Thêm danh mục"}
+            onToggleFullscreen={() => setFullscreenPopup((current) => current === "category" ? null : "category")}
+          />
+        }
         open={modalOpen}
         footer={null}
         maskClosable={false}
+        width={fullscreenPopup === "category" ? "calc(100vw - 24px)" : 560}
         onCancel={() => {
           setModalOpen(false)
           setEditing(null)
+          setFullscreenPopup((current) => current === "category" ? null : current)
         }}
       >
         <Form form={form} layout="vertical" onFinish={save}>
@@ -384,11 +396,21 @@ export function CategoriesPage() {
 
       {/* Import modal */}
       <Modal
-        title="Import Ngành / Nhóm / Loại"
+        className={`quick-drawer${fullscreenPopup === "import" ? " quick-drawer-fullscreen" : ""}`}
+        title={
+          <ModalTitleBar
+            fullscreen={fullscreenPopup === "import"}
+            title="Import Ngành / Nhóm / Loại"
+            onToggleFullscreen={() => setFullscreenPopup((current) => current === "import" ? null : "import")}
+          />
+        }
         open={importModal}
-        onCancel={closeImport}
+        onCancel={() => {
+          closeImport()
+          setFullscreenPopup((current) => current === "import" ? null : current)
+        }}
         footer={null}
-        width={860}
+        width={fullscreenPopup === "import" ? "calc(100vw - 24px)" : 860}
       >
         {!importResult ? (
           <>

@@ -2598,6 +2598,23 @@ textarea.ant-input {
   justify-content: flex-end;
 }
 
+.ant-modal.quick-drawer-fullscreen {
+  max-width: calc(100vw - 24px);
+  top: 12px;
+}
+
+.ant-modal.quick-drawer-fullscreen .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 24px);
+}
+
+.ant-modal.quick-drawer-fullscreen .ant-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
 .service-order-grid {
   display: grid;
   gap: 0 16px;

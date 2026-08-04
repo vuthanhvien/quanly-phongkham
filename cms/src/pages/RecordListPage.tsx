@@ -1,7 +1,6 @@
 import { useDelete, useList } from "@refinedev/core"
 import {
   AuditOutlined,
-  CloseOutlined,
   CopyOutlined,
   ClearOutlined,
   DeleteOutlined,
@@ -568,12 +567,9 @@ export function RecordListPage() {
             <Typography.Text strong>{`Chi tiết ${entityLabels[resource] || resource}`}</Typography.Text>
             {detailId ? (
               <Space size={8}>
-                <Button icon={<CloseOutlined />} onClick={closeDetail}>
-                  Đóng
-                </Button>
-                <Button icon={<FullscreenOutlined />} onClick={() => navigate(`/${resource}/${detailId}/full`)}>
-                Xem đầy đủ
-                </Button>
+                <Tooltip title="Xem đầy đủ">
+                  <Button ghost icon={<FullscreenOutlined />} onClick={() => navigate(`/${resource}/${detailId}/full`)} />
+                </Tooltip>
                 {hasActionAccess(resource, "update") && (
                   <Button
                     className="primary-glow"
@@ -614,12 +610,9 @@ export function RecordListPage() {
             <Typography.Text strong>{relatedQuickView ? `Chi tiết ${entityLabels[relatedQuickView.resource] || relatedQuickView.resource}` : "Chi tiết liên kết"}</Typography.Text>
             {relatedQuickView ? (
               <Space size={8}>
-                <Button icon={<CloseOutlined />} onClick={() => setRelatedQuickView(null)}>
-                  Đóng
-                </Button>
-                <Button icon={<FullscreenOutlined />} onClick={() => navigate(`/${relatedQuickView.resource}/${relatedQuickView.id}/full`)}>
-                Xem đầy đủ
-                </Button>
+                <Tooltip title="Xem đầy đủ">
+                  <Button ghost icon={<FullscreenOutlined />} onClick={() => navigate(`/${relatedQuickView.resource}/${relatedQuickView.id}/full`)} />
+                </Tooltip>
                 {hasActionAccess(relatedQuickView.resource, "update") && (
                   <Button
                     className="primary-glow"

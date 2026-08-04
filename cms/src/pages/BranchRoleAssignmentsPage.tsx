@@ -12,6 +12,7 @@ import {
 } from "antd"
 import { useEffect, useState } from "react"
 import { api } from "../api"
+import { ModalTitleBar } from "../components/ModalTitleBar"
 import { BranchRoleAssignment, DynamicRole } from "../models"
 import { getFirstOptionValue } from "../utils/branchDefaults"
 
@@ -34,6 +35,7 @@ export function BranchRoleAssignmentsPage() {
   const [assignmentModal, setAssignmentModal] = useState(false)
   const [editingAssignment, setEditingAssignment] =
     useState<BranchRoleAssignment | null>(null)
+  const [fullscreenPopup, setFullscreenPopup] = useState(false)
   const [assignmentForm] = Form.useForm<AssignmentFormValues>()
 
   useEffect(() => {
@@ -95,6 +97,7 @@ export function BranchRoleAssignmentsPage() {
     }
     setAssignmentModal(false)
     setEditingAssignment(null)
+    setFullscreenPopup(false)
     assignmentForm.resetFields()
     await load()
   }
@@ -171,17 +174,22 @@ export function BranchRoleAssignmentsPage() {
         />
       </Card>
       <Modal
+        className={`quick-drawer${fullscreenPopup ? " quick-drawer-fullscreen" : ""}`}
         title={
-          editingAssignment
-            ? "Cập nhật phân quyền theo chi nhánh"
-            : "Thêm phân quyền theo chi nhánh"
+          <ModalTitleBar
+            fullscreen={fullscreenPopup}
+            title={editingAssignment ? "Cập nhật phân quyền theo chi nhánh" : "Thêm phân quyền theo chi nhánh"}
+            onToggleFullscreen={() => setFullscreenPopup((current) => !current)}
+          />
         }
         open={assignmentModal}
         footer={null}
         maskClosable={false}
+        width={fullscreenPopup ? "calc(100vw - 24px)" : 620}
         onCancel={() => {
           setAssignmentModal(false)
           setEditingAssignment(null)
+          setFullscreenPopup(false)
         }}
       >
         <Form form={assignmentForm} layout="vertical" onFinish={saveAssignment}>

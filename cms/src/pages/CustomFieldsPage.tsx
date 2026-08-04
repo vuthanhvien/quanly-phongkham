@@ -31,6 +31,7 @@ import { useEffect, useMemo, useState, type Key } from "react"
 import * as XLSX from "xlsx"
 import { api } from "../api"
 import { appModuleGroups } from "../company-types"
+import { ModalTitleBar } from "../components/ModalTitleBar"
 import { CustomField, entityLabels } from "../models"
 
 const CUSTOM_FIELD_TYPES = [
@@ -85,6 +86,7 @@ export function CustomFieldsPage() {
   const [customTables, setCustomTables] = useState<Array<{ id: string; name: string; key: string }>>([])
   const [fieldModal, setFieldModal] = useState(false)
   const [editingField, setEditingField] = useState<CustomField | null>(null)
+  const [fullscreenPopup, setFullscreenPopup] = useState<string | null>(null)
   const [batchModal, setBatchModal] = useState(false)
   const [batchMode, setBatchMode] = useState<"create" | "upsert">("create")
   const [batchRows, setBatchRows] = useState<BatchFieldRow[]>([])
@@ -125,6 +127,7 @@ export function CustomFieldsPage() {
     }
     setFieldModal(false)
     setEditingField(null)
+    setFullscreenPopup((current) => current === "field" ? null : current)
     fieldForm.resetFields()
     await load()
   }
@@ -420,13 +423,22 @@ export function CustomFieldsPage() {
         />
       </Card>
       <Modal
-        title={editingField ? "Cập nhật custom field" : "Thêm custom field"}
+        className={`quick-drawer${fullscreenPopup === "field" ? " quick-drawer-fullscreen" : ""}`}
+        title={
+          <ModalTitleBar
+            fullscreen={fullscreenPopup === "field"}
+            title={editingField ? "Cập nhật custom field" : "Thêm custom field"}
+            onToggleFullscreen={() => setFullscreenPopup((current) => current === "field" ? null : "field")}
+          />
+        }
         open={fieldModal}
         footer={null}
         maskClosable={false}
+        width={fullscreenPopup === "field" ? "calc(100vw - 24px)" : 560}
         onCancel={() => {
           setFieldModal(false)
           setEditingField(null)
+          setFullscreenPopup((current) => current === "field" ? null : current)
         }}
       >
         <Form form={fieldForm} layout="vertical" onFinish={saveField}>
@@ -482,19 +494,25 @@ export function CustomFieldsPage() {
         </Form>
       </Modal>
       <Modal
+        className={`quick-drawer${fullscreenPopup === "batch" ? " quick-drawer-fullscreen" : ""}`}
         title={
-          batchMode === "create"
-            ? "Add multi custom fields"
-            : "Update multi custom fields"
+          <ModalTitleBar
+            fullscreen={fullscreenPopup === "batch"}
+            title={batchMode === "create" ? "Add multi custom fields" : "Update multi custom fields"}
+            onToggleFullscreen={() => setFullscreenPopup((current) => current === "batch" ? null : "batch")}
+          />
         }
         open={batchModal}
         maskClosable={false}
-        onCancel={() => setBatchModal(false)}
+        onCancel={() => {
+          setBatchModal(false)
+          setFullscreenPopup((current) => current === "batch" ? null : current)
+        }}
         onOk={() => void submitBatch()}
         okText={
           batchMode === "create" ? "Thêm hàng loạt" : "Cập nhật hàng loạt"
         }
-        width={1440}
+        width={fullscreenPopup === "batch" ? "calc(100vw - 24px)" : 1440}
       >
         <Typography.Paragraph type="secondary">
           Chỉnh nhiều field trực tiếp theo dạng bảng. `Add multi` dùng để thêm
@@ -535,11 +553,21 @@ export function CustomFieldsPage() {
         />
       </Modal>
       <Modal
-        title="Nhập trường tuỳ biến từ file"
+        className={`quick-drawer${fullscreenPopup === "import" ? " quick-drawer-fullscreen" : ""}`}
+        title={
+          <ModalTitleBar
+            fullscreen={fullscreenPopup === "import"}
+            title="Nhập trường tuỳ biến từ file"
+            onToggleFullscreen={() => setFullscreenPopup((current) => current === "import" ? null : "import")}
+          />
+        }
         open={importModal}
         maskClosable={false}
-        onCancel={() => setImportModal(false)}
-        width={1120}
+        onCancel={() => {
+          setImportModal(false)
+          setFullscreenPopup((current) => current === "import" ? null : current)
+        }}
+        width={fullscreenPopup === "import" ? "calc(100vw - 24px)" : 1120}
         footer={[
           <Button key="cancel" onClick={() => setImportModal(false)}>
             Hủy

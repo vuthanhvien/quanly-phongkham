@@ -3,6 +3,7 @@ import { Button, Card, Col, Flex, Form, Input, InputNumber, Modal, Row, Select, 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { api } from '../../api'
 import { ImagePickerInput } from '../../components/ImagePickerInput'
+import { ModalTitleBar } from '../../components/ModalTitleBar'
 import type { LandingBlock, LandingContentItem, LandingFormField, LandingSlide } from '../../models'
 import type { BlockComposerState, LandingSectionDraft } from './editor-helpers'
 
@@ -74,6 +75,7 @@ export function BlockComposerModal() {
   } = useBlockComposerModal()
 
   const isEditMode = composer?.mode === 'edit'
+  const [fullscreenPopup, setFullscreenPopup] = useState(false)
   const [contentRecords, setContentRecords] = useState<Array<Record<string, unknown>>>([])
   const contentResource = composer?.block.type === 'posts' ? 'posts' : composer?.block.type === 'news' ? 'news' : null
   const selectedContentIds = useMemo(
@@ -103,6 +105,10 @@ export function BlockComposerModal() {
     }
   }, [contentResource])
 
+  useEffect(() => {
+    if (!open) setFullscreenPopup(false)
+  }, [open])
+
   function mapContentRecord(record: Record<string, unknown>): LandingContentItem {
     const slug = String(record.slug || '')
     return {
@@ -117,7 +123,25 @@ export function BlockComposerModal() {
   }
 
   return (
-    <Modal title={isEditMode ? 'Cấu hình block' : 'Thêm block vào section'} open={open} onCancel={onCancel} onOk={onSave} okText={isEditMode ? 'Cập nhật block' : 'Lưu block'} confirmLoading={saving} width={760}>
+    <Modal
+      className={`quick-drawer${fullscreenPopup ? " quick-drawer-fullscreen" : ""}`}
+      title={
+        <ModalTitleBar
+          fullscreen={fullscreenPopup}
+          title={isEditMode ? 'Cấu hình block' : 'Thêm block vào section'}
+          onToggleFullscreen={() => setFullscreenPopup((current) => !current)}
+        />
+      }
+      open={open}
+      onCancel={() => {
+        setFullscreenPopup(false)
+        onCancel()
+      }}
+      onOk={onSave}
+      okText={isEditMode ? 'Cập nhật block' : 'Lưu block'}
+      confirmLoading={saving}
+      width={fullscreenPopup ? "calc(100vw - 24px)" : 760}
+    >
       {composer ? (
         <Form layout="vertical" size="small">
         <Space direction="vertical" size={12} style={{ width: '100%' }}>

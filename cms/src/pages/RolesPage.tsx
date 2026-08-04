@@ -22,6 +22,7 @@ import {
 } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
+import { ModalTitleBar } from "../components/ModalTitleBar"
 import { BranchRoleAssignment, DynamicRole, systemRoleSelectOptions } from "../models"
 import { getFirstOptionValue } from "../utils/branchDefaults"
 
@@ -60,6 +61,7 @@ export function RolesPage() {
 
   const [roleModal, setRoleModal] = useState(false)
   const [editingRole, setEditingRole] = useState<DynamicRole | null>(null)
+  const [fullscreenPopup, setFullscreenPopup] = useState<string | null>(null)
   const [roleForm] = Form.useForm<RoleFormValues>()
 
   const [assignModal, setAssignModal] = useState(false)
@@ -128,6 +130,7 @@ export function RolesPage() {
     }
     setRoleModal(false)
     setEditingRole(null)
+    setFullscreenPopup((current) => current === "role" ? null : current)
     roleForm.resetFields()
     await load()
   }
@@ -192,6 +195,7 @@ export function RolesPage() {
     }
     setAssignModal(false)
     setEditingAssign(null)
+    setFullscreenPopup((current) => current === "assign" ? null : current)
     assignForm.resetFields()
     await load()
   }
@@ -521,11 +525,23 @@ export function RolesPage() {
 
       {/* Role Modal */}
       <Modal
-        title={editingRole ? "Cập nhật vai trò" : "Thêm vai trò"}
+        className={`quick-drawer${fullscreenPopup === "role" ? " quick-drawer-fullscreen" : ""}`}
+        title={
+          <ModalTitleBar
+            fullscreen={fullscreenPopup === "role"}
+            title={editingRole ? "Cập nhật vai trò" : "Thêm vai trò"}
+            onToggleFullscreen={() => setFullscreenPopup((current) => current === "role" ? null : "role")}
+          />
+        }
         open={roleModal}
         footer={null}
         maskClosable={false}
-        onCancel={() => { setRoleModal(false); setEditingRole(null) }}
+        width={fullscreenPopup === "role" ? "calc(100vw - 24px)" : 560}
+        onCancel={() => {
+          setRoleModal(false)
+          setEditingRole(null)
+          setFullscreenPopup((current) => current === "role" ? null : current)
+        }}
       >
         <Form form={roleForm} layout="vertical" onFinish={saveRole}>
           <Form.Item name="name" label="Tên vai trò" rules={[{ required: true, message: "Nhập tên" }]}>
@@ -548,15 +564,23 @@ export function RolesPage() {
 
       {/* Assignment Modal */}
       <Modal
+        className={`quick-drawer${fullscreenPopup === "assign" ? " quick-drawer-fullscreen" : ""}`}
         title={
-          editingAssign
-            ? "Cập nhật phân quyền"
-            : `Thêm người vào vai trò "${selectedRole?.name}"`
+          <ModalTitleBar
+            fullscreen={fullscreenPopup === "assign"}
+            title={editingAssign ? "Cập nhật phân quyền" : `Thêm người vào vai trò "${selectedRole?.name}"`}
+            onToggleFullscreen={() => setFullscreenPopup((current) => current === "assign" ? null : "assign")}
+          />
         }
         open={assignModal}
         footer={null}
         maskClosable={false}
-        onCancel={() => { setAssignModal(false); setEditingAssign(null) }}
+        width={fullscreenPopup === "assign" ? "calc(100vw - 24px)" : 620}
+        onCancel={() => {
+          setAssignModal(false)
+          setEditingAssign(null)
+          setFullscreenPopup((current) => current === "assign" ? null : current)
+        }}
       >
         <Form form={assignForm} layout="vertical" onFinish={saveAssign}>
           <Form.Item name="userIds" label="Người dùng" rules={[{ required: true, type: "array", min: 1, message: "Chọn ít nhất 1 người" }]}>

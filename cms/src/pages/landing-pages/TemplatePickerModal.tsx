@@ -1,4 +1,6 @@
 import { Button, Card, Flex, Modal, Space, Tabs, Tag, Typography } from 'antd'
+import { useEffect, useState } from 'react'
+import { ModalTitleBar } from '../../components/ModalTitleBar'
 import type { PageTemplate } from './editor-helpers'
 
 type Props = {
@@ -10,8 +12,30 @@ type Props = {
 }
 
 export function TemplatePickerModal({ open, saving, templates, onCancel, onApply }: Props) {
+  const [fullscreenPopup, setFullscreenPopup] = useState(false)
+
+  useEffect(() => {
+    if (!open) setFullscreenPopup(false)
+  }, [open])
+
   return (
-    <Modal footer={null} onCancel={onCancel} open={open} title="Chọn mẫu cho trang mới" width={780}>
+    <Modal
+      className={`quick-drawer${fullscreenPopup ? " quick-drawer-fullscreen" : ""}`}
+      footer={null}
+      onCancel={() => {
+        setFullscreenPopup(false)
+        onCancel()
+      }}
+      open={open}
+      title={
+        <ModalTitleBar
+          fullscreen={fullscreenPopup}
+          title="Chọn mẫu cho trang mới"
+          onToggleFullscreen={() => setFullscreenPopup((current) => !current)}
+        />
+      }
+      width={fullscreenPopup ? "calc(100vw - 24px)" : 780}
+    >
       <Tabs
         style={{ marginTop: 4 }}
         items={[...new Set(templates.map((t) => t.category))].map((category) => ({

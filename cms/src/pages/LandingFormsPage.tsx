@@ -2,6 +2,7 @@ import { CheckOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Card, Checkbox, Drawer, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
+import { ModalTitleBar } from '../components/ModalTitleBar'
 import { baseFields, entityLabels, type FieldSpec, type LandingFormField } from '../models'
 import { createId } from '../utils/createId'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -25,6 +26,7 @@ export function LandingFormsPage() {
   const [items, setItems] = useState<LandingFormRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [fullscreenPopup, setFullscreenPopup] = useState(false)
   const [saving, setSaving] = useState(false)
   const [model, setModel] = useState('leads')
   const [submissionForm, setSubmissionForm] = useState<LandingFormRecord | null>(null)
@@ -67,6 +69,7 @@ export function LandingFormsPage() {
       await api.post('/settings/landing-forms', { name: values.name, title: values.title, targetResource: values.targetResource, description: values.description, fields })
       message.success('Đã tạo form. Gắn form vào Landing Page trong block Form.')
       setOpen(false)
+      setFullscreenPopup(false)
       await load()
     } catch (error) { message.error(getApiErrorMessage(error, 'Không thể tạo form')) }
     finally { setSaving(false) }
@@ -98,13 +101,24 @@ export function LandingFormsPage() {
       { title: 'Fields', render: (_value, item) => item.fields?.length || 0 },
       { title: '', width: 70, render: (_value, item) => <Tooltip title="Xem submissions"><Button type="text" icon={<EyeOutlined />} onClick={() => void showSubmissions(item)} /></Tooltip> },
     ]} /></Card>
-    <Modal destroyOnHidden footer={null} open={open} title="Tạo Landing Form" onCancel={() => setOpen(false)} width={680}>
+    <Modal
+      className={`quick-drawer${fullscreenPopup ? " quick-drawer-fullscreen" : ""}`}
+      destroyOnHidden
+      footer={null}
+      open={open}
+      title={<ModalTitleBar fullscreen={fullscreenPopup} title="Tạo Landing Form" onToggleFullscreen={() => setFullscreenPopup((current) => !current)} />}
+      width={fullscreenPopup ? "calc(100vw - 24px)" : 680}
+      onCancel={() => {
+        setOpen(false)
+        setFullscreenPopup(false)
+      }}
+    >
       <Form form={form} layout="vertical" onFinish={(values) => void createForm(values)}>
         <Space style={{ display: 'flex' }}><Form.Item name="name" label="Tên form" rules={[{ required: true }]}><Input /></Form.Item><Form.Item name="title" label="Tiêu đề hiển thị" rules={[{ required: true }]}><Input /></Form.Item></Space>
         <Form.Item name="targetResource" label="Model lưu sau khi duyệt" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" onChange={onModelChange} options={Object.keys(baseFields).map((key) => ({ value: key, label: entityLabels[key] || key }))} /></Form.Item>
         <Form.Item name="fieldKeys" label="Field hiển thị cho người dùng" rules={[{ required: true, message: 'Chọn ít nhất một field' }]}><Checkbox.Group style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }} options={modelFields.map((field) => ({ value: field.key, label: `${field.label}${field.required ? ' *' : ''}` }))} /></Form.Item>
         <Form.Item name="description" label="Mô tả"><Input.TextArea /></Form.Item>
-        <Space><Button className="primary-glow" htmlType="submit" loading={saving} type="primary">Tạo form</Button><Button onClick={() => setOpen(false)}>Hủy</Button></Space>
+        <Space><Button className="primary-glow" htmlType="submit" loading={saving} type="primary">Tạo form</Button><Button onClick={() => { setOpen(false); setFullscreenPopup(false) }}>Hủy</Button></Space>
       </Form>
     </Modal>
     <Drawer open={Boolean(submissionForm)} title={submissionForm ? `Submissions: ${submissionForm.title}` : 'Submissions'} width={760} onClose={() => setSubmissionForm(null)}>
