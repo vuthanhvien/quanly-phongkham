@@ -808,8 +808,8 @@ export class SettingsService {
   async renderTemplate(templateId: string, recordId: string) {
     const template = await this.templates.findOne({ where: { id: templateId, isActive: true } });
     if (!template) throw new NotFoundException('Không tìm thấy mẫu in');
-    const record = await this.records.findRaw(template.entityType, recordId);
-    const data = { ...record, ...(record.customFields || {}) };
+    const record = await this.records.findRaw(template.entityType, recordId, '*') as Record<string, unknown>;
+    const data = this.buildPrintContext(record);
     return Handlebars.compile(template.htmlTemplate)(data);
   }
 
@@ -829,10 +829,76 @@ export class SettingsService {
   async renderDocxTemplate(templateId: string, recordId: string) {
     const template = await this.templates.findOne({ where: { id: templateId, isActive: true, templateType: 'DOCX' } });
     if (!template?.docxPath) throw new NotFoundException('Không tìm thấy mẫu DOCX');
-    const record = await this.records.findRaw(template.entityType, recordId) as Record<string, unknown>;
-    const data = { ...record, ...(record.customFields || {}) };
+    const record = await this.records.findRaw(template.entityType, recordId, '*') as Record<string, unknown>;
+    const data = this.buildPrintContext(record);
     const source = await fs.readFile(template.docxPath);
     return { buffer: renderDocxTemplate(source, data), filename: `${template.name}-${recordId}.docx` };
+  }
+
+  private buildPrintContext(record: Record<string, unknown>) {
+    const context = this.enrichPrintObject({ ...record, ...((record.customFields || {}) as Record<string, unknown>) });
+    Object.entries(context).forEach(([key, value]) => {
+      if (!value || Array.isArray(value) || typeof value !== 'object') return;
+      context[key] = this.enrichPrintObject(value as Record<string, unknown>);
+    });
+    return context;
+  }
+
+  private enrichPrintObject(record: Record<string, unknown>) {
+    const next: Record<string, unknown> = { ...record };
+    if (!next.name && typeof next.fullName === 'string') next.name = next.fullName;
+
+    Object.entries(record).forEach(([key, value]) => {
+      if (value === null || value === undefined || Array.isArray(value) || typeof value === 'object') return;
+      if (typeof value === 'number' || this.isNumericText(value)) {
+        next[`${key}_fm`] = this.formatPrintNumber(value);
+      }
+      const date = this.parsePrintDate(value);
+      if (date) {
+        next[`${key}_fm`] = this.formatPrintDate(date, 'dmy-slash');
+        next[`${key}_fm_mdy`] = this.formatPrintDate(date, 'mdy-slash');
+        next[`${key}_fm_ymd`] = this.formatPrintDate(date, 'ymd-dash');
+        next[`${key}_fm_dmy`] = this.formatPrintDate(date, 'dmy-dash');
+      }
+      if (typeof value === 'string') {
+        next[`${key}_up`] = value.toLocaleUpperCase('vi-VN');
+        next[`${key}_cap`] = value
+          .toLocaleLowerCase('vi-VN')
+          .replace(/(^|\s)\S/g, (char) => char.toLocaleUpperCase('vi-VN'));
+      }
+    });
+
+    return next;
+  }
+
+  private isNumericText(value: unknown) {
+    if (typeof value !== 'string') return false;
+    if (!value.trim()) return false;
+    return Number.isFinite(Number(value));
+  }
+
+  private formatPrintNumber(value: unknown) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return String(value ?? '');
+    return new Intl.NumberFormat('vi-VN').format(numeric);
+  }
+
+  private parsePrintDate(value: unknown) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+    if (typeof value !== 'string') return null;
+    if (!/^\d{4}-\d{2}-\d{2}/.test(value)) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  private formatPrintDate(value: Date, format: 'dmy-slash' | 'mdy-slash' | 'ymd-dash' | 'dmy-dash') {
+    const day = String(value.getDate()).padStart(2, '0');
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const year = String(value.getFullYear());
+    if (format === 'mdy-slash') return `${month}/${day}/${year}`;
+    if (format === 'ymd-dash') return `${year}-${month}-${day}`;
+    if (format === 'dmy-dash') return `${day}-${month}-${year}`;
+    return `${day}/${month}/${year}`;
   }
 
   private isAdmin(user?: AuthUser) {

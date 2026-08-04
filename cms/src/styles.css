@@ -1308,6 +1308,11 @@ body {
   gap: 8px;
 }
 
+.template-variable-select {
+  min-width: 320px;
+  width: min(100%, 520px);
+}
+
 .template-preset-grid {
   display: grid;
   gap: 12px;

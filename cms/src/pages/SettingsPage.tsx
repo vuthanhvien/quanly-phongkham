@@ -28,7 +28,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { getApiErrorMessage } from "../utils/apiError"
-import { CustomField, DynamicRole, entityLabels, getResourceActionOptions, normalizeSelectOption, permissionLabels, type SelectOption } from "../models"
+import { baseFields, CustomField, DynamicRole, entityLabels, FieldSpec, getResourceActionOptions, normalizeSelectOption, permissionLabels, relationFields, type SelectOption } from "../models"
 import {
   buildFieldLayoutConfigs,
   DEFAULT_ROLE_SCOPE,
@@ -62,6 +62,12 @@ interface TemplatePreset {
   label: string
   description: string
   htmlTemplate: string
+}
+
+interface TemplateVariableOption {
+  key: string
+  label: string
+  description?: string
 }
 
 const DEFAULT_TEMPLATE_HTML = `<style>
@@ -437,6 +443,66 @@ function removeSelectOptionAt(options: SelectOption[] | undefined, index: number
   return normalizeEditableOptions(options).filter((_, optionIndex) => optionIndex !== index)
 }
 
+function relationObjectKey(fieldKey: string) {
+  return fieldKey.endsWith("Id") ? fieldKey.slice(0, -2) : fieldKey
+}
+
+function templateFieldKind(field: FieldSpec) {
+  if (field.displayFormat === "currency" || field.displayFormat === "number" || field.displayFormat === "percent") return "number"
+  if (field.type === "number") return "number"
+  if (field.type === "date" || field.type === "datetime") return "date"
+  return "string"
+}
+
+function formatVariableOptions(key: string, label: string, kind: string): TemplateVariableOption[] {
+  if (kind === "number") {
+    return [
+      { key: `${key}_fm`, label: `${label} - định dạng số/tiền` },
+    ]
+  }
+  if (kind === "date") {
+    return [
+      { key: `${key}_fm`, label: `${label} - ngày DD/MM/YYYY` },
+      { key: `${key}_fm_mdy`, label: `${label} - ngày MM/DD/YYYY` },
+      { key: `${key}_fm_ymd`, label: `${label} - ngày YYYY-MM-DD` },
+      { key: `${key}_fm_dmy`, label: `${label} - ngày DD-MM-YYYY` },
+    ]
+  }
+  return [
+    { key: `${key}_up`, label: `${label} - chữ hoa` },
+    { key: `${key}_cap`, label: `${label} - viết hoa đầu từ` },
+  ]
+}
+
+function buildTemplateVariableOptions(resource: string, catalog: FieldSpec[]): TemplateVariableOption[] {
+  const options: TemplateVariableOption[] = []
+  const pushField = (key: string, label: string, field: FieldSpec) => {
+    options.push({ key, label })
+    options.push(...formatVariableOptions(key, label, templateFieldKind(field)))
+  }
+
+  catalog.forEach((field) => {
+    pushField(field.key, field.label, field)
+    const relation = field.relation || relationFields[field.key]
+    if (!relation) return
+    const relationKey = relationObjectKey(field.key)
+    const relatedFields = baseFields[relation.resource] || []
+    relatedFields.forEach((relatedField) => {
+      const relationLabel = `${field.label} / ${relatedField.label}`
+      pushField(`${relationKey}.${relatedField.key}`, relationLabel, relatedField)
+      if (relatedField.key === "fullName") {
+        pushField(`${relationKey}.name`, `${field.label} / Tên`, relatedField)
+      }
+    })
+  })
+
+  const unique = new Map<string, TemplateVariableOption>()
+  options.forEach((option) => {
+    if (!unique.has(option.key)) unique.set(option.key, option)
+  })
+  return Array.from(unique.values()).sort((a, b) => a.key.localeCompare(b.key))
+}
+
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [entityType, setEntityType] = useState(() => searchParams.get("module") || "customers")
@@ -464,8 +530,8 @@ export function SettingsPage() {
     [entityType, fields],
   )
   const templateVariables = useMemo(
-    () => fieldCatalog.map((field) => `{{${field.key}}}`),
-    [fieldCatalog],
+    () => buildTemplateVariableOptions(entityType, fieldCatalog),
+    [entityType, fieldCatalog],
   )
   const selectableRoles = useMemo(
     () => getRoleOptions(views, [selectedRole, ...dynamicRoles.map((role) => role.key)]),
@@ -670,6 +736,13 @@ export function SettingsPage() {
     message.success(`Đã nạp mẫu ${preset.label}`)
   }
 
+  function insertTemplateVariable(key: string) {
+    const token = `{{${key}}}`
+    const current = String(templateForm.getFieldValue("htmlTemplate") || "")
+    const separator = current && !current.endsWith("\n") ? "\n" : ""
+    templateForm.setFieldsValue({ htmlTemplate: `${current}${separator}${token}` })
+  }
+
   const updateConfig = useCallback((
     viewType: ViewType,
     key: string,
@@ -869,10 +942,22 @@ export function SettingsPage() {
               children: (
                 <div className="settings-tab-panel">
                   <div className="settings-tab-header">
-                    <Typography.Paragraph type="secondary">
-                      Dùng biến theo cú pháp Handlebars như {"{{fullName}}"} hoặc {"{{custom_key}}"}.
-                      Có thể nhúng CSS trực tiếp bằng thẻ {"<style>...</style>"} ở đầu template.
-                    </Typography.Paragraph>
+                    <Select
+                      allowClear
+                      showSearch
+                      className="template-variable-select"
+                      optionFilterProp="search"
+                      placeholder="Tìm biến in theo code hoặc label"
+                      options={templateVariables.map((variable) => ({
+                        value: variable.key,
+                        label: `${variable.key} - ${variable.label}`,
+                        search: `${variable.key} ${variable.label}`,
+                      }))}
+                      onSelect={(key) => {
+                        void navigator.clipboard?.writeText(`{{${key}}}`)
+                        message.success(`Đã copy {{${key}}}`)
+                      }}
+                    />
                     <Space wrap>
                       <Button onClick={openCreateTemplate}>Thêm mẫu</Button>
                       <Button onClick={() => setDocxTemplateModal(true)}>Tải mẫu DOCX</Button>
@@ -898,13 +983,6 @@ export function SettingsPage() {
                       ))}
                     </div>
                   )}
-                  <div className="template-variable-cloud">
-                    {templateVariables.map((variable) => (
-                      <Tag className="soft-tag" key={variable}>
-                        {variable}
-                      </Tag>
-                    ))}
-                  </div>
                   <Divider />
                   <div className="template-layout">
                     <div>
@@ -1023,13 +1101,19 @@ export function SettingsPage() {
                 />
               </Card>
               <Card className="template-preview-card" title="Biến có thể dùng">
-                <div className="template-variable-cloud">
-                  {templateVariables.map((variable) => (
-                    <Tag className="soft-tag" key={variable}>
-                      {variable}
-                    </Tag>
-                  ))}
-                </div>
+                <Select
+                  allowClear
+                  showSearch
+                  className="template-variable-select"
+                  optionFilterProp="search"
+                  placeholder="Chọn biến để thêm vào template"
+                  options={templateVariables.map((variable) => ({
+                    value: variable.key,
+                    label: `${variable.key} - ${variable.label}`,
+                    search: `${variable.key} ${variable.label}`,
+                  }))}
+                  onSelect={(key) => insertTemplateVariable(String(key))}
+                />
               </Card>
             </div>
           </div>

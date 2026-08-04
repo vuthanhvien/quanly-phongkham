@@ -91,14 +91,14 @@ export function ChatbotSettingsPage() {
       </div>
 
       <Card className="glass-card" loading={loading}>
-        <Alert
+        {/* <Alert
           icon={<RobotOutlined />}
           showIcon
           type="info"
           message="Chatbot tư vấn & đặt lịch"
           description="Chatbot sẽ xuất hiện trên landing page để tư vấn dịch vụ và hỗ trợ khách hàng đặt lịch hẹn. Cần có Anthropic API Key để kích hoạt."
           style={{ marginBottom: 24 }}
-        />
+        /> */}
 
         <Form form={form} layout="vertical" onFinish={save}>
           <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 16 }}>
