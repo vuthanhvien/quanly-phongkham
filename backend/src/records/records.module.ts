@@ -9,9 +9,11 @@ import {
   AccountingVoucher,
   AccountingVoucherLine,
   Attendance,
+  AttendanceAdjustmentRequest,
   AuditLog,
   BranchRoleAssignment,
   Branch,
+  BusinessTripRequest,
   Commission,
   Consultation,
   ContentNews,
@@ -33,6 +35,7 @@ import {
   LeaveRequest,
   MedicalEpisode,
   Payroll,
+  PaymentRequest,
   PerformanceReview,
   PositionHistory,
   RecordDraft,
@@ -51,13 +54,20 @@ import {
   User,
   ViewSetting,
   WorkContract,
+  WorkflowAction,
+  WorkflowDefinition,
+  WorkflowInstance,
+  WorkflowStep,
+  WorkflowTask,
   WorkSchedule,
 } from '../entities/entities';
 import { RecordsController } from './records.controller';
 import { RecordsService } from './records.service';
+import { WorkflowModule } from '../workflow/workflow.module';
 
 @Module({
   imports: [
+    WorkflowModule,
     TenantOrmModule.forFeature([
       Branch,
       Department,
@@ -103,7 +113,15 @@ import { RecordsService } from './records.service';
       WorkContract,
       StaffInsurance,
       Attendance,
+      AttendanceAdjustmentRequest,
       LeaveRequest,
+      BusinessTripRequest,
+      PaymentRequest,
+      WorkflowDefinition,
+      WorkflowStep,
+      WorkflowInstance,
+      WorkflowTask,
+      WorkflowAction,
       Payroll,
       StaffReward,
       StaffTraining,

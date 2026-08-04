@@ -860,6 +860,21 @@ async function loadRelated(
         field: "staffId",
       },
       {
+        title: "Đổi giờ chấm công",
+        resource: "attendance-adjustment-requests",
+        field: "staffId",
+      },
+      {
+        title: "Đơn công tác",
+        resource: "business-trip-requests",
+        field: "staffId",
+      },
+      {
+        title: "Xin thanh toán",
+        resource: "payment-requests",
+        field: "staffId",
+      },
+      {
         title: "Bảng lương",
         resource: "payrolls",
         field: "staffId",

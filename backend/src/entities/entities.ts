@@ -193,6 +193,12 @@ export class Staff extends ConfigurableEntity {
   @Column({ nullable: true })
   userId?: string;
 
+  @Column({ nullable: true })
+  leaderStaffId?: string;
+
+  @Column({ nullable: true })
+  mentorStaffId?: string;
+
   @Column({ default: 'ACTIVE' })
   status: string;
 
@@ -2171,6 +2177,237 @@ export class LeaveRequest extends ConfigurableEntity {
   branchId?: string;
 }
 
+@Entity('attendance_adjustment_requests')
+export class AttendanceAdjustmentRequest extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column({ nullable: true })
+  attendanceId?: string;
+
+  @Column({ type: 'date' })
+  date: string;
+
+  @Column({ nullable: true })
+  requestedCheckIn?: string;
+
+  @Column({ nullable: true })
+  requestedCheckOut?: string;
+
+  @Column({ type: 'text', nullable: true })
+  reason?: string;
+
+  @Column({ default: 'pending' })
+  status: string; // draft | pending | approved | rejected | cancelled
+
+  @Column({ nullable: true })
+  approvedById?: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+}
+
+@Entity('business_trip_requests')
+export class BusinessTripRequest extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column()
+  destination: string;
+
+  @Column({ type: 'date' })
+  startDate: string;
+
+  @Column({ type: 'date' })
+  endDate: string;
+
+  @Column({ type: 'text', nullable: true })
+  purpose?: string;
+
+  @Column({ type: 'float', default: 0 })
+  estimatedAmount: number;
+
+  @Column({ default: 'pending' })
+  status: string; // draft | pending | approved | rejected | cancelled
+
+  @Column({ nullable: true })
+  approvedById?: string;
+}
+
+@Entity('payment_requests')
+export class PaymentRequest extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column({ nullable: true })
+  branchId?: string;
+
+  @Column({ default: 'reimbursement' })
+  requestType: string; // reimbursement | advance | payment
+
+  @Column()
+  title: string;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ type: 'float', default: 0 })
+  amount: number;
+
+  @Column({ type: 'date', nullable: true })
+  requestedPaymentDate?: string;
+
+  @Column({ default: 'TRANSFER' })
+  paymentMethod: string;
+
+  @Column({ nullable: true })
+  paymentAccountNumber?: string;
+
+  @Column({ default: 'pending' })
+  status: string; // draft | pending | approved | rejected | paid | cancelled
+
+  @Column({ nullable: true })
+  approvedById?: string;
+}
+
+@Entity('workflow_definitions')
+export class WorkflowDefinition extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  name: string;
+
+  @Column()
+  targetResource: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @Column({ type: 'simple-json', nullable: true })
+  submitStatuses?: string[];
+
+  @Column({ default: 'approved' })
+  approvedStatus: string;
+
+  @Column({ default: 'rejected' })
+  rejectedStatus: string;
+
+  @Column({ default: 'cancelled' })
+  cancelledStatus: string;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+}
+
+@Entity('workflow_steps')
+export class WorkflowStep extends ConfigurableEntity {
+  @Column()
+  definitionId: string;
+
+  @Column()
+  name: string;
+
+  @Column({ type: 'int', default: 1 })
+  stepOrder: number;
+
+  @Column({ default: 'EMPLOYEE_LEADER' })
+  approverType: string; // FIXED_USER | FIXED_STAFF | EMPLOYEE_LEADER | EMPLOYEE_MENTOR | DEPARTMENT_MANAGER | ROLE
+
+  @Column({ nullable: true })
+  approverUserId?: string;
+
+  @Column({ nullable: true })
+  approverStaffId?: string;
+
+  @Column({ nullable: true })
+  approverRoleKey?: string;
+
+  @Column({ default: 'any' })
+  approvalMode: string; // any | all
+
+  @Column({ default: true })
+  isActive: boolean;
+}
+
+@Entity('workflow_instances')
+export class WorkflowInstance extends ConfigurableEntity {
+  @Column()
+  definitionId: string;
+
+  @Column()
+  targetResource: string;
+
+  @Column()
+  targetRecordId: string;
+
+  @Column({ nullable: true })
+  requesterUserId?: string;
+
+  @Column({ nullable: true })
+  requesterStaffId?: string;
+
+  @Column({ type: 'int', default: 1 })
+  currentStepOrder: number;
+
+  @Column({ default: 'pending' })
+  status: string; // pending | approved | rejected | cancelled
+
+  @Column({ nullable: true })
+  completedAt?: Date;
+}
+
+@Entity('workflow_tasks')
+export class WorkflowTask extends ConfigurableEntity {
+  @Column()
+  instanceId: string;
+
+  @Column()
+  stepId: string;
+
+  @Column({ type: 'int', default: 1 })
+  stepOrder: number;
+
+  @Column({ nullable: true })
+  assigneeUserId?: string;
+
+  @Column({ nullable: true })
+  assigneeStaffId?: string;
+
+  @Column({ default: 'pending' })
+  status: string; // pending | approved | rejected | cancelled
+
+  @Column({ nullable: true })
+  actedAt?: Date;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('workflow_actions')
+export class WorkflowAction extends ConfigurableEntity {
+  @Column()
+  instanceId: string;
+
+  @Column({ nullable: true })
+  taskId?: string;
+
+  @Column()
+  action: string; // submit | approve | reject | cancel | advance
+
+  @Column({ nullable: true })
+  actorUserId?: string;
+
+  @Column({ nullable: true })
+  actorStaffId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
 @Entity('payrolls')
 export class Payroll extends ConfigurableEntity {
   @Column()
@@ -2411,5 +2648,13 @@ export const ENTITIES = [
   StaffInsurance,
   Attendance,
   LeaveRequest,
+  AttendanceAdjustmentRequest,
+  BusinessTripRequest,
+  PaymentRequest,
+  WorkflowDefinition,
+  WorkflowStep,
+  WorkflowInstance,
+  WorkflowTask,
+  WorkflowAction,
   Payroll,
 ];

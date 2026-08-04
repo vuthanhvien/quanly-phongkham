@@ -91,6 +91,14 @@ const menuIcons: Record<string, React.ReactNode> = {
   files: <FileDoneOutlined />,
   attendances: <CalendarOutlined />,
   'leave-requests': <FileDoneOutlined />,
+  'attendance-adjustment-requests': <CalendarOutlined />,
+  'business-trip-requests': <SolutionOutlined />,
+  'payment-requests': <DollarOutlined />,
+  'workflow-definitions': <DeploymentUnitOutlined />,
+  'workflow-steps': <InteractionOutlined />,
+  'workflow-instances': <AuditOutlined />,
+  'workflow-tasks': <FileDoneOutlined />,
+  'workflow-actions': <AuditOutlined />,
   payrolls: <DollarOutlined />,
   'work-contracts': <SolutionOutlined />,
   'staff-insurances': <AuditOutlined />,
@@ -107,6 +115,7 @@ const menuGroupIcons: Record<AppModuleGroup["key"], React.ReactNode> = {
   documents: <FolderOpenOutlined />,
   hr: <TeamOutlined />,
   finance: <DollarOutlined />,
+  workflow: <AuditOutlined />,
   admin: <SettingOutlined />,
 }
 

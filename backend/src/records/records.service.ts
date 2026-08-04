@@ -15,9 +15,11 @@ import {
   AccountingVoucher,
   AccountingVoucherLine,
   Attendance,
+  AttendanceAdjustmentRequest,
   AuditLog,
   BranchRoleAssignment,
   Branch,
+  BusinessTripRequest,
   Commission,
   Consultation,
   ConfigurableEntity,
@@ -39,6 +41,7 @@ import {
   LeaveRequest,
   MedicalEpisode,
   Payroll,
+  PaymentRequest,
   PerformanceReview,
   PositionHistory,
   RecordDraft,
@@ -57,8 +60,14 @@ import {
   User,
   ViewSetting,
   WorkContract,
+  WorkflowAction,
+  WorkflowDefinition,
+  WorkflowInstance,
+  WorkflowStep,
+  WorkflowTask,
   WorkSchedule,
 } from '../entities/entities';
+import { WorkflowService } from '../workflow/workflow.service';
 
 const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print'];
 
@@ -289,6 +298,8 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   roomId: 'rooms',
   equipmentId: 'equipments',
   managerStaffId: 'staff',
+  leaderStaffId: 'staff',
+  mentorStaffId: 'staff',
   assignedStaff: 'staff',
   staffId: 'staff',
   assignedStaffId: 'staff',
@@ -304,6 +315,16 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   leadId: 'leads',
   userId: 'user-accounts',
   invoiceId: 'invoices',
+  attendanceId: 'attendances',
+  definitionId: 'workflow-definitions',
+  stepId: 'workflow-steps',
+  instanceId: 'workflow-instances',
+  requesterUserId: 'user-accounts',
+  requesterStaffId: 'staff',
+  assigneeUserId: 'user-accounts',
+  assigneeStaffId: 'staff',
+  actorUserId: 'user-accounts',
+  actorStaffId: 'staff',
   supplierId: 'suppliers',
   productId: 'products',
   baseUnitId: 'units',
@@ -369,6 +390,14 @@ const RESOURCE_IMPORT_KEYS: Record<string, string> = {
   'staff-insurances': 'id',
   attendances: 'id',
   'leave-requests': 'id',
+  'attendance-adjustment-requests': 'id',
+  'business-trip-requests': 'id',
+  'payment-requests': 'id',
+  'workflow-definitions': 'code',
+  'workflow-steps': 'id',
+  'workflow-instances': 'id',
+  'workflow-tasks': 'id',
+  'workflow-actions': 'id',
   payrolls: 'id',
   'staff-rewards': 'id',
   'staff-trainings': 'id',
@@ -431,12 +460,21 @@ export class RecordsService {
     @InjectRepository(StaffInsurance) private readonly staffInsurances: Repository<StaffInsurance>,
     @InjectRepository(Attendance) private readonly attendances: Repository<Attendance>,
     @InjectRepository(LeaveRequest) private readonly leaveRequests: Repository<LeaveRequest>,
+    @InjectRepository(AttendanceAdjustmentRequest) private readonly attendanceAdjustmentRequests: Repository<AttendanceAdjustmentRequest>,
+    @InjectRepository(BusinessTripRequest) private readonly businessTripRequests: Repository<BusinessTripRequest>,
+    @InjectRepository(PaymentRequest) private readonly paymentRequests: Repository<PaymentRequest>,
+    @InjectRepository(WorkflowDefinition) private readonly workflowDefinitions: Repository<WorkflowDefinition>,
+    @InjectRepository(WorkflowStep) private readonly workflowSteps: Repository<WorkflowStep>,
+    @InjectRepository(WorkflowInstance) private readonly workflowInstances: Repository<WorkflowInstance>,
+    @InjectRepository(WorkflowTask) private readonly workflowTasks: Repository<WorkflowTask>,
+    @InjectRepository(WorkflowAction) private readonly workflowActions: Repository<WorkflowAction>,
     @InjectRepository(Payroll) private readonly payrolls: Repository<Payroll>,
     @InjectRepository(StaffReward) private readonly staffRewards: Repository<StaffReward>,
     @InjectRepository(StaffTraining) private readonly staffTrainings: Repository<StaffTraining>,
     @InjectRepository(PerformanceReview) private readonly performanceReviews: Repository<PerformanceReview>,
     @InjectRepository(PositionHistory) private readonly positionHistories: Repository<PositionHistory>,
     @InjectRepository(RecordDraft) private readonly recordDrafts: Repository<RecordDraft>,
+    private readonly workflowService: WorkflowService,
   ) {}
 
   private repository(resource: string): ResourceRepository {
@@ -480,6 +518,14 @@ export class RecordsService {
       'staff-insurances': this.staffInsurances,
       attendances: this.attendances,
       'leave-requests': this.leaveRequests,
+      'attendance-adjustment-requests': this.attendanceAdjustmentRequests,
+      'business-trip-requests': this.businessTripRequests,
+      'payment-requests': this.paymentRequests,
+      'workflow-definitions': this.workflowDefinitions,
+      'workflow-steps': this.workflowSteps,
+      'workflow-instances': this.workflowInstances,
+      'workflow-tasks': this.workflowTasks,
+      'workflow-actions': this.workflowActions,
       payrolls: this.payrolls,
       'staff-rewards': this.staffRewards,
       'staff-trainings': this.staffTrainings,
@@ -552,6 +598,13 @@ export class RecordsService {
         posts: ['title', 'slug', 'category', 'excerpt', 'authorName', 'status'],
         news: ['title', 'slug', 'category', 'excerpt', 'sourceName', 'status'],
         'work-schedules': ['shiftLabel', 'status'],
+        'leave-requests': ['status', 'reason'],
+        'attendance-adjustment-requests': ['status', 'reason'],
+        'business-trip-requests': ['destination', 'purpose', 'status'],
+        'payment-requests': ['title', 'description', 'status'],
+        'workflow-definitions': ['code', 'name', 'targetResource'],
+        'workflow-instances': ['targetResource', 'targetRecordId', 'status'],
+        'workflow-tasks': ['status', 'note'],
         'branch-role-assignments': ['roleName'],
         'branch-permissions': ['roleName'],
         'user-accounts': ['email', 'username', 'fullName', 'role'],
@@ -800,6 +853,7 @@ export class RecordsService {
     if (resource === 'accounting-voucher-lines') await this.recalculateAccountingVoucherTotals(String(record.voucherId || ''));
     await this.replaceCustomFieldValues(resource, record.id, (payload.customFields || {}) as Record<string, unknown>);
     await this.syncAccountingForSourceResource(resource, record.id, user);
+    await this.workflowService.startForRecord(resource, record, user);
     await this.audit(user, 'CREATE', resource, record.id, normalized);
     const hydrated = await this.findRaw(resource, record.id);
     return { data: this.protect(resource, hydrated) };
@@ -863,6 +917,7 @@ export class RecordsService {
     }
     await this.replaceCustomFieldValues(resource, id, mergedCustomFields);
     await this.syncAccountingForSourceResource(resource, id, user);
+    await this.workflowService.startForRecord(resource, record, user);
     await this.audit(user, 'UPDATE', resource, id, { before: previous, changes: normalized });
     const hydrated = await this.findRaw(resource, record.id);
     return { data: this.protect(resource, hydrated) };
@@ -2986,6 +3041,19 @@ export class RecordsService {
       value.netSalary = Number(value.netSalary || 0);
       if (!value.paymentMethod) value.paymentMethod = 'TRANSFER';
     }
+    if (resource === 'attendance-adjustment-requests') {
+      if (!value.status) value.status = 'pending';
+    }
+    if (resource === 'business-trip-requests') {
+      value.estimatedAmount = Number(value.estimatedAmount || 0);
+      if (!value.status) value.status = 'pending';
+    }
+    if (resource === 'payment-requests') {
+      value.amount = Number(value.amount || 0);
+      if (!value.requestType) value.requestType = 'reimbursement';
+      if (!value.paymentMethod) value.paymentMethod = 'TRANSFER';
+      if (!value.status) value.status = 'pending';
+    }
     if (resource === 'accounting-voucher-lines') {
       value.debitAmount = Number(value.debitAmount || 0);
       value.creditAmount = Number(value.creditAmount || 0);
@@ -3821,6 +3889,9 @@ export class RecordsService {
       'staff-insurances',
       'attendances',
       'leave-requests',
+      'attendance-adjustment-requests',
+      'business-trip-requests',
+      'payment-requests',
       'payrolls',
       'staff-rewards',
       'staff-trainings',
@@ -3858,6 +3929,9 @@ export class RecordsService {
       'staff-insurances': 'branchId',
       attendances: 'branchId',
       'leave-requests': 'branchId',
+      'attendance-adjustment-requests': 'branchId',
+      'business-trip-requests': 'branchId',
+      'payment-requests': 'branchId',
       payrolls: 'branchId',
       'staff-rewards': 'branchId',
       'staff-trainings': 'branchId',

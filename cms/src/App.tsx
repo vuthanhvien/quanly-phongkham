@@ -37,6 +37,8 @@ import { CategoriesPage } from './pages/CategoriesPage';
 import { DepartmentsPage } from './pages/DepartmentsPage';
 import { PayrollsPage } from './pages/PayrollsPage';
 import { UiSettingsPage } from './pages/UiSettingsPage';
+import { WorkflowDefinitionDetailPage } from './pages/WorkflowDefinitionDetailPage';
+import { WorkflowTasksPage } from './pages/WorkflowTasksPage';
 import { ZaloInboxPage } from './pages/ZaloInboxPage';
 import { registerToastApi } from './toast';
 
@@ -266,6 +268,13 @@ export function App() {
               </Route>
               <Route element={<StaticResourceGuard resource="payrolls" />}>
                 <Route path="/payrolls" element={<PayrollsPage />} />
+              </Route>
+              <Route element={<StaticResourceGuard resource="workflow-tasks" />}>
+                <Route path="/workflow-tasks" element={<WorkflowTasksPage />} />
+              </Route>
+              <Route element={<StaticResourceGuard resource="workflow-definitions" />}>
+                <Route path="/workflow-definitions/:id/full" element={<WorkflowDefinitionDetailPage />} />
+                <Route path="/workflow-definitions/:id" element={<WorkflowDefinitionDetailPage />} />
               </Route>
               <Route element={<ResourceGuard />}>
                 <Route path="/:resource" element={<RecordListPage />} />
