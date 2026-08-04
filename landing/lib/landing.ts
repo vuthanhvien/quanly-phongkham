@@ -1,6 +1,8 @@
 import { createId } from './create-id'
 
-export type LandingBlockType = 'title' | 'text' | 'image' | 'video' | 'form' | 'slider'
+export type LandingBlockType = 'title' | 'text' | 'image' | 'video' | 'form' | 'slider' | 'gallery' | 'posts' | 'news'
+export type LandingGalleryLayout = 'grid' | 'mosaic' | 'editorial'
+export type LandingSliderVariant = 'carousel' | 'cards' | 'feature'
 
 export type LandingSectionWidth = 'container' | 'full'
 
@@ -44,6 +46,18 @@ export interface LandingSlide {
   caption?: string
 }
 
+export interface LandingContentItem {
+  id: string
+  url?: string
+  alt?: string
+  title?: string
+  description?: string
+  caption?: string
+  label?: string
+  date?: string
+  href?: string
+}
+
 export interface LandingBlock {
   id: string
   type: LandingBlockType
@@ -69,6 +83,9 @@ export interface LandingBlock {
   formId?: string
   fields?: LandingFormField[]
   slides?: LandingSlide[]
+  sliderVariant?: LandingSliderVariant
+  galleryLayout?: LandingGalleryLayout
+  items?: LandingContentItem[]
 }
 
 export interface LandingPageData {

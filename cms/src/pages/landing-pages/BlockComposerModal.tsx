@@ -1,8 +1,9 @@
 import { PlusOutlined } from '@ant-design/icons'
 import { Button, Card, Col, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Typography } from 'antd'
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { api } from '../../api'
 import { ImagePickerInput } from '../../components/ImagePickerInput'
-import type { LandingBlock, LandingFormField, LandingSlide } from '../../models'
+import type { LandingBlock, LandingContentItem, LandingFormField, LandingSlide } from '../../models'
 import type { BlockComposerState, LandingSectionDraft } from './editor-helpers'
 
 export type BlockComposerModalContextValue = {
@@ -19,6 +20,9 @@ export type BlockComposerModalContextValue = {
   onAddSlide: () => void
   onUpdateSlide: (slideId: string, patch: Partial<LandingSlide>) => void
   onRemoveSlide: (slideId: string) => void
+  onAddItem: () => void
+  onUpdateItem: (itemId: string, patch: Partial<LandingContentItem>) => void
+  onRemoveItem: (itemId: string) => void
   onAddField: () => void
   onUpdateField: (fieldId: string, patch: Partial<LandingFormField>) => void
   onRemoveField: (fieldId: string) => void
@@ -60,6 +64,9 @@ export function BlockComposerModal() {
     onAddSlide,
     onUpdateSlide,
     onRemoveSlide,
+    onAddItem,
+    onUpdateItem,
+    onRemoveItem,
     onAddField,
     onUpdateField,
     onRemoveField,
@@ -67,6 +74,47 @@ export function BlockComposerModal() {
   } = useBlockComposerModal()
 
   const isEditMode = composer?.mode === 'edit'
+  const [contentRecords, setContentRecords] = useState<Array<Record<string, unknown>>>([])
+  const contentResource = composer?.block.type === 'posts' ? 'posts' : composer?.block.type === 'news' ? 'news' : null
+  const selectedContentIds = useMemo(
+    () => (composer?.block.items || []).map((item) => item.id).filter((id) => contentRecords.some((record) => String(record.id) === id)),
+    [composer?.block.items, contentRecords],
+  )
+
+  useEffect(() => {
+    let active = true
+    async function loadContentRecords() {
+      if (!contentResource) {
+        setContentRecords([])
+        return
+      }
+      try {
+        const response = await api.get(`/records/${contentResource}`, { params: { pageSize: 200, status: 'PUBLISHED' } })
+        if (!active) return
+        setContentRecords(response.data?.data || [])
+      } catch {
+        if (!active) return
+        setContentRecords([])
+      }
+    }
+    void loadContentRecords()
+    return () => {
+      active = false
+    }
+  }, [contentResource])
+
+  function mapContentRecord(record: Record<string, unknown>): LandingContentItem {
+    const slug = String(record.slug || '')
+    return {
+      id: String(record.id),
+      title: String(record.title || ''),
+      label: String(record.category || ''),
+      description: String(record.excerpt || ''),
+      url: typeof record.imageUrl === 'string' ? record.imageUrl : undefined,
+      date: String(record.publishedAt || '').slice(0, 10),
+      href: slug ? `/${slug}` : undefined,
+    }
+  }
 
   return (
     <Modal title={isEditMode ? 'Cấu hình block' : 'Thêm block vào section'} open={open} onCancel={onCancel} onOk={onSave} okText={isEditMode ? 'Cập nhật block' : 'Lưu block'} confirmLoading={saving} width={760}>
@@ -158,9 +206,10 @@ export function BlockComposerModal() {
 
           {composer.block.type === 'slider' ? (
             <Space direction="vertical" size={10} style={{ width: '100%' }}>
-              <Form.Item label="Tiêu đề slider" style={{ marginBottom: 0 }}>
-                <Input value={composer.block.title} onChange={(event) => onUpdateBlock({ title: event.target.value })} />
-              </Form.Item>
+              <Row gutter={12}>
+                <Col span={14}><Form.Item label="Tiêu đề slider" style={{ marginBottom: 0 }}><Input value={composer.block.title} onChange={(event) => onUpdateBlock({ title: event.target.value })} /></Form.Item></Col>
+                <Col span={10}><Form.Item label="Kiểu hiển thị" style={{ marginBottom: 0 }}><Select value={composer.block.sliderVariant || 'carousel'} onChange={(sliderVariant) => onUpdateBlock({ sliderVariant })} options={[{ value: 'carousel', label: 'Toàn khung' }, { value: 'cards', label: 'Thẻ ảnh' }, { value: 'feature', label: 'Nổi bật' }]} /></Form.Item></Col>
+              </Row>
               <Flex justify="space-between" align="center">
                 <Typography.Text strong>Danh sách slide</Typography.Text>
                 <Button size="small" icon={<PlusOutlined />} onClick={onAddSlide}>Thêm slide</Button>
@@ -184,6 +233,51 @@ export function BlockComposerModal() {
                       </Col>
                     </Row>
                     <Button size="small" danger onClick={() => onRemoveSlide(slide.id)}>Xoá slide</Button>
+                  </Space>
+                </Card>
+              ))}
+            </Space>
+          ) : null}
+
+          {['gallery', 'posts', 'news'].includes(composer.block.type) ? (
+            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+              <Row gutter={12}>
+                <Col span={composer.block.type === 'gallery' ? 12 : 24}><Form.Item label="Tiêu đề block" style={{ marginBottom: 0 }}><Input value={composer.block.title} onChange={(event) => onUpdateBlock({ title: event.target.value })} /></Form.Item></Col>
+                {composer.block.type === 'gallery' ? <Col span={12}><Form.Item label="Bố cục ảnh" style={{ marginBottom: 0 }}><Select value={composer.block.galleryLayout || 'mosaic'} onChange={(galleryLayout) => onUpdateBlock({ galleryLayout })} options={[{ value: 'grid', label: 'Lưới đều' }, { value: 'mosaic', label: 'Xếp hình' }, { value: 'editorial', label: 'Tạp chí' }]} /></Form.Item></Col> : null}
+              </Row>
+              <Form.Item label="Mô tả" style={{ marginBottom: 0 }}><Input.TextArea rows={2} value={composer.block.description} onChange={(event) => onUpdateBlock({ description: event.target.value })} /></Form.Item>
+              {contentResource ? (
+                <Form.Item label={`Lấy từ ${contentResource === 'posts' ? 'Posts' : 'News'} trong DB`} style={{ marginBottom: 0 }}>
+                  <Select
+                    allowClear
+                    mode="multiple"
+                    optionFilterProp="label"
+                    options={contentRecords.map((record) => ({
+                      value: String(record.id),
+                      label: `${record.title || 'Không tiêu đề'}${record.category ? ` - ${record.category}` : ''}`,
+                    }))}
+                    placeholder="Chọn bài đã đăng"
+                    value={selectedContentIds}
+                    onChange={(ids) => {
+                      const selectedRecords = ids
+                        .map((id) => contentRecords.find((record) => String(record.id) === id))
+                        .filter(Boolean) as Array<Record<string, unknown>>
+                      onUpdateBlock({ items: selectedRecords.map(mapContentRecord) })
+                    }}
+                  />
+                </Form.Item>
+              ) : null}
+              <Flex align="center" justify="space-between"><Typography.Text strong>{composer.block.type === 'gallery' ? 'Ảnh trong gallery' : 'Danh sách nội dung'}</Typography.Text><Button icon={<PlusOutlined />} size="small" onClick={onAddItem}>Thêm mục</Button></Flex>
+              {(composer.block.items || []).map((item) => (
+                <Card key={item.id} size="small">
+                  <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                    <Form.Item label="Ảnh đại diện" style={{ marginBottom: 0 }}><ImagePickerInput value={item.url} onChange={(url) => onUpdateItem(item.id, { url })} /></Form.Item>
+                    <Row gutter={12}>
+                      <Col span={12}><Form.Item label={composer.block.type === 'gallery' ? 'Chú thích' : 'Tiêu đề'} style={{ marginBottom: 0 }}><Input value={composer.block.type === 'gallery' ? item.caption : item.title} onChange={(event) => onUpdateItem(item.id, composer.block.type === 'gallery' ? { caption: event.target.value } : { title: event.target.value })} /></Form.Item></Col>
+                      <Col span={12}><Form.Item label={composer.block.type === 'gallery' ? 'Alt ảnh' : 'Nhãn chuyên mục'} style={{ marginBottom: 0 }}><Input value={composer.block.type === 'gallery' ? item.alt : item.label} onChange={(event) => onUpdateItem(item.id, composer.block.type === 'gallery' ? { alt: event.target.value } : { label: event.target.value })} /></Form.Item></Col>
+                    </Row>
+                    {composer.block.type !== 'gallery' ? <><Row gutter={12}><Col span={12}><Form.Item label="Ngày hiển thị" style={{ marginBottom: 0 }}><Input value={item.date} onChange={(event) => onUpdateItem(item.id, { date: event.target.value })} placeholder="08/07/2026" /></Form.Item></Col><Col span={12}><Form.Item label="Liên kết" style={{ marginBottom: 0 }}><Input value={item.href} onChange={(event) => onUpdateItem(item.id, { href: event.target.value })} /></Form.Item></Col></Row><Form.Item label="Mô tả ngắn" style={{ marginBottom: 0 }}><Input.TextArea rows={2} value={item.description} onChange={(event) => onUpdateItem(item.id, { description: event.target.value })} /></Form.Item></> : null}
+                    <Button danger size="small" onClick={() => onRemoveItem(item.id)}>Xoá mục</Button>
                   </Space>
                 </Card>
               ))}

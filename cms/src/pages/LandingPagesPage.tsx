@@ -35,28 +35,26 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { api } from '../api'
 import { ImagePickerInput } from '../components/ImagePickerInput'
-import type { LandingBlock, LandingBlockType, LandingFormField, LandingPage, LandingSectionWidth, LandingSlide } from '../models'
+import type { LandingBlock, LandingBlockType, LandingContentItem, LandingFormField, LandingPage, LandingSectionWidth, LandingSlide } from '../models'
 import { LandingThemeEditor } from './LandingThemePage'
 import { BlockComposerModal, BlockComposerProvider } from './landing-pages/BlockComposerModal'
 import { LandingSiteSettingsDrawer, LandingSiteSettingsProvider } from './landing-pages/LandingSiteSettingsDrawer'
 import { SectionsTreeCard } from './landing-pages/SectionsTreeCard'
-import { TemplatePickerModal } from './landing-pages/TemplatePickerModal'
 import {
   blockTypeIcons,
   blockTypeOptions,
   buildBlockForSection,
   type BlockComposerState,
   createBlock,
+  createContentItem,
   createField,
   createSectionMeta,
   createSlide,
   deriveSections,
   emptyPage,
-  makeId,
   normalizeBlock,
   normalizeBlocks,
   normalizePath,
-  type PageTemplate,
   type LandingSectionDraft,
   normalizeSectionWidth,
   slugify,
@@ -72,7 +70,6 @@ import {
   type SocialLink,
   updateNavTree,
 } from './landing-pages/site-settings'
-import { PAGE_TEMPLATES } from './landing-pages/templates'
 
 function getLandingBaseUrl() {
   const configuredUrl = import.meta.env.VITE_LANDING_URL?.trim()
@@ -125,7 +122,6 @@ export function LandingPagesPage() {
   const [draft, setDraft] = useState<Omit<LandingPage, 'id' | 'createdAt' | 'updatedAt'>>(emptyPage())
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [templateModal, setTemplateModal] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [iframeKey, setIframeKey] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
@@ -395,44 +391,10 @@ export function LandingPagesPage() {
   }
 
   function startCreatePage() {
-    setTemplateModal(true)
-  }
-
-  function applyTemplate(template: PageTemplate) {
     setSelectedId(null)
-    setDraft({
-      ...template.page,
-      blocks: normalizeBlocks(template.page.blocks.map((block) => ({ ...block, id: makeId() }))),
-    })
-    setTemplateModal(false)
-  }
-
-  async function applyAndSave(template: PageTemplate) {
-    // Blank template: chỉ apply vào editor, không save
-    if (!template.page.title.trim()) {
-      applyTemplate(template)
-      return
-    }
-
-    const blocks = normalizeBlocks(template.page.blocks.map((block, index) => ({ ...block, id: makeId(), order: index + 1 })))
-    const payload = {
-      ...template.page,
-      blocks,
-      slug: slugify(template.page.slug || template.page.title),
-      path: normalizePath(template.page.path || template.page.slug || template.page.title),
-    }
-
-    setTemplateModal(false)
-    setSaving(true)
-    try {
-      const response = await api.post('/settings/landing-pages', payload)
-      message.success(`Đã tạo page "${payload.title}"`)
-      await loadPages(response.data.data.id)
-    } catch {
-      message.error('Tạo page thất bại')
-    } finally {
-      setSaving(false)
-    }
+    setDraft(emptyPage())
+    setSelectedBlockId(null)
+    setBlockComposer(null)
   }
 
   function syncPageTitle(title: string) {
@@ -557,6 +519,18 @@ export function LandingPagesPage() {
         block: { ...current.block, slides: (current.block.slides || []).filter((slide) => slide.id !== slideId) },
       }
     })
+  }
+
+  function updateComposerItem(itemId: string, patch: Partial<LandingContentItem>) {
+    setBlockComposer((current) => current ? { ...current, block: { ...current.block, items: (current.block.items || []).map((item) => item.id === itemId ? { ...item, ...patch } : item) } } : current)
+  }
+
+  function addComposerItem() {
+    setBlockComposer((current) => current ? { ...current, block: { ...current.block, items: [...(current.block.items || []), createContentItem()] } } : current)
+  }
+
+  function removeComposerItem(itemId: string) {
+    setBlockComposer((current) => current ? { ...current, block: { ...current.block, items: (current.block.items || []).filter((item) => item.id !== itemId) } } : current)
   }
 
   async function saveComposerBlock() {
@@ -949,6 +923,9 @@ export function LandingPagesPage() {
           onAddSlide: addComposerSlide,
           onUpdateSlide: updateComposerSlide,
           onRemoveSlide: removeComposerSlide,
+          onAddItem: addComposerItem,
+          onUpdateItem: updateComposerItem,
+          onRemoveItem: removeComposerItem,
           onAddField: addComposerField,
           onUpdateField: updateComposerField,
           onRemoveField: removeComposerField,
@@ -958,13 +935,6 @@ export function LandingPagesPage() {
         <BlockComposerModal />
       </BlockComposerProvider>
 
-      <TemplatePickerModal
-        open={templateModal}
-        saving={saving}
-        templates={PAGE_TEMPLATES}
-        onCancel={() => setTemplateModal(false)}
-        onApply={(template) => void applyAndSave(template)}
-      />
     </div>
   )
 }

@@ -930,6 +930,75 @@ export class ManagedFile extends ConfigurableEntity {
   isActive: boolean;
 }
 
+@Entity('content_posts')
+export class ContentPost extends ConfigurableEntity {
+  @Column({ unique: true })
+  slug: string;
+
+  @Column()
+  title: string;
+
+  @Column({ nullable: true })
+  category?: string;
+
+  @Column({ nullable: true })
+  imageUrl?: string;
+
+  @Column({ type: 'text', nullable: true })
+  excerpt?: string;
+
+  @Column({ type: 'text', nullable: true })
+  content?: string;
+
+  @Column({ nullable: true })
+  authorName?: string;
+
+  @Column({ nullable: true })
+  publishedAt?: string;
+
+  @Column({ default: 'DRAFT' })
+  status: string;
+
+  @Column({ default: false })
+  isFeatured: boolean;
+}
+
+@Entity('content_news')
+export class ContentNews extends ConfigurableEntity {
+  @Column({ unique: true })
+  slug: string;
+
+  @Column()
+  title: string;
+
+  @Column({ nullable: true })
+  category?: string;
+
+  @Column({ nullable: true })
+  imageUrl?: string;
+
+  @Column({ type: 'text', nullable: true })
+  excerpt?: string;
+
+  @Column({ type: 'text', nullable: true })
+  content?: string;
+
+  @Column({ nullable: true })
+  sourceName?: string;
+
+  @Column({ nullable: true })
+  sourceUrl?: string;
+
+  @Column({ nullable: true })
+  publishedAt?: string;
+
+  @Column({ default: 'DRAFT' })
+  status: string;
+
+  @Column({ default: false })
+  isFeatured: boolean;
+}
+
 @Entity('stock_batches')
 export class StockBatch extends ConfigurableEntity {
   @Column()
@@ -2319,6 +2388,8 @@ export const ENTITIES = [
   CustomTableColumn,
   CustomTableRow,
   CustomFieldValue,
+  ContentPost,
+  ContentNews,
   ViewSetting,
   PrintTemplate,
   LandingPage,

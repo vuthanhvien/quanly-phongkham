@@ -575,6 +575,7 @@ export function RecordListPage() {
               {hasActionAccess(resource, "update") && (
                 <Button
                   className="primary-glow"
+                  icon={<EditOutlined />}
                   type="primary"
                   onClick={() => {
                     closeDetail()
@@ -614,6 +615,7 @@ export function RecordListPage() {
               {hasActionAccess(relatedQuickView.resource, "update") && (
                 <Button
                   className="primary-glow"
+                  icon={<EditOutlined />}
                   type="primary"
                   onClick={() => {
                     setEditingId(null)

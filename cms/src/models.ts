@@ -71,7 +71,9 @@ export interface DynamicRole {
   isActive: boolean;
 }
 
-export type LandingBlockType = 'title' | 'text' | 'image' | 'video' | 'form' | 'slider';
+export type LandingBlockType = 'title' | 'text' | 'image' | 'video' | 'form' | 'slider' | 'gallery' | 'posts' | 'news';
+export type LandingGalleryLayout = 'grid' | 'mosaic' | 'editorial';
+export type LandingSliderVariant = 'carousel' | 'cards' | 'feature';
 
 export type LandingSectionWidth = 'container' | 'full';
 
@@ -115,6 +117,18 @@ export interface LandingSlide {
   caption?: string;
 }
 
+export interface LandingContentItem {
+  id: string;
+  url?: string;
+  alt?: string;
+  title?: string;
+  description?: string;
+  caption?: string;
+  label?: string;
+  date?: string;
+  href?: string;
+}
+
 export interface LandingBlock {
   id: string;
   type: LandingBlockType;
@@ -141,6 +155,9 @@ export interface LandingBlock {
   targetResource?: 'leads' | 'appointments' | 'service-orders';
   fields?: LandingFormField[];
   slides?: LandingSlide[];
+  sliderVariant?: LandingSliderVariant;
+  galleryLayout?: LandingGalleryLayout;
+  items?: LandingContentItem[];
 }
 
 export interface LandingPage {
@@ -217,6 +234,8 @@ export const entityLabels: Record<string, string> = {
   branches: 'Chi nhánh',
   'file-folders': 'Folder tài liệu',
   files: 'Thư viện file',
+  posts: 'Posts',
+  news: 'News',
   customers: 'Khách hàng',
   leads: 'Lead',
   'lead-activities': 'Hoạt động lead',
@@ -275,7 +294,7 @@ export const relationFields: Record<string, RelationSpec> = {
   folderId: { resource: 'file-folders', labelFields: ['code', 'name'] },
   parentId: { resource: 'file-folders', labelFields: ['code', 'name'] },
   branchId: { resource: 'branches', labelFields: ['slug', 'name'] },
-  baseUnitId: { resource: 'units', labelFields: ['code', 'name'] },
+  baseUnitId: { resource: 'units', labelFields: ['name'] },
   defaultBranchId: { resource: 'branches', labelFields: ['slug', 'name'] },
   periodId: { resource: 'accounting-periods', labelFields: ['code', 'name'] },
   accountId: { resource: 'accounting-chart-accounts', labelFields: ['accountNumber', 'name'] },
@@ -308,6 +327,31 @@ export const relationFields: Record<string, RelationSpec> = {
 };
 
 export const baseFields: Record<string, FieldSpec[]> = {
+  posts: [
+    { key: 'title', label: 'Tiêu đề', required: true, width: '66', tableWidth: 260 },
+    { key: 'slug', label: 'Slug', required: true, width: '33', tableWidth: 180 },
+    { key: 'category', label: 'Danh mục', width: '33', tableWidth: 160 },
+    { key: 'imageUrl', label: 'Ảnh đại diện', type: 'image', width: '66', tableWidth: 180 },
+    { key: 'excerpt', label: 'Mô tả ngắn', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'content', label: 'Nội dung', type: 'textarea', width: '100', tableWidth: 420 },
+    { key: 'authorName', label: 'Tác giả', width: '33', tableWidth: 160 },
+    { key: 'publishedAt', label: 'Ngày đăng', type: 'date', width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'DRAFT', label: 'Nháp' }, { value: 'PUBLISHED', label: 'Đã đăng' }], defaultValue: 'DRAFT', width: '33', tableWidth: 130 },
+    { key: 'isFeatured', label: 'Nổi bật', type: 'select', options: [{ value: 'false', label: 'Không' }, { value: 'true', label: 'Có' }], defaultValue: 'false', width: '33', tableWidth: 120 },
+  ],
+  news: [
+    { key: 'title', label: 'Tiêu đề', required: true, width: '66', tableWidth: 260 },
+    { key: 'slug', label: 'Slug', required: true, width: '33', tableWidth: 180 },
+    { key: 'category', label: 'Danh mục', width: '33', tableWidth: 160 },
+    { key: 'imageUrl', label: 'Ảnh đại diện', type: 'image', width: '66', tableWidth: 180 },
+    { key: 'excerpt', label: 'Tóm tắt', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'content', label: 'Nội dung', type: 'textarea', width: '100', tableWidth: 420 },
+    { key: 'sourceName', label: 'Nguồn tin', width: '33', tableWidth: 160 },
+    { key: 'sourceUrl', label: 'Link nguồn', width: '66', tableWidth: 220 },
+    { key: 'publishedAt', label: 'Ngày đăng', type: 'date', width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'DRAFT', label: 'Nháp' }, { value: 'PUBLISHED', label: 'Đã đăng' }], defaultValue: 'DRAFT', width: '33', tableWidth: 130 },
+    { key: 'isFeatured', label: 'Nổi bật', type: 'select', options: [{ value: 'false', label: 'Không' }, { value: 'true', label: 'Có' }], defaultValue: 'false', width: '33', tableWidth: 120 },
+  ],
   branches: [
     { key: 'slug', label: 'Mã URL', required: true, width: '33', tableWidth: 140 },
     { key: 'name', label: 'Tên chi nhánh', required: true, width: '66', tableWidth: 220 },

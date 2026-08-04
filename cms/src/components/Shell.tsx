@@ -9,6 +9,7 @@ import {
   DatabaseOutlined,
   DollarOutlined,
   ExperimentOutlined,
+  FileTextOutlined,
   FileDoneOutlined,
   FolderOpenOutlined,
   FundOutlined,
@@ -24,6 +25,7 @@ import {
   MenuUnfoldOutlined,
   PictureOutlined,
   ProductOutlined,
+  ReadOutlined,
   RobotOutlined,
   SettingOutlined,
   ShopOutlined,
@@ -56,6 +58,8 @@ const menuIcons: Record<string, React.ReactNode> = {
   roles: <SettingOutlined />,
   "branch-role-assignments": <DeploymentUnitOutlined />,
   "landing-pages": <GlobalOutlined />,
+  posts: <FileTextOutlined />,
+  news: <ReadOutlined />,
   departments: <SolutionOutlined />,
   rooms: <BankOutlined />,
   equipments: <ExperimentOutlined />,
@@ -275,6 +279,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
       children: hasScreenAccess("settings") ? [
         { key: "/pages", icon: <GlobalOutlined />, label: <Link to="/pages">Pages</Link> },
         { key: "/forms", icon: <FileDoneOutlined />, label: <Link to="/forms">Forms</Link> },
+        { key: "/posts", icon: menuIcons.posts, label: <Link to="/posts">Posts</Link> },
+        { key: "/news", icon: menuIcons.news, label: <Link to="/news">News</Link> },
         { key: "/domains", icon: <GlobalOutlined />, label: <Link to="/domains">Domains</Link> },
         { key: "/configs", icon: <SettingOutlined />, label: <Link to="/configs">Configs</Link> },
       ] : [],
@@ -356,7 +362,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     (location.pathname.startsWith("/zalo-inbox")
       ? "front-office"
       : undefined) ||
-    (["/pages", "/forms", "/domains", "/configs"].some((path) => location.pathname.startsWith(path))
+    (["/pages", "/forms", "/posts", "/news", "/domains", "/configs"].some((path) => location.pathname.startsWith(path))
       ? "landing"
       : undefined) ||
     (location.pathname === "/roles"

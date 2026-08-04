@@ -231,7 +231,18 @@ export function DashboardPage() {
   }
 
   return (
-    <>
+    <div className="dashboard-home">
+      <header className="dashboard-home-heading">
+        <div>
+          <Typography.Text className="eyebrow">Tổng quan</Typography.Text>
+          <Typography.Title level={2}>Hôm nay có gì?</Typography.Title>
+          <Typography.Text type="secondary">Theo dõi nhịp vận hành và các việc cần xử lý trong ngày.</Typography.Text>
+        </div>
+        <div className="dashboard-date-chip">
+          <Typography.Text type="secondary">{dayjs().format("dddd")}</Typography.Text>
+          <Typography.Text strong>{dayjs().format("DD [tháng] MM, YYYY")}</Typography.Text>
+        </div>
+      </header>
       {staffDashboard ? (
         <DashboardStaffSection
           actionLoading={staffActionLoading}
@@ -279,7 +290,7 @@ export function DashboardPage() {
           }}
         />
       </Modal>
-    </>
+    </div>
   )
 }
 

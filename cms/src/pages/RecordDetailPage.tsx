@@ -18,6 +18,7 @@ import {
 import { ReactNode, useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
+  ArrowLeftOutlined,
   AuditOutlined,
   BankOutlined,
   CalendarOutlined,
@@ -235,7 +236,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
           </div>
           <Space>
             <Link to={`/${resource}`}>
-              <Button>Quay lại</Button>
+              <Button icon={<ArrowLeftOutlined />}>Quay lại</Button>
             </Link>
             {resource === "leads" && !record?.convertedCustomerId && hasActionAccess(resource, "convert-to-customer") && (
               <Tooltip title="Chuyển lead thành khách hàng">
@@ -292,6 +293,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
             {hasActionAccess(resource, "update") && (
               <Button
                 className="primary-glow"
+                icon={<EditOutlined />}
                 type="primary"
                 onClick={() => setMainEdit({ resource, recordId: id })}
               >

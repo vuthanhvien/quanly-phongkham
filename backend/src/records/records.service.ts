@@ -21,6 +21,8 @@ import {
   Commission,
   Consultation,
   ConfigurableEntity,
+  ContentNews,
+  ContentPost,
   CustomFieldDefinition,
   CustomFieldValue,
   CustomTableRow,
@@ -326,6 +328,8 @@ const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
   'accounting-chart-accounts': 'accountNumber',
   'accounting-cash-flow-mappings': 'code',
   'accounting-vouchers': 'code',
+  posts: 'slug',
+  news: 'slug',
 };
 
 const RESOURCE_IMPORT_KEYS: Record<string, string> = {
@@ -370,6 +374,8 @@ const RESOURCE_IMPORT_KEYS: Record<string, string> = {
   'accounting-cash-flow-mappings': 'code',
   'accounting-vouchers': 'code',
   'accounting-voucher-lines': 'id',
+  posts: 'slug',
+  news: 'slug',
 };
 
 @Injectable()
@@ -408,6 +414,8 @@ export class RecordsService {
     @InjectRepository(Expense) private readonly expenses: Repository<Expense>,
     @InjectRepository(Treatment) private readonly treatments: Repository<Treatment>,
     @InjectRepository(Commission) private readonly commissions: Repository<Commission>,
+    @InjectRepository(ContentPost) private readonly posts: Repository<ContentPost>,
+    @InjectRepository(ContentNews) private readonly news: Repository<ContentNews>,
     @InjectRepository(CustomFieldDefinition) private readonly fieldDefinitions: Repository<CustomFieldDefinition>,
     @InjectRepository(CustomFieldValue) private readonly customFieldValues: Repository<CustomFieldValue>,
     @InjectRepository(CustomTableRow) private readonly customTableRows: Repository<CustomTableRow>,
@@ -460,6 +468,8 @@ export class RecordsService {
       expenses: this.expenses,
       treatments: this.treatments,
       commissions: this.commissions,
+      posts: this.posts,
+      news: this.news,
       'work-contracts': this.workContracts,
       'staff-insurances': this.staffInsurances,
       attendances: this.attendances,
@@ -532,6 +542,8 @@ export class RecordsService {
         'customer-images': ['title', 'mediaType', 'diagnosisNote'],
         'file-folders': ['code', 'name', 'description'],
         files: ['title', 'originalName', 'mimeType', 'extension'],
+        posts: ['title', 'slug', 'category', 'excerpt', 'authorName', 'status'],
+        news: ['title', 'slug', 'category', 'excerpt', 'sourceName', 'status'],
         'work-schedules': ['shiftLabel', 'status'],
         'branch-role-assignments': ['roleName'],
         'branch-permissions': ['roleName'],
@@ -2846,6 +2858,13 @@ export class RecordsService {
       const normalizedType = String(value.type || '').trim().toUpperCase();
       value.type = ['ADMIN', 'DOCTOR', 'STAFF'].includes(normalizedType) ? normalizedType : 'STAFF';
     }
+    if (resource === 'posts' || resource === 'news') {
+      value.slug = String(value.slug || '').trim();
+      value.title = String(value.title || '').trim();
+      value.status = String(value.status || 'DRAFT').trim().toUpperCase();
+      value.isFeatured = value.isFeatured === true || value.isFeatured === 'true' || value.isFeatured === '1';
+      if (!['DRAFT', 'PUBLISHED'].includes(String(value.status))) value.status = 'DRAFT';
+    }
     if (resource === 'customers') {
       if (typeof value.phone === 'string' && value.phone.includes('*')) {
         delete value.phone;
@@ -3236,6 +3255,11 @@ export class RecordsService {
       if (!value.branchId && voucher.branchId) {
         value.branchId = voucher.branchId;
       }
+    }
+
+    if (resource === 'posts' || resource === 'news') {
+      if (!String(value.slug || '').trim()) throw new BadRequestException('Slug là bắt buộc');
+      if (!String(value.title || '').trim()) throw new BadRequestException('Tiêu đề là bắt buộc');
     }
 
     if (resource === 'accounting-chart-accounts') {

@@ -3,11 +3,13 @@ import {
   FormOutlined,
   InsertRowAboveOutlined,
   PictureOutlined,
+  ReadOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons'
 import type {
   LandingBlock,
   LandingBlockType,
+  LandingContentItem,
   LandingElementStyle,
   LandingFormField,
   LandingPage,
@@ -22,6 +24,9 @@ export const blockTypeOptions: Array<{ value: LandingBlockType; label: string }>
   { value: 'text', label: 'Đoạn văn' },
   { value: 'image', label: 'Hình ảnh' },
   { value: 'slider', label: 'Trình chiếu' },
+  { value: 'gallery', label: 'Thư viện ảnh' },
+  { value: 'posts', label: 'Bài viết' },
+  { value: 'news', label: 'Danh sách tin' },
   { value: 'video', label: 'Video' },
   { value: 'form', label: 'Biểu mẫu tuỳ chỉnh' },
 ]
@@ -31,6 +36,9 @@ export const blockTypeIcons: Record<LandingBlockType, React.ReactNode> = {
   text: <FormOutlined />,
   image: <PictureOutlined />,
   slider: <DesktopOutlined />,
+  gallery: <PictureOutlined />,
+  posts: <ReadOutlined />,
+  news: <ReadOutlined />,
   video: <VideoCameraOutlined />,
   form: <InsertRowAboveOutlined />,
 }
@@ -69,6 +77,10 @@ export function createSlide(): LandingSlide {
     alt: '',
     caption: '',
   }
+}
+
+export function createContentItem(): LandingContentItem {
+  return { id: createId(), url: '', alt: '', title: 'Tiêu đề nội dung', description: '', label: '', date: '', href: '' }
 }
 
 export function normalizeSectionWidth(value?: string): LandingSectionWidth {
@@ -155,6 +167,7 @@ export function normalizeBlock(block: LandingBlock, index: number): LandingBlock
     blockStyle: normalizeElementStyle(block.blockStyle),
     fields: block.fields ? block.fields.map((field) => ({ ...field })) : undefined,
     slides: block.slides ? block.slides.map((slide) => ({ ...slide })) : undefined,
+    items: block.items ? block.items.map((item) => ({ ...item })) : undefined,
   }
 }
 
@@ -211,7 +224,15 @@ export function createBlock(type: LandingBlockType): LandingBlock {
   }
 
   if (type === 'slider') {
-    return { ...base, title: 'Slider hinh anh', slides: [createSlide(), createSlide()] }
+    return { ...base, title: 'Slider hinh anh', sliderVariant: 'carousel', slides: [createSlide(), createSlide()] }
+  }
+
+  if (type === 'gallery') {
+    return { ...base, title: 'Thu vien hinh anh', description: '', galleryLayout: 'mosaic', items: Array.from({ length: 6 }, createContentItem) }
+  }
+
+  if (type === 'posts' || type === 'news') {
+    return { ...base, title: type === 'posts' ? 'Bai viet moi' : 'Tin tuc moi nhat', description: '', items: Array.from({ length: 3 }, createContentItem) }
   }
 
   if (type === 'video') {
