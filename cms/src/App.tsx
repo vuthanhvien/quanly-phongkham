@@ -30,6 +30,7 @@ import { RecordListPage } from './pages/RecordListPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RolesPage } from './pages/RolesPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PrintTemplateEditorPage } from './pages/PrintTemplateEditorPage';
 import { ChatbotSettingsPage } from './pages/ChatbotSettingsPage';
 import { LandingThemePage } from './pages/LandingThemePage';
 import { CategoriesPage } from './pages/CategoriesPage';
@@ -231,6 +232,7 @@ export function App() {
                 <Route path="/custom-tables/:id/data" element={<CustomTableDataPage />} />
                 <Route path="/locations" element={<LocationsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/settings/print-templates/:id" element={<PrintTemplateEditorPage />} />
                 <Route path="/pages" element={<LandingPageListPage />} />
                 <Route path="/pages/:id" element={<LandingPagesPage />} />
                 <Route path="/forms" element={<LandingFormsPage />} />

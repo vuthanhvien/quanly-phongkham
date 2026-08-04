@@ -1,9 +1,18 @@
 import {
+  AlignCenterOutlined,
+  AlignLeftOutlined,
+  AlignRightOutlined,
+  BoldOutlined,
   DeleteOutlined,
   HolderOutlined,
+  ItalicOutlined,
   FileTextOutlined,
+  OrderedListOutlined,
   PlusOutlined,
   SettingOutlined,
+  TableOutlined,
+  UnderlineOutlined,
+  UnorderedListOutlined,
 } from "@ant-design/icons"
 import {
   Button,
@@ -22,10 +31,9 @@ import {
   Upload,
   message,
 } from "antd"
-import Editor from "@monaco-editor/react"
 import type { ColumnsType } from "antd/es/table"
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { useSearchParams } from "react-router-dom"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { getApiErrorMessage } from "../utils/apiError"
 import { baseFields, CustomField, DynamicRole, entityLabels, FieldSpec, getResourceActionOptions, normalizeSelectOption, permissionLabels, relationFields, type SelectOption } from "../models"
@@ -64,7 +72,7 @@ interface TemplatePreset {
   htmlTemplate: string
 }
 
-interface TemplateVariableOption {
+export interface TemplateVariableOption {
   key: string
   label: string
   description?: string
@@ -385,6 +393,9 @@ const TEMPLATE_PRESETS: TemplatePreset[] = [
   },
 ]
 
+export const DEFAULT_PRINT_TEMPLATE_HTML = DEFAULT_TEMPLATE_HTML
+export const PRINT_TEMPLATE_PRESETS = TEMPLATE_PRESETS
+
 function formatSelectOptions(options?: SelectOption[]) {
   if (!Array.isArray(options) || options.length === 0) return ""
   return options
@@ -474,7 +485,7 @@ function formatVariableOptions(key: string, label: string, kind: string): Templa
   ]
 }
 
-function buildTemplateVariableOptions(resource: string, catalog: FieldSpec[]): TemplateVariableOption[] {
+export function buildTemplateVariableOptions(resource: string, catalog: FieldSpec[]): TemplateVariableOption[] {
   const options: TemplateVariableOption[] = []
   const pushField = (key: string, label: string, field: FieldSpec) => {
     options.push({ key, label })
@@ -503,8 +514,113 @@ function buildTemplateVariableOptions(resource: string, catalog: FieldSpec[]): T
   return Array.from(unique.values()).sort((a, b) => a.key.localeCompare(b.key))
 }
 
+export function PrintHtmlEditor({
+  value,
+  onChange,
+  variables,
+}: {
+  value?: string
+  onChange?: (value: string) => void
+  variables: TemplateVariableOption[]
+}) {
+  const editorRef = useRef<HTMLDivElement>(null)
+  const [sourceMode, setSourceMode] = useState(false)
+
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor || sourceMode) return
+    if (document.activeElement === editor) return
+    if (editor.innerHTML !== (value || "")) {
+      editor.innerHTML = value || ""
+    }
+  }, [sourceMode, value])
+
+  function emit() {
+    onChange?.(editorRef.current?.innerHTML || "")
+  }
+
+  function run(command: string, commandValue?: string) {
+    editorRef.current?.focus()
+    document.execCommand(command, false, commandValue)
+    emit()
+  }
+
+  function insertHtml(html: string) {
+    editorRef.current?.focus()
+    document.execCommand("insertHTML", false, html)
+    emit()
+  }
+
+  return (
+    <div className="print-html-editor">
+      <div className="print-html-editor__toolbar">
+        <Button icon={<BoldOutlined />} size="small" onClick={() => run("bold")} />
+        <Button icon={<ItalicOutlined />} size="small" onClick={() => run("italic")} />
+        <Button icon={<UnderlineOutlined />} size="small" onClick={() => run("underline")} />
+        <Select
+          size="small"
+          className="print-html-editor__block-select"
+          placeholder="Định dạng"
+          options={[
+            { value: "p", label: "Đoạn văn" },
+            { value: "h1", label: "Tiêu đề 1" },
+            { value: "h2", label: "Tiêu đề 2" },
+            { value: "h3", label: "Tiêu đề 3" },
+          ]}
+          onSelect={(tag) => run("formatBlock", tag)}
+        />
+        <Button icon={<UnorderedListOutlined />} size="small" onClick={() => run("insertUnorderedList")} />
+        <Button icon={<OrderedListOutlined />} size="small" onClick={() => run("insertOrderedList")} />
+        <Button icon={<AlignLeftOutlined />} size="small" onClick={() => run("justifyLeft")} />
+        <Button icon={<AlignCenterOutlined />} size="small" onClick={() => run("justifyCenter")} />
+        <Button icon={<AlignRightOutlined />} size="small" onClick={() => run("justifyRight")} />
+        <Button
+          icon={<TableOutlined />}
+          size="small"
+          onClick={() => insertHtml('<table style="border-collapse:collapse;width:100%"><tr><td style="border:1px solid #ddd;padding:8px">Nội dung</td><td style="border:1px solid #ddd;padding:8px">{{code}}</td></tr></table>')}
+        />
+        <Select
+          allowClear
+          showSearch
+          size="small"
+          className="print-html-editor__variable-select"
+          optionFilterProp="search"
+          placeholder="Chèn biến"
+          options={variables.map((variable) => ({
+            value: variable.key,
+            label: `${variable.key} - ${variable.label}`,
+            search: `${variable.key} ${variable.label}`,
+          }))}
+          onSelect={(key) => insertHtml(`{{${key}}}`)}
+        />
+        <Button size="small" onClick={() => setSourceMode((current) => !current)}>
+          {sourceMode ? "Soạn thảo" : "HTML"}
+        </Button>
+      </div>
+      {sourceMode ? (
+        <Input.TextArea
+          className="print-html-editor__source"
+          rows={18}
+          value={value}
+          onChange={(event) => onChange?.(event.target.value)}
+        />
+      ) : (
+        <div
+          ref={editorRef}
+          className="print-html-editor__surface"
+          contentEditable
+          suppressContentEditableWarning
+          onBlur={emit}
+          onInput={emit}
+        />
+      )}
+    </div>
+  )
+}
+
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [entityType, setEntityType] = useState(() => searchParams.get("module") || "customers")
   const [selectedRole, setSelectedRole] = useState(() => normalizeRole(searchParams.get("role") || getStoredUserRole()))
   const [moduleEnabled, setModuleEnabled] = useState(true)
@@ -517,13 +633,9 @@ export function SettingsPage() {
   const [dynamicRoles, setDynamicRoles] = useState<DynamicRole[]>([])
   const [allowedActions, setAllowedActions] = useState<string[]>([])
   const [toast, toastContextHolder] = message.useMessage()
-  const [templateModal, setTemplateModal] = useState(false)
-  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
-  const [templateForm] = Form.useForm()
   const [docxTemplateForm] = Form.useForm()
   const [docxTemplateModal, setDocxTemplateModal] = useState(false)
   const [docxFile, setDocxFile] = useState<File | null>(null)
-  const templateHtml = Form.useWatch("htmlTemplate", templateForm)
 
   const fieldCatalog = useMemo(
     () => getFieldCatalog(entityType, fields),
@@ -667,23 +779,6 @@ export function SettingsPage() {
     await load()
   }
 
-  async function saveTemplate(values: Record<string, unknown>) {
-    if (editingTemplate) {
-      await api.patch(`/settings/print-templates/${editingTemplate.id}`, {
-        ...values,
-        entityType,
-      })
-      message.success("Đã cập nhật mẫu in")
-    } else {
-      await api.post("/settings/print-templates", { ...values, entityType })
-      message.success("Đã lưu mẫu in")
-    }
-    setTemplateModal(false)
-    setEditingTemplate(null)
-    templateForm.resetFields()
-    await load()
-  }
-
   async function saveDocxTemplate(values: Record<string, unknown>) {
     if (!docxFile) { message.error("Chọn file DOCX mẫu"); return }
     const formData = new FormData()
@@ -701,46 +796,15 @@ export function SettingsPage() {
   }
 
   function openCreateTemplate() {
-    setEditingTemplate(null)
-    templateForm.resetFields()
-    templateForm.setFieldsValue({
-      name: "",
-      htmlTemplate: DEFAULT_TEMPLATE_HTML,
-    })
-    setTemplateModal(true)
+    navigate(`/settings/print-templates/new?module=${entityType}`)
   }
 
   function openCreateTemplateFromPreset(preset: TemplatePreset) {
-    setEditingTemplate(null)
-    templateForm.resetFields()
-    templateForm.setFieldsValue({
-      name: preset.label,
-      htmlTemplate: preset.htmlTemplate,
-    })
-    setTemplateModal(true)
+    navigate(`/settings/print-templates/new?module=${entityType}&preset=${preset.key}`)
   }
 
   function openEditTemplate(template: Template) {
-    setEditingTemplate(template)
-    templateForm.setFieldsValue(template)
-    setTemplateModal(true)
-  }
-
-  function applyPresetToEditor(presetKey: string) {
-    const preset = templatePresets.find((item) => item.key === presetKey)
-    if (!preset) return
-    templateForm.setFieldsValue({
-      name: templateForm.getFieldValue("name") || preset.label,
-      htmlTemplate: preset.htmlTemplate,
-    })
-    message.success(`Đã nạp mẫu ${preset.label}`)
-  }
-
-  function insertTemplateVariable(key: string) {
-    const token = `{{${key}}}`
-    const current = String(templateForm.getFieldValue("htmlTemplate") || "")
-    const separator = current && !current.endsWith("\n") ? "\n" : ""
-    templateForm.setFieldsValue({ htmlTemplate: `${current}${separator}${token}` })
+    navigate(`/settings/print-templates/${template.id}?module=${entityType}`)
   }
 
   const updateConfig = useCallback((
@@ -1037,91 +1101,6 @@ export function SettingsPage() {
           ]}
         />
       </Card>
-      <Modal
-        title={editingTemplate ? "Cập nhật mẫu in HTML" : "Thêm mẫu in HTML"}
-        open={templateModal}
-        footer={null}
-        maskClosable={false}
-        onCancel={() => {
-          setTemplateModal(false)
-          setEditingTemplate(null)
-        }}
-        width={1080}
-      >
-        <Form form={templateForm} layout="vertical" onFinish={saveTemplate}>
-          <div className="template-editor-layout">
-            <div>
-              {templatePresets.length > 0 && (
-                <Form.Item label="Mẫu có sẵn">
-                  <Select
-                    allowClear
-                    placeholder="Chọn mẫu để nạp nhanh vào editor"
-                    options={templatePresets.map((preset) => ({
-                      value: preset.key,
-                      label: preset.label,
-                    }))}
-                    onChange={(value) => value && applyPresetToEditor(String(value))}
-                  />
-                </Form.Item>
-              )}
-              <Form.Item
-                name="name"
-                label="Tên mẫu"
-                rules={[{ required: true }]}
-              >
-                <Input />
-              </Form.Item>
-              <Form.Item
-                name="htmlTemplate"
-                label="HTML template"
-                rules={[{ required: true }]}
-              >
-                <Editor
-                  height="420px"
-                  defaultLanguage="html"
-                  options={{
-                    fontSize: 14,
-                    minimap: { enabled: false },
-                    padding: { top: 14 },
-                    scrollBeyondLastLine: false,
-                    wordWrap: "on",
-                  }}
-                />
-              </Form.Item>
-            </div>
-            <div>
-              <Card className="template-preview-card" title="Preview trực tiếp">
-                <div
-                  className="template-preview-surface"
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      templateHtml ||
-                      "<p>Nhập HTML mẫu in để xem preview tại đây.</p>",
-                  }}
-                />
-              </Card>
-              <Card className="template-preview-card" title="Biến có thể dùng">
-                <Select
-                  allowClear
-                  showSearch
-                  className="template-variable-select"
-                  optionFilterProp="search"
-                  placeholder="Chọn biến để thêm vào template"
-                  options={templateVariables.map((variable) => ({
-                    value: variable.key,
-                    label: `${variable.key} - ${variable.label}`,
-                    search: `${variable.key} ${variable.label}`,
-                  }))}
-                  onSelect={(key) => insertTemplateVariable(String(key))}
-                />
-              </Card>
-            </div>
-          </div>
-          <Button className="primary-glow" htmlType="submit" type="primary">
-            {editingTemplate ? "Cập nhật mẫu" : "Lưu mẫu in"}
-          </Button>
-        </Form>
-      </Modal>
       <Modal title="Tải mẫu in DOCX" open={docxTemplateModal} footer={null} onCancel={() => { setDocxTemplateModal(false); setDocxFile(null) }}>
         <Typography.Paragraph type="secondary">Dùng placeholder liền mạch như <code>{"{{fullName}}"}</code>, <code>{"{{code}}"}</code>. Khi in, hệ thống sẽ thay dữ liệu và tải DOCX kết quả.</Typography.Paragraph>
         <Form form={docxTemplateForm} layout="vertical" onFinish={saveDocxTemplate}>
