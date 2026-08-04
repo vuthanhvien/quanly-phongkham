@@ -37,7 +37,7 @@ export function RecordValueView({ field, value, lookups, fileLookups, compact, o
   }
 
   const relationSpec = getRelationSpec(field)
-  const relationMeta = getRelationMeta(lookups, field, value)
+  const relationMeta = getRelationObjectValue(value) || getRelationMeta(lookups, field, value)
   if (relationSpec && isCompactRelationCard(relationSpec.resource) && relationMeta) {
     return renderRelationCardValue(field, value, lookups, compact, relationSpec.resource, relationMeta, onRelationClick)
   }
@@ -57,7 +57,9 @@ function renderRelationCardValue(
   relationMeta: RelationLookupRecord,
   onRelationClick?: (resource: string, id: string) => void,
 ) {
-  const itemId = Array.isArray(value) ? String(value[0] || "") : String(value)
+  const itemId = String(relationMeta.id || (Array.isArray(value) ? value[0] || "" : value))
+  const primaryText = String(relationMeta.fullName || relationMeta.name || relationMeta.display_title || displayValue(field, value, lookups) || "")
+  const secondaryText = String(relationMeta.code || relationMeta.phone || relationMeta.email || relationMeta.label || "")
   const content = (
     <span className={`relation-entity-card${compact ? " compact" : ""}`}>
       <span className="relation-entity-card__avatar-wrap">
@@ -70,8 +72,8 @@ function renderRelationCardValue(
         {relationMeta.isArchived ? <span className="archived-record-avatar-badge" title="Đã lưu trữ"><InboxOutlined /></span> : null}
       </span>
       <span className="relation-entity-card__copy">
-        <strong>{relationMeta.code || relationMeta.display_title || displayValue(field, value, lookups)}</strong>
-        <span>{relationMeta.fullName || relationMeta.name || relationMeta.display_title || displayValue(field, value, lookups)}</span>
+        <strong>{primaryText}</strong>
+        <span>{secondaryText}</span>
       </span>
     </span>
   )
@@ -92,6 +94,17 @@ function renderRelationCardValue(
       {content}
     </Button>
   )
+}
+
+function getRelationObjectValue(value: unknown): RelationLookupRecord | undefined {
+  if (!value || Array.isArray(value) || typeof value !== "object") return undefined
+  const record = value as Record<string, unknown>
+  if (!record.id) return undefined
+  return {
+    ...record,
+    id: String(record.id),
+    label: String(record.fullName || record.name || record.code || record.email || record.id),
+  } as RelationLookupRecord
 }
 
 function renderRelationValue(

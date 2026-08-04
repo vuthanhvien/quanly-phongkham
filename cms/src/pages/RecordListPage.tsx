@@ -1,6 +1,7 @@
 import { useDelete, useList } from "@refinedev/core"
 import {
   AuditOutlined,
+  CloseOutlined,
   CopyOutlined,
   ClearOutlined,
   DeleteOutlined,
@@ -44,7 +45,7 @@ import { ProductForm } from "../components/ProductForm"
 import { StockBatchForm } from "../components/StockBatchForm"
 import { CustomField, entityLabels } from "../models"
 import { RecordDetailPage } from "./RecordDetailPage"
-import { displayValue, FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap, resolveRecordFieldValue } from "../relations"
+import { displayValue, FileLookupMap, hasFileField, loadFileLookupMap, LookupMap, resolveRecordFieldValue } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
 import * as XLSX from "xlsx"
 import {
@@ -134,13 +135,10 @@ export function RecordListPage() {
         )
         setDisplayFields(tableFields)
         setTemplates(prints.data.data)
-        const lookupFields = resource === "appointments"
-          ? [...tableFields, "doctorStaffId"]
-          : tableFields
-        return Promise.all([loadRelationOptions(lookupFields, { includeArchived: true }), loadFileLookupMap()])
+        return hasFileField(tableFields) ? loadFileLookupMap() : Promise.resolve({})
       })
-      .then(([nextLookups, nextFileLookups]) => {
-        setLookups(nextLookups)
+      .then((nextFileLookups) => {
+        setLookups({})
         setFileLookups(nextFileLookups)
       })
   }, [resource])
@@ -565,29 +563,35 @@ export function RecordListPage() {
         destroyOnHidden
         maskClosable={false}
         open={Boolean(detailId)}
-        title={`Chi tiết ${entityLabels[resource] || resource}`}
-        footer={
-          detailId ? (
-            <Space>
-              <Button onClick={() => navigate(`/${resource}/${detailId}/full`)}>
-                Xem đầy đủ
-              </Button>
-              {hasActionAccess(resource, "update") && (
-                <Button
-                  className="primary-glow"
-                  icon={<EditOutlined />}
-                  type="primary"
-                  onClick={() => {
-                    closeDetail()
-                    setEditingId(detailId)
-                  }}
-                >
-                  Sửa hồ sơ
+        title={
+          <div className="quick-drawer-titlebar">
+            <Typography.Text strong>{`Chi tiết ${entityLabels[resource] || resource}`}</Typography.Text>
+            {detailId ? (
+              <Space size={8}>
+                <Button icon={<CloseOutlined />} onClick={closeDetail}>
+                  Đóng
                 </Button>
-              )}
-            </Space>
-          ) : null
+                <Button icon={<FullscreenOutlined />} onClick={() => navigate(`/${resource}/${detailId}/full`)}>
+                Xem đầy đủ
+                </Button>
+                {hasActionAccess(resource, "update") && (
+                  <Button
+                    className="primary-glow"
+                    icon={<EditOutlined />}
+                    type="primary"
+                    onClick={() => {
+                      closeDetail()
+                      setEditingId(detailId)
+                    }}
+                  >
+                    Sửa hồ sơ
+                  </Button>
+                )}
+              </Space>
+            ) : null}
+          </div>
         }
+        footer={null}
         width={screens.md ? (resource === "service-orders" ? 1100 : 900) : "calc(100vw - 16px)"}
         onCancel={closeDetail}
       >
@@ -605,30 +609,36 @@ export function RecordListPage() {
         destroyOnHidden
         maskClosable={false}
         open={Boolean(relatedQuickView)}
-        title={relatedQuickView ? `Chi tiết ${entityLabels[relatedQuickView.resource] || relatedQuickView.resource}` : "Chi tiết liên kết"}
-        footer={
-          relatedQuickView ? (
-            <Space>
-              <Button onClick={() => navigate(`/${relatedQuickView.resource}/${relatedQuickView.id}/full`)}>
-                Xem đầy đủ
-              </Button>
-              {hasActionAccess(relatedQuickView.resource, "update") && (
-                <Button
-                  className="primary-glow"
-                  icon={<EditOutlined />}
-                  type="primary"
-                  onClick={() => {
-                    setEditingId(null)
-                    setCreating(false)
-                    navigate(`/${relatedQuickView.resource}/${relatedQuickView.id}/edit`)
-                  }}
-                >
-                  Sửa hồ sơ
+        title={
+          <div className="quick-drawer-titlebar">
+            <Typography.Text strong>{relatedQuickView ? `Chi tiết ${entityLabels[relatedQuickView.resource] || relatedQuickView.resource}` : "Chi tiết liên kết"}</Typography.Text>
+            {relatedQuickView ? (
+              <Space size={8}>
+                <Button icon={<CloseOutlined />} onClick={() => setRelatedQuickView(null)}>
+                  Đóng
                 </Button>
-              )}
-            </Space>
-          ) : null
+                <Button icon={<FullscreenOutlined />} onClick={() => navigate(`/${relatedQuickView.resource}/${relatedQuickView.id}/full`)}>
+                Xem đầy đủ
+                </Button>
+                {hasActionAccess(relatedQuickView.resource, "update") && (
+                  <Button
+                    className="primary-glow"
+                    icon={<EditOutlined />}
+                    type="primary"
+                    onClick={() => {
+                      setEditingId(null)
+                      setCreating(false)
+                      navigate(`/${relatedQuickView.resource}/${relatedQuickView.id}/edit`)
+                    }}
+                  >
+                    Sửa hồ sơ
+                  </Button>
+                )}
+              </Space>
+            ) : null}
+          </div>
         }
+        footer={null}
         width={screens.md ? 900 : "calc(100vw - 16px)"}
         onCancel={() => setRelatedQuickView(null)}
       >

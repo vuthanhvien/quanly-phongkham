@@ -40,7 +40,7 @@ import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
 import { ProductForm } from "../components/ProductForm"
 import { CustomField, entityLabels, getFieldLabel } from "../models"
-import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap, resolveRecordFieldValue } from "../relations"
+import { FileLookupMap, hasFileField, loadFileLookupMap, LookupMap, resolveRecordFieldValue } from "../relations"
 import {
   FieldLayoutConfig,
   getFieldCatalog,
@@ -131,36 +131,14 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
       setRecord(nextRecord)
       setRelated(relatedResponse)
       setFields(detailFields)
-      Promise.all([
-        loadRelationOptions([
-          ...detailFields,
-          ...relatedResponse.flatMap((block) => [...block.tableFields, ...block.detailFields]),
-          "branchId",
-          "defaultBranchId",
-          "customerId",
-          "leadId",
-          "staffId",
-          "assignedStaffId",
-          "ownerStaffId",
-          "consultantStaffId",
-          "doctorStaffId",
-          "picStaffId",
-          "performerStaffId",
-          "roomId",
-          "equipmentId",
-          "userId",
-          "invoiceId",
-          "convertedCustomerId",
-          "periodId",
-          "accountId",
-          "voucherId",
-          "cashFlowMappingId",
-          "postedById",
-        ]),
-        loadFileLookupMap(),
-      ]).then(([lookupResponse, nextFileLookups]) => {
+      const visibleFields = [
+        ...detailFields,
+        ...relatedResponse.flatMap((block) => [...block.tableFields, ...block.detailFields]),
+      ]
+      const fileLookupRequest = hasFileField(visibleFields) ? loadFileLookupMap() : Promise.resolve({})
+      fileLookupRequest.then((nextFileLookups) => {
         if (!mounted) return
-        setLookups(lookupResponse)
+        setLookups({})
         setFileLookups(nextFileLookups)
         setLoading(false)
       })
@@ -746,32 +724,16 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
     const activeRole = getStoredUserRole()
     const nextRelated = await loadRelated(resource, id, activeRole)
     setRelated(nextRelated)
-    const nextLookups = await loadRelationOptions([
+    setLookups({})
+    const visibleFields = [
       ...fields,
       ...nextRelated.flatMap((block) => [...block.tableFields, ...block.detailFields]),
-      "branchId",
-      "defaultBranchId",
-      "customerId",
-      "leadId",
-      "staffId",
-      "assignedStaffId",
-      "ownerStaffId",
-      "consultantStaffId",
-      "doctorStaffId",
-      "picStaffId",
-      "performerStaffId",
-      "roomId",
-      "equipmentId",
-      "userId",
-      "invoiceId",
-      "convertedCustomerId",
-      "periodId",
-      "accountId",
-      "voucherId",
-      "cashFlowMappingId",
-      "postedById",
-    ])
-    setLookups(nextLookups)
+    ]
+    if (hasFileField(visibleFields)) {
+      setFileLookups(await loadFileLookupMap())
+    } else {
+      setFileLookups({})
+    }
   }
 
   async function reloadCurrentRecord() {
@@ -961,7 +923,7 @@ async function loadBlocks(
     specs.map(async (spec) => {
       const [recordResponse, fieldResponse, viewResponse, printResponse] = await Promise.all([
         api
-          .get(`/records/${spec.resource}`, { params: { pageSize: 100 } })
+          .get(`/records/${spec.resource}`, { params: { pageSize: 100, include: '*' } })
           .catch(() => ({ data: { data: [] } })),
         api
           .get("/settings/custom-fields", { params: { entityType: spec.resource } })

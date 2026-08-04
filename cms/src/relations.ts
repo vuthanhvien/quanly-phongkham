@@ -175,6 +175,10 @@ export async function loadFileLookupMap(pageSize = 500) {
   return Object.fromEntries(entries) as FileLookupMap;
 }
 
+export function hasFileField(fields: FieldSpec[]) {
+  return fields.some((field) => field.type === 'file');
+}
+
 const DATETIME_KEYS = new Set(['createdAt', 'updatedAt', 'deletedAt']);
 
 export function displayValue(field: string | FieldSpec, value: unknown, lookups: LookupMap) {
