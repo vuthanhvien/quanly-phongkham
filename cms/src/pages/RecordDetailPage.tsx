@@ -40,7 +40,7 @@ import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
 import { ProductForm } from "../components/ProductForm"
 import { CustomField, entityLabels, getFieldLabel } from "../models"
-import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
+import { FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap, resolveRecordFieldValue } from "../relations"
 import {
   FieldLayoutConfig,
   getFieldCatalog,
@@ -106,7 +106,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
     setLoading(true)
     const activeRole = getStoredUserRole()
     Promise.all([
-      api.get(`/records/${resource}/${id}`),
+      api.get(`/records/${resource}/${id}`, { params: { include: '*' } }),
       loadRelated(resource, id, activeRole),
       api.get("/settings/custom-fields", { params: { entityType: resource } }),
       api.get("/settings/views", { params: { entityType: resource } }),
@@ -197,7 +197,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                       field={field}
                       fileLookups={fileLookups}
                       lookups={lookups}
-                      value={record?.[field.key] ?? record?.customFields?.[field.key]}
+                      value={resolveRecordFieldValue(record, field)}
                     />
                   </div>
                 </div>
@@ -383,7 +383,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                             ) : field.label}
                           </div>
                           <div className="detail-item-content">
-                            <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={record?.[field.key] ?? record?.customFields?.[field.key]} />
+                            <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={resolveRecordFieldValue(record, field)} />
                           </div>
                         </div>
                       </Col>
@@ -420,7 +420,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                         key: field.key,
                         width: field.tableWidth,
                         render: (_: unknown, row: Record<string, any>) =>
-                          <RecordValueView compact field={field} fileLookups={fileLookups} lookups={lookups} value={row[field.key] ?? row.customFields?.[field.key]} />,
+                          <RecordValueView compact field={field} fileLookups={fileLookups} lookups={lookups} value={resolveRecordFieldValue(row, field)} />,
                       })),
                       {
                         title: "",
@@ -599,7 +599,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                       )}
                     </div>
                     <div className="detail-item-content">
-                      <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={relatedDetail.record?.[field.key] ?? relatedDetail.record?.customFields?.[field.key]} />
+                      <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={resolveRecordFieldValue(relatedDetail.record, field)} />
                     </div>
                   </div>
                 </Col>
@@ -735,7 +735,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   async function openRelatedDetail(block: RelatedBlock, recordId: string) {
     setRelatedDetailLoading(true)
     try {
-      const response = await api.get(`/records/${block.resource}/${recordId}`)
+      const response = await api.get(`/records/${block.resource}/${recordId}`, { params: { include: '*' } })
       setRelatedDetail({ block, record: response.data.data })
     } finally {
       setRelatedDetailLoading(false)
@@ -775,7 +775,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   }
 
   async function reloadCurrentRecord() {
-    const response = await api.get(`/records/${resource}/${id}`)
+    const response = await api.get(`/records/${resource}/${id}`, { params: { include: '*' } })
     setRecord(response.data.data)
   }
 

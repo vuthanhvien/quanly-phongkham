@@ -18,9 +18,9 @@ export class RecordsController {
     @Request() request?: ExpressRequest & { user?: AuthUser },
   ) {
     const filters = Object.fromEntries(
-      Object.entries(query || {}).filter(([key]) => !['page', 'pageSize', 'search'].includes(key)),
+      Object.entries(query || {}).filter(([key]) => !['page', 'pageSize', 'search', 'include'].includes(key)),
     );
-    return this.records.list(resource, page, pageSize, search, filters, request?.user, request);
+    return this.records.list(resource, page, pageSize, search, filters, request?.user, request, query?.include);
   }
 
   @Post('records/customers/:id/reveal-phone')
@@ -141,8 +141,13 @@ export class RecordsController {
   }
 
   @Get('records/:resource/:id')
-  find(@Param('resource') resource: string, @Param('id') id: string, @Request() request: ExpressRequest & { user: AuthUser }) {
-    return this.records.find(resource, id, request.user, request);
+  find(
+    @Param('resource') resource: string,
+    @Param('id') id: string,
+    @Query('include') include: string | undefined,
+    @Request() request: ExpressRequest & { user: AuthUser },
+  ) {
+    return this.records.find(resource, id, request.user, request, include);
   }
 
   @Get('reports/accounting/general-ledger')

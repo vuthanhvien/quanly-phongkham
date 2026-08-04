@@ -44,7 +44,7 @@ import { ProductForm } from "../components/ProductForm"
 import { StockBatchForm } from "../components/StockBatchForm"
 import { CustomField, entityLabels } from "../models"
 import { RecordDetailPage } from "./RecordDetailPage"
-import { displayValue, FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap } from "../relations"
+import { displayValue, FileLookupMap, loadFileLookupMap, loadRelationOptions, LookupMap, resolveRecordFieldValue } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
 import * as XLSX from "xlsx"
 import {
@@ -163,7 +163,7 @@ export function RecordListPage() {
                 if (!hasResourceAccess(targetResource)) return
                 setRelatedQuickView({ resource: targetResource, id })
               }}
-              value={row[field.key] ?? row.customFields?.[field.key]}
+              value={resolveRecordFieldValue(row, field)}
             />
           </Space>
         ),
@@ -328,7 +328,7 @@ export function RecordListPage() {
   async function duplicateRecord(recordId: string) {
     setDuplicatingId(recordId)
     try {
-      const response = await api.get(`/records/${resource}/${recordId}`)
+      const response = await api.get(`/records/${resource}/${recordId}`, { params: { include: '*' } })
       const preparedValues = buildDuplicateValues(response.data.data)
       setEditingId(null)
       setDuplicateValues(preparedValues)
@@ -384,10 +384,10 @@ export function RecordListPage() {
     const selectedRows = await Promise.all(selectedRowKeys.map(async (selectedId) => {
       const id = String(selectedId)
       if (visibleRowsById.has(id)) return visibleRowsById.get(id)!
-      return (await api.get(`/records/${resource}/${id}`)).data.data
+      return (await api.get(`/records/${resource}/${id}`, { params: { include: '*' } })).data.data
     }))
     const exportRows = selectedRows.map((row: Record<string, any>) =>
-      Object.fromEntries(displayFields.map((field) => [field.label, displayValue(field, row[field.key] ?? row.customFields?.[field.key], lookups)])),
+      Object.fromEntries(displayFields.map((field) => [field.label, displayValue(field, resolveRecordFieldValue(row, field), lookups)])),
     )
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(exportRows), entityLabels[resource] || resource)
@@ -400,7 +400,7 @@ export function RecordListPage() {
     setCloningSelected(true)
     try {
       const results = await Promise.allSettled(ids.map(async (id) => {
-        const response = await api.get(`/records/${resource}/${id}`)
+        const response = await api.get(`/records/${resource}/${id}`, { params: { include: '*' } })
         await api.post(`/records/${resource}`, buildDuplicateValues(response.data.data))
       }))
       const succeeded = results.filter((result) => result.status === "fulfilled").length

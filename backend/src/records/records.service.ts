@@ -304,11 +304,17 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   leadId: 'leads',
   userId: 'user-accounts',
   invoiceId: 'invoices',
+  supplierId: 'suppliers',
+  productId: 'products',
+  baseUnitId: 'units',
+  folderId: 'file-folders',
+  parentId: 'file-folders',
   periodId: 'accounting-periods',
   accountId: 'accounting-chart-accounts',
   parentAccountId: 'accounting-chart-accounts',
   voucherId: 'accounting-vouchers',
   cashFlowMappingId: 'accounting-cash-flow-mappings',
+  postedById: 'user-accounts',
 };
 
 const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
@@ -500,6 +506,7 @@ export class RecordsService {
     filters: Record<string, string> = {},
     user?: AuthUser,
     request?: RequestContext,
+    include?: string,
   ) {
     await this.assertPermission(user, resource, 'view');
     const repository = this.repository(resource);
@@ -577,6 +584,7 @@ export class RecordsService {
       total = result[1];
     }
     let hydrated = await this.hydrateCustomFields(resource, rows);
+    hydrated = await this.attachRelationObjects(hydrated, include, request);
     if (resource === 'user-accounts') {
       hydrated = await this.attachUserBranchRoleMetadata(hydrated as unknown as User[]) as unknown as ConfigurableEntity[];
     }
@@ -586,9 +594,10 @@ export class RecordsService {
     return { data: hydrated.map((row) => this.protect(resource, row, request)), total };
   }
 
-  async findRaw(resource: string, id: string) {
+  async findRaw(resource: string, id: string, include?: string, request?: RequestContext) {
     const record = await this.findStored(resource, id);
     let [hydrated] = await this.hydrateCustomFields(resource, [record]);
+    [hydrated] = await this.attachRelationObjects([hydrated], include, request);
     if (resource === 'staff') {
       [hydrated] = await this.attachStaffRoleMetadata([hydrated as Staff]);
     }
@@ -601,14 +610,67 @@ export class RecordsService {
     return hydrated;
   }
 
+  private parseIncludeSpec(include?: string) {
+    const values = String(include || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return {
+      all: values.includes('*'),
+      values: new Set(values),
+    };
+  }
+
+  private relationObjectKey(field: string) {
+    return field.endsWith('Id') ? field.slice(0, -2) : field;
+  }
+
+  private async attachRelationObjects<T extends ConfigurableEntity>(records: T[], include?: string, request?: RequestContext) {
+    if (!records.length) return records;
+    const includeSpec = this.parseIncludeSpec(include);
+    if (!includeSpec.all && includeSpec.values.size === 0) return records;
+
+    const relationEntries = Object.entries(FIELD_RELATION_RESOURCES).filter(([field]) => {
+      const objectKey = this.relationObjectKey(field);
+      if (!includeSpec.all && !includeSpec.values.has(field) && !includeSpec.values.has(objectKey)) return false;
+      return records.some((record) => Boolean((record as unknown as Record<string, unknown>)[field]));
+    });
+    if (!relationEntries.length) return records;
+
+    const relationMaps = new Map<string, Map<string, unknown>>();
+    await Promise.all(relationEntries.map(async ([field, relationResource]) => {
+      const ids = Array.from(new Set(records
+        .map((record) => String((record as unknown as Record<string, unknown>)[field] || ''))
+        .filter(Boolean)));
+      if (!ids.length) return;
+      const rows = await this.repository(relationResource).find({ where: { id: In(ids) } });
+      relationMaps.set(field, new Map(rows.map((row: ConfigurableEntity) => [
+        String(row.id),
+        this.protect(relationResource, row, request),
+      ])));
+    }));
+
+    return records.map((record) => {
+      const next = { ...(record as unknown as Record<string, unknown>) };
+      relationEntries.forEach(([field]) => {
+        const value = String(next[field] || '');
+        if (!value) return;
+        const relationObject = relationMaps.get(field)?.get(value);
+        if (!relationObject) return;
+        next[this.relationObjectKey(field)] = relationObject;
+      });
+      return next as unknown as T;
+    });
+  }
+
   private async findStored(resource: string, id: string) {
     const record = await this.repository(resource).findOne({ where: { id } });
     if (!record) throw new NotFoundException('Không tìm thấy dữ liệu');
     return record;
   }
 
-  async find(resource: string, id: string, user?: AuthUser, request?: RequestContext) {
-    const record = await this.findRaw(resource, id);
+  async find(resource: string, id: string, user?: AuthUser, request?: RequestContext, include?: string) {
+    const record = await this.findRaw(resource, id, include, request);
     await this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
     return { data: this.protect(resource, record, request) };
   }

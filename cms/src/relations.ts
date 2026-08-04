@@ -88,6 +88,26 @@ export function relationLabel(record: Record<string, unknown>, spec: RelationSpe
   return parts.length ? parts.join(' - ') : String(record.id || '');
 }
 
+export function relationObjectKey(field: string | FieldSpec) {
+  const key = typeof field === 'string' ? field : field.key;
+  if (!key.endsWith('Id')) return undefined;
+  return key.slice(0, -2);
+}
+
+export function resolveRecordFieldValue(record: Record<string, any> | null | undefined, field: string | FieldSpec) {
+  if (!record) return undefined;
+  const key = typeof field === 'string' ? field : field.key;
+  const relation = resolveRelationSpec(field);
+  const value = record[key] ?? record.customFields?.[key];
+  if (!relation) return value;
+
+  const objectKey = relationObjectKey(field);
+  if (!objectKey) return value;
+  const relationObject = record[objectKey];
+  if (relationObject && typeof relationObject === 'object') return relationObject;
+  return value;
+}
+
 export async function loadRelationOptions(fields: Array<string | FieldSpec>, options?: { includeArchived?: boolean }) {
   const relationSpecs = fields
     .map((field) => resolveRelationSpec(field))
@@ -190,6 +210,7 @@ export function displayValue(field: string | FieldSpec, value: unknown, lookups:
     if (relation) return value.map((item) => lookups[relation.resource]?.[String(item)] || String(item)).join(', ');
     return value.join(', ');
   }
+  if (relation && typeof value === 'object') return relationLabel(value as Record<string, unknown>, relation);
   if (relation) return lookups[relation.lookupKey || relation.resource]?.[String(value)] || lookups[relation.resource]?.[String(value)] || String(value);
   if (typeof field !== 'string') {
     if (field.displayFormat === 'currency') return formatDisplayCurrency(value);

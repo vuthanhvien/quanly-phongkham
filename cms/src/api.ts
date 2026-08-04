@@ -183,18 +183,19 @@ export const dataProvider: DataProvider = {
       params: {
         page: current,
         pageSize,
+        include: '*',
         search: search && 'value' in search ? search.value : undefined,
         ...requestFilters,
       },
     });
     return response.data;
   },
-  getOne: async ({ resource, id }) => (await api.get(`/records/${resource}/${id}`)).data,
+  getOne: async ({ resource, id }) => (await api.get(`/records/${resource}/${id}`, { params: { include: '*' } })).data,
   create: async ({ resource, variables }) => (await api.post(`/records/${resource}`, variables)).data,
   update: async ({ resource, id, variables }) => (await api.patch(`/records/${resource}/${id}`, variables)).data,
   deleteOne: async ({ resource, id }) => (await api.delete(`/records/${resource}/${id}`)).data,
   getMany: async ({ resource, ids }) => ({
-    data: await Promise.all(ids.map(async (id) => (await api.get(`/records/${resource}/${id}`)).data.data)),
+    data: await Promise.all(ids.map(async (id) => (await api.get(`/records/${resource}/${id}`, { params: { include: '*' } })).data.data)),
   }),
   createMany: async () => ({ data: [] }),
   deleteMany: async () => ({ data: [] }),

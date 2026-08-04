@@ -106,7 +106,7 @@ function renderRelationValue(
   return (
     <>
       {values.map((item, index) => {
-        const itemId = String(item)
+        const itemId = typeof item === "object" && item && "id" in item ? String((item as Record<string, unknown>).id) : String(item)
         const label = displayValue(field, item, lookups)
         return (
           <span key={`${itemId}-${index}`}>
