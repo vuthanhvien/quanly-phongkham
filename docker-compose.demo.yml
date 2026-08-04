@@ -1,0 +1,31 @@
+name: gis-clinic-demo
+
+services:
+  gis-clinic-demo:
+    image: ${DEMO_IMAGE_PREFIX:-${DOCKER_USER:-vienvu}/gis-clinic-demo}:${DEMO_TAG:-demo}
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      MANAGEMENT_DATABASE_URL: ${MANAGEMENT_DATABASE_URL:-}
+      TENANTS_JSON: ${TENANTS_JSON:-}
+      TYPEORM_SYNCHRONIZE: ${TYPEORM_SYNCHRONIZE:-true}
+      JWT_SECRET: ${JWT_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      API_PORT: 9998
+      LANDING_PORT: 9997
+      CMS_PORT: 9999
+      LANDING_API_URL: http://127.0.0.1:9998/api
+      LANDING_REVALIDATE_URL: http://127.0.0.1:9997/api/revalidate
+      LANDING_REVALIDATE_SECRET: ${LANDING_REVALIDATE_SECRET:-${JWT_SECRET}}
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:?Set PUBLIC_API_URL, e.g. http://demo.example.com:9998/api}
+      ERROR_LOG_ENABLED: ${ERROR_LOG_ENABLED:-true}
+    ports:
+      - "${LANDING_PORT:-9997}:9997"
+      - "${API_PORT:-9998}:9998"
+      - "${ADMIN_PORT:-9999}:9999"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ${UPLOADS_DIR:-./data/demo/uploads}:/app/backend/storage/uploads
+      - ${LOGS_DIR:-./data/demo/logs}:/app/backend/storage/logs
+    restart: unless-stopped
