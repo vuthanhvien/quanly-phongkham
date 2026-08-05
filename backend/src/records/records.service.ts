@@ -4,7 +4,7 @@ import { hash } from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { extname, join } from 'path';
-import { FindOptionsWhere, ILike, In, IsNull, LessThan, MoreThan, QueryFailedError, Repository } from 'typeorm';
+import { FindOptionsWhere, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual, Not, QueryFailedError, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
 import {
   Appointment,
@@ -92,11 +92,11 @@ const RESOURCE_ACTIONS: Record<string, string[]> = {
   'accounting-vouchers': [...DEFAULT_RESOURCE_ACTIONS, 'post', 'unpost'],
 };
 
-function normalizeRole(role?: string) {
+function normalizeRole (role?: string) {
   return role?.trim().toUpperCase() || 'ALL';
 }
 
-function buildRoleChain(role?: string, mainRole?: string) {
+function buildRoleChain (role?: string, mainRole?: string) {
   const normalizedRole = normalizeRole(role);
   if (normalizedRole === 'ALL') return ['ALL'];
   const normalizedMainRole = normalizeRole(mainRole);
@@ -499,9 +499,9 @@ export class RecordsService {
     @InjectRepository(PositionHistory) private readonly positionHistories: Repository<PositionHistory>,
     @InjectRepository(RecordDraft) private readonly recordDrafts: Repository<RecordDraft>,
     private readonly workflowService: WorkflowService,
-  ) {}
+  ) { }
 
-  private repository(resource: string): ResourceRepository {
+  private repository (resource: string): ResourceRepository {
     const map: Record<string, ResourceRepository> = {
       branches: this.branches,
       departments: this.departments,
@@ -566,14 +566,14 @@ export class RecordsService {
     return repository;
   }
 
-  private draftTitle(resource: string, payload: Record<string, unknown>) {
+  private draftTitle (resource: string, payload: Record<string, unknown>) {
     const meaningful = [payload.code, payload.name, payload.fullName, payload.title]
       .map((value) => String(value || '').trim())
       .find(Boolean);
     return meaningful ? `Nháp: ${meaningful}` : `Nháp ${this.resourceLabel(resource)} ${new Date().toLocaleString('vi-VN')}`;
   }
 
-  private async ensureDefaultLeaveTypes() {
+  private async ensureDefaultLeaveTypes () {
     const existing = await this.leaveTypes.count({ where: { isArchived: false } });
     if (existing > 0) return this.leaveTypes.find({ where: { isArchived: false, isActive: true }, order: { createdAt: 'ASC' } });
 
@@ -589,7 +589,7 @@ export class RecordsService {
     return this.leaveTypes.find({ where: { isArchived: false, isActive: true }, order: { createdAt: 'ASC' } });
   }
 
-  private leaveDays(startDate: unknown, endDate: unknown) {
+  private leaveDays (startDate: unknown, endDate: unknown) {
     const start = new Date(`${String(startDate)}T00:00:00`);
     const end = new Date(`${String(endDate)}T00:00:00`);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
@@ -603,7 +603,7 @@ export class RecordsService {
     return total;
   }
 
-  async leaveBalance(staffId: string | undefined, year: number | undefined, user: AuthUser) {
+  async leaveBalance (staffId: string | undefined, year: number | undefined, user: AuthUser) {
     await this.assertAnyActionPermission(user, 'leave-requests', ['view', 'create']);
     const resolvedStaffId = staffId || user.staffId;
     if (!resolvedStaffId) throw new BadRequestException('Không xác định được nhân viên');
@@ -647,7 +647,7 @@ export class RecordsService {
     };
   }
 
-  private async prepareLeaveRequest(payload: Record<string, unknown>, ignoredId?: string) {
+  private async prepareLeaveRequest (payload: Record<string, unknown>, ignoredId?: string) {
     const staffId = String(payload.staffId || '').trim();
     const leaveTypeCode = String(payload.leaveType || '').trim();
     if (!staffId || !leaveTypeCode) throw new BadRequestException('Nhân viên và loại nghỉ là bắt buộc');
@@ -674,7 +674,7 @@ export class RecordsService {
     }
   }
 
-  async list(
+  async list (
     resource: string,
     page = 1,
     pageSize = 20,
@@ -683,6 +683,7 @@ export class RecordsService {
     user?: AuthUser,
     request?: RequestContext,
     include?: string,
+    advanced?: string,
   ) {
     await this.assertPermission(user, resource, 'view');
     if (resource === 'leave-types') await this.ensureDefaultLeaveTypes();
@@ -746,6 +747,7 @@ export class RecordsService {
       };
       where = (searchable[resource] || []).map((field) => ({ [field]: ILike(`%${search}%`) })) as FindOptionsWhere<ConfigurableEntity>[];
     }
+    where = await this.applyAdvancedFilters(resource, where, advanced);
     where = await this.applyResourceFilters(resource, where, normalizedFilters);
     if (!includeArchived) {
       where = this.mergeWhere(where, { isArchived } as FindOptionsWhere<ConfigurableEntity>);
@@ -782,7 +784,7 @@ export class RecordsService {
     return { data: hydrated.map((row) => this.protect(resource, row, request)), total };
   }
 
-  async findRaw(resource: string, id: string, include?: string, request?: RequestContext) {
+  async findRaw (resource: string, id: string, include?: string, request?: RequestContext) {
     const record = await this.findStored(resource, id);
     let [hydrated] = await this.hydrateCustomFields(resource, [record]);
     [hydrated] = await this.attachRelationObjects([hydrated], include, request);
@@ -804,7 +806,7 @@ export class RecordsService {
     return hydrated;
   }
 
-  private parseIncludeSpec(include?: string) {
+  private parseIncludeSpec (include?: string) {
     const values = String(include || '')
       .split(',')
       .map((item) => item.trim())
@@ -815,11 +817,11 @@ export class RecordsService {
     };
   }
 
-  private relationObjectKey(field: string) {
+  private relationObjectKey (field: string) {
     return field.endsWith('Id') ? field.slice(0, -2) : field;
   }
 
-  private async attachRelationObjects<T extends ConfigurableEntity>(records: T[], include?: string, request?: RequestContext) {
+  private async attachRelationObjects<T extends ConfigurableEntity> (records: T[], include?: string, request?: RequestContext) {
     if (!records.length) return records;
     const includeSpec = this.parseIncludeSpec(include);
     if (!includeSpec.all && includeSpec.values.size === 0) return records;
@@ -857,13 +859,13 @@ export class RecordsService {
     });
   }
 
-  private async findStored(resource: string, id: string) {
+  private async findStored (resource: string, id: string) {
     const record = await this.repository(resource).findOne({ where: { id } });
     if (!record) throw new NotFoundException('Không tìm thấy dữ liệu');
     return record;
   }
 
-  private async syncProjectMembers(projectId: string, memberStaffIds: unknown[]) {
+  private async syncProjectMembers (projectId: string, memberStaffIds: unknown[]) {
     const staffIds = Array.from(new Set(memberStaffIds.map(String).filter(Boolean)));
     const existing = await this.projectMembers.find({ where: { projectId, isArchived: false } });
     const existingByStaffId = new Map(existing.map((item) => [item.staffId, item]));
@@ -877,7 +879,7 @@ export class RecordsService {
     if (removed.length) await this.projectMembers.save(removed.map((item) => ({ ...item, isArchived: true })));
   }
 
-  private async attachProjectMembers(project: Project) {
+  private async attachProjectMembers (project: Project) {
     const members = await this.projectMembers.find({ where: { projectId: project.id, isArchived: false } });
     const staffIds = members.map((member) => member.staffId);
     const staffRows = staffIds.length ? await this.staff.find({ where: { id: In(staffIds), isArchived: false } }) : [];
@@ -889,13 +891,13 @@ export class RecordsService {
     };
   }
 
-  async find(resource: string, id: string, user?: AuthUser, request?: RequestContext, include?: string) {
+  async find (resource: string, id: string, user?: AuthUser, request?: RequestContext, include?: string) {
     const record = await this.findRaw(resource, id, include, request);
     await this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
     return { data: this.protect(resource, record, request) };
   }
 
-  async exportImportBundle(resource: string, template = false, fake = false, user?: AuthUser, request?: RequestContext) {
+  async exportImportBundle (resource: string, template = false, fake = false, user?: AuthUser, request?: RequestContext) {
     const config = await this.bundleConfig(resource);
     await this.assertPermission(user, config.main.resource, 'view');
 
@@ -943,7 +945,7 @@ export class RecordsService {
     };
   }
 
-  async importBundle(resource: string, sheets: Record<string, Array<Record<string, unknown>>>, user: AuthUser) {
+  async importBundle (resource: string, sheets: Record<string, Array<Record<string, unknown>>>, user: AuthUser) {
     const config = await this.bundleConfig(resource);
     const mainSheetRows = Array.isArray(sheets?.[config.main.sheetName]) ? sheets[config.main.sheetName] : [];
     const parentCache = new Map<string, ConfigurableEntity>();
@@ -976,7 +978,7 @@ export class RecordsService {
     };
   }
 
-  async importUpsert(resource: string, payload: Record<string, unknown>, user: AuthUser) {
+  async importUpsert (resource: string, payload: Record<string, unknown>, user: AuthUser) {
     const keyField = this.importKeyField(resource);
     if (!keyField) {
       throw new BadRequestException('Module này chưa hỗ trợ import upsert theo code');
@@ -1000,7 +1002,7 @@ export class RecordsService {
     return this.create(resource, payload, user);
   }
 
-  async create(resource: string, payload: Record<string, unknown>, user: AuthUser) {
+  async create (resource: string, payload: Record<string, unknown>, user: AuthUser) {
     if (resource === 'files') {
       throw new BadRequestException('Hãy dùng endpoint upload file để tạo tệp mới');
     }
@@ -1034,7 +1036,7 @@ export class RecordsService {
     return { data: this.protect(resource, hydrated) };
   }
 
-  async listDrafts(resource: string, user: AuthUser) {
+  async listDrafts (resource: string, user: AuthUser) {
     this.repository(resource); // validates the resource without touching its records
     await this.assertPermission(user, resource, 'create');
     const drafts = await this.recordDrafts.find({
@@ -1044,7 +1046,7 @@ export class RecordsService {
     return { data: drafts };
   }
 
-  async createDraft(resource: string, payload: Record<string, unknown>, user: AuthUser) {
+  async createDraft (resource: string, payload: Record<string, unknown>, user: AuthUser) {
     this.repository(resource); // drafts intentionally skip normal field and business validation
     await this.assertPermission(user, resource, 'create', this.branchIdOf(resource, payload));
     const draft = await this.recordDrafts.save(this.recordDrafts.create({
@@ -1056,7 +1058,7 @@ export class RecordsService {
     return { data: draft };
   }
 
-  async removeDraft(resource: string, id: string, user: AuthUser) {
+  async removeDraft (resource: string, id: string, user: AuthUser) {
     this.repository(resource);
     const draft = await this.recordDrafts.findOne({ where: { id, resource, ownerId: user.id } });
     if (!draft) throw new NotFoundException('Bản nháp không tồn tại');
@@ -1064,7 +1066,7 @@ export class RecordsService {
     return { data: { id } };
   }
 
-  async update(resource: string, id: string, payload: Record<string, unknown>, user: AuthUser) {
+  async update (resource: string, id: string, payload: Record<string, unknown>, user: AuthUser) {
     const previous = await this.findStored(resource, id);
     const previousCustomFields = await this.loadCustomFieldsMap(resource, [id]);
     const mergedCustomFields = {
@@ -1108,7 +1110,7 @@ export class RecordsService {
     return { data: this.protect(resource, hydrated) };
   }
 
-  async remove(resource: string, id: string, user: AuthUser) {
+  async remove (resource: string, id: string, user: AuthUser) {
     const record = await this.findStored(resource, id);
     await this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
     await this.repository(resource).save({ ...record, isArchived: true });
@@ -1116,14 +1118,14 @@ export class RecordsService {
     return { data: { id } };
   }
 
-  async revealPhone(id: string, user: AuthUser) {
+  async revealPhone (id: string, user: AuthUser) {
     const customer = (await this.findRaw('customers', id)) as Customer;
     await this.assertPermission(user, 'customers', 'reveal-phone');
     await this.audit(user, 'REVEAL_PHONE', 'customers', id);
     return { data: { phone: customer.phone } };
   }
 
-  async convertLeadToCustomer(id: string, user: AuthUser) {
+  async convertLeadToCustomer (id: string, user: AuthUser) {
     const lead = await this.findStored('leads', id) as Lead;
     await this.assertPermission(user, 'leads', 'convert-to-customer');
 
@@ -1162,7 +1164,7 @@ export class RecordsService {
     return { data: await this.findRaw('customers', customer.id) };
   }
 
-  private async saveRecord(resource: string, entity: any, repository: ResourceRepository) {
+  private async saveRecord (resource: string, entity: any, repository: ResourceRepository) {
     try {
       return await repository.save(entity);
     } catch (error) {
@@ -1171,7 +1173,7 @@ export class RecordsService {
     }
   }
 
-  private handlePersistenceError(resource: string, error: unknown): never | void {
+  private handlePersistenceError (resource: string, error: unknown): never | void {
     if (!(error instanceof QueryFailedError)) return;
     const driverError = error.driverError as {
       code?: string;
@@ -1212,7 +1214,7 @@ export class RecordsService {
     throw new BadRequestException(`Dữ liệu ${resourceLabel.toLowerCase()} đã tồn tại`);
   }
 
-  private extractUniqueField(detail?: string, constraint?: string) {
+  private extractUniqueField (detail?: string, constraint?: string) {
     const detailMatch = detail?.match(/\(([^)]+)\)=/)
     if (detailMatch?.[1]) return detailMatch[1];
     const constraintMatch = constraint?.match(/_([a-zA-Z0-9]+)_key$/)
@@ -1227,7 +1229,7 @@ export class RecordsService {
     return undefined;
   }
 
-  private resourceLabel(resource: string) {
+  private resourceLabel (resource: string) {
     const labels: Record<string, string> = {
       branches: 'chi nhánh',
       departments: 'phòng ban',
@@ -1259,11 +1261,11 @@ export class RecordsService {
     return labels[resource] || resource;
   }
 
-  private importKeyField(resource: string) {
+  private importKeyField (resource: string) {
     return RESOURCE_IMPORT_KEYS[resource];
   }
 
-  private async bundleConfig(resource: string) {
+  private async bundleConfig (resource: string) {
     const config = IMPORT_BUNDLE_CONFIGS[resource as BundleRootResource];
     if (!config) throw new BadRequestException('Module này chưa hỗ trợ import/export bundle');
 
@@ -1295,7 +1297,7 @@ export class RecordsService {
     };
   }
 
-  private async listBundleRows(resource: string, user?: AuthUser) {
+  private async listBundleRows (resource: string, user?: AuthUser) {
     const where = this.applyBranchScope(resource, {}, user) as FindOptionsWhere<ConfigurableEntity>;
     return this.repository(resource).find({
       where,
@@ -1304,7 +1306,7 @@ export class RecordsService {
     });
   }
 
-  private async listRelatedBundleRows(sheetConfig: ImportBundleSheetConfig, parentIds: string[], user?: AuthUser) {
+  private async listRelatedBundleRows (sheetConfig: ImportBundleSheetConfig, parentIds: string[], user?: AuthUser) {
     if (parentIds.length === 0 || !sheetConfig.parentField) return [];
     const scopedWhere = this.applyBranchScope(
       sheetConfig.resource,
@@ -1318,7 +1320,7 @@ export class RecordsService {
     });
   }
 
-  private async mapBundleExportRows(
+  private async mapBundleExportRows (
     sheetConfig: ImportBundleSheetConfig,
     rows: Array<Record<string, unknown>>,
     parentCodeById: Map<string, string>,
@@ -1354,7 +1356,7 @@ export class RecordsService {
     );
   }
 
-  private async buildFakeBundleSheets(resource: BundleRootResource, request?: RequestContext) {
+  private async buildFakeBundleSheets (resource: BundleRootResource, request?: RequestContext) {
     const config = await this.bundleConfig(resource);
     const sampleSize = 5;
     const referencePools = await this.loadBundleReferencePools(config);
@@ -1410,7 +1412,7 @@ export class RecordsService {
     }));
   }
 
-  private async loadBundleReferencePools(config: { main: ImportBundleSheetConfig; related: ImportBundleSheetConfig[] }) {
+  private async loadBundleReferencePools (config: { main: ImportBundleSheetConfig; related: ImportBundleSheetConfig[] }) {
     const relationResources = new Set<string>();
     [config.main, ...config.related].forEach((sheet) => {
       sheet.columns.forEach((column) => {
@@ -1442,7 +1444,7 @@ export class RecordsService {
     return Object.fromEntries(entries) as Record<string, string[]>;
   }
 
-  private buildFakeBundleRow(
+  private buildFakeBundleRow (
     sheetConfig: ImportBundleSheetConfig,
     context: {
       resource: BundleRootResource;
@@ -1467,7 +1469,7 @@ export class RecordsService {
     return row;
   }
 
-  private fakeBundleValue(
+  private fakeBundleValue (
     resource: string,
     column: string,
     context: {
@@ -1537,7 +1539,7 @@ export class RecordsService {
     return `Mau ${column} ${context.index + 1}`;
   }
 
-  private fakeBundleCustomFieldValue(
+  private fakeBundleCustomFieldValue (
     field: Pick<CustomFieldDefinition, 'key' | 'dataType' | 'relationResource' | 'options'>,
     context: { index: number; referencePools: Record<string, string[]> },
   ) {
@@ -1554,7 +1556,7 @@ export class RecordsService {
     return `Mau ${field.key} ${context.index + 1}`;
   }
 
-  private fakeStaffBundleValue(
+  private fakeStaffBundleValue (
     resource: string,
     column: string,
     context: {
@@ -1653,7 +1655,7 @@ export class RecordsService {
     return undefined;
   }
 
-  private fakeStatusValue(resource: string, index: number) {
+  private fakeStatusValue (resource: string, index: number) {
     const options: Record<string, string[]> = {
       customers: ['CONSULTING', 'IN_TREATMENT', 'COMPLETED'],
       leads: ['NEW', 'CONTACTING', 'QUALIFIED'],
@@ -1679,27 +1681,27 @@ export class RecordsService {
     return list[index % list.length];
   }
 
-  private fakeDate(index: number) {
+  private fakeDate (index: number) {
     const date = new Date(Date.UTC(2026, 0, 1 + index));
     return date.toISOString().slice(0, 10);
   }
 
-  private fakeDateTime(index: number, extraHours = 0) {
+  private fakeDateTime (index: number, extraHours = 0) {
     const date = new Date(Date.UTC(2026, 0, 1 + index, 8 + extraHours, 0, 0));
     return date.toISOString().slice(0, 16);
   }
 
-  private fakeFixedDate(year: number, monthIndex: number, day: number) {
+  private fakeFixedDate (year: number, monthIndex: number, day: number) {
     const date = new Date(Date.UTC(year, monthIndex, day));
     return date.toISOString().slice(0, 10);
   }
 
-  private fakeFixedDateTime(year: number, monthIndex: number, day: number, hour: number, minute: number) {
+  private fakeFixedDateTime (year: number, monthIndex: number, day: number, hour: number, minute: number) {
     const date = new Date(Date.UTC(year, monthIndex, day, hour, minute, 0));
     return date.toISOString().slice(0, 16);
   }
 
-  private fakeStaffRoster(index: number) {
+  private fakeStaffRoster (index: number) {
     const patterns = [
       {
         label: 'Ca sáng',
@@ -1762,7 +1764,7 @@ export class RecordsService {
     return patterns[index % patterns.length];
   }
 
-  private fakeStaffPayrollMetrics(index: number) {
+  private fakeStaffPayrollMetrics (index: number) {
     const baseSalary = 8_500_000 + (index % 5) * 1_500_000;
     const workingDays = 26;
     const actualDays = 22 + (index % 4);
@@ -1786,7 +1788,7 @@ export class RecordsService {
     };
   }
 
-  private fakeNumber(column: string, index: number) {
+  private fakeNumber (column: string, index: number) {
     if (column === 'reviewYear' || column === 'year') return 2026;
     if (column === 'reviewMonth' || column === 'month') return (index % 12) + 1;
     if (column === 'dependants') return index % 3;
@@ -1800,7 +1802,7 @@ export class RecordsService {
     return index + 1;
   }
 
-  private serializeFakeBundleCellValue(_column: string, value: unknown, request?: RequestContext) {
+  private serializeFakeBundleCellValue (_column: string, value: unknown, request?: RequestContext) {
     if (value instanceof Date) return value.toISOString();
     if (Array.isArray(value)) return value.join(', ');
     if (typeof value === 'string' && value.startsWith('/uploads/')) {
@@ -1809,7 +1811,7 @@ export class RecordsService {
     return value;
   }
 
-  private generateBundleCode(resource: BundleRootResource, index: number) {
+  private generateBundleCode (resource: BundleRootResource, index: number) {
     const prefix: Record<BundleRootResource, string> = {
       customers: 'KH',
       leads: 'LD',
@@ -1818,7 +1820,7 @@ export class RecordsService {
     return `${prefix[resource]}-IMPORT-${String(index + 1).padStart(3, '0')}`;
   }
 
-  private async exportBundleColumnValue(
+  private async exportBundleColumnValue (
     resource: string,
     column: string,
     value: unknown,
@@ -1840,7 +1842,7 @@ export class RecordsService {
     return value;
   }
 
-  private formatBundleDateValue(resource: string, column: string, value: Date) {
+  private formatBundleDateValue (resource: string, column: string, value: Date) {
     const iso = value.toISOString();
     const dateColumns = new Set([
       'joinedAt', 'dateOfBirth', 'idCardIssuedDate', 'orderDate', 'operationDate', 'workDate', 'date', 'startDate', 'endDate',
@@ -1853,7 +1855,7 @@ export class RecordsService {
     return iso;
   }
 
-  private async resolveExternalKeyForRecord(resource: string, id: string, cache: Map<string, string>, request?: RequestContext) {
+  private async resolveExternalKeyForRecord (resource: string, id: string, cache: Map<string, string>, request?: RequestContext) {
     const cacheKey = `${resource}:${id}`;
     if (cache.has(cacheKey)) return cache.get(cacheKey) || '';
     const field = RESOURCE_EXTERNAL_KEYS[resource];
@@ -1866,7 +1868,7 @@ export class RecordsService {
     return value;
   }
 
-  private bundleRowIsEmpty(row: Record<string, unknown>, columns: string[]) {
+  private bundleRowIsEmpty (row: Record<string, unknown>, columns: string[]) {
     return columns.every((column) => {
       const value = row?.[column];
       if (Array.isArray(value)) return value.length === 0;
@@ -1874,7 +1876,7 @@ export class RecordsService {
     });
   }
 
-  private async upsertBundleMainRow(sheetConfig: ImportBundleSheetConfig, row: Record<string, unknown>, user: AuthUser) {
+  private async upsertBundleMainRow (sheetConfig: ImportBundleSheetConfig, row: Record<string, unknown>, user: AuthUser) {
     const code = String(row.code || '').trim();
     if (!code) {
       throw new BadRequestException(`Sheet ${sheetConfig.sheetName} bat buoc co cot code`);
@@ -1884,7 +1886,7 @@ export class RecordsService {
     return response.data as ConfigurableEntity;
   }
 
-  private async upsertBundleRelatedRow(
+  private async upsertBundleRelatedRow (
     rootResource: BundleRootResource,
     sheetConfig: ImportBundleSheetConfig,
     row: Record<string, unknown>,
@@ -1930,7 +1932,7 @@ export class RecordsService {
     return response.data;
   }
 
-  private async findBundleParentByCode(
+  private async findBundleParentByCode (
     rootResource: BundleRootResource,
     code: string,
     parentCache: Map<string, ConfigurableEntity>,
@@ -1942,7 +1944,7 @@ export class RecordsService {
     return record as ConfigurableEntity | null;
   }
 
-  private async buildBundlePayload(
+  private async buildBundlePayload (
     sheetConfig: ImportBundleSheetConfig,
     row: Record<string, unknown>,
     parentRecord?: ConfigurableEntity,
@@ -1966,7 +1968,7 @@ export class RecordsService {
     return payload;
   }
 
-  private async resolveBundleImportValue(
+  private async resolveBundleImportValue (
     column: string,
     rawValue: unknown,
     customField?: Pick<CustomFieldDefinition, 'key' | 'dataType' | 'relationResource' | 'options'>,
@@ -1980,7 +1982,7 @@ export class RecordsService {
     return this.resolveBundleRelationValue(relationResource, normalizedValue);
   }
 
-  private normalizeBundleCustomFieldValue(
+  private normalizeBundleCustomFieldValue (
     field: Pick<CustomFieldDefinition, 'dataType'>,
     rawValue: unknown,
   ) {
@@ -1999,7 +2001,7 @@ export class RecordsService {
     return rawValue;
   }
 
-  private async resolveBundleRelationValue(resource: string, rawValue: unknown) {
+  private async resolveBundleRelationValue (resource: string, rawValue: unknown) {
     const normalized = String(rawValue || '').trim();
     if (!normalized) return undefined;
     const field = RESOURCE_EXTERNAL_KEYS[resource];
@@ -2012,7 +2014,7 @@ export class RecordsService {
     return String((record as Record<string, unknown>).id);
   }
 
-  async uploadFiles(files: any[], payload: { folderId?: string; title?: string; note?: string }, user: AuthUser, request?: RequestContext) {
+  async uploadFiles (files: any[], payload: { folderId?: string; title?: string; note?: string }, user: AuthUser, request?: RequestContext) {
     await this.assertPermission(user, 'files', 'create');
     if (!payload.folderId) {
       throw new BadRequestException('Phải chọn folder trước khi upload file');
@@ -2033,7 +2035,7 @@ export class RecordsService {
     return { data: uploaded.map((item) => this.protect('files', item as unknown as ConfigurableEntity, request)) };
   }
 
-  async serviceOrderProductOptions(user?: AuthUser) {
+  async serviceOrderProductOptions (user?: AuthUser) {
     await this.assertAnyActionPermission(user, 'service-orders', ['create', 'update', 'view']);
     const rows = await this.products.find({
       order: { createdAt: 'DESC' },
@@ -2063,7 +2065,7 @@ export class RecordsService {
     return { data: options, total: options.length };
   }
 
-  async stockBatchFormOptions(user?: AuthUser) {
+  async stockBatchFormOptions (user?: AuthUser) {
     await this.assertAnyActionPermission(user, 'stock-batches', ['create', 'update', 'view']);
     const [products, branches, suppliers, batches, units] = await Promise.all([
       this.products.find({ order: { createdAt: 'DESC' }, take: 500 }),
@@ -2084,7 +2086,7 @@ export class RecordsService {
     };
   }
 
-  async receiptStock(payload: Record<string, unknown>, user: AuthUser) {
+  async receiptStock (payload: Record<string, unknown>, user: AuthUser) {
     await this.assertAnyActionPermission(user, 'stock-batches', ['create', 'update']);
     const branchId = String(payload.branchId || '');
     if (!branchId) throw new BadRequestException('Phiếu nhập kho phải có chi nhánh');
@@ -2135,7 +2137,7 @@ export class RecordsService {
     };
   }
 
-  async issueStock(payload: Record<string, unknown>, user: AuthUser) {
+  async issueStock (payload: Record<string, unknown>, user: AuthUser) {
     await this.assertAnyActionPermission(user, 'stock-batches', ['create', 'update']);
     const items = await this.normalizeStockIssueItems(payload.items);
     const touched: StockBatch[] = [];
@@ -2169,7 +2171,7 @@ export class RecordsService {
     };
   }
 
-  async postAccountingVoucher(id: string, user: AuthUser) {
+  async postAccountingVoucher (id: string, user: AuthUser) {
     const voucher = await this.accountingVouchers.findOne({ where: { id } });
     if (!voucher) throw new NotFoundException('Không tìm thấy chứng từ kế toán');
     await this.assertPermission(user, 'accounting-vouchers', 'post', voucher.branchId);
@@ -2210,7 +2212,7 @@ export class RecordsService {
     return { data: await this.findRaw('accounting-vouchers', id) };
   }
 
-  async unpostAccountingVoucher(id: string, user: AuthUser) {
+  async unpostAccountingVoucher (id: string, user: AuthUser) {
     const voucher = await this.accountingVouchers.findOne({ where: { id } });
     if (!voucher) throw new NotFoundException('Không tìm thấy chứng từ kế toán');
     await this.assertPermission(user, 'accounting-vouchers', 'unpost', voucher.branchId);
@@ -2225,7 +2227,7 @@ export class RecordsService {
     return { data: await this.findRaw('accounting-vouchers', id) };
   }
 
-  async accountingGeneralLedger(params: Record<string, string>, user?: AuthUser) {
+  async accountingGeneralLedger (params: Record<string, string>, user?: AuthUser) {
     await this.assertAnyActionPermission(user, 'accounting-vouchers', ['view']);
     const rows = await this.loadPostedVoucherLines(params, user);
     const accounts = await this.accountingChartAccounts.find();
@@ -2258,7 +2260,7 @@ export class RecordsService {
     return { data, total: data.length };
   }
 
-  async accountingTrialBalance(params: Record<string, string>, user?: AuthUser) {
+  async accountingTrialBalance (params: Record<string, string>, user?: AuthUser) {
     await this.assertAnyActionPermission(user, 'accounting-vouchers', ['view']);
     const rows = await this.loadPostedVoucherLines(params, user);
     const accounts = await this.accountingChartAccounts.find({ order: { accountNumber: 'ASC' } });
@@ -2300,7 +2302,7 @@ export class RecordsService {
     };
   }
 
-  async accountingCashFlow(params: Record<string, string>, user?: AuthUser) {
+  async accountingCashFlow (params: Record<string, string>, user?: AuthUser) {
     await this.assertAnyActionPermission(user, 'accounting-vouchers', ['view']);
     const rows = await this.loadPostedVoucherLines(params, user);
     const mappings = await this.accountingCashFlowMappings.find({ where: { isActive: true }, order: { sortOrder: 'ASC', createdAt: 'ASC' } });
@@ -2347,7 +2349,7 @@ export class RecordsService {
     };
   }
 
-  async accountingReceivables(params: Record<string, string>, user?: AuthUser) {
+  async accountingReceivables (params: Record<string, string>, user?: AuthUser) {
     await this.assertAnyActionPermission(user, 'accounting-vouchers', ['view']);
     const rows = await this.loadPostedVoucherLines(params, user);
     const accounts = await this.accountingChartAccounts.find();
@@ -2396,7 +2398,7 @@ export class RecordsService {
     };
   }
 
-  async accountingPayables(params: Record<string, string>, user?: AuthUser) {
+  async accountingPayables (params: Record<string, string>, user?: AuthUser) {
     await this.assertAnyActionPermission(user, 'accounting-vouchers', ['view']);
     const rows = await this.loadPostedVoucherLines(params, user);
     const accounts = await this.accountingChartAccounts.find();
@@ -2445,15 +2447,15 @@ export class RecordsService {
     };
   }
 
-  async accountingCashBook(params: Record<string, string>, user?: AuthUser) {
+  async accountingCashBook (params: Record<string, string>, user?: AuthUser) {
     return this.accountingMoneyBook({ ...params, accountPrefix: params.accountPrefix || '111' }, user);
   }
 
-  async accountingBankBook(params: Record<string, string>, user?: AuthUser) {
+  async accountingBankBook (params: Record<string, string>, user?: AuthUser) {
     return this.accountingMoneyBook({ ...params, accountPrefix: params.accountPrefix || '112' }, user);
   }
 
-  private async accountingMoneyBook(params: Record<string, string>, user?: AuthUser) {
+  private async accountingMoneyBook (params: Record<string, string>, user?: AuthUser) {
     await this.assertAnyActionPermission(user, 'accounting-vouchers', ['view']);
     const rows = await this.loadPostedVoucherLines(params, user);
     const accounts = await this.accountingChartAccounts.find();
@@ -2505,7 +2507,7 @@ export class RecordsService {
     };
   }
 
-  async bootstrapVietnameseAccounting(user: AuthUser) {
+  async bootstrapVietnameseAccounting (user: AuthUser) {
     await this.assertPermission(user, 'accounting-chart-accounts', 'create');
 
     const starterAccounts: Array<Partial<AccountingChartAccount>> = [
@@ -2600,7 +2602,7 @@ export class RecordsService {
     };
   }
 
-  async generateSourceAccountingVoucher(resource: 'invoices' | 'expenses' | 'payrolls', sourceId: string, user: AuthUser) {
+  async generateSourceAccountingVoucher (resource: 'invoices' | 'expenses' | 'payrolls', sourceId: string, user: AuthUser) {
     const vouchers = await this.syncAccountingForSpecificSource(resource, sourceId, user, true);
     return {
       data: vouchers[0] ? await this.findRaw('accounting-vouchers', vouchers[0].id) : null,
@@ -2608,12 +2610,12 @@ export class RecordsService {
     };
   }
 
-  private async syncAccountingForSourceResource(resource: string, sourceId: string, user: AuthUser) {
+  private async syncAccountingForSourceResource (resource: string, sourceId: string, user: AuthUser) {
     if (!['invoices', 'expenses', 'payrolls'].includes(resource)) return;
     await this.syncAccountingForSpecificSource(resource as 'invoices' | 'expenses' | 'payrolls', sourceId, user, false);
   }
 
-  private async syncAccountingForSpecificSource(
+  private async syncAccountingForSpecificSource (
     resource: 'invoices' | 'expenses' | 'payrolls',
     sourceId: string,
     user: AuthUser,
@@ -2662,7 +2664,7 @@ export class RecordsService {
     return savedVouchers;
   }
 
-  private async buildSourceVoucherDrafts(
+  private async buildSourceVoucherDrafts (
     resource: 'invoices' | 'expenses' | 'payrolls',
     sourceRecord: Record<string, unknown>,
     branchId?: string,
@@ -2677,7 +2679,7 @@ export class RecordsService {
     return this.buildPayrollVoucherDrafts(sourceRecord as unknown as Payroll, fiscalSetting, branchId);
   }
 
-  private async buildInvoiceVoucherDraft(invoice: Invoice, fiscalSetting: AccountingFiscalSetting, branchId?: string) {
+  private async buildInvoiceVoucherDraft (invoice: Invoice, fiscalSetting: AccountingFiscalSetting, branchId?: string) {
     const totalAmount = Number(invoice.totalAmount || 0);
     const paidAmount = Number(invoice.paidAmount || 0);
     const vatAmount = Number(invoice.vatAmount || 0);
@@ -2755,7 +2757,7 @@ export class RecordsService {
     };
   }
 
-  private async buildExpenseVoucherDraft(expense: Expense, fiscalSetting: AccountingFiscalSetting, branchId?: string) {
+  private async buildExpenseVoucherDraft (expense: Expense, fiscalSetting: AccountingFiscalSetting, branchId?: string) {
     const amount = Number(expense.amount || 0);
     const vatAmount = Number(expense.vatAmount || 0);
     const beforeTaxAmount = Number(expense.beforeTaxAmount || Math.max(amount - vatAmount, 0));
@@ -2818,7 +2820,7 @@ export class RecordsService {
     };
   }
 
-  private async buildPayrollVoucherDrafts(payroll: Payroll, fiscalSetting: AccountingFiscalSetting, branchId?: string) {
+  private async buildPayrollVoucherDrafts (payroll: Payroll, fiscalSetting: AccountingFiscalSetting, branchId?: string) {
     if (!['confirmed', 'paid'].includes(String(payroll.status || ''))) return [];
 
     const accountingDate = this.lastDateOfMonth(payroll.year, payroll.month);
@@ -2943,7 +2945,7 @@ export class RecordsService {
     return drafts;
   }
 
-  private async getFiscalSetting() {
+  private async getFiscalSetting () {
     const fiscalSetting = await this.accountingFiscalSettings.findOne({ order: { createdAt: 'ASC' } });
     if (!fiscalSetting) {
       throw new BadRequestException('Chưa cấu hình accounting-fiscal-settings');
@@ -2951,7 +2953,7 @@ export class RecordsService {
     return fiscalSetting;
   }
 
-  private async ensureNoPostedAccountingVoucher(resource: string, sourceId: string) {
+  private async ensureNoPostedAccountingVoucher (resource: string, sourceId: string) {
     if (!['invoices', 'expenses', 'payrolls'].includes(resource)) return;
     const posted = await this.accountingVouchers.find({
       where: [
@@ -2965,7 +2967,7 @@ export class RecordsService {
     }
   }
 
-  private async removeDraftSourceVouchers(resource: string, sourceId: string) {
+  private async removeDraftSourceVouchers (resource: string, sourceId: string) {
     if (!['invoices', 'expenses', 'payrolls'].includes(resource)) return;
     const drafts = await this.accountingVouchers.find({
       where: [
@@ -2980,7 +2982,7 @@ export class RecordsService {
     }
   }
 
-  private async removeObsoleteDraftSourceVouchers(resource: string, sourceId: string, activeSourceModules: string[]) {
+  private async removeObsoleteDraftSourceVouchers (resource: string, sourceId: string, activeSourceModules: string[]) {
     const candidates = await this.accountingVouchers.find({
       where: [
         { sourceModule: resource, sourceRecordId: sourceId, status: 'DRAFT' },
@@ -2997,7 +2999,7 @@ export class RecordsService {
     }
   }
 
-  private async findPeriodForDate(accountingDate: string) {
+  private async findPeriodForDate (accountingDate: string) {
     if (!accountingDate) return null;
     const periods = await this.accountingPeriods.find({
       where: [
@@ -3009,7 +3011,7 @@ export class RecordsService {
     return periods.find((item) => item.startDate <= accountingDate && item.endDate >= accountingDate) || null;
   }
 
-  private async findAccountByNumber(accountNumber: string) {
+  private async findAccountByNumber (accountNumber: string) {
     const normalized = String(accountNumber || '').trim();
     const account = await this.accountingChartAccounts.findOne({ where: { accountNumber: normalized } });
     if (!account) {
@@ -3018,7 +3020,7 @@ export class RecordsService {
     return account;
   }
 
-  private async findCashFlowMappingByCode(code: string, required = true) {
+  private async findCashFlowMappingByCode (code: string, required = true) {
     const mapping = await this.accountingCashFlowMappings.findOne({ where: { code } });
     if (!mapping && required) {
       throw new BadRequestException(`Khong tim thay ma dong tien ${code}`);
@@ -3026,7 +3028,7 @@ export class RecordsService {
     return mapping;
   }
 
-  private resolveMoneyAccountNumber(method: unknown, fiscalSetting: AccountingFiscalSetting) {
+  private resolveMoneyAccountNumber (method: unknown, fiscalSetting: AccountingFiscalSetting) {
     const normalizedMethod = String(method || '').toUpperCase();
     if (normalizedMethod === 'TRANSFER' || normalizedMethod === 'CARD') {
       return fiscalSetting.bankAccountNumber || '112';
@@ -3034,36 +3036,36 @@ export class RecordsService {
     return fiscalSetting.cashAccountNumber || '111';
   }
 
-  private resolveExpenseAccountNumber(expense: Expense, fiscalSetting: AccountingFiscalSetting) {
+  private resolveExpenseAccountNumber (expense: Expense, fiscalSetting: AccountingFiscalSetting) {
     const category = String(expense.category || '').toLowerCase();
     if (category.includes('ban hang') || category.includes('marketing')) return '641';
     if (category.includes('lai vay') || category.includes('tai chinh')) return '635';
     return fiscalSetting.expenseAccountNumber || '642';
   }
 
-  private resolvePayrollExpenseAccountNumber(fiscalSetting: AccountingFiscalSetting) {
+  private resolvePayrollExpenseAccountNumber (fiscalSetting: AccountingFiscalSetting) {
     return fiscalSetting.expenseAccountNumber || '642';
   }
 
-  private resolvePayrollAccruedAmount(payroll: Payroll) {
+  private resolvePayrollAccruedAmount (payroll: Payroll) {
     return Number(payroll.netSalary || 0)
       + Number(payroll.insuranceDeduction || 0)
       + Number(payroll.pitAmount || 0)
       + Number(payroll.deduction || 0);
   }
 
-  private dateStringFromValue(value: unknown) {
+  private dateStringFromValue (value: unknown) {
     if (typeof value === 'string') return value.slice(0, 10);
     if (value instanceof Date) return value.toISOString().slice(0, 10);
     return new Date().toISOString().slice(0, 10);
   }
 
-  private lastDateOfMonth(year: number, month: number) {
+  private lastDateOfMonth (year: number, month: number) {
     const date = new Date(Date.UTC(year, month, 0));
     return date.toISOString().slice(0, 10);
   }
 
-  private async loadPostedVoucherLines(params: Record<string, string>, user?: AuthUser) {
+  private async loadPostedVoucherLines (params: Record<string, string>, user?: AuthUser) {
     const lines = await this.accountingVoucherLines.find({ order: { createdAt: 'ASC' } });
     const voucherIds = Array.from(new Set(lines.map((line) => line.voucherId).filter(Boolean)));
     const vouchers = voucherIds.length > 0
@@ -3087,7 +3089,7 @@ export class RecordsService {
     });
   }
 
-  private async storeUploadedFile(
+  private async storeUploadedFile (
     file: any,
     folder: FileFolder,
     payload: { title?: string; note?: string },
@@ -3130,7 +3132,7 @@ export class RecordsService {
     return record;
   }
 
-  async audits(page = 1, pageSize = 30, user?: AuthUser) {
+  async audits (page = 1, pageSize = 30, user?: AuthUser) {
     this.assertScreenAccess(user, 'audit-logs');
     const [data, total] = await this.auditLogs.findAndCount({
       order: { createdAt: 'DESC' },
@@ -3140,7 +3142,7 @@ export class RecordsService {
     return { data, total };
   }
 
-  private protect(resource: string, record: ConfigurableEntity, request?: RequestContext) {
+  private protect (resource: string, record: ConfigurableEntity, request?: RequestContext) {
     if (resource === 'user-accounts') {
       const user = { ...(record as unknown as Record<string, unknown>) };
       delete user.passwordHash;
@@ -3157,7 +3159,7 @@ export class RecordsService {
     return customer;
   }
 
-  private async attachStaffRoleMetadata(records: Staff[]) {
+  private async attachStaffRoleMetadata (records: Staff[]) {
     if (!records.length) return records;
     const staffIds = records.map((item) => String(item.id));
     const userIds = records.map((item) => String(item.userId || '')).filter(Boolean);
@@ -3179,7 +3181,7 @@ export class RecordsService {
     });
   }
 
-  private async attachUserBranchRoleMetadata(records: User[]) {
+  private async attachUserBranchRoleMetadata (records: User[]) {
     if (!records.length) return records;
     const userIds = records.map((record) => record.id);
     const assignments = await this.branchPermissions.find({ where: { userId: In(userIds), isArchived: false } });
@@ -3194,13 +3196,13 @@ export class RecordsService {
     })) as User[];
   }
 
-  private resolveStaffType(record: Pick<Staff, 'type'>) {
+  private resolveStaffType (record: Pick<Staff, 'type'>) {
     const normalizedStoredType = String(record.type || '').trim().toUpperCase();
     if (['ADMIN', 'DOCTOR', 'STAFF'].includes(normalizedStoredType)) return normalizedStoredType;
     return 'STAFF';
   }
 
-  private async syncStaffTypeToUserRole(resource: string, record: Record<string, unknown>) {
+  private async syncStaffTypeToUserRole (resource: string, record: Record<string, unknown>) {
     if (resource !== 'staff') return;
     const userId = String(record.userId || '').trim();
     const nextRole = String(record.type || '').trim().toUpperCase();
@@ -3223,7 +3225,7 @@ export class RecordsService {
     }
   }
 
-  private toAbsolutePublicUrl(url: string | undefined, request?: RequestContext) {
+  private toAbsolutePublicUrl (url: string | undefined, request?: RequestContext) {
     if (!url) return '';
     if (/^(https?:)?\/\//i.test(url)) return url;
     const baseUrl = this.resolvePublicBaseUrl(request);
@@ -3231,7 +3233,7 @@ export class RecordsService {
     return `${baseUrl}${normalizedPath}`;
   }
 
-  private resolvePublicBaseUrl(request?: RequestContext) {
+  private resolvePublicBaseUrl (request?: RequestContext) {
     const envBaseUrl = (process.env.APP_PUBLIC_URL || process.env.PUBLIC_BASE_URL || '').trim();
     if (envBaseUrl) return envBaseUrl.replace(/\/+$/, '');
 
@@ -3246,7 +3248,7 @@ export class RecordsService {
     return `http://localhost:${process.env.PORT || 3000}`;
   }
 
-  private requestHeader(request: RequestContext | undefined, name: string) {
+  private requestHeader (request: RequestContext | undefined, name: string) {
     const direct = request?.get?.(name);
     if (direct) return direct.split(',')[0].trim();
     const raw = request?.headers?.[name];
@@ -3255,7 +3257,7 @@ export class RecordsService {
     return '';
   }
 
-  private async normalize(resource: string, payload: Record<string, unknown>, creating = false) {
+  private async normalize (resource: string, payload: Record<string, unknown>, creating = false) {
     const value = { ...payload };
     delete value.id;
     delete value.createdAt;
@@ -3468,11 +3470,11 @@ export class RecordsService {
     return value;
   }
 
-  private isRecurringWorkSchedule(value: Record<string, unknown>) {
+  private isRecurringWorkSchedule (value: Record<string, unknown>) {
     return String(value.recurrenceType || 'NONE').trim().toUpperCase() !== 'NONE';
   }
 
-  private async saveWorkScheduleSchema(
+  private async saveWorkScheduleSchema (
     normalized: Record<string, unknown>,
     payload: Record<string, unknown>,
     user: AuthUser,
@@ -3494,7 +3496,7 @@ export class RecordsService {
     return { data: this.protect('work-schedules', hydrated) };
   }
 
-  private buildRecurringWorkScheduleEntries(normalized: Record<string, unknown>) {
+  private buildRecurringWorkScheduleEntries (normalized: Record<string, unknown>) {
     const workDate = String(normalized.workDate || '').trim();
     const recurrenceType = String(normalized.recurrenceType || 'NONE').trim().toUpperCase() as WorkScheduleRecurrenceType;
     const recurrenceInterval = Math.max(1, Number(normalized.recurrenceInterval || 1));
@@ -3531,7 +3533,7 @@ export class RecordsService {
     }));
   }
 
-  private expandRecurringDates(
+  private expandRecurringDates (
     startDate: Date,
     untilDate: Date,
     recurrenceType: WorkScheduleRecurrenceType,
@@ -3573,7 +3575,7 @@ export class RecordsService {
     return [new Date(startDate)];
   }
 
-  private normalizeRecurrenceWeekdays(value: string, startDate: Date) {
+  private normalizeRecurrenceWeekdays (value: string, startDate: Date) {
     const normalized = value
       .split(',')
       .map((item) => item.trim().toUpperCase())
@@ -3581,25 +3583,25 @@ export class RecordsService {
     return normalized.length > 0 ? normalized : [this.weekdayCode(startDate)];
   }
 
-  private parseDateOnly(value: string) {
+  private parseDateOnly (value: string) {
     const parsed = new Date(`${value}T00:00:00`);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  private formatDateOnly(value: Date) {
+  private formatDateOnly (value: Date) {
     const year = value.getFullYear();
     const month = String(value.getMonth() + 1).padStart(2, '0');
     const day = String(value.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
 
-  private addDays(value: Date, days: number) {
+  private addDays (value: Date, days: number) {
     const next = new Date(value);
     next.setDate(next.getDate() + days);
     return next;
   }
 
-  private addMonthsPreservingDay(value: Date, months: number) {
+  private addMonthsPreservingDay (value: Date, months: number) {
     const year = value.getFullYear();
     const monthIndex = value.getMonth() + months;
     const targetYear = year + Math.floor(monthIndex / 12);
@@ -3608,18 +3610,132 @@ export class RecordsService {
     return new Date(targetYear, targetMonth, Math.min(value.getDate(), lastDay));
   }
 
-  private weekdayCode(value: Date) {
+  private weekdayCode (value: Date) {
     return ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][value.getDay()];
   }
 
-  private applyDateToDateTime(targetDate: Date, dateTimeText: string) {
+  private applyDateToDateTime (targetDate: Date, dateTimeText: string) {
     const matched = String(dateTimeText).match(/T(\d{2}:\d{2})/);
     const timeText = matched?.[1];
     if (!timeText) return dateTimeText;
     return `${this.formatDateOnly(targetDate)}T${timeText}`;
   }
 
-  private async applyResourceFilters(
+  private async applyAdvancedFilters (
+    resource: string,
+    where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
+    rawFilters?: string,
+  ) {
+    const filters = this.parseAdvancedFilters(rawFilters);
+    if (filters.length === 0) return where;
+
+    const repository = this.repository(resource);
+    const columnNames = new Set(repository.metadata.columns.map((column) => column.propertyName));
+    const customDefinitions = await this.fieldDefinitions.find({ where: { entityType: resource, isActive: true } });
+    const customByKey = new Map(customDefinitions.map((field) => [field.key, field]));
+
+    for (const filter of filters) {
+      const customField = customByKey.get(filter.field);
+      if (customField) {
+        const normalizedFilter = filter.operator === 'number'
+          ? { ...filter, operator: this.advancedNumericOperator(filter.value), value: this.advancedFilterValue(filter.value, 'number') }
+          : filter;
+        const values = await this.customFieldValues.find({
+          where: { entityType: resource, fieldKey: filter.field },
+          select: ['recordId', 'valueText'],
+        });
+        const matchingIds = values
+          .filter((row) => this.advancedFilterMatches(this.parseCustomFieldValue(row.valueText, customField.dataType), normalizedFilter))
+          .map((row) => row.recordId);
+        where = this.mergeWhere(where, {
+          id: In(matchingIds.length > 0 ? matchingIds : ['__no_advanced_filter_match__']),
+        } as FindOptionsWhere<ConfigurableEntity>);
+        continue;
+      }
+
+      if (!columnNames.has(filter.field)) continue;
+      const column = repository.metadata.columns.find((item) => item.propertyName === filter.field);
+      const value = this.advancedFilterValue(filter.value, String(column?.type || ''));
+      const operator = filter.operator === 'number' ? this.advancedNumericOperator(filter.value) : filter.operator;
+      const condition = this.advancedFilterCondition(operator, value);
+      where = this.mergeWhere(where, { [filter.field]: condition } as FindOptionsWhere<ConfigurableEntity>);
+    }
+    return where;
+  }
+
+  private parseAdvancedFilters (rawFilters?: string) {
+    if (!rawFilters) return [] as Array<{ field: string; operator: string; value: string | number }>;
+    try {
+      const parsed = JSON.parse(rawFilters);
+      if (!Array.isArray(parsed)) return [];
+      const operators = new Set(['contains', 'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'number']);
+      return parsed
+        .slice(0, 20)
+        .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+        .map((item) => ({
+          field: String(item.field || '').trim(),
+          operator: String(item.operator || 'contains').trim().toLowerCase(),
+          value: typeof item.value === 'number' ? item.value : String(item.value || '').trim(),
+        }))
+        .filter((item) => /^[a-zA-Z0-9_-]+$/.test(item.field) && operators.has(item.operator) && String(item.value).trim() !== '');
+    } catch {
+      return [];
+    }
+  }
+
+  private advancedFilterValue (value: string | number, columnType: string) {
+    const normalizedType = columnType.toLowerCase();
+    if (['int', 'integer', 'bigint', 'decimal', 'numeric', 'float', 'double', 'real'].some((type) => normalizedType.includes(type))) {
+      const parsed = Number(String(value).replace(/^\s*(>=|<=|>|<)\s*/, ''));
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return String(value);
+  }
+
+  private advancedNumericOperator (value: string | number) {
+    const matched = String(value).trim().match(/^(>=|<=|>|<)/);
+    if (matched?.[1] === '>') return 'gt';
+    if (matched?.[1] === '>=') return 'gte';
+    if (matched?.[1] === '<') return 'lt';
+    if (matched?.[1] === '<=') return 'lte';
+    return 'eq';
+  }
+
+  private advancedFilterCondition (operator: string, value: string | number) {
+    if (operator === 'contains') return ILike(`%${String(value)}%`);
+    if (operator === 'ne') return typeof value === 'string' ? Not(ILike(String(value))) : Not(value);
+    if (operator === 'gt') return MoreThan(value);
+    if (operator === 'gte') return MoreThanOrEqual(value);
+    if (operator === 'lt') return LessThan(value);
+    if (operator === 'lte') return LessThanOrEqual(value);
+    return value;
+  }
+
+  private advancedFilterMatches (actual: unknown, filter: { operator: string; value: string | number }) {
+    const expected = filter.value;
+    if (typeof actual === 'number' || typeof expected === 'number') {
+      const left = Number(actual);
+      const right = Number(expected);
+      if (!Number.isFinite(left) || !Number.isFinite(right)) return false;
+      if (filter.operator === 'ne') return left !== right;
+      if (filter.operator === 'gt') return left > right;
+      if (filter.operator === 'gte') return left >= right;
+      if (filter.operator === 'lt') return left < right;
+      if (filter.operator === 'lte') return left <= right;
+      return left === right;
+    }
+    const left = String(actual ?? '').toLocaleLowerCase();
+    const right = String(expected).toLocaleLowerCase();
+    if (filter.operator === 'contains') return left.includes(right);
+    if (filter.operator === 'ne') return left !== right;
+    if (filter.operator === 'gt') return left > right;
+    if (filter.operator === 'gte') return left >= right;
+    if (filter.operator === 'lt') return left < right;
+    if (filter.operator === 'lte') return left <= right;
+    return left === right;
+  }
+
+  private async applyResourceFilters (
     resource: string,
     where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
     filters: Record<string, string>,
@@ -3642,7 +3758,7 @@ export class RecordsService {
     return this.mergeWhere(where, scoped);
   }
 
-  private mergeWhere(
+  private mergeWhere (
     where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
     scoped: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
   ) {
@@ -3653,7 +3769,7 @@ export class RecordsService {
     return merged;
   }
 
-  private async resolveStaffIdsByUserRole(role: string) {
+  private async resolveStaffIdsByUserRole (role: string) {
     const normalizedRole = String(role).trim().toUpperCase();
     const staffRows = await this.staff.find({
       select: ['id', 'type'],
@@ -3665,7 +3781,7 @@ export class RecordsService {
       .map((item) => String(item.id));
   }
 
-  private async normalizeInput(resource: string, payload: Record<string, unknown>, creating = false) {
+  private async normalizeInput (resource: string, payload: Record<string, unknown>, creating = false) {
     if (resource !== 'user-accounts') {
       const value = await this.normalize(resource, payload, creating);
       if (resource === 'products') {
@@ -3705,7 +3821,7 @@ export class RecordsService {
     return value;
   }
 
-  private async validateAccountingResource(resource: string, value: Record<string, unknown>, creating: boolean) {
+  private async validateAccountingResource (resource: string, value: Record<string, unknown>, creating: boolean) {
     if (resource === 'accounting-vouchers') {
       if (!String(value.code || '').trim()) throw new BadRequestException('Chứng từ kế toán bắt buộc có mã');
       if (!String(value.voucherDate || '').trim()) throw new BadRequestException('Chứng từ kế toán bắt buộc có ngày chứng từ');
@@ -3792,7 +3908,7 @@ export class RecordsService {
     }
   }
 
-  private async validateCustomFields(resource: string, payload: Record<string, unknown>, creating: boolean) {
+  private async validateCustomFields (resource: string, payload: Record<string, unknown>, creating: boolean) {
     const fields = await this.fieldDefinitions.find({ where: { entityType: resource, isActive: true } });
     const values = (payload.customFields || {}) as Record<string, unknown>;
     for (const field of fields) {
@@ -3804,23 +3920,23 @@ export class RecordsService {
       const valueItems = Array.isArray(value) ? value : [value];
       const valid =
         field.dataType === 'number' ? !Number.isNaN(Number(value)) :
-        field.dataType === 'boolean' ? typeof value === 'boolean' :
-        field.dataType === 'select' ? !field.options || field.options.includes(String(value)) :
-        field.dataType === 'file' ? Boolean(
-          (await this.files.count({ where: { id: In(valueItems.map((item) => String(item))), isActive: true } })) === valueItems.length,
-        ) :
-        field.dataType === 'image' ? typeof value === 'string' && value.trim().length > 0 :
-        field.dataType === 'images' ? Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === 'string' && item.trim().length > 0) :
-        field.dataType === 'relative' ? typeof value === 'string' && value.length > 0 :
-        field.dataType === 'dynamic-table' ? Boolean(
-          field.customTableId && (await this.customTableRows.count({ where: { tableId: field.customTableId, id: In(valueItems.map((item) => String(item))), isArchived: false } })) === valueItems.length,
-        ) :
-        true;
+          field.dataType === 'boolean' ? typeof value === 'boolean' :
+            field.dataType === 'select' ? !field.options || field.options.includes(String(value)) :
+              field.dataType === 'file' ? Boolean(
+                (await this.files.count({ where: { id: In(valueItems.map((item) => String(item))), isActive: true } })) === valueItems.length,
+              ) :
+                field.dataType === 'image' ? typeof value === 'string' && value.trim().length > 0 :
+                  field.dataType === 'images' ? Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === 'string' && item.trim().length > 0) :
+                    field.dataType === 'relative' ? typeof value === 'string' && value.length > 0 :
+                      field.dataType === 'dynamic-table' ? Boolean(
+                        field.customTableId && (await this.customTableRows.count({ where: { tableId: field.customTableId, id: In(valueItems.map((item) => String(item))), isArchived: false } })) === valueItems.length,
+                      ) :
+                        true;
       if (!valid) throw new BadRequestException(`Gia tri khong hop le cho ${field.label}`);
     }
   }
 
-  private async hydrateCustomFields<T extends ConfigurableEntity>(resource: string, records: T[]) {
+  private async hydrateCustomFields<T extends ConfigurableEntity> (resource: string, records: T[]) {
     if (records.length === 0) return records;
     const recordIds = records.map((record) => record.id).filter(Boolean);
     const storedValues = await this.loadCustomFieldsMap(resource, recordIds);
@@ -3830,7 +3946,7 @@ export class RecordsService {
     }));
   }
 
-  private async loadCustomFieldsMap(resource: string, recordIds: string[]) {
+  private async loadCustomFieldsMap (resource: string, recordIds: string[]) {
     const normalizedIds = Array.from(new Set(recordIds.filter(Boolean)));
     const valuesByRecord = new Map<string, Record<string, unknown>>();
     if (normalizedIds.length === 0) return valuesByRecord;
@@ -3856,13 +3972,13 @@ export class RecordsService {
 
     return valuesByRecord;
   }
-  private parseCustomFieldValue(valueText: string, dataType?: string) {
+  private parseCustomFieldValue (valueText: string, dataType?: string) {
     if (dataType === 'number') return Number(valueText);
     if (dataType === 'boolean') return valueText === 'true';
     return valueText;
   }
 
-  private computeServiceOrderTotals(payload: Record<string, unknown>, items: ServiceOrderItem[]) {
+  private computeServiceOrderTotals (payload: Record<string, unknown>, items: ServiceOrderItem[]) {
     const totalQuantity = items.reduce((sum, item) => sum + Number(item.baseQuantity || item.quantity || 0), 0);
     const totalAmount = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
     payload.quantity = totalQuantity;
@@ -3871,14 +3987,14 @@ export class RecordsService {
     payload.serviceName = this.summarizeServiceOrderItems(items);
   }
 
-  private summarizeServiceOrderItems(items: ServiceOrderItem[]) {
+  private summarizeServiceOrderItems (items: ServiceOrderItem[]) {
     if (items.length === 0) return 'Chua co san pham';
     if (items.length === 1) return items[0].itemName;
     if (items.length === 2) return `${items[0].itemName}, ${items[1].itemName}`;
     return `${items[0].itemName}, ${items[1].itemName} +${items.length - 2}`;
   }
 
-  private async normalizeServiceOrderItems(value: unknown) {
+  private async normalizeServiceOrderItems (value: unknown) {
     if (!Array.isArray(value) || value.length === 0) {
       throw new BadRequestException('Đơn hàng phải có ít nhất 1 sản phẩm');
     }
@@ -3931,7 +4047,7 @@ export class RecordsService {
     });
   }
 
-  private normalizeProductVariants(value: unknown) {
+  private normalizeProductVariants (value: unknown) {
     if (!Array.isArray(value)) return [];
     return value
       .map((item) => {
@@ -3955,7 +4071,7 @@ export class RecordsService {
       });
   }
 
-  private async syncProductVariants(productId: string, variants: ReturnType<RecordsService['normalizeProductVariants']>) {
+  private async syncProductVariants (productId: string, variants: ReturnType<RecordsService['normalizeProductVariants']>) {
     const existing = await this.productVariants.find({ where: { productId } });
     const incomingIds = new Set(variants.map((variant) => variant.id).filter(Boolean));
     const activeExistingIds = existing.filter((variant) => !variant.isArchived).map((variant) => variant.id);
@@ -3970,12 +4086,12 @@ export class RecordsService {
     }
   }
 
-  private async attachProductVariants(product: Product) {
+  private async attachProductVariants (product: Product) {
     const variants = await this.productVariants.find({ where: { productId: product.id, isArchived: false }, order: { createdAt: 'ASC' } });
     return { ...product, variants };
   }
 
-  private unitConversionFactor(baseUnitId: string | undefined, transferUnitId: string | undefined, units: Map<string, Unit>) {
+  private unitConversionFactor (baseUnitId: string | undefined, transferUnitId: string | undefined, units: Map<string, Unit>) {
     if (!baseUnitId || !transferUnitId || baseUnitId === transferUnitId) return 1;
     const base = units.get(baseUnitId);
     const transfer = units.get(transferUnitId);
@@ -3987,7 +4103,7 @@ export class RecordsService {
     return factor;
   }
 
-  private async normalizeProductBundle(value: Record<string, unknown>, bundleProductId = '') {
+  private async normalizeProductBundle (value: Record<string, unknown>, bundleProductId = '') {
     const productType = String(value.productType || 'CONSUMABLE').toUpperCase();
     value.productType = productType;
     if (productType !== 'COMBO') {
@@ -4018,7 +4134,7 @@ export class RecordsService {
     });
   }
 
-  private async normalizeStockReceiptItems(value: unknown, branchId: string, defaultSupplierId?: string) {
+  private async normalizeStockReceiptItems (value: unknown, branchId: string, defaultSupplierId?: string) {
     if (!Array.isArray(value) || value.length === 0) {
       throw new BadRequestException('Phiếu nhập kho phải có ít nhất 1 sản phẩm');
     }
@@ -4062,7 +4178,7 @@ export class RecordsService {
     });
   }
 
-  private async normalizeStockIssueItems(value: unknown) {
+  private async normalizeStockIssueItems (value: unknown) {
     if (!Array.isArray(value) || value.length === 0) {
       throw new BadRequestException('Phiếu xuất kho phải có ít nhất 1 lô sản phẩm');
     }
@@ -4076,7 +4192,7 @@ export class RecordsService {
     });
   }
 
-  private async findMatchingStockBatch(item: {
+  private async findMatchingStockBatch (item: {
     productId: string;
     branchId: string;
     supplierId?: string;
@@ -4101,7 +4217,7 @@ export class RecordsService {
     );
   }
 
-  private async normalizeProductBaseUnit(value: Record<string, unknown>) {
+  private async normalizeProductBaseUnit (value: Record<string, unknown>) {
     const baseUnitId = String(value.baseUnitId || '');
     if (!baseUnitId) throw new BadRequestException('Sản phẩm bắt buộc chọn đơn vị cơ sở');
     const unit = await this.units.findOne({ where: { id: baseUnitId } });
@@ -4110,7 +4226,7 @@ export class RecordsService {
     }
   }
 
-  private async replaceServiceOrderItems(orderId: string, items: ServiceOrderItem[]) {
+  private async replaceServiceOrderItems (orderId: string, items: ServiceOrderItem[]) {
     await this.serviceOrderItems.delete({ orderId });
     if (items.length === 0) return;
     await this.serviceOrderItems.save(
@@ -4128,7 +4244,7 @@ export class RecordsService {
     );
   }
 
-  private async attachServiceOrderItems(record: ServiceOrder) {
+  private async attachServiceOrderItems (record: ServiceOrder) {
     const items = await this.serviceOrderItems.find({ where: { orderId: record.id }, order: { createdAt: 'ASC' } });
     return {
       ...record,
@@ -4136,7 +4252,7 @@ export class RecordsService {
     };
   }
 
-  private async attachAccountingVoucherLines(record: AccountingVoucher) {
+  private async attachAccountingVoucherLines (record: AccountingVoucher) {
     const lines = await this.accountingVoucherLines.find({
       where: { voucherId: record.id },
       order: { createdAt: 'ASC' },
@@ -4147,7 +4263,7 @@ export class RecordsService {
     };
   }
 
-  private async recalculateAccountingVoucherTotals(voucherId: string) {
+  private async recalculateAccountingVoucherTotals (voucherId: string) {
     if (!voucherId) return;
     const voucher = await this.accountingVouchers.findOne({ where: { id: voucherId } });
     if (!voucher) return;
@@ -4157,7 +4273,7 @@ export class RecordsService {
     await this.accountingVouchers.save(voucher);
   }
 
-  private async replaceCustomFieldValues(resource: string, recordId: string, values: Record<string, unknown>) {
+  private async replaceCustomFieldValues (resource: string, recordId: string, values: Record<string, unknown>) {
     await this.customFieldValues.delete({ entityType: resource, recordId });
 
     const rows = Object.entries(values).flatMap(([fieldKey, value]) => {
@@ -4185,12 +4301,12 @@ export class RecordsService {
     }
   }
 
-  private isEmptyCustomFieldValue(value: unknown) {
+  private isEmptyCustomFieldValue (value: unknown) {
     if (Array.isArray(value)) return value.length === 0;
     return value === undefined || value === null || value === '';
   }
 
-  private async copyCustomFieldValues(
+  private async copyCustomFieldValues (
     sourceEntityType: string,
     sourceRecordId: string,
     targetEntityType: string,
@@ -4213,7 +4329,7 @@ export class RecordsService {
     );
   }
 
-  private async generateCustomerCodeFromLead(lead: Lead) {
+  private async generateCustomerCodeFromLead (lead: Lead) {
     const prefix = lead.code ? `KH-${lead.code}` : `KH-${Date.now()}`;
     let candidate = prefix;
     let suffix = 1;
@@ -4224,7 +4340,7 @@ export class RecordsService {
     return candidate;
   }
 
-  private async ensureAppointmentAvailable(payload: Record<string, unknown>, ignoredId?: string) {
+  private async ensureAppointmentAvailable (payload: Record<string, unknown>, ignoredId?: string) {
     if (!payload.startTime || !payload.endTime || (!payload.doctorStaffId && !payload.roomId)) return;
     const existing = await this.appointments.find({
       where: {
@@ -4243,7 +4359,7 @@ export class RecordsService {
     if (conflict) throw new BadRequestException('Bác sĩ hoặc phòng đã có lịch trong khung giờ này');
   }
 
-  private async assertPermission(user: AuthUser | undefined, resource: string, action: string, branchId?: string) {
+  private async assertPermission (user: AuthUser | undefined, resource: string, action: string, branchId?: string) {
     this.assertResourceAccess(user, resource);
     if (!user) return;
     const allowedActions = await this.resolveAllowedActions(resource, user.activeRole || user.role, user.roleMain || user.role);
@@ -4258,7 +4374,7 @@ export class RecordsService {
     }
   }
 
-  private async assertAnyActionPermission(user: AuthUser | undefined, resource: string, actions: string[]) {
+  private async assertAnyActionPermission (user: AuthUser | undefined, resource: string, actions: string[]) {
     this.assertResourceAccess(user, resource);
     if (!user) return;
     const allowedActions = await this.resolveAllowedActions(resource, user.activeRole || user.role, user.roleMain || user.role);
@@ -4267,7 +4383,7 @@ export class RecordsService {
     }
   }
 
-  private async resolveAllowedActions(resource: string, role?: string, mainRole?: string) {
+  private async resolveAllowedActions (resource: string, role?: string, mainRole?: string) {
     const roleChain = buildRoleChain(role, mainRole);
     const views = await this.viewSettings.find({ where: { entityType: resource } });
     for (const inheritedRole of roleChain) {
@@ -4281,12 +4397,12 @@ export class RecordsService {
     return RESOURCE_ACTIONS[resource] || DEFAULT_RESOURCE_ACTIONS;
   }
 
-  private allowedBranches(user: AuthUser | undefined) {
+  private allowedBranches (user: AuthUser | undefined) {
     if (!user || this.isAdmin(user)) return undefined;
     return Array.from(new Set((user.branchPermissions || []).map((item) => item.branchId).filter(Boolean)));
   }
 
-  private applyBranchScope(
+  private applyBranchScope (
     resource: string,
     where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
     user?: AuthUser,
@@ -4297,7 +4413,7 @@ export class RecordsService {
     return scoped ? this.mergeWhere(where, scoped) : where;
   }
 
-  private applySelectedBranchFilters(
+  private applySelectedBranchFilters (
     resource: string,
     where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
     filters: Record<string, string>,
@@ -4312,7 +4428,7 @@ export class RecordsService {
     return scoped ? this.mergeWhere(where, scoped) : where;
   }
 
-  private buildBranchScopedWhere(resource: string, branchIds: string[]) {
+  private buildBranchScopedWhere (resource: string, branchIds: string[]) {
     const branchField = this.branchField(resource);
     if (branchField) {
       const scoped = { [branchField]: In(Array.from(new Set([...branchIds, '']))) } as FindOptionsWhere<ConfigurableEntity>;
@@ -4327,7 +4443,7 @@ export class RecordsService {
     return undefined;
   }
 
-  private branchFieldAllowsEmpty(resource: string) {
+  private branchFieldAllowsEmpty (resource: string) {
     return [
       'accounting-fiscal-settings',
       'accounting-vouchers',
@@ -4347,12 +4463,12 @@ export class RecordsService {
     ].includes(resource);
   }
 
-  private branchIdOf(resource: string, record: object) {
+  private branchIdOf (resource: string, record: object) {
     const field = this.branchField(resource);
     return field ? String((record as Record<string, unknown>)[field] || '') || undefined : undefined;
   }
 
-  private branchField(resource: string) {
+  private branchField (resource: string) {
     const map: Record<string, string> = {
       rooms: 'branchId',
       equipments: 'branchId',
@@ -4388,24 +4504,24 @@ export class RecordsService {
     return map[resource];
   }
 
-  private isAdmin(user: AuthUser | undefined) {
+  private isAdmin (user: AuthUser | undefined) {
     return !user || (user.roleMain || user.role) === 'ADMIN';
   }
 
-  private assertResourceAccess(user: AuthUser | undefined, resource: string) {
+  private assertResourceAccess (user: AuthUser | undefined, resource: string) {
     if (!user) return;
     if ((user.disabledModules || []).includes(resource)) {
       throw new ForbiddenException('Role hiện tại không được sử dụng module này');
     }
   }
 
-  private assertScreenAccess(user: AuthUser | undefined, screen: string) {
+  private assertScreenAccess (user: AuthUser | undefined, screen: string) {
     void screen;
     if (!user || this.isAdmin(user)) return;
     throw new ForbiddenException('Chỉ ADMIN mới được truy cập màn hình hệ thống');
   }
 
-  private async audit(
+  private async audit (
     user: AuthUser,
     action: string,
     module: string,

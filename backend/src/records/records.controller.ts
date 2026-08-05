@@ -14,13 +14,14 @@ export class RecordsController {
     @Query('page', new ParseIntPipe({ optional: true })) page = 1,
     @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize = 20,
     @Query('search') search?: string,
+    @Query('advanced') advanced?: string,
     @Query() query?: Record<string, string>,
     @Request() request?: ExpressRequest & { user?: AuthUser },
   ) {
     const filters = Object.fromEntries(
-      Object.entries(query || {}).filter(([key]) => !['page', 'pageSize', 'search', 'include'].includes(key)),
+      Object.entries(query || {}).filter(([key]) => !['page', 'pageSize', 'search', 'advanced', 'include'].includes(key)),
     );
-    return this.records.list(resource, page, pageSize, search, filters, request?.user, request, query?.include);
+    return this.records.list(resource, page, pageSize, search, filters, request?.user, request, query?.include, advanced);
   }
 
   @Post('records/customers/:id/reveal-phone')

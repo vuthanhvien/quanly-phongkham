@@ -1,6 +1,6 @@
 import { ArrowLeftOutlined, DownloadOutlined, ImportOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons"
 import { faker } from "@faker-js/faker"
-import { Alert, Button, Card, Space, Table, Tabs, Tag, Typography, Upload, message } from "antd"
+import { Alert, Button, Card, Select, Space, Table, Tabs, Tag, Typography, Upload, message } from "antd"
 import type { UploadProps } from "antd"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
@@ -75,7 +75,7 @@ export function RecordImportPage() {
   const [bundleSheetStats, setBundleSheetStats] = useState<Array<{ name: string; count: number }>>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const testRowCount = 100
+  const [testRowCount, setTestRowCount] = useState(500)
 
   const unsupported = UNSUPPORTED_RESOURCES.has(resource)
   const bundleMode = BUNDLE_RESOURCES.has(resource)
@@ -346,9 +346,22 @@ export function RecordImportPage() {
             Tải file mẫu
           </Button>
           {!bundleMode ? (
-            <Button icon={<ImportOutlined />} onClick={() => void downloadExportData()}>
-              Tải data test + custom fields
-            </Button>
+            <>
+              <Select
+                aria-label="Số dòng dữ liệu mẫu"
+                options={[
+                  { value: 100, label: '100 dòng' },
+                  { value: 250, label: '250 dòng' },
+                  { value: 500, label: '500 dòng' },
+                ]}
+                value={testRowCount}
+                onChange={setTestRowCount}
+                style={{ width: 120 }}
+              />
+              <Button icon={<ImportOutlined />} onClick={() => void downloadExportData()}>
+                Tải data mẫu + custom fields
+              </Button>
+            </>
           ) : (
             <Button icon={<ImportOutlined />} onClick={() => void downloadExportData()}>
               Export data hiện có

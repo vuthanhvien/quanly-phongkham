@@ -19,6 +19,7 @@ import {
 import {
   Button,
   Card,
+  Checkbox,
   Dropdown,
   Grid,
   Input,
@@ -43,7 +44,7 @@ import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
 import { ProductForm } from "../components/ProductForm"
 import { StockBatchForm } from "../components/StockBatchForm"
-import { CustomField, entityLabels } from "../models"
+import { CustomField, entityLabels, normalizeSelectOption } from "../models"
 import { RecordDetailPage } from "./RecordDetailPage"
 import { displayValue, FileLookupMap, hasFileField, loadFileLookupMap, LookupMap, resolveRecordFieldValue } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
@@ -62,6 +63,8 @@ export function RecordListPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState("")
+  const [advancedSearch, setAdvancedSearch] = useState(false)
+  const [advancedFilters, setAdvancedFilters] = useState<Record<string, { operator: string; value?: string | number }>>({})
   const [recordStatus, setRecordStatus] = useState<"active" | "archived">("active")
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
@@ -81,11 +84,18 @@ export function RecordListPage() {
   const [archiveSelectedOpen, setArchiveSelectedOpen] = useState(false)
   const [archivingSelected, setArchivingSelected] = useState(false)
   const [cloningSelected, setCloningSelected] = useState(false)
+  const advancedFilterPayload = useMemo(() => {
+    const filters = Object.entries(advancedFilters)
+      .filter(([, filter]) => filter.value !== undefined && filter.value !== null && String(filter.value).trim() !== "")
+      .map(([field, filter]) => ({ field, operator: filter.operator, value: filter.value }))
+    return filters.length > 0 ? JSON.stringify(filters) : ""
+  }, [advancedFilters])
   const query = useList({
     resource,
     pagination: { currentPage, pageSize },
     filters: [
       { field: "search", operator: "contains" as const, value: search },
+      ...(advancedSearch && advancedFilterPayload ? [{ field: "advanced", operator: "eq" as const, value: advancedFilterPayload }] : []),
       { field: "isArchived", operator: "eq" as const, value: recordStatus === "archived" },
       ...(resource === "appointments" && doctorFilter ? [{ field: "doctorStaffId", operator: "eq" as const, value: doctorFilter }] : []),
     ],
@@ -110,6 +120,8 @@ export function RecordListPage() {
     setDuplicatingId(null)
     setDoctorFilter(undefined)
     setRecordStatus("active")
+    setAdvancedSearch(false)
+    setAdvancedFilters({})
     setSelectedRowKeys([])
     if (detailId) {
       const nextParams = new URLSearchParams(searchParams)
@@ -117,6 +129,70 @@ export function RecordListPage() {
       setSearchParams(nextParams, { replace: true })
     }
   }, [resource])
+
+  function updateAdvancedFilter(field: FieldLayoutConfig, next: Partial<{ operator: string; value?: string | number }>) {
+    setCurrentPage(1)
+    setAdvancedFilters((current) => {
+      const previous = current[field.key] || { operator: defaultAdvancedOperator(field) }
+      const updated = { ...previous, ...next }
+      if (updated.value === undefined || updated.value === null || String(updated.value).trim() === "") {
+        const { [field.key]: _removed, ...rest } = current
+        return rest
+      }
+      return { ...current, [field.key]: updated }
+    })
+  }
+
+  function renderAdvancedFilter(field: FieldLayoutConfig) {
+    const current = advancedFilters[field.key] || { operator: defaultAdvancedOperator(field) }
+    const selectOptions = (field.options || []).map(normalizeSelectOption)
+    const isOptionField = (field.type === "select" || field.type === "multi-select") && selectOptions.length > 0
+
+    return (
+      <div className="advanced-column-filter" onClick={(event) => event.stopPropagation()}>
+        {isOptionField ? (
+          <Select
+            allowClear
+            aria-label={`Lọc ${field.label}`}
+            className="advanced-column-value"
+            options={selectOptions}
+            placeholder="Chọn"
+            size="small"
+            value={current.value}
+            onChange={(value) => updateAdvancedFilter(field, { operator: "eq", value })}
+          />
+        ) : field.type === "number" ? (
+          <Input
+            aria-label={`Lọc ${field.label}`}
+            className="advanced-column-value"
+            placeholder="> 12, >= 10"
+            size="small"
+            value={String(current.value || "")}
+            onChange={(event) => updateAdvancedFilter(field, { operator: "number", value: event.target.value })}
+          />
+        ) : field.type === "date" || field.type === "datetime" ? (
+          <Input
+            aria-label={`Lọc ${field.label}`}
+            className="advanced-column-value"
+            size="small"
+            type="date"
+            value={String(current.value || "")}
+            onChange={(event) => updateAdvancedFilter(field, { value: event.target.value })}
+          />
+        ) : (
+          <Input
+            allowClear
+            aria-label={`Lọc ${field.label}`}
+            className="advanced-column-value"
+            placeholder="Tìm trong cột"
+            size="small"
+            value={String(current.value || "")}
+            onChange={(event) => updateAdvancedFilter(field, { value: event.target.value })}
+          />
+        )}
+      </div>
+    )
+  }
 
   useEffect(() => {
     Promise.all([
@@ -150,7 +226,12 @@ export function RecordListPage() {
   const columns: ColumnsType<Record<string, any>> = useMemo(
     () => [
       ...displayFields.map((field) => ({
-        title: field.label,
+        title: advancedSearch ? (
+          <Space direction="vertical" size={4} style={{ width: "100%" }}>
+            <span>{field.label}</span>
+            {renderAdvancedFilter(field)}
+          </Space>
+        ) : field.label,
         dataIndex: field.key,
         key: field.key,
         width: field.tableWidth,
@@ -288,7 +369,7 @@ export function RecordListPage() {
         },
       },
     ],
-    [displayFields, resource, recordStatus, templates, lookups, fileLookups, screens.md],
+    [advancedFilters, advancedSearch, displayFields, resource, recordStatus, templates, lookups, fileLookups, screens.md],
   )
 
   const doctorOptions = useMemo(
@@ -465,6 +546,16 @@ export function RecordListPage() {
               setSearch(value)
             }}
           />
+          <Checkbox
+            checked={advancedSearch}
+            onChange={(event) => {
+              setAdvancedSearch(event.target.checked)
+              if (!event.target.checked) setAdvancedFilters({})
+              setCurrentPage(1)
+            }}
+          >
+            Tìm kiếm nâng cao
+          </Checkbox>
           {resource === "appointments" ? (
             <Select
               allowClear
@@ -782,6 +873,12 @@ function buildDuplicateValues(record: Record<string, unknown>) {
   }
 
   return nextValues
+}
+
+function defaultAdvancedOperator(field: FieldLayoutConfig) {
+  if (field.type === 'number') return 'number'
+  if (field.type === 'date' || field.type === 'datetime') return 'eq'
+  return 'contains'
 }
 
 function buildUnitTree(rows: Record<string, any>[]) {
