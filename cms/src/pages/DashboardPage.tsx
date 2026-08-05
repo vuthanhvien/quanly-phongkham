@@ -5,7 +5,7 @@ import {
   TeamOutlined,
 } from "@ant-design/icons"
 import { useGetIdentity } from "@refinedev/core"
-import { Card, Grid, Modal, Typography, message } from "antd"
+import { Card, Grid, Modal, Spin, Typography, message } from "antd"
 import dayjs from "dayjs"
 import { useEffect, useState } from "react"
 import { useAppUi } from "../app-ui"
@@ -72,6 +72,15 @@ type StaffDashboardData = {
   monthAttendanceCount: number
 }
 
+type LeaveBalance = {
+  code: string
+  name: string
+  entitlementDays: number | null
+  usedDays: number
+  pendingDays: number
+  remainingDays: number | null
+}
+
 export function DashboardPage() {
   const screens = Grid.useBreakpoint()
   const { data: identity } = useGetIdentity<Identity>()
@@ -82,12 +91,31 @@ export function DashboardPage() {
   const [staffDashboard, setStaffDashboard] = useState<StaffDashboardData | null>(null)
   const [staffActionLoading, setStaffActionLoading] = useState<"checkin" | "checkout" | undefined>(undefined)
   const [leaveDrawerOpen, setLeaveDrawerOpen] = useState(false)
+  const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([])
+  const [leaveBalanceLoading, setLeaveBalanceLoading] = useState(false)
   const companyType = settings.companyType || "clinic"
   const dashboardCopy = companyTypeDashboardCopy[companyType]
 
   useEffect(() => {
     void loadDashboard()
   }, [companyType, identity?.staffId, identity?.branchId, identity?.fullName, identity?.username, identity?.email])
+
+  useEffect(() => {
+    if (!leaveDrawerOpen || !identity?.staffId) return
+    let active = true
+    setLeaveBalanceLoading(true)
+    api.get("/records/leave-requests/balance", { params: { staffId: identity.staffId } })
+      .then((response) => {
+        if (active) setLeaveBalances(response.data?.data || [])
+      })
+      .catch(() => {
+        if (active) setLeaveBalances([])
+      })
+      .finally(() => {
+        if (active) setLeaveBalanceLoading(false)
+      })
+    return () => { active = false }
+  }, [identity?.staffId, leaveDrawerOpen])
 
   async function loadDashboard() {
     const [
@@ -272,8 +300,23 @@ export function DashboardPage() {
         footer={null}
         onCancel={() => setLeaveDrawerOpen(false)}
       >
+        {leaveBalanceLoading ? <Spin size="small" /> : leaveBalances.length > 0 ? (
+          <div className="leave-balance-summary">
+            {leaveBalances.map((balance) => (
+              <div className="leave-balance-summary__item" key={balance.code}>
+                <Typography.Text strong>{balance.name}</Typography.Text>
+                <Typography.Text type="secondary">
+                  {balance.remainingDays === null
+                    ? "Không giới hạn"
+                    : `Còn ${balance.remainingDays} ngày · Đã dùng ${balance.usedDays}${balance.pendingDays ? ` · Chờ duyệt ${balance.pendingDays}` : ""}`}
+                </Typography.Text>
+              </div>
+            ))}
+          </div>
+        ) : null}
         <RecordFormContent
           compact
+          hiddenFieldKeys={["staffId", "branchId", "status", "approvedById", "requestedDays"]}
           initialValues={{
             staffId: identity?.staffId,
             branchId: identity?.branchId,
@@ -286,6 +329,7 @@ export function DashboardPage() {
           onCancel={() => setLeaveDrawerOpen(false)}
           onSuccess={() => {
             setLeaveDrawerOpen(false)
+            setLeaveBalances([])
             void loadDashboard()
           }}
         />

@@ -6,7 +6,7 @@ import Handlebars from 'handlebars';
 import { basename, join } from 'path';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, LandingDomain, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, User, ViewSetting } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, ItemCategory, LandingDomain, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, Product, Unit, User, ViewSetting } from '../entities/entities';
 import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
 import { renderDocxTemplate } from './docx-template';
@@ -101,6 +101,40 @@ const APP_MODULE_KEYS = [
   'user-accounts',
 ] as const;
 
+const INDUSTRY_DATASETS = {
+  clinic: {
+    categories: [['Dịch vụ điều trị', 'DV-DIEU-TRI'], ['Chăm sóc da', 'DV-CSDA'], ['Vật tư y tế', 'VT-YTE']],
+    products: [['DV-INIT-FACIAL', 'Chăm sóc da cơ bản', 'SERVICE', 'Cái', 'Dịch vụ điều trị'], ['VT-INIT-GANGTAY', 'Găng tay y tế', 'CONSUMABLE', 'Cái', 'Vật tư y tế']],
+  },
+  retail: {
+    categories: [['Hàng tiêu dùng', 'HH-TIEU-DUNG'], ['Chăm sóc cá nhân', 'HH-CA-NHAN'], ['Thực phẩm đóng gói', 'HH-THUC-PHAM']],
+    products: [['HH-INIT-NUOC', 'Nước uống đóng chai', 'RETAIL', 'Chai', 'Hàng tiêu dùng'], ['HH-INIT-KHAN', 'Khăn giấy', 'RETAIL', 'Hộp', 'Hàng tiêu dùng']],
+  },
+  cafe: {
+    categories: [['Cà phê', 'FB-CA-PHE'], ['Trà & nước giải khát', 'FB-TRA'], ['Bánh & topping', 'FB-TOPPING']],
+    products: [['FB-INIT-DEN', 'Cà phê đen', 'RETAIL', 'Ly', 'Cà phê'], ['FB-INIT-SUA', 'Cà phê sữa', 'RETAIL', 'Ly', 'Cà phê'], ['FB-INIT-TRA', 'Trà đào', 'RETAIL', 'Ly', 'Trà & nước giải khát']],
+  },
+  agriculture: {
+    categories: [['Hạt giống', 'NN-HAT-GIONG'], ['Phân bón & dinh dưỡng', 'NN-PHAN-BON'], ['Vật tư nông nghiệp', 'NN-VAT-TU'], ['Nông sản', 'NN-NONG-SAN']],
+    products: [['NN-INIT-HAT', 'Hạt giống rau', 'RETAIL', 'Gói', 'Hạt giống'], ['NN-INIT-PHAN', 'Phân bón hữu cơ', 'RETAIL', 'Kg', 'Phân bón & dinh dưỡng']],
+  },
+  general: {
+    categories: [['Hàng hóa', 'GEN-HANG-HOA'], ['Dịch vụ', 'GEN-DICH-VU']],
+    products: [['GEN-INIT-HANG', 'Hàng hóa mẫu', 'RETAIL', 'Cái', 'Hàng hóa'], ['GEN-INIT-DV', 'Dịch vụ mẫu', 'SERVICE', 'Cái', 'Dịch vụ']],
+  },
+} as const;
+
+const INDUSTRY_UNITS = [
+  { name: 'Cái', factor: 1 },
+  { name: 'Chai', factor: 1 },
+  { name: 'Gói', factor: 1 },
+  { name: 'Kg', factor: 1 },
+  { name: 'Lít', factor: 1 },
+  { name: 'Ly', factor: 1 },
+] as const;
+
+type IndustryType = keyof typeof INDUSTRY_DATASETS;
+
 function slugify(input?: string) {
   return String(input || '')
     .normalize('NFD')
@@ -144,6 +178,9 @@ export class SettingsService {
     @InjectRepository(BranchRoleAssignment) private readonly branchRoles: Repository<BranchRoleAssignment>,
     @InjectRepository(LandingThemeSetting) private readonly landingThemeSettings: Repository<LandingThemeSetting>,
     @InjectRepository(LandingGlobalSetting) private readonly landingGlobalSettings: Repository<LandingGlobalSetting>,
+    @InjectRepository(Unit) private readonly units: Repository<Unit>,
+    @InjectRepository(ItemCategory) private readonly itemCategories: Repository<ItemCategory>,
+    @InjectRepository(Product) private readonly products: Repository<Product>,
     private readonly records: RecordsService,
   ) {}
 
@@ -477,6 +514,65 @@ export class SettingsService {
       next.appDescription = null as unknown as string;
     }
     return this.appUiSettings.save(next);
+  }
+
+  async initializeIndustryData(companyType?: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const normalizedType = this.normalizeCompanyType(companyType || (await this.ensureAppUiSettings()).companyType);
+    const dataset = INDUSTRY_DATASETS[normalizedType];
+    const created = { units: 0, categories: 0, products: 0 };
+    const unitsByName = new Map((await this.units.find()).map((unit) => [unit.name, unit]));
+
+    for (const definition of INDUSTRY_UNITS) {
+      if (unitsByName.has(definition.name)) continue;
+      const unit = await this.units.save(this.units.create({ name: definition.name, conversionFactor: definition.factor }));
+      unitsByName.set(unit.name, unit);
+      created.units += 1;
+    }
+
+    const unitChildren = [
+      { name: 'Hộp', baseName: 'Cái', factor: 10 },
+      { name: 'Thùng', baseName: 'Cái', factor: 24 },
+    ];
+    for (const definition of unitChildren) {
+      if (unitsByName.has(definition.name)) continue;
+      const base = unitsByName.get(definition.baseName);
+      if (!base) continue;
+      const unit = await this.units.save(this.units.create({ name: definition.name, baseUnitId: base.id, conversionFactor: definition.factor }));
+      unitsByName.set(unit.name, unit);
+      created.units += 1;
+    }
+
+    const categoriesByCode = new Map((await this.itemCategories.find({ where: { isArchived: false } })).filter((item) => item.code).map((item) => [String(item.code), item]));
+    const categoriesByName = new Map((await this.itemCategories.find({ where: { isArchived: false } })).map((item) => [item.name, item]));
+    for (const [name, code] of dataset.categories) {
+      if (categoriesByCode.has(code) || categoriesByName.has(name)) continue;
+      const category = await this.itemCategories.save(this.itemCategories.create({ name, code, level: 1, sortOrder: 0, isActive: true }));
+      categoriesByCode.set(code, category);
+      categoriesByName.set(name, category);
+      created.categories += 1;
+    }
+
+    const productsByCode = new Set((await this.products.find({ select: ['code'] })).map((product) => product.code));
+    for (const [code, name, productType, unitName, categoryName] of dataset.products) {
+      if (productsByCode.has(code)) continue;
+      const unit = unitsByName.get(unitName);
+      const category = categoriesByName.get(categoryName);
+      if (!unit || !category) continue;
+      await this.products.save(this.products.create({
+        code,
+        name,
+        productType,
+        baseUnitId: unit.baseUnitId ? unitsByName.get('Cái')?.id : unit.id,
+        category: category.id,
+        sellingPrice: 0,
+        minStockLevel: 0,
+      }));
+      productsByCode.add(code);
+      created.products += 1;
+    }
+
+    return { companyType: normalizedType, created };
   }
 
   async getChatbotSettings(user?: AuthUser) {
@@ -1266,12 +1362,12 @@ export class SettingsService {
     return normalized;
   }
 
-  private normalizeCompanyType(value: unknown) {
+  private normalizeCompanyType(value: unknown): IndustryType {
     const normalized = String(value || '').trim().toLowerCase();
     if (!['clinic', 'retail', 'cafe', 'agriculture', 'general'].includes(normalized)) {
       throw new BadRequestException('companyType không hợp lệ');
     }
-    return normalized;
+    return normalized as IndustryType;
   }
 
   private normalizeUiSize(value: unknown) {

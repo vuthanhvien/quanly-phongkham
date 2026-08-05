@@ -91,6 +91,8 @@ const menuIcons: Record<string, React.ReactNode> = {
   files: <FileDoneOutlined />,
   attendances: <CalendarOutlined />,
   'leave-requests': <FileDoneOutlined />,
+  'leave-types': <CalendarOutlined />,
+  'leave-allocations': <FileDoneOutlined />,
   'attendance-adjustment-requests': <CalendarOutlined />,
   'business-trip-requests': <SolutionOutlined />,
   'payment-requests': <DollarOutlined />,
@@ -137,6 +139,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     staffId?: string
   }>()
   const { settings } = useAppUi()
+  const browserPageTitle = useMemo(() => resolveBrowserPageTitle(location.pathname), [location.pathname])
   const [staffDisplayName, setStaffDisplayName] = useState<string>()
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -148,6 +151,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [branchOptions, setBranchOptions] = useState<Array<{ value: string; label: string }>>([])
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>(() => getGlobalBranchFilterIds())
+
+  useEffect(() => {
+    const appName = String(settings.appName || 'CMS').trim() || 'CMS'
+    document.title = browserPageTitle ? `${browserPageTitle} | ${appName}` : appName
+  }, [browserPageTitle, settings.appName])
 
   useEffect(() => {
     let active = true
@@ -436,10 +444,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
       >
         <div className="brand-card">
           <div className="brand-mark">
-            {settings.appIconUrl ? <img alt={settings.appName} src={settings.appIconUrl} /> : settings.appName.slice(0, 2).toUpperCase()}
+            {settings.appIconUrl ? <img alt={settings.appName} src={settings.appIconUrl} /> : (settings.appName || 'CMS').slice(0, 2).toUpperCase()}
           </div>
           <div className="brand-copy">
-            <Typography.Title level={4}>{settings.appName}</Typography.Title>
+            <Typography.Title level={4}>{settings.appName || 'CMS'}</Typography.Title>
           </div>
         </div>
         <div className="side-menu-scroll">
@@ -510,21 +518,48 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <Modal
         className="mobile-menu-drawer"
         open={mobileMenuOpen}
-        title={settings.appName}
+        title={settings.appName || 'CMS'}
         width={320}
         footer={null}
         onCancel={() => setMobileMenuOpen(false)}
       >
         <div className="brand-card mobile-menu-brand">
           <div className="brand-mark">
-            {settings.appIconUrl ? <img alt={settings.appName} src={settings.appIconUrl} /> : settings.appName.slice(0, 2).toUpperCase()}
+            {settings.appIconUrl ? <img alt={settings.appName} src={settings.appIconUrl} /> : (settings.appName || 'CMS').slice(0, 2).toUpperCase()}
           </div>
           <div className="brand-copy">
-            <Typography.Title level={4}>{settings.appName}</Typography.Title>
+            <Typography.Title level={4}>{settings.appName || 'CMS'}</Typography.Title>
           </div>
         </div>
         <div className="mobile-menu-scroll">{menuNode}</div>
       </Modal>
     </Layout>
   )
+}
+
+function resolveBrowserPageTitle(pathname: string) {
+  const root = pathname.split('/').filter(Boolean)[0] || ''
+  if (!root) return 'Tổng quan'
+
+  const staticTitles: Record<string, string> = {
+    calendar: 'Lịch tổng',
+    profile: 'Hồ sơ cá nhân',
+    'accounting-reports': 'Báo cáo kế toán',
+    'zalo-inbox': 'Hộp thư Zalo',
+    'custom-fields': 'Trường tuỳ biến',
+    'custom-tables': 'Bảng dữ liệu động',
+    locations: 'Địa chỉ',
+    settings: 'Cấu hình động',
+    pages: 'Landing pages',
+    forms: 'Landing forms',
+    domains: 'Landing domains',
+    configs: 'Landing configs',
+    'chatbot-settings': 'Chatbot',
+    'landing-theme': 'Giao diện landing',
+    roles: 'Vai trò & Phân quyền',
+    'ui-settings': 'Giao diện CMS',
+    'audit-logs': 'Nhật ký hệ thống',
+  }
+
+  return staticTitles[root] || entityLabels[root] || root
 }

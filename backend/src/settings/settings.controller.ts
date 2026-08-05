@@ -184,6 +184,11 @@ export class SettingsController {
     return { data: await this.settings.updateAppUiSettings(payload, request?.user) };
   }
 
+  @Post('app-ui/initialize-industry-data')
+  async initializeIndustryData(@Body() payload: { companyType?: string }, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.initializeIndustryData(payload?.companyType, request?.user) };
+  }
+
   @Get('chatbot')
   async getChatbotSettings(@Request() request?: { user: AuthUser }) {
     return { data: await this.settings.getChatbotSettings(request?.user) };

@@ -283,6 +283,8 @@ export const entityLabels: Record<string, string> = {
   'staff-insurances': 'Bảo hiểm nhân viên',
   attendances: 'Chấm công',
   'leave-requests': 'Nghỉ phép',
+  'leave-types': 'Loại nghỉ',
+  'leave-allocations': 'Cấp phép năm',
   payrolls: 'Bảng lương',
 };
 
@@ -718,10 +720,28 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'branchId', label: 'Chi nhánh', width: '50', tableWidth: 190 },
     { key: 'startDate', label: 'Từ ngày', type: 'date', required: true, width: '33', tableWidth: 150 },
     { key: 'endDate', label: 'Đến ngày', type: 'date', required: true, width: '33', tableWidth: 150 },
-    { key: 'leaveType', label: 'Loại nghỉ', type: 'select', options: [{ value: 'annual', label: 'Nghỉ phép năm' }, { value: 'sick', label: 'Nghỉ bệnh' }, { value: 'personal', label: 'Việc riêng' }, { value: 'unpaid', label: 'Không lương' }, { value: 'maternity', label: 'Thai sản' }, { value: 'other', label: 'Khác' }], required: true, width: '33', tableWidth: 160 },
+    { key: 'leaveType', label: 'Loại nghỉ', type: 'select', options: [], required: true, width: '33', tableWidth: 160 },
+    { key: 'requestedDays', label: 'Số ngày nghỉ', type: 'number', disabled: true, width: '33', tableWidth: 130 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'pending', label: 'Chờ duyệt' }, { value: 'approved', label: 'Đã duyệt' }, { value: 'rejected', label: 'Từ chối' }, { value: 'cancelled', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'reason', label: 'Lý do', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'approvedById', label: 'Người duyệt', width: '50', tableWidth: 220 },
+  ],
+  'leave-types': [
+    { key: 'code', label: 'Mã loại nghỉ', required: true, width: '33', tableWidth: 160 },
+    { key: 'name', label: 'Tên loại nghỉ', required: true, width: '33', tableWidth: 220 },
+    { key: 'defaultDays', label: 'Hạn mức mặc định/năm', type: 'number', width: '33', tableWidth: 190 },
+    { key: 'requiresAllocation', label: 'Quản lý số dư', type: 'select', options: [{ value: 'true', label: 'Có' }, { value: 'false', label: 'Không giới hạn' }], defaultValue: 'true', width: '33', tableWidth: 160 },
+    { key: 'isPaid', label: 'Hưởng lương', type: 'select', options: [{ value: 'true', label: 'Có' }, { value: 'false', label: 'Không' }], defaultValue: 'true', width: '33', tableWidth: 140 },
+    { key: 'isActive', label: 'Đang áp dụng', type: 'select', options: [{ value: 'true', label: 'Có' }, { value: 'false', label: 'Không' }], defaultValue: 'true', width: '33', tableWidth: 150 },
+    { key: 'description', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
+  ],
+  'leave-allocations': [
+    { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
+    { key: 'leaveTypeCode', label: 'Loại nghỉ', type: 'select', options: [], required: true, width: '50', tableWidth: 180 },
+    { key: 'year', label: 'Năm', type: 'number', required: true, width: '33', tableWidth: 110 },
+    { key: 'allocatedDays', label: 'Ngày được cấp', type: 'number', required: true, width: '33', tableWidth: 150 },
+    { key: 'carriedOverDays', label: 'Ngày chuyển sang', type: 'number', width: '33', tableWidth: 170 },
+    { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   'attendance-adjustment-requests': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },

@@ -903,6 +903,29 @@ body {
   overflow-y: auto;
 }
 
+.leave-balance-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.leave-balance-summary__item {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--app-surface-border, #dbe1ea);
+  border-radius: 6px;
+  background: var(--app-surface-muted, #f8fafc);
+}
+
+.leave-balance-summary__item .ant-typography {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .quick-drawer .ant-drawer-header {
   border-bottom-color: rgba(15, 23, 42, 0.08) !important;
 }

@@ -53,6 +53,7 @@ interface RecordFormContentProps {
   id?: string
   compact?: boolean
   initialValues?: Record<string, unknown>
+  hiddenFieldKeys?: string[]
   onCancel?: () => void
   onSuccess?: () => void
   notifyOnSuccess?: boolean
@@ -80,6 +81,7 @@ export function RecordFormContent({
   id,
   compact,
   initialValues,
+  hiddenFieldKeys = [],
   onCancel,
   onSuccess,
   notifyOnSuccess = true,
@@ -111,8 +113,11 @@ export function RecordFormContent({
       api.get("/settings/custom-fields", { params: { entityType: resource } }),
       api.get("/settings/views", { params: { entityType: resource } }),
       api.get("/settings/custom-tables", { params: { includeRows: true } }),
+      resource === "leave-requests" || resource === "leave-allocations"
+        ? api.get("/records/leave-types", { params: { pageSize: 100 } })
+        : Promise.resolve({ data: { data: [] } }),
     ])
-      .then(([fieldResponse, viewResponse, tableResponse]) => {
+      .then(([fieldResponse, viewResponse, tableResponse, leaveTypesResponse]) => {
         const tables = new Map((tableResponse.data.data || []).map((table: Record<string, unknown>) => [String(table.id), table]))
         const customFields = fieldResponse.data.data.filter(
           (field: CustomField) => field.isActive,
@@ -129,14 +134,20 @@ export function RecordFormContent({
             }),
           }
         })
+        const leaveTypeOptions = (leaveTypesResponse.data.data || [])
+          .filter((item: Record<string, unknown>) => item.isActive !== false)
+          .map((item: Record<string, unknown>) => ({ value: String(item.code), label: String(item.name || item.code) }))
         const nextFields = getVisibleFieldConfigs(
           getFieldCatalog(resource, customFields),
           viewResponse.data.data as ViewSettingRecord[],
           "FORM",
           getStoredUserRole(),
         )
-        setFields(nextFields)
-        return loadRelationOptions(nextFields)
+        const fieldsWithLeaveTypes = resource === "leave-requests" || resource === "leave-allocations"
+          ? nextFields.map((field) => field.key === "leaveType" || field.key === "leaveTypeCode" ? { ...field, options: leaveTypeOptions } : field)
+          : nextFields
+        setFields(fieldsWithLeaveTypes)
+        return loadRelationOptions(fieldsWithLeaveTypes)
       })
       .then(setLookups)
   }, [resource])
@@ -367,9 +378,10 @@ export function RecordFormContent({
       if (isAppointmentForm && (field.key === "startTime" || field.key === "endTime")) return false
       if (isWorkScheduleForm && (field.key === "workDate" || field.key === "startTime" || field.key === "endTime" || field.key === "recurrenceUntil")) return false
       if (isAddressForm && field.key === "address") return false
+      if (hiddenFieldKeys.includes(field.key)) return false
       return true
     }),
-    [fields, isAddressForm, isAppointmentForm, isWorkScheduleForm],
+    [fields, hiddenFieldKeys, isAddressForm, isAppointmentForm, isWorkScheduleForm],
   )
   const fieldTabs = useMemo(() => groupFieldsByTab(visibleFields), [visibleFields])
   const usesTabs = fieldTabs.length > 1 || Boolean(fieldTabs[0]?.tab)
@@ -716,8 +728,8 @@ function FieldInput({
     return (
       <InputNumber
         disabled={field.disabled}
-        formatter={formatNumberInput}
-        parser={parseNumberInput}
+        formatter={field.key === "year" ? undefined : formatNumberInput}
+        parser={field.key === "year" ? undefined : parseNumberInput}
         placeholder={placeholder}
         style={{ width: "100%" }}
         value={value as number | undefined}

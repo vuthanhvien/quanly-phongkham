@@ -2213,7 +2213,10 @@ export class LeaveRequest extends ConfigurableEntity {
   endDate: string;
 
   @Column({ default: 'annual' })
-  leaveType: string; // annual | sick | personal | unpaid | maternity | other
+  leaveType: string; // leave_types.code
+
+  @Column({ type: 'float', default: 1 })
+  requestedDays: number;
 
   @Column({ default: 'pending' })
   status: string; // pending | approved | rejected | cancelled
@@ -2226,6 +2229,53 @@ export class LeaveRequest extends ConfigurableEntity {
 
   @Column({ nullable: true })
   branchId?: string;
+}
+
+@Entity('leave_types')
+export class LeaveType extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  name: string;
+
+  // A null quota means this leave type is not limited by an annual balance.
+  @Column({ type: 'float', nullable: true })
+  defaultDays?: number;
+
+  @Column({ default: true })
+  requiresAllocation: boolean;
+
+  @Column({ default: true })
+  isPaid: boolean;
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+}
+
+@Entity('leave_allocations')
+@Index(['staffId', 'leaveTypeCode', 'year'], { unique: true })
+export class LeaveAllocation extends ConfigurableEntity {
+  @Column()
+  staffId: string;
+
+  @Column()
+  leaveTypeCode: string;
+
+  @Column({ type: 'int' })
+  year: number;
+
+  @Column({ type: 'float', default: 0 })
+  allocatedDays: number;
+
+  @Column({ type: 'float', default: 0 })
+  carriedOverDays: number;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
 }
 
 @Entity('attendance_adjustment_requests')
@@ -2733,6 +2783,8 @@ export const ENTITIES = [
   StaffInsurance,
   Attendance,
   LeaveRequest,
+  LeaveType,
+  LeaveAllocation,
   AttendanceAdjustmentRequest,
   BusinessTripRequest,
   PaymentRequest,

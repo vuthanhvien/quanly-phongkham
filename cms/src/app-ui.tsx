@@ -159,7 +159,8 @@ export function tablePaddingBySize(size: AppUiSettings['size']) {
 }
 
 export function syncDocumentBranding(settings: AppUiSettings) {
-  document.title = settings.appName
+  const appName = String(settings.appName || defaultAppUiSettings.appName).trim() || defaultAppUiSettings.appName
+  document.title = appName
   document.documentElement.dataset.uiTheme = 'light'
   document.documentElement.style.setProperty('--app-primary', settings.primaryColor)
   document.documentElement.style.setProperty('--app-font-family', settings.fontFamily)
@@ -192,19 +193,25 @@ export function syncDocumentBranding(settings: AppUiSettings) {
     description.setAttribute('name', 'description')
     document.head.appendChild(description)
   }
-  description.setAttribute('content', settings.appDescription || settings.appName)
+  description.setAttribute('content', settings.appDescription || appName)
 
-  let icon = document.querySelector('link[rel="icon"]')
-  if (!icon) {
-    icon = document.createElement('link')
-    icon.setAttribute('rel', 'icon')
-    document.head.appendChild(icon)
-  }
-  if (settings.appIconUrl) {
-    icon.setAttribute('href', settings.appIconUrl)
-  } else {
-    icon.removeAttribute('href')
-  }
+  const iconUrl = settings.appIconUrl || `${import.meta.env.BASE_URL}favicon.svg`
+  syncFavicon('app-favicon', 'icon', iconUrl)
+  syncFavicon('app-shortcut-icon', 'shortcut icon', iconUrl)
+}
+
+function syncFavicon(id: string, rel: string, href: string) {
+  const previous = document.getElementById(id) as HTMLLinkElement | null
+  if (previous?.href === new URL(href, window.location.href).href) return
+
+  // Replacing the element prompts browsers to reload a newly selected icon.
+  const icon = document.createElement('link')
+  icon.id = id
+  icon.rel = rel
+  icon.href = href
+  if (/\.svg(?:$|[?#])/i.test(href)) icon.type = 'image/svg+xml'
+  previous?.replaceWith(icon)
+  if (!previous) document.head.appendChild(icon)
 }
 
 function hexToRgb(hex: string) {

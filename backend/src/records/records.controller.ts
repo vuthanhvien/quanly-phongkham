@@ -78,6 +78,15 @@ export class RecordsController {
     return this.records.serviceOrderProductOptions(request.user);
   }
 
+  @Get('records/leave-requests/balance')
+  leaveBalance(
+    @Query('staffId') staffId: string | undefined,
+    @Query('year', new ParseIntPipe({ optional: true })) year: number | undefined,
+    @Request() request: { user: AuthUser },
+  ) {
+    return this.records.leaveBalance(staffId, year, request.user);
+  }
+
   @Get('records/stock-batches/form-options')
   stockBatchFormOptions(@Request() request: { user: AuthUser }) {
     return this.records.stockBatchFormOptions(request.user);

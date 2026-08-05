@@ -38,7 +38,9 @@ import {
   Invoice,
   Lead,
   LeadActivity,
+  LeaveAllocation,
   LeaveRequest,
+  LeaveType,
   MedicalEpisode,
   Payroll,
   PaymentRequest,
@@ -467,6 +469,8 @@ export class RecordsService {
     @InjectRepository(StaffInsurance) private readonly staffInsurances: Repository<StaffInsurance>,
     @InjectRepository(Attendance) private readonly attendances: Repository<Attendance>,
     @InjectRepository(LeaveRequest) private readonly leaveRequests: Repository<LeaveRequest>,
+    @InjectRepository(LeaveType) private readonly leaveTypes: Repository<LeaveType>,
+    @InjectRepository(LeaveAllocation) private readonly leaveAllocations: Repository<LeaveAllocation>,
     @InjectRepository(AttendanceAdjustmentRequest) private readonly attendanceAdjustmentRequests: Repository<AttendanceAdjustmentRequest>,
     @InjectRepository(BusinessTripRequest) private readonly businessTripRequests: Repository<BusinessTripRequest>,
     @InjectRepository(PaymentRequest) private readonly paymentRequests: Repository<PaymentRequest>,
@@ -525,6 +529,8 @@ export class RecordsService {
       'staff-insurances': this.staffInsurances,
       attendances: this.attendances,
       'leave-requests': this.leaveRequests,
+      'leave-types': this.leaveTypes,
+      'leave-allocations': this.leaveAllocations,
       'attendance-adjustment-requests': this.attendanceAdjustmentRequests,
       'business-trip-requests': this.businessTripRequests,
       'payment-requests': this.paymentRequests,
@@ -551,6 +557,107 @@ export class RecordsService {
     return meaningful ? `Nháp: ${meaningful}` : `Nháp ${this.resourceLabel(resource)} ${new Date().toLocaleString('vi-VN')}`;
   }
 
+  private async ensureDefaultLeaveTypes() {
+    const existing = await this.leaveTypes.count({ where: { isArchived: false } });
+    if (existing > 0) return this.leaveTypes.find({ where: { isArchived: false, isActive: true }, order: { createdAt: 'ASC' } });
+
+    await this.leaveTypes.save([
+      { code: 'annual', name: 'Nghỉ phép năm', defaultDays: 12, requiresAllocation: true, isPaid: true, isActive: true },
+      { code: 'sick', name: 'Nghỉ bệnh', requiresAllocation: false, isPaid: true, isActive: true },
+      { code: 'personal', name: 'Việc riêng', defaultDays: 3, requiresAllocation: true, isPaid: true, isActive: true },
+      { code: 'unpaid', name: 'Không lương', requiresAllocation: false, isPaid: false, isActive: true },
+      { code: 'maternity', name: 'Thai sản', requiresAllocation: false, isPaid: true, isActive: true },
+      { code: 'other', name: 'Khác', requiresAllocation: false, isPaid: false, isActive: true },
+    ].map((payload) => this.leaveTypes.create(payload)));
+
+    return this.leaveTypes.find({ where: { isArchived: false, isActive: true }, order: { createdAt: 'ASC' } });
+  }
+
+  private leaveDays(startDate: unknown, endDate: unknown) {
+    const start = new Date(`${String(startDate)}T00:00:00`);
+    const end = new Date(`${String(endDate)}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+      throw new BadRequestException('Khoảng thời gian nghỉ không hợp lệ');
+    }
+    let total = 0;
+    for (const day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
+      const weekday = day.getDay();
+      if (weekday !== 0 && weekday !== 6) total += 1;
+    }
+    return total;
+  }
+
+  async leaveBalance(staffId: string | undefined, year: number | undefined, user: AuthUser) {
+    await this.assertAnyActionPermission(user, 'leave-requests', ['view', 'create']);
+    const resolvedStaffId = staffId || user.staffId;
+    if (!resolvedStaffId) throw new BadRequestException('Không xác định được nhân viên');
+    if (!this.isAdmin(user) && user.staffId !== resolvedStaffId) {
+      throw new ForbiddenException('Bạn chỉ có thể xem số dư phép của chính mình');
+    }
+    const resolvedYear = year || new Date().getFullYear();
+    const types = await this.ensureDefaultLeaveTypes();
+    const [allocations, requests] = await Promise.all([
+      this.leaveAllocations.find({ where: { staffId: resolvedStaffId, year: resolvedYear, isArchived: false } }),
+      this.leaveRequests.find({ where: { staffId: resolvedStaffId, isArchived: false } }),
+    ]);
+    const allocationByType = new Map(allocations.map((item) => [item.leaveTypeCode, item]));
+    const relevantRequests = requests.filter((request) => String(request.startDate || '').startsWith(String(resolvedYear)));
+
+    return {
+      data: types.map((type) => {
+        const allocation = allocationByType.get(type.code);
+        const entitlementDays = type.requiresAllocation
+          ? Number(allocation?.allocatedDays ?? type.defaultDays ?? 0) + Number(allocation?.carriedOverDays ?? 0)
+          : null;
+        const matching = relevantRequests.filter((request) => request.leaveType === type.code);
+        const usedDays = matching
+          .filter((request) => String(request.status).toLowerCase() === 'approved')
+          .reduce((sum, request) => sum + Number(request.requestedDays || this.leaveDays(request.startDate, request.endDate)), 0);
+        const pendingDays = matching
+          .filter((request) => !['approved', 'rejected', 'cancelled', 'draft'].includes(String(request.status).toLowerCase()))
+          .reduce((sum, request) => sum + Number(request.requestedDays || this.leaveDays(request.startDate, request.endDate)), 0);
+        return {
+          code: type.code,
+          name: type.name,
+          isPaid: type.isPaid,
+          requiresAllocation: type.requiresAllocation,
+          entitlementDays,
+          usedDays,
+          pendingDays,
+          remainingDays: entitlementDays === null ? null : Math.max(0, entitlementDays - usedDays - pendingDays),
+        };
+      }),
+      year: resolvedYear,
+    };
+  }
+
+  private async prepareLeaveRequest(payload: Record<string, unknown>, ignoredId?: string) {
+    const staffId = String(payload.staffId || '').trim();
+    const leaveTypeCode = String(payload.leaveType || '').trim();
+    if (!staffId || !leaveTypeCode) throw new BadRequestException('Nhân viên và loại nghỉ là bắt buộc');
+    const types = await this.ensureDefaultLeaveTypes();
+    const leaveType = types.find((item) => item.code === leaveTypeCode);
+    if (!leaveType) throw new BadRequestException('Loại nghỉ không tồn tại hoặc đã ngừng áp dụng');
+
+    const requestedDays = this.leaveDays(payload.startDate, payload.endDate);
+    if (requestedDays <= 0) throw new BadRequestException('Đơn nghỉ cần có ít nhất một ngày làm việc');
+    payload.requestedDays = requestedDays;
+    if (!leaveType.requiresAllocation) return;
+
+    const year = new Date(`${String(payload.startDate)}T00:00:00`).getFullYear();
+    const balance = await this.leaveBalance(staffId, year, { id: '', email: '', fullName: '', role: 'ADMIN' });
+    const summary = balance.data.find((item) => item.code === leaveTypeCode);
+    const existing = ignoredId ? await this.leaveRequests.findOne({ where: { id: ignoredId } }) : undefined;
+    const previousDays = existing && existing.leaveType === leaveTypeCode && String(existing.startDate || '').startsWith(String(year))
+      && !['rejected', 'cancelled', 'draft'].includes(String(existing.status).toLowerCase())
+      ? Number(existing.requestedDays || this.leaveDays(existing.startDate, existing.endDate))
+      : 0;
+    const remainingBeforeChange = Number(summary?.remainingDays || 0) + previousDays;
+    if (requestedDays > remainingBeforeChange) {
+      throw new BadRequestException(`Số ngày nghỉ vượt số dư còn lại (${remainingBeforeChange} ngày)`);
+    }
+  }
+
   async list(
     resource: string,
     page = 1,
@@ -562,6 +669,7 @@ export class RecordsService {
     include?: string,
   ) {
     await this.assertPermission(user, resource, 'view');
+    if (resource === 'leave-types') await this.ensureDefaultLeaveTypes();
     const repository = this.repository(resource);
     const isArchived = String(filters.isArchived || '').toLowerCase() === 'true';
     const includeArchived = String(filters.includeArchived || '').toLowerCase() === 'true';
@@ -606,6 +714,8 @@ export class RecordsService {
         news: ['title', 'slug', 'category', 'excerpt', 'sourceName', 'status'],
         'work-schedules': ['shiftLabel', 'status'],
         'leave-requests': ['status', 'reason'],
+        'leave-types': ['code', 'name', 'description'],
+        'leave-allocations': ['leaveTypeCode', 'year', 'note'],
         'attendance-adjustment-requests': ['status', 'reason'],
         'business-trip-requests': ['destination', 'purpose', 'status'],
         'payment-requests': ['title', 'description', 'status'],
@@ -858,6 +968,7 @@ export class RecordsService {
     }
     const normalized = await this.normalizeInput(resource, payload, true);
     delete normalized.variants;
+    if (resource === 'leave-requests') await this.prepareLeaveRequest(normalized);
     if (resource === 'work-schedules') return this.saveWorkScheduleSchema(normalized, payload, user);
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
@@ -927,6 +1038,7 @@ export class RecordsService {
       ...payload,
     }, false);
     delete normalized.variants;
+    if (resource === 'leave-requests') await this.prepareLeaveRequest(normalized, id);
     await this.assertPermission(user, resource, 'update', this.branchIdOf(resource, normalized) || this.branchIdOf(resource, previous));
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized, id);
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
@@ -1084,6 +1196,8 @@ export class RecordsService {
       suppliers: 'nhà cung cấp',
       products: 'sản phẩm',
       units: 'đơn vị tính',
+      'leave-types': 'loại nghỉ',
+      'leave-allocations': 'cấp phép năm',
       consultations: 'phiếu thăm khám',
       'service-orders': 'đơn hàng',
       invoices: 'hóa đơn',
@@ -3092,7 +3206,7 @@ export class RecordsService {
     return '';
   }
 
-  private normalize(resource: string, payload: Record<string, unknown>) {
+  private async normalize(resource: string, payload: Record<string, unknown>) {
     const value = { ...payload };
     delete value.id;
     delete value.createdAt;
@@ -3102,6 +3216,30 @@ export class RecordsService {
     if (resource === 'staff') {
       const normalizedType = String(value.type || '').trim().toUpperCase();
       value.type = ['ADMIN', 'DOCTOR', 'STAFF'].includes(normalizedType) ? normalizedType : 'STAFF';
+    }
+    if (resource === 'leave-types') {
+      value.code = String(value.code || '').trim().toLowerCase();
+      value.name = String(value.name || '').trim();
+      value.defaultDays = value.defaultDays === undefined || value.defaultDays === null || value.defaultDays === ''
+        ? undefined
+        : Number(value.defaultDays);
+      value.requiresAllocation = value.requiresAllocation === true || value.requiresAllocation === 'true' || value.requiresAllocation === '1';
+      value.isPaid = value.isPaid === true || value.isPaid === 'true' || value.isPaid === '1';
+      value.isActive = value.isActive === undefined || value.isActive === true || value.isActive === 'true' || value.isActive === '1';
+      if (!value.code || !value.name) throw new BadRequestException('Loại nghỉ bắt buộc có mã và tên');
+    }
+    if (resource === 'leave-allocations') {
+      const year = Number(value.year || 0);
+      const allocatedDays = Number(value.allocatedDays || 0);
+      const carriedOverDays = Number(value.carriedOverDays || 0);
+      value.year = year;
+      value.allocatedDays = allocatedDays;
+      value.carriedOverDays = carriedOverDays;
+      if (!String(value.staffId || '').trim() || !String(value.leaveTypeCode || '').trim() || year < 2000 || allocatedDays < 0 || carriedOverDays < 0) {
+        throw new BadRequestException('Dữ liệu cấp phép năm không hợp lệ');
+      }
+      const leaveType = await this.leaveTypes.findOne({ where: { code: String(value.leaveTypeCode), isArchived: false, isActive: true } });
+      if (!leaveType) throw new BadRequestException('Loại nghỉ không tồn tại hoặc đã ngừng áp dụng');
     }
     if (resource === 'posts' || resource === 'news') {
       value.slug = String(value.slug || '').trim();
@@ -3436,7 +3574,7 @@ export class RecordsService {
 
   private async normalizeInput(resource: string, payload: Record<string, unknown>, creating = false) {
     if (resource !== 'user-accounts') {
-      const value = this.normalize(resource, payload);
+      const value = await this.normalize(resource, payload);
       if (resource === 'products') {
         await this.normalizeProductBaseUnit(value);
         await this.normalizeProductBundle(value, String(payload.id || ''));

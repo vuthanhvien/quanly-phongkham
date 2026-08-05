@@ -1,7 +1,8 @@
-import { BgColorsOutlined, BorderOutlined, FontSizeOutlined, UndoOutlined } from '@ant-design/icons'
-import { Button, Card, Checkbox, Col, Flex, Form, Input, InputNumber, Radio, Row, Select, Space, Typography, message } from 'antd'
+import { BgColorsOutlined, BorderOutlined, DatabaseOutlined, FontSizeOutlined, UndoOutlined } from '@ant-design/icons'
+import { Button, Card, Checkbox, Col, Flex, Form, Input, InputNumber, Popconfirm, Radio, Row, Select, Space, Typography, message } from 'antd'
+import { api } from '../api'
 import { useEffect, useState } from 'react'
-import { buildShadowValue, companyTypeOptions, defaultAppUiSettings, fontFamilyOptions, useAppUi, type AppUiSettings } from '../app-ui'
+import { buildShadowValue, companyTypeOptions, defaultAppUiSettings, fontFamilyOptions, syncDocumentBranding, useAppUi, type AppUiSettings } from '../app-ui'
 import { appModuleGroups, appModuleLabels, companyTypeModulePresets, resolveMenuGroupLabel, type CompanyType } from '../company-types'
 import { ImagePickerInput } from '../components/ImagePickerInput'
 
@@ -113,21 +114,26 @@ export function UiSettingsPage() {
   const { settings, save, loading } = useAppUi()
   const [form] = Form.useForm<UiSettingsFormValues>()
   const [saving, setSaving] = useState(false)
-  const watchedValues = Form.useWatch([], form)
-  const preview = { ...defaultAppUiSettings, ...settings, ...(watchedValues || {}) }
-  const previewShadow = buildShadowValue(preview, 1)
+  const [initializing, setInitializing] = useState(false)
+  const draftAppName = Form.useWatch('appName', form)
+  const selectedCompanyType = (Form.useWatch('companyType', form) || settings.companyType || defaultAppUiSettings.companyType) as CompanyType
 
   useEffect(() => {
     form.setFieldsValue({ ...defaultAppUiSettings, ...settings })
   }, [form, settings])
 
+  useEffect(() => {
+    document.title = String(draftAppName || settings.appName || defaultAppUiSettings.appName).trim() || defaultAppUiSettings.appName
+  }, [draftAppName, settings.appName])
+
   async function handleSubmit(values: UiSettingsFormValues) {
     setSaving(true)
     try {
-      await save({
+      const next = await save({
         ...values,
         appDescription: typeof values.appDescription === 'string' ? values.appDescription.trim() : '',
       })
+      syncDocumentBranding(next)
       message.success('Đã cập nhật giao diện CMS')
     } finally {
       setSaving(false)
@@ -144,6 +150,17 @@ export function UiSettingsPage() {
     message.success('Đã áp preset module theo loại hình công ty')
   }
 
+  async function handleInitializeIndustryData() {
+    setInitializing(true)
+    try {
+      const response = await api.post('/settings/app-ui/initialize-industry-data', { companyType: selectedCompanyType })
+      const created = response.data.data?.created || {}
+      message.success(`Đã khởi tạo: ${created.units || 0} đơn vị, ${created.categories || 0} nhóm hàng, ${created.products || 0} hàng mẫu`)
+    } finally {
+      setInitializing(false)
+    }
+  }
+
   return (
     <Space direction="vertical" size={20} style={{ width: '100%' }}>
       <Flex align="start" justify="space-between" gap={16} wrap>
@@ -155,9 +172,14 @@ export function UiSettingsPage() {
             Tuỳ biến sâu màu sắc và phong cách CMS cho nền, đầu trang, menu, chữ và nút bấm.
           </Typography.Paragraph>
         </div>
-        <Button icon={<UndoOutlined />} onClick={handleResetDefaults}>
-          Khôi phục preset mặc định
-        </Button>
+        <Space>
+          <Button icon={<UndoOutlined />} onClick={handleResetDefaults}>
+            Khôi phục preset mặc định
+          </Button>
+          <Button loading={saving || loading} type="primary" icon={<BgColorsOutlined />} onClick={() => form.submit()}>
+            Lưu UI settings
+          </Button>
+        </Space>
       </Flex>
 
       <Form form={form} layout="vertical" onFinish={handleSubmit}>
@@ -195,6 +217,24 @@ export function UiSettingsPage() {
               <Card
                 className="glass-card settings-card"
                 extra={
+                  <Popconfirm
+                    title="Khởi tạo dữ liệu theo ngành hàng?"
+                    description="Chỉ bổ sung dữ liệu mẫu còn thiếu, không xóa dữ liệu hiện có."
+                    okText="Khởi tạo"
+                    cancelText="Hủy"
+                    onConfirm={() => void handleInitializeIndustryData()}
+                  >
+                    <Button type="primary" icon={<DatabaseOutlined />} loading={initializing}>Khởi tạo dữ liệu</Button>
+                  </Popconfirm>
+                }
+                title="Dữ liệu theo ngành hàng"
+              >
+                <Typography.Text>{companyTypeOptions.find((item) => item.value === selectedCompanyType)?.label}</Typography.Text>
+              </Card>
+
+              <Card
+                className="glass-card settings-card"
+                extra={
                   <Button size="small" type="default" onClick={handleApplyCompanyPreset}>
                     Áp preset theo loại hình
                   </Button>
@@ -211,7 +251,7 @@ export function UiSettingsPage() {
                         {appModuleGroups.map((group) => (
                           <div key={group.key}>
                             <Typography.Title level={5} style={{ marginBottom: 10 }}>
-                              {resolveMenuGroupLabel(group.key, group.label, preview.companyType)}
+                              {resolveMenuGroupLabel(group.key, group.label, selectedCompanyType)}
                             </Typography.Title>
                             <Row gutter={[12, 12]}>
                               {group.modules.map((moduleKey) => (
@@ -228,63 +268,64 @@ export function UiSettingsPage() {
                 </Space>
               </Card>
 
-              {colorSections.map((section) => (
-                <Card key={section.title} className="glass-card settings-card" title={section.title}>
-                  <Row gutter={[16, 0]}>
-                    {section.fields.map((field) => (
-                      <Col key={field.name} md={12} xs={24}>
-                        <Form.Item label={field.label} name={field.name} rules={colorRules}>
-                          <ColorInput placeholder="#000000" />
-                        </Form.Item>
-                      </Col>
-                    ))}
-                  </Row>
-                </Card>
-              ))}
+              <Card className="glass-card settings-card" title="Màu sắc giao diện">
+                <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                  {colorSections.map((section) => (
+                    <div key={section.title}>
+                      <Typography.Text strong>{section.title}</Typography.Text>
+                      <Row gutter={[16, 0]} style={{ marginTop: 8 }}>
+                        {section.fields.map((field) => (
+                          <Col key={field.name} lg={8} md={12} xs={24}>
+                            <Form.Item label={field.label} name={field.name} rules={colorRules}>
+                              <ColorInput placeholder="#000000" />
+                            </Form.Item>
+                          </Col>
+                        ))}
+                      </Row>
+                    </div>
+                  ))}
+                </Space>
+              </Card>
 
-              <Card className="glass-card settings-card" title="Kích thước & bo góc">
+              <Card className="glass-card settings-card" title="Hiển thị & hiệu ứng">
                 <Row gutter={[16, 0]}>
-                  <Col md={12} xs={24}>
+                  <Col lg={8} md={12} xs={24}>
                     <Form.Item label="Kích thước giao diện" name="size" rules={[{ required: true }]}>
                       <Radio.Group optionType="button" buttonStyle="solid" options={sizeOptions} />
                     </Form.Item>
                   </Col>
-                  <Col md={12} xs={24}>
+                  <Col lg={8} md={12} xs={24}>
                     <Form.Item label="Độ bo góc" name="borderRadius" rules={[{ required: true }]}>
                       <InputNumber min={0} max={32} style={{ width: '100%' }} addonBefore={<BorderOutlined />} />
                     </Form.Item>
                   </Col>
+                  <Col lg={8} md={12} xs={24}>
+                    <Form.Item label="Chọn font" name="fontFamily" rules={[{ required: true }]}>
+                      <Select
+                        options={fontFamilyOptions.map((font) => ({ value: font.value, label: font.label }))}
+                        placeholder="Chọn font cho CMS"
+                        suffixIcon={<FontSizeOutlined />}
+                      />
+                    </Form.Item>
+                  </Col>
                 </Row>
-              </Card>
-
-              <Card className="glass-card settings-card" title="Phông chữ">
-                <Form.Item label="Chọn font" name="fontFamily" rules={[{ required: true }]}>
-                  <Select
-                    options={fontFamilyOptions.map((font) => ({ value: font.value, label: font.label }))}
-                    placeholder="Chọn font cho CMS"
-                    suffixIcon={<FontSizeOutlined />}
-                  />
-                </Form.Item>
-              </Card>
-
-              <Card className="glass-card settings-card" title="Đổ bóng">
                 <Row gutter={[16, 0]}>
-                  <Col md={12} xs={24}>
+                  <Col lg={8} md={12} xs={24}>
                     <Form.Item label="Màu bóng" name="shadowColor" rules={colorRules}>
                       <ColorInput placeholder="#0f172a" />
                     </Form.Item>
                   </Col>
-                  <Col md={12} xs={24}>
+                  <Col lg={8} md={12} xs={24}>
                     <Form.Item label="Opacity (%)" name="shadowOpacity" rules={[{ required: true }]}>
                       <InputNumber min={0} max={100} style={{ width: '100%' }} />
                     </Form.Item>
                   </Col>
-                  <Col md={12} xs={24}>
+                  <Col lg={8} md={12} xs={24}>
                     <Form.Item label="Độ mờ" name="shadowBlur" rules={[{ required: true }]}>
                       <InputNumber min={0} max={60} style={{ width: '100%' }} />
                     </Form.Item>
                   </Col>
-                  <Col md={12} xs={24}>
+                  <Col lg={8} md={12} xs={24}>
                     <Form.Item label="Độ lệch Y" name="shadowOffsetY" rules={[{ required: true }]}>
                       <InputNumber min={0} max={24} style={{ width: '100%' }} />
                     </Form.Item>
@@ -295,7 +336,11 @@ export function UiSettingsPage() {
           </Col>
 
           <Col lg={9} xs={24}>
-            <div className="ui-settings-preview-sticky">
+            <Form.Item noStyle shouldUpdate>
+              {() => {
+                const preview = { ...defaultAppUiSettings, ...settings, ...form.getFieldsValue(true) }
+                const previewShadow = buildShadowValue(preview, 1)
+                return <div className="ui-settings-preview-sticky">
             <Card className="glass-card settings-card" title="Xem trước nhanh">
               <div
                 style={{
@@ -438,16 +483,11 @@ export function UiSettingsPage() {
                 <Typography.Text type="secondary">Shadow: {preview.shadowOpacity}% / {preview.shadowBlur}px / y {preview.shadowOffsetY}px</Typography.Text>
               </Space>
             </Card>
-            </div>
+                </div>
+              }}
+            </Form.Item>
           </Col>
 
-          <Col span={24}>
-            <Flex justify="end">
-              <Button htmlType="submit" loading={saving || loading} type="primary" icon={<BgColorsOutlined />}>
-                Lưu UI settings
-              </Button>
-            </Flex>
-          </Col>
         </Row>
       </Form>
     </Space>
