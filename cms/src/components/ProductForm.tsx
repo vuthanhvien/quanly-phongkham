@@ -1,5 +1,5 @@
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons"
-import { Button, Card, Form, Input, InputNumber, Select, Space, Table, Typography, message } from "antd"
+import { Button, Card, Form, Input, InputNumber, Select, Space, Switch, Table, Typography, message } from "antd"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
@@ -16,6 +16,7 @@ interface ProductFormProps {
 }
 
 type BundleItem = { productId?: string; quantity?: number }
+type VariantItem = { id?: string; code?: string; name?: string; barcode?: string; attributeSummary?: string; sellingPrice?: number; minStockLevel?: number; isActive?: boolean }
 type ProductOption = { value: string; label: string; productType: string }
 type ProductCategory = { id: string; name: string; parentId?: string; level: number; isActive: boolean }
 type UnitOption = { value: string; label: string }
@@ -29,11 +30,13 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
   const [units, setUnits] = useState<UnitOption[]>([])
   const productType = Form.useWatch("productType", form)
   const bundleItems = Form.useWatch("bundleItems", { form, preserve: true }) as BundleItem[] | undefined
+  const hasVariants = Form.useWatch("hasVariants", form) as boolean | undefined
+  const variants = Form.useWatch("variants", { form, preserve: true }) as VariantItem[] | undefined
 
   useEffect(() => { void Promise.all([loadProducts(), loadCategories(), loadUnits()]) }, [])
   useEffect(() => {
     if (editing) { void loadRecord(); return }
-    form.setFieldsValue({ productType: "CONSUMABLE", sellingPrice: 0, minStockLevel: 0, bundleItems: [], ...(initialValues || {}) })
+    form.setFieldsValue({ productType: "CONSUMABLE", sellingPrice: 0, minStockLevel: 0, bundleItems: [], variants: [], ...(initialValues || {}) })
   }, [editing, form, id, initialValues])
 
   async function loadProducts() {
@@ -61,14 +64,15 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
   async function loadUnits() {
     try {
       const response = await api.get("/records/units", { params: { pageSize: 500 } })
-      setUnits((response.data.data || []).map((item: Record<string, unknown>) => ({ value: String(item.id), label: `${item.code || ""} - ${item.name || ""}` })))
+      // A product is stocked in the root unit; conversion units are selected on movements.
+      setUnits((response.data.data || []).filter((item: Record<string, unknown>) => !item.baseUnitId).map((item: Record<string, unknown>) => ({ value: String(item.id), label: String(item.name || item.id) })))
     } catch (error) { message.error(getApiErrorMessage(error, "Không tải được đơn vị tính")) }
   }
 
   async function loadRecord() {
     try {
       const response = await api.get(`/records/products/${id}`)
-      form.setFieldsValue({ ...response.data.data, ...(initialValues || {}), bundleItems: normalizeBundleItems(response.data.data?.bundleItems) })
+      form.setFieldsValue({ ...response.data.data, ...(initialValues || {}), bundleItems: normalizeBundleItems(response.data.data?.bundleItems), variants: normalizeVariantItems(response.data.data?.variants).map((item) => ({ ...item, attributeSummary: Object.values((item as any).attributeValues || {}).join(" / ") })) })
     } catch (error) { message.error(getApiErrorMessage(error, "Không tải được sản phẩm")) }
   }
 
@@ -77,7 +81,7 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
     if (values.productType === "COMBO" && items.length === 0) { message.error("Combo cần có ít nhất một sản phẩm/dịch vụ thành phần"); return }
     setSubmitting(true)
     try {
-      const payload = { ...values, bundleItems: values.productType === "COMBO" ? items : [] }
+      const payload = { ...values, hasVariants: Boolean(values.hasVariants), variants: values.hasVariants ? normalizeVariants(form.getFieldValue("variants")) : [], bundleItems: values.productType === "COMBO" ? items : [] }
       if (editing) await api.patch(`/records/products/${id}`, payload)
       else await api.post("/records/products", payload)
       message.success("Đã lưu sản phẩm")
@@ -87,6 +91,7 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
   }
 
   function setBundleItems(items: BundleItem[]) { form.setFieldsValue({ bundleItems: items }) }
+  function setVariants(items: VariantItem[]) { form.setFieldsValue({ variants: items }) }
   const componentOptions = useMemo(() => products.filter((product) => product.value !== id && product.productType !== "COMBO"), [products, id])
   const categoryOptions = useMemo(() => {
     const categoriesById = new Map(categories.map((category) => [category.id, category]))
@@ -114,6 +119,16 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
     { title: "SL / số buổi", dataIndex: "quantity", width: 150, render: (_value, row) => <InputNumber formatter={formatNumberInput} min={1} parser={parseNumberInput} style={{ width: "100%" }} value={row.quantity} onChange={(quantity) => { const items = normalizeBundleItems(form.getFieldValue("bundleItems")); items[row.index] = { ...items[row.index], quantity: Number(quantity || 0) }; setBundleItems(items) }} /> },
     { title: "", width: 52, render: (_value, row) => <Button danger type="text" icon={<DeleteOutlined />} onClick={() => { const items = normalizeBundleItems(form.getFieldValue("bundleItems")); items.splice(row.index, 1); setBundleItems(items) }} /> },
   ]
+  const variantRows = normalizeVariantItems(variants).map((item, index) => ({ ...item, key: index, index }))
+  function updateVariant<K extends keyof VariantItem>(index: number, key: K, value: VariantItem[K]) { const next = normalizeVariantItems(form.getFieldValue("variants")); next[index] = { ...next[index], [key]: value }; setVariants(next) }
+  const variantColumns: ColumnsType<VariantItem & { key: number; index: number }> = [
+    { title: "SKU", dataIndex: "code", width: 140, render: (_v, row) => <Input value={row.code} onChange={(event) => updateVariant(row.index, "code", event.target.value)} /> },
+    { title: "Tên biến thể", dataIndex: "name", width: 170, render: (_v, row) => <Input placeholder="30ml, Đỏ / M" value={row.name} onChange={(event) => updateVariant(row.index, "name", event.target.value)} /> },
+    { title: "Thuộc tính", dataIndex: "attributeSummary", width: 170, render: (_v, row) => <Input placeholder="30ml / Đỏ" value={row.attributeSummary} onChange={(event) => updateVariant(row.index, "attributeSummary", event.target.value)} /> },
+    { title: "Barcode", dataIndex: "barcode", width: 140, render: (_v, row) => <Input value={row.barcode} onChange={(event) => updateVariant(row.index, "barcode", event.target.value)} /> },
+    { title: "Giá bán", dataIndex: "sellingPrice", width: 135, render: (_v, row) => <InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} value={row.sellingPrice} onChange={(value) => updateVariant(row.index, "sellingPrice", Number(value || 0))} /> },
+    { title: "", width: 52, render: (_v, row) => <Button danger type="text" icon={<DeleteOutlined />} onClick={() => { const next = normalizeVariantItems(form.getFieldValue("variants")); next.splice(row.index, 1); setVariants(next) }} /> },
+  ]
 
   return <>
     {!compact && <Typography.Title level={3}>{editing ? "Cập nhật" : "Thêm"} sản phẩm</Typography.Title>}
@@ -134,9 +149,11 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
           />
         </Form.Item>
         <Form.Item label="Đơn vị cơ sở" name="baseUnitId" rules={[{ required: true, message: "Chọn đơn vị cơ sở" }]}><Select showSearch optionFilterProp="label" options={units} placeholder="Chọn đơn vị cơ sở" /></Form.Item>
+        <Form.Item label="Có biến thể" name="hasVariants" valuePropName="checked"><Switch /></Form.Item>
         <Form.Item label="Giá bán gói / SP" name="sellingPrice"><InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} /></Form.Item>
         <Form.Item label="Tồn tối thiểu" name="minStockLevel"><InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} /></Form.Item>
       </div>
+      {hasVariants ? <Card className="glass-card service-order-items-card" title="Biến thể / SKU" extra={<Button htmlType="button" icon={<PlusOutlined />} onClick={() => setVariants([...normalizeVariantItems(form.getFieldValue("variants")), { sellingPrice: Number(form.getFieldValue("sellingPrice") || 0), isActive: true }])}>Thêm biến thể</Button>}><Table columns={variantColumns} dataSource={variantRows} pagination={false} rowKey="key" scroll={{ x: 800 }} /></Card> : null}
       {productType === "COMBO" && <Card className="glass-card service-order-items-card" title="Thành phần của combo" extra={<Button htmlType="button" icon={<PlusOutlined />} onClick={() => setBundleItems([...normalizeBundleItems(form.getFieldValue("bundleItems")), { quantity: 1 }])}>Thêm thành phần</Button>}>
         <Typography.Paragraph type="secondary">Khi chọn combo trong đơn, các thành phần này sẽ tự được thêm vào. Giá bán vẫn lấy theo giá của combo.</Typography.Paragraph>
         <Table columns={columns} dataSource={rows} pagination={false} rowKey="key" />
@@ -149,4 +166,24 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
 function normalizeBundleItems(value: unknown): BundleItem[] {
   if (!Array.isArray(value)) return []
   return value.map((item) => ({ productId: (item as Record<string, unknown>)?.productId ? String((item as Record<string, unknown>).productId) : undefined, quantity: Number((item as Record<string, unknown>)?.quantity || 0) }))
+}
+
+function normalizeVariantItems(value: unknown): VariantItem[] {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => ({ ...(item as VariantItem) }))
+}
+
+function normalizeVariants(value: unknown) {
+  return normalizeVariantItems(value)
+    .filter((item) => item.code?.trim() || item.name?.trim())
+    .map((item) => ({
+      id: item.id,
+      code: String(item.code || "").trim(),
+      name: String(item.name || "").trim(),
+      barcode: String(item.barcode || "").trim() || undefined,
+      attributeValues: item.attributeSummary?.trim() ? { option: item.attributeSummary.trim() } : {},
+      sellingPrice: Number(item.sellingPrice || 0),
+      minStockLevel: Number(item.minStockLevel || 0),
+      isActive: item.isActive !== false,
+    }))
 }

@@ -35,41 +35,41 @@ const DEFAULT_WORKFLOWS: Array<{
   description: string;
   steps: Array<{ name: string; approverType: string; approverRoleKey?: string; boardX?: number; boardY?: number; stateKey?: string; stateLabel?: string; approveActionLabel?: string; rejectActionLabel?: string }>;
 }> = [
-  {
-    code: 'leave-request-default',
-    name: 'Duyệt đơn xin nghỉ',
-    targetResource: 'leave-requests',
-    description: 'Leader hoặc mentor của nhân viên duyệt đơn nghỉ phép.',
-    steps: [{ name: 'Leader/Mentor duyệt', approverType: 'EMPLOYEE_LEADER', boardX: 0, boardY: 0, stateKey: 'leader_review', stateLabel: 'Chờ Leader duyệt' }],
-  },
-  {
-    code: 'attendance-adjustment-default',
-    name: 'Duyệt đổi giờ chấm công',
-    targetResource: 'attendance-adjustment-requests',
-    description: 'Leader hoặc trưởng bộ phận duyệt yêu cầu đổi giờ check-in/check-out.',
-    steps: [{ name: 'Leader duyệt', approverType: 'EMPLOYEE_LEADER', boardX: 0, boardY: 0, stateKey: 'leader_review', stateLabel: 'Chờ Leader xác nhận' }],
-  },
-  {
-    code: 'business-trip-default',
-    name: 'Duyệt đơn công tác',
-    targetResource: 'business-trip-requests',
-    description: 'Leader duyệt trước, sau đó HR/Admin xác nhận.',
-    steps: [
-      { name: 'Leader duyệt', approverType: 'EMPLOYEE_LEADER', boardX: -150, boardY: 0, stateKey: 'leader_review', stateLabel: 'Chờ Leader duyệt' },
-      { name: 'HR/Admin xác nhận', approverType: 'ROLE', approverRoleKey: 'ADMIN', boardX: 150, boardY: 0, stateKey: 'hr_confirm', stateLabel: 'Chờ HR/Admin xác nhận' },
-    ],
-  },
-  {
-    code: 'payment-request-default',
-    name: 'Duyệt xin thanh toán',
-    targetResource: 'payment-requests',
-    description: 'Leader duyệt trước, sau đó Admin/Kế toán xác nhận.',
-    steps: [
-      { name: 'Leader duyệt', approverType: 'EMPLOYEE_LEADER', boardX: -150, boardY: 0, stateKey: 'leader_review', stateLabel: 'Chờ Leader duyệt' },
-      { name: 'Kế toán/Admin xác nhận', approverType: 'ROLE', approverRoleKey: 'ADMIN', boardX: 150, boardY: 0, stateKey: 'accounting_review', stateLabel: 'Chờ kế toán xác nhận' },
-    ],
-  },
-];
+    {
+      code: 'leave-request-default',
+      name: 'Duyệt đơn xin nghỉ',
+      targetResource: 'leave-requests',
+      description: 'Leader hoặc mentor của nhân viên duyệt đơn nghỉ phép.',
+      steps: [{ name: 'Leader/Mentor duyệt', approverType: 'EMPLOYEE_LEADER', boardX: 0, boardY: 0, stateKey: 'leader_review', stateLabel: 'Chờ Leader duyệt' }],
+    },
+    {
+      code: 'attendance-adjustment-default',
+      name: 'Duyệt đổi giờ chấm công',
+      targetResource: 'attendance-adjustment-requests',
+      description: 'Leader hoặc trưởng bộ phận duyệt yêu cầu đổi giờ check-in/check-out.',
+      steps: [{ name: 'Leader duyệt', approverType: 'EMPLOYEE_LEADER', boardX: 0, boardY: 0, stateKey: 'leader_review', stateLabel: 'Chờ Leader xác nhận' }],
+    },
+    {
+      code: 'business-trip-default',
+      name: 'Duyệt đơn công tác',
+      targetResource: 'business-trip-requests',
+      description: 'Leader duyệt trước, sau đó HR/Admin xác nhận.',
+      steps: [
+        { name: 'Leader duyệt', approverType: 'EMPLOYEE_LEADER', boardX: -150, boardY: 0, stateKey: 'leader_review', stateLabel: 'Chờ Leader duyệt' },
+        { name: 'HR/Admin xác nhận', approverType: 'ROLE', approverRoleKey: 'ADMIN', boardX: 150, boardY: 0, stateKey: 'hr_confirm', stateLabel: 'Chờ HR/Admin xác nhận' },
+      ],
+    },
+    {
+      code: 'payment-request-default',
+      name: 'Duyệt xin thanh toán',
+      targetResource: 'payment-requests',
+      description: 'Leader duyệt trước, sau đó Admin/Kế toán xác nhận.',
+      steps: [
+        { name: 'Leader duyệt', approverType: 'EMPLOYEE_LEADER', boardX: -150, boardY: 0, stateKey: 'leader_review', stateLabel: 'Chờ Leader duyệt' },
+        { name: 'Kế toán/Admin xác nhận', approverType: 'ROLE', approverRoleKey: 'ADMIN', boardX: 150, boardY: 0, stateKey: 'accounting_review', stateLabel: 'Chờ kế toán xác nhận' },
+      ],
+    },
+  ];
 
 @Injectable()
 export class WorkflowService {
@@ -88,9 +88,9 @@ export class WorkflowService {
     @InjectRepository(WorkflowInstance) private readonly instances: Repository<WorkflowInstance>,
     @InjectRepository(WorkflowStep) private readonly steps: Repository<WorkflowStep>,
     @InjectRepository(WorkflowTask) private readonly tasks: Repository<WorkflowTask>,
-  ) {}
+  ) { }
 
-  async bootstrapDefaults(_user?: AuthUser) {
+  async bootstrapDefaults (_user?: AuthUser) {
     const created: WorkflowDefinition[] = [];
     for (const config of DEFAULT_WORKFLOWS) {
       let definition = await this.definitions.findOne({ where: { code: config.code } });
@@ -130,7 +130,7 @@ export class WorkflowService {
     return { data: { created: created.length } };
   }
 
-  async listDefinitions(_user?: AuthUser) {
+  async listDefinitions (_user?: AuthUser) {
     await this.ensureDefaultDefinitions();
     const definitions = await this.definitions.find({ order: { targetResource: 'ASC', createdAt: 'DESC' } });
     const steps = await this.steps.find({ order: { stepOrder: 'ASC' } });
@@ -143,7 +143,7 @@ export class WorkflowService {
     };
   }
 
-  async startForRecord(resource: string, record: Record<string, unknown>, user?: AuthUser) {
+  async startForRecord (resource: string, record: Record<string, unknown>, user?: AuthUser) {
     if (!this.isWorkflowResource(resource)) return null;
     const recordId = String(record.id || '');
     if (!recordId) return null;
@@ -180,7 +180,7 @@ export class WorkflowService {
     return instance;
   }
 
-  async myTasks(user: AuthUser) {
+  async myTasks (user: AuthUser) {
     const userIds = [user.id].filter(Boolean);
     const staffIds = [user.staffId].filter(Boolean) as string[];
     const tasks = await this.tasks.find({ where: { status: 'pending' }, order: { createdAt: 'DESC' } });
@@ -215,7 +215,7 @@ export class WorkflowService {
     };
   }
 
-  async instanceDetail(id: string, user: AuthUser) {
+  async instanceDetail (id: string, user: AuthUser) {
     const instance = await this.instances.findOne({ where: { id } });
     if (!instance) throw new NotFoundException('Workflow không tồn tại');
     const [definition, steps, tasks, actions] = await Promise.all([
@@ -237,7 +237,7 @@ export class WorkflowService {
     };
   }
 
-  async approve(instanceId: string, note: string | undefined, user: AuthUser) {
+  async approve (instanceId: string, note: string | undefined, user: AuthUser) {
     const { instance, task } = await this.findActionableTask(instanceId, user);
     task.status = 'approved';
     task.actedAt = new Date();
@@ -284,7 +284,7 @@ export class WorkflowService {
     return this.instanceDetail(instanceId, user);
   }
 
-  async reject(instanceId: string, note: string | undefined, user: AuthUser) {
+  async reject (instanceId: string, note: string | undefined, user: AuthUser) {
     const { instance, task } = await this.findActionableTask(instanceId, user);
     task.status = 'rejected';
     task.actedAt = new Date();
@@ -317,7 +317,7 @@ export class WorkflowService {
     return this.instanceDetail(instanceId, user);
   }
 
-  async cancel(instanceId: string, note: string | undefined, user: AuthUser) {
+  async cancel (instanceId: string, note: string | undefined, user: AuthUser) {
     const instance = await this.instances.findOne({ where: { id: instanceId } });
     if (!instance) throw new NotFoundException('Workflow không tồn tại');
     if (instance.requesterUserId !== user.id && user.role !== 'ADMIN') {
@@ -334,19 +334,19 @@ export class WorkflowService {
     return this.instanceDetail(instanceId, user);
   }
 
-  private async ensureDefaultDefinitions() {
+  private async ensureDefaultDefinitions () {
     await this.bootstrapDefaults();
   }
 
-  private isWorkflowResource(resource: string): resource is WorkflowTargetResource {
+  private isWorkflowResource (resource: string): resource is WorkflowTargetResource {
     return ['leave-requests', 'attendance-adjustment-requests', 'business-trip-requests', 'payment-requests'].includes(resource);
   }
 
-  private resolveRequesterStaffId(record: Record<string, unknown>, user?: AuthUser) {
+  private resolveRequesterStaffId (record: Record<string, unknown>, user?: AuthUser) {
     return String(record.staffId || user?.staffId || '').trim() || undefined;
   }
 
-  private async createTasksForStep(instance: WorkflowInstance, step: WorkflowStep) {
+  private async createTasksForStep (instance: WorkflowInstance, step: WorkflowStep) {
     const target = await this.loadTargetRecord(instance.targetResource, instance.targetRecordId);
     let assignees = await this.resolveApprovers(step, target, instance);
     if (assignees.length === 0) {
@@ -365,7 +365,7 @@ export class WorkflowService {
     })));
   }
 
-  private async resolveApprovers(step: WorkflowStep, target: TargetRecord, instance: WorkflowInstance): Promise<WorkflowAssignee[]> {
+  private async resolveApprovers (step: WorkflowStep, target: TargetRecord, instance: WorkflowInstance): Promise<WorkflowAssignee[]> {
     switch (step.approverType) {
       case 'FIXED_USER':
         return [{ userId: step.approverUserId, staffId: undefined }].filter((item) => item.userId);
@@ -387,26 +387,26 @@ export class WorkflowService {
     }
   }
 
-  private async assigneeFromEmployeeRelation(target: TargetRecord, key: 'leaderStaffId' | 'mentorStaffId') {
+  private async assigneeFromEmployeeRelation (target: TargetRecord, key: 'leaderStaffId' | 'mentorStaffId') {
     const employee = await this.staff.findOne({ where: { id: target.staffId } });
     return this.assigneeFromStaffId(employee?.[key]);
   }
 
-  private async departmentManagerAssignee(target: TargetRecord) {
+  private async departmentManagerAssignee (target: TargetRecord) {
     const employee = await this.staff.findOne({ where: { id: target.staffId } });
     if (!employee?.departmentId) return null;
     const department = await this.departments.findOne({ where: { id: employee.departmentId } });
     return this.assigneeFromStaffId(department?.managerStaffId);
   }
 
-  private async assigneeFromStaffId(staffId?: string) {
+  private async assigneeFromStaffId (staffId?: string) {
     if (!staffId) return null;
     const staff = await this.staff.findOne({ where: { id: staffId } });
     if (!staff) return null;
     return { staffId: staff.id, userId: staff.userId };
   }
 
-  private async roleAssignees(roleKey?: string) {
+  private async roleAssignees (roleKey?: string) {
     const key = String(roleKey || 'ADMIN').trim().toUpperCase();
     const users = await this.users.find({ where: { role: key } });
     const assignments = await this.branchAssignments.find();
@@ -419,7 +419,7 @@ export class WorkflowService {
       .map((userId) => ({ userId }));
   }
 
-  private async findActionableTask(instanceId: string, user: AuthUser) {
+  private async findActionableTask (instanceId: string, user: AuthUser) {
     const instance = await this.instances.findOne({ where: { id: instanceId } });
     if (!instance) throw new NotFoundException('Workflow không tồn tại');
     if (instance.status !== 'pending') throw new BadRequestException('Workflow không còn ở trạng thái chờ duyệt');
@@ -432,13 +432,13 @@ export class WorkflowService {
     return { instance, task };
   }
 
-  private canSeeInstance(instance: WorkflowInstance, tasks: WorkflowTask[], user: AuthUser) {
+  private canSeeInstance (instance: WorkflowInstance, tasks: WorkflowTask[], user: AuthUser) {
     if (user.role === 'ADMIN') return true;
     if (instance.requesterUserId === user.id || instance.requesterStaffId === user.staffId) return true;
     return tasks.some((task) => task.assigneeUserId === user.id || (task.assigneeStaffId && task.assigneeStaffId === user.staffId));
   }
 
-  private async applyFinalStatus(instance: WorkflowInstance, status: 'approved' | 'rejected' | 'cancelled', user: AuthUser) {
+  private async applyFinalStatus (instance: WorkflowInstance, status: 'approved' | 'rejected' | 'cancelled', user: AuthUser) {
     const repo = this.targetRepository(instance.targetResource);
     const record = await repo.findOne({ where: { id: instance.targetRecordId } });
     if (!record) return;
@@ -457,7 +457,7 @@ export class WorkflowService {
     }
   }
 
-  private async applyStepStatus(instance: WorkflowInstance, step: WorkflowStep) {
+  private async applyStepStatus (instance: WorkflowInstance, step: WorkflowStep) {
     const stepStatus = String(step.stateKey || '').trim();
     if (!stepStatus) return;
     const repo = this.targetRepository(instance.targetResource);
@@ -469,19 +469,19 @@ export class WorkflowService {
     });
   }
 
-  private normalizeStatusList(value?: string[]) {
+  private normalizeStatusList (value?: string[]) {
     const statuses = Array.isArray(value) ? value : [];
     const normalized = statuses.map((item) => String(item || '').trim().toLowerCase()).filter(Boolean);
     return normalized.length > 0 ? normalized : ['pending', 'submitted'];
   }
 
-  private resolveFinalStatus(definition: WorkflowDefinition | null, status: 'approved' | 'rejected' | 'cancelled') {
+  private resolveFinalStatus (definition: WorkflowDefinition | null, status: 'approved' | 'rejected' | 'cancelled') {
     if (status === 'approved') return String(definition?.approvedStatus || 'approved').trim() || 'approved';
     if (status === 'rejected') return String(definition?.rejectedStatus || 'rejected').trim() || 'rejected';
     return String(definition?.cancelledStatus || 'cancelled').trim() || 'cancelled';
   }
 
-  private async applyAttendanceAdjustment(request: AttendanceAdjustmentRequest) {
+  private async applyAttendanceAdjustment (request: AttendanceAdjustmentRequest) {
     const attendance = request.attendanceId
       ? await this.attendances.findOne({ where: { id: request.attendanceId } })
       : await this.attendances.findOne({ where: { staffId: request.staffId, date: request.date } });
@@ -498,7 +498,7 @@ export class WorkflowService {
     await this.attendances.save(this.attendances.create(payload));
   }
 
-  private targetRepository(resource: string): Repository<any> {
+  private targetRepository (resource: string): Repository<any> {
     const map: Record<string, Repository<any>> = {
       'leave-requests': this.leaveRequests,
       'attendance-adjustment-requests': this.attendanceAdjustments,
@@ -510,7 +510,7 @@ export class WorkflowService {
     return repo;
   }
 
-  private async loadTargetRecords(instances: WorkflowInstance[]) {
+  private async loadTargetRecords (instances: WorkflowInstance[]) {
     const map = new Map<string, TargetRecord | null>();
     await Promise.all(instances.map(async (instance) => {
       map.set(`${instance.targetResource}:${instance.targetRecordId}`, await this.loadTargetRecord(instance.targetResource, instance.targetRecordId));
@@ -518,7 +518,7 @@ export class WorkflowService {
     return map;
   }
 
-  private async loadTargetRecord(resource: string, id: string): Promise<TargetRecord> {
+  private async loadTargetRecord (resource: string, id: string): Promise<TargetRecord> {
     const record = await this.targetRepository(resource).findOne({ where: { id } });
     if (!record) throw new NotFoundException('Không tìm thấy chứng từ cần duyệt');
     return record;

@@ -21,8 +21,12 @@ interface OptionItem {
 }
 
 interface ProductOption extends OptionItem {
-  usageUnit: string
-  purchaseUnit: string
+  baseUnitId?: string
+}
+
+interface UnitOption extends OptionItem {
+  baseUnitId?: string
+  conversionFactor: number
 }
 
 interface BatchOption extends OptionItem {
@@ -40,7 +44,7 @@ interface ReceiptLineValue {
   batchNumber?: string
   expiryDate?: string
   quantity?: number
-  unit?: string
+  transferUnitId?: string
   supplierId?: string
 }
 
@@ -56,6 +60,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
   const [branchOptions, setBranchOptions] = useState<OptionItem[]>([])
   const [supplierOptions, setSupplierOptions] = useState<OptionItem[]>([])
   const [productOptions, setProductOptions] = useState<ProductOption[]>([])
+  const [unitOptions, setUnitOptions] = useState<UnitOption[]>([])
   const [batchOptions, setBatchOptions] = useState<BatchOption[]>([])
   const movementType = Form.useWatch("movementType", form) as "IMPORT" | "EXPORT" | undefined
   const branchId = Form.useWatch("branchId", form) as string | undefined
@@ -81,7 +86,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
             batchNumber: item.batchNumber ? String(item.batchNumber) : "",
             expiryDate: item.expiryDate ? String(item.expiryDate) : undefined,
             quantity: Number(item.quantity || 1),
-            unit: item.unit ? String(item.unit) : undefined,
+            transferUnitId: item.transferUnitId ? String(item.transferUnitId) : undefined,
             supplierId: item.supplierId ? String(item.supplierId) : supplierId,
           }))
         : [createReceiptItem(supplierId)]
@@ -105,23 +110,26 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
         const response = await api.get("/records/stock-batches/form-options")
         payload = response.data.data || {}
       } catch {
-        const [productsResponse, branchesResponse, suppliersResponse, batchesResponse] = await Promise.all([
+        const [productsResponse, branchesResponse, suppliersResponse, batchesResponse, unitsResponse] = await Promise.all([
           api.get("/records/products", { params: { pageSize: 500 } }),
           api.get("/records/branches", { params: { pageSize: 200 } }),
           api.get("/records/suppliers", { params: { pageSize: 300 } }),
           api.get("/records/stock-batches", { params: { pageSize: 500 } }),
+          api.get("/records/units", { params: { pageSize: 500 } }),
         ])
         payload = {
           products: productsResponse.data.data || [],
           branches: branchesResponse.data.data || [],
           suppliers: suppliersResponse.data.data || [],
           batches: batchesResponse.data.data || [],
+          units: unitsResponse.data.data || [],
         }
       }
       const branchRows = Array.isArray(payload.branches) ? payload.branches : []
       const supplierRows = Array.isArray(payload.suppliers) ? payload.suppliers : []
       const productRows = Array.isArray(payload.products) ? payload.products : []
       const batchRows = Array.isArray(payload.batches) ? payload.batches : []
+      const unitRows = Array.isArray(payload.units) ? payload.units : []
 
       const nextBranchOptions = branchRows.map((row: Record<string, unknown>) => ({
         value: String(row.id),
@@ -138,10 +146,15 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
         productRows.map((row: Record<string, unknown>) => ({
           value: String(row.id),
           label: `${row.code || ""} - ${row.name || row.id}`,
-          usageUnit: String(row.usageUnit || "cai"),
-          purchaseUnit: String(row.purchaseUnit || "cai"),
+          baseUnitId: row.baseUnitId ? String(row.baseUnitId) : undefined,
         })),
       )
+      setUnitOptions(unitRows.map((row: Record<string, unknown>) => ({
+        value: String(row.id),
+        label: String(row.name || row.id),
+        baseUnitId: row.baseUnitId ? String(row.baseUnitId) : undefined,
+        conversionFactor: Number(row.conversionFactor || 1),
+      })))
       setBatchOptions(
         batchRows.map((row: Record<string, unknown>) => ({
           value: String(row.id),
@@ -178,7 +191,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
     nextItems[index] = {
       ...nextItems[index],
       productId,
-      unit: product?.usageUnit || product?.purchaseUnit || "cai",
+      transferUnitId: product?.baseUnitId,
       supplierId: nextItems[index]?.supplierId || supplierId,
     }
     form.setFieldsValue({ items: nextItems })
@@ -263,7 +276,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
           batchNumber: item.batchNumber,
           expiryDate: item.expiryDate,
           quantity: Number(item.quantity || 0),
-          unit: item.unit,
+          transferUnitId: item.transferUnitId,
           supplierId: item.supplierId || values.supplierId,
         }))
         .filter((item) => item.productId)
@@ -348,13 +361,15 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
       ),
     },
     {
-      title: "Đơn vị",
-      dataIndex: "unit",
-      key: "unit",
-      width: 120,
-      render: (_value, row) => (
-        <Input disabled value={row.unit} placeholder="Tự động theo sản phẩm" />
-      ),
+      title: "Đơn vị nhập",
+      dataIndex: "transferUnitId",
+      key: "transferUnitId",
+      width: 170,
+      render: (_value, row) => {
+        const product = productOptions.find((item) => item.value === row.productId)
+        const options = unitOptions.filter((unit) => product?.baseUnitId && (unit.value === product.baseUnitId || unit.baseUnitId === product.baseUnitId))
+        return <Select disabled={!product?.baseUnitId} options={options} placeholder="Chọn đơn vị" style={{ width: "100%" }} value={row.transferUnitId} onChange={(value) => handleReceiptFieldChange(row.index, "transferUnitId", value)} />
+      },
     },
     {
       title: "",
@@ -485,7 +500,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
 }
 
 function createReceiptItem(defaultSupplierId?: string): ReceiptLineValue {
-  return { quantity: 1, unit: "cai", supplierId: defaultSupplierId }
+  return { quantity: 1, supplierId: defaultSupplierId }
 }
 
 function createIssueItem(): IssueLineValue {
@@ -499,7 +514,7 @@ function normalizeReceiptItems(value: unknown): ReceiptLineValue[] {
     batchNumber: (item as Record<string, unknown>)?.batchNumber ? String((item as Record<string, unknown>).batchNumber) : undefined,
     expiryDate: (item as Record<string, unknown>)?.expiryDate ? String((item as Record<string, unknown>).expiryDate) : undefined,
     quantity: Number((item as Record<string, unknown>)?.quantity || 0),
-    unit: (item as Record<string, unknown>)?.unit ? String((item as Record<string, unknown>).unit) : undefined,
+    transferUnitId: (item as Record<string, unknown>)?.transferUnitId ? String((item as Record<string, unknown>).transferUnitId) : undefined,
     supplierId: (item as Record<string, unknown>)?.supplierId ? String((item as Record<string, unknown>).supplierId) : undefined,
   }))
 }

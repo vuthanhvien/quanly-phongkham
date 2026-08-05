@@ -605,10 +605,9 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'minStockLevel', label: 'Tồn tối thiểu', type: 'number', width: '33', tableWidth: 150 },
   ],
   units: [
-    { key: 'code', label: 'Mã đơn vị', required: true, width: '33', tableWidth: 150 },
-    { key: 'name', label: 'Tên đơn vị', required: true, width: '33', tableWidth: 180 },
-    { key: 'baseUnitId', label: 'Đơn vị cơ sở', width: '33', tableWidth: 180 },
-    { key: 'conversionFactor', label: 'Tỷ lệ quy đổi', type: 'number', required: true, defaultValue: 1, width: '33', tableWidth: 160 },
+    { key: 'name', label: 'Tên đơn vị', required: true, width: '50', tableWidth: 220 },
+    { key: 'baseUnitId', label: 'Đơn vị cơ sở', width: '25', tableWidth: 180 },
+    { key: 'conversionFactor', label: 'Tỷ lệ quy đổi', type: 'number', required: true, defaultValue: 1, width: '25', tableWidth: 160 },
   ],
   'medical-episodes': [
     { key: 'customerId', label: 'Khách hàng', required: true, width: '50', tableWidth: 220 },

@@ -46,6 +46,7 @@ import {
   PositionHistory,
   RecordDraft,
   Product,
+  ProductVariant,
   Unit,
   Room,
   ServiceOrder,
@@ -352,6 +353,7 @@ const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
   leads: 'code',
   suppliers: 'code',
   products: 'code',
+  units: 'name',
   invoices: 'code',
   'user-accounts': 'email',
   'accounting-periods': 'code',
@@ -377,6 +379,7 @@ const RESOURCE_IMPORT_KEYS: Record<string, string> = {
   'lead-activities': 'id',
   suppliers: 'code',
   products: 'code',
+  units: 'name',
   'medical-episodes': 'id',
   appointments: 'id',
   'work-schedules': 'id',
@@ -437,6 +440,7 @@ export class RecordsService {
     @InjectRepository(LeadActivity) private readonly leadActivities: Repository<LeadActivity>,
     @InjectRepository(Supplier) private readonly suppliers: Repository<Supplier>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
+    @InjectRepository(ProductVariant) private readonly productVariants: Repository<ProductVariant>,
     @InjectRepository(Unit) private readonly units: Repository<Unit>,
     @InjectRepository(ServiceOrderItem) private readonly serviceOrderItems: Repository<ServiceOrderItem>,
     @InjectRepository(MedicalEpisode) private readonly episodes: Repository<MedicalEpisode>,
@@ -660,6 +664,9 @@ export class RecordsService {
     if (resource === 'service-orders') {
       return this.attachServiceOrderItems(hydrated as ServiceOrder);
     }
+    if (resource === 'products') {
+      return this.attachProductVariants(hydrated as Product);
+    }
     if (resource === 'accounting-vouchers') {
       return this.attachAccountingVoucherLines(hydrated as AccountingVoucher);
     }
@@ -845,12 +852,18 @@ export class RecordsService {
     const serviceOrderItems = resource === 'service-orders'
       ? await this.normalizeServiceOrderItems(payload.items)
       : [];
+    const productVariants = resource === 'products' ? this.normalizeProductVariants(payload.variants) : [];
+    if (resource === 'products' && Boolean(payload.hasVariants) && productVariants.length === 0) {
+      throw new BadRequestException('Sản phẩm có biến thể cần ít nhất một SKU');
+    }
     const normalized = await this.normalizeInput(resource, payload, true);
+    delete normalized.variants;
     if (resource === 'work-schedules') return this.saveWorkScheduleSchema(normalized, payload, user);
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
     const record = await this.saveRecord(resource, repository.create(normalized), repository);
+    if (resource === 'products') await this.syncProductVariants(record.id, productVariants);
     await this.syncStaffTypeToUserRole(resource, record);
     if (resource === 'service-orders') await this.replaceServiceOrderItems(record.id, serviceOrderItems);
     if (resource === 'accounting-voucher-lines') await this.recalculateAccountingVoucherTotals(String(record.voucherId || ''));
@@ -903,15 +916,23 @@ export class RecordsService {
     const serviceOrderItems = resource === 'service-orders'
       ? await this.normalizeServiceOrderItems(payload.items)
       : [];
+    const productVariants = resource === 'products' && Object.prototype.hasOwnProperty.call(payload, 'variants')
+      ? this.normalizeProductVariants(payload.variants)
+      : undefined;
+    if (resource === 'products' && Boolean(payload.hasVariants) && productVariants && productVariants.length === 0) {
+      throw new BadRequestException('Sản phẩm có biến thể cần ít nhất một SKU');
+    }
     const normalized = await this.normalizeInput(resource, {
       ...previous,
       ...payload,
     }, false);
+    delete normalized.variants;
     await this.assertPermission(user, resource, 'update', this.branchIdOf(resource, normalized) || this.branchIdOf(resource, previous));
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized, id);
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
     const record = await this.saveRecord(resource, repository.merge(previous, normalized), repository);
+    if (resource === 'products' && productVariants) await this.syncProductVariants(record.id, productVariants);
     await this.syncStaffTypeToUserRole(resource, record);
     if (resource === 'service-orders') await this.replaceServiceOrderItems(id, serviceOrderItems);
     if (resource === 'accounting-voucher-lines') {
@@ -1855,19 +1876,38 @@ export class RecordsService {
       order: { createdAt: 'DESC' },
       take: 500,
     });
-    return {
-      data: rows.map((item) => this.protect('products', item as unknown as ConfigurableEntity)),
-      total: rows.length,
-    };
+    const variants = await this.productVariants.find({ where: { isArchived: false, isActive: true }, take: 5000 });
+    const variantsByProduct = new Map<string, ProductVariant[]>();
+    variants.forEach((variant) => variantsByProduct.set(variant.productId, [...(variantsByProduct.get(variant.productId) || []), variant]));
+    const options = rows.reduce<Array<Record<string, unknown>>>((all, product) => {
+      const productVariants = variantsByProduct.get(product.id) || [];
+      if (!product.hasVariants || productVariants.length === 0) {
+        all.push({ ...this.protect('products', product as unknown as ConfigurableEntity), variantId: undefined });
+        return all;
+      }
+      all.push(...productVariants.map((variant) => ({
+        ...this.protect('products', product as unknown as ConfigurableEntity),
+        variantId: variant.id,
+        variantCode: variant.code,
+        variantName: variant.name,
+        variantAttributes: variant.attributeValues || {},
+        sellingPrice: variant.sellingPrice,
+        minStockLevel: variant.minStockLevel,
+        barcode: variant.barcode || product.barcode,
+      })));
+      return all;
+    }, []);
+    return { data: options, total: options.length };
   }
 
   async stockBatchFormOptions(user?: AuthUser) {
     await this.assertAnyActionPermission(user, 'stock-batches', ['create', 'update', 'view']);
-    const [products, branches, suppliers, batches] = await Promise.all([
+    const [products, branches, suppliers, batches, units] = await Promise.all([
       this.products.find({ order: { createdAt: 'DESC' }, take: 500 }),
       this.branches.find({ order: { createdAt: 'DESC' }, take: 200 }),
       this.suppliers.find({ order: { createdAt: 'DESC' }, take: 300 }),
       this.stockBatches.find({ order: { createdAt: 'DESC' }, take: 500 }),
+      this.units.find({ order: { name: 'ASC' }, take: 500 }),
     ]);
 
     return {
@@ -1876,6 +1916,7 @@ export class RecordsService {
         branches: branches.map((item) => this.protect('branches', item as unknown as ConfigurableEntity)),
         suppliers: suppliers.map((item) => this.protect('suppliers', item as unknown as ConfigurableEntity)),
         batches: batches.map((item) => this.protect('stock-batches', item as unknown as ConfigurableEntity)),
+        units: units.map((item) => this.protect('units', item as unknown as ConfigurableEntity)),
       },
     };
   }
@@ -1893,6 +1934,7 @@ export class RecordsService {
       const existing = await this.findMatchingStockBatch(item);
       if (existing) {
         existing.remainingQuantity = Number(existing.remainingQuantity || 0) + item.quantity;
+        existing.baseUnitId = item.baseUnitId;
         existing.unit = item.unit;
         existing.supplierId = item.supplierId;
         existing.expiryDate = item.expiryDate;
@@ -1906,6 +1948,7 @@ export class RecordsService {
         batchNumber: item.batchNumber,
         expiryDate: item.expiryDate,
         remainingQuantity: item.quantity,
+        baseUnitId: item.baseUnitId,
         unit: item.unit,
       })));
     }
@@ -3394,7 +3437,10 @@ export class RecordsService {
   private async normalizeInput(resource: string, payload: Record<string, unknown>, creating = false) {
     if (resource !== 'user-accounts') {
       const value = this.normalize(resource, payload);
-      if (resource === 'products') await this.normalizeProductBundle(value, String(payload.id || ''));
+      if (resource === 'products') {
+        await this.normalizeProductBaseUnit(value);
+        await this.normalizeProductBundle(value, String(payload.id || ''));
+      }
       await this.validateAccountingResource(resource, value, creating);
       return value;
     }
@@ -3608,6 +3654,8 @@ export class RecordsService {
     const productIds = Array.from(new Set(value.map((item) => String((item as Record<string, unknown>)?.productId || '')).filter(Boolean)));
     const products = await this.products.find({ where: { id: In(productIds) } });
     const productsById = new Map(products.map((item) => [item.id, item]));
+    const variantIds = Array.from(new Set(value.map((item) => String((item as Record<string, unknown>)?.variantId || '')).filter(Boolean)));
+    const variantsById = new Map((await this.productVariants.find({ where: { id: In(variantIds), isArchived: false } })).map((item) => [item.id, item]));
     const unitIds = Array.from(new Set([...products.map((product) => String(product.baseUnitId || '')).filter(Boolean), ...value.map((item) => String((item as Record<string, unknown>)?.transferUnitId || '')).filter(Boolean)]));
     const unitsById = new Map((await this.units.find({ where: { id: In(unitIds) } })).map((unit) => [unit.id, unit]));
 
@@ -3616,17 +3664,28 @@ export class RecordsService {
       const productId = String(item.productId || '');
       const product = productsById.get(productId);
       if (!product) throw new BadRequestException('Sản phẩm trong đơn hàng không hợp lệ');
+      const variantId = String(item.variantId || '') || undefined;
+      const variant = variantId ? variantsById.get(variantId) : undefined;
+      if (variantId && (!variant || variant.productId !== product.id || !variant.isActive)) {
+        throw new BadRequestException('Biến thể sản phẩm trong đơn hàng không hợp lệ');
+      }
+      if (product.hasVariants && !variantId && !Boolean(item.isComboComponent)) {
+        throw new BadRequestException(`Sản phẩm ${product.name} cần chọn biến thể trước khi bán`);
+      }
       const quantity = Number(item.quantity || 0);
       const transferUnitId = String(item.transferUnitId || product.baseUnitId || '') || undefined;
       const conversionFactor = this.unitConversionFactor(product.baseUnitId, transferUnitId, unitsById);
       const isComboComponent = Boolean(item.isComboComponent);
-      const unitPrice = isComboComponent ? 0 : Number(item.unitPrice ?? product.sellingPrice ?? 0);
+      const unitPrice = isComboComponent ? 0 : Number(item.unitPrice ?? variant?.sellingPrice ?? product.sellingPrice ?? 0);
       if (quantity <= 0) {
         throw new BadRequestException(`So luong khong hop le cho san pham ${product.name}`);
       }
       return this.serviceOrderItems.create({
         productId: product.id,
-        itemName: String(item.itemName || product.name),
+        variantId,
+        variantCode: variant?.code,
+        variantAttributes: variant?.attributeValues,
+        itemName: String(item.itemName || (variant ? `${product.name} - ${variant.name}` : product.name)),
         quantity,
         baseQuantity: quantity * conversionFactor,
         transferUnitId,
@@ -3639,6 +3698,50 @@ export class RecordsService {
           : undefined,
       });
     });
+  }
+
+  private normalizeProductVariants(value: unknown) {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) => {
+        const row = item as Record<string, unknown>;
+        const code = String(row.code || '').trim();
+        const name = String(row.name || '').trim();
+        if (!code || !name) throw new BadRequestException('Mỗi biến thể cần có mã và tên');
+        const attributes = row.attributeValues && typeof row.attributeValues === 'object'
+          ? row.attributeValues as Record<string, string>
+          : {};
+        return {
+          id: row.id ? String(row.id) : undefined,
+          code,
+          name,
+          barcode: String(row.barcode || '').trim() || undefined,
+          attributeValues: attributes,
+          sellingPrice: Number(row.sellingPrice || 0),
+          minStockLevel: Number(row.minStockLevel || 0),
+          isActive: row.isActive !== false,
+        };
+      });
+  }
+
+  private async syncProductVariants(productId: string, variants: ReturnType<RecordsService['normalizeProductVariants']>) {
+    const existing = await this.productVariants.find({ where: { productId } });
+    const incomingIds = new Set(variants.map((variant) => variant.id).filter(Boolean));
+    const activeExistingIds = existing.filter((variant) => !variant.isArchived).map((variant) => variant.id);
+    await Promise.all(activeExistingIds.filter((id) => !incomingIds.has(id)).map((id) => this.productVariants.update(id, { isArchived: true, isActive: false })));
+    for (const variant of variants) {
+      const payload = { ...variant, productId, isArchived: false };
+      if (variant.id && existing.some((item) => item.id === variant.id)) {
+        await this.productVariants.save(this.productVariants.merge(existing.find((item) => item.id === variant.id)!, payload));
+      } else {
+        await this.productVariants.save(this.productVariants.create(payload));
+      }
+    }
+  }
+
+  private async attachProductVariants(product: Product) {
+    const variants = await this.productVariants.find({ where: { productId: product.id, isArchived: false }, order: { createdAt: 'ASC' } });
+    return { ...product, variants };
   }
 
   private unitConversionFactor(baseUnitId: string | undefined, transferUnitId: string | undefined, units: Map<string, Unit>) {
@@ -3689,8 +3792,14 @@ export class RecordsService {
       throw new BadRequestException('Phiếu nhập kho phải có ít nhất 1 sản phẩm');
     }
     const productIds = Array.from(new Set(value.map((item) => String((item as Record<string, unknown>)?.productId || '')).filter(Boolean)));
+    const transferUnitIds = Array.from(new Set(value.map((item) => String((item as Record<string, unknown>)?.transferUnitId || '')).filter(Boolean)));
     const products = await this.products.find({ where: { id: In(productIds) } });
     const productsById = new Map(products.map((item) => [item.id, item]));
+    const unitIds = Array.from(new Set([
+      ...products.map((product) => String(product.baseUnitId || '')).filter(Boolean),
+      ...transferUnitIds,
+    ]));
+    const unitsById = new Map((await this.units.find({ where: { id: In(unitIds) } })).map((unit) => [unit.id, unit]));
 
     return value.map((rawItem) => {
       const item = rawItem as Record<string, unknown>;
@@ -3699,6 +3808,14 @@ export class RecordsService {
       if (!product) throw new BadRequestException('Sản phẩm trong phiếu nhập không hợp lệ');
       const quantity = Number(item.quantity || 0);
       if (quantity <= 0) throw new BadRequestException(`So luong nhap khong hop le cho ${product.name}`);
+      const baseUnitId = String(product.baseUnitId || '');
+      const baseUnit = unitsById.get(baseUnitId);
+      if (!baseUnit || baseUnit.baseUnitId) throw new BadRequestException(`Đơn vị cơ sở của ${product.name} không hợp lệ`);
+      const transferUnitId = String(item.transferUnitId || baseUnitId);
+      const transferUnit = unitsById.get(transferUnitId);
+      if (!transferUnit || (transferUnit.baseUnitId || transferUnit.id) !== baseUnit.id) {
+        throw new BadRequestException(`Đơn vị nhập của ${product.name} không cùng nhóm quy đổi`);
+      }
       const batchNumber = String(item.batchNumber || '').trim();
       if (!batchNumber) throw new BadRequestException(`Chua nhap so lo cho ${product.name}`);
       return {
@@ -3707,8 +3824,9 @@ export class RecordsService {
         supplierId: item.supplierId ? String(item.supplierId) : defaultSupplierId,
         batchNumber,
         expiryDate: item.expiryDate ? String(item.expiryDate) : undefined,
-        quantity,
-        unit: String(item.unit || product.usageUnit || product.purchaseUnit || 'cai'),
+        quantity: quantity * Number(transferUnit.conversionFactor || 1),
+        baseUnitId: baseUnit.id,
+        unit: baseUnit.name,
       };
     });
   }
@@ -3733,6 +3851,7 @@ export class RecordsService {
     supplierId?: string;
     batchNumber: string;
     expiryDate?: string;
+    baseUnitId: string;
     unit: string;
   }) {
     const rows = await this.stockBatches.find({
@@ -3747,8 +3866,17 @@ export class RecordsService {
     return rows.find((row) =>
       String(row.supplierId || '') === String(item.supplierId || '')
       && String(row.expiryDate || '') === String(item.expiryDate || '')
-      && String(row.unit || '') === String(item.unit || ''),
+      && String(row.baseUnitId || '') === String(item.baseUnitId || ''),
     );
+  }
+
+  private async normalizeProductBaseUnit(value: Record<string, unknown>) {
+    const baseUnitId = String(value.baseUnitId || '');
+    if (!baseUnitId) throw new BadRequestException('Sản phẩm bắt buộc chọn đơn vị cơ sở');
+    const unit = await this.units.findOne({ where: { id: baseUnitId } });
+    if (!unit || unit.baseUnitId) {
+      throw new BadRequestException('Đơn vị cơ sở của sản phẩm phải là đơn vị gốc, không phải đơn vị quy đổi');
+    }
   }
 
   private async replaceServiceOrderItems(orderId: string, items: ServiceOrderItem[]) {
@@ -3758,6 +3886,9 @@ export class RecordsService {
       items.map((item) => this.serviceOrderItems.create({
         orderId,
         productId: item.productId,
+        variantId: item.variantId,
+        variantCode: item.variantCode,
+        variantAttributes: item.variantAttributes,
         itemName: item.itemName,
         quantity: item.quantity,
         unitPrice: item.unitPrice,

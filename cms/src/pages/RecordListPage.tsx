@@ -791,7 +791,7 @@ function buildUnitTree(rows: Record<string, any>[]) {
   })
 
   const byName = (left: Record<string, any>, right: Record<string, any>) =>
-    String(left.name || left.code || "").localeCompare(String(right.name || right.code || ""), "vi")
+    String(left.name || left.id || "").localeCompare(String(right.name || right.id || ""), "vi")
   roots.sort(byName)
   nodes.forEach((node) => {
     if (node.children.length === 0) delete node.children

@@ -598,6 +598,12 @@ export class Product extends ConfigurableEntity {
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   sellingPrice: number;
 
+  @Column({ default: false })
+  hasVariants: boolean;
+
+  @Column({ type: 'simple-json', nullable: true })
+  variantAttributes?: Array<{ key: string; label: string; values: string[] }>;
+
   // Only used when productType is COMBO.  Keeping the composition on the
   // product makes a bundle portable and prevents its selling price from being
   // derived from (and accidentally changed by) its components.
@@ -611,12 +617,40 @@ export class Product extends ConfigurableEntity {
   supplierId?: string;
 }
 
-@Entity('units')
-export class Unit extends ConfigurableEntity {
+@Entity('product_variants')
+export class ProductVariant extends ConfigurableEntity {
+  @Column()
+  productId: string;
+
   @Column({ unique: true })
   code: string;
 
   @Column()
+  name: string;
+
+  @Column({ nullable: true, unique: true })
+  barcode?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  attributeValues?: Record<string, string>;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  sellingPrice: number;
+
+  @Column({ default: 0 })
+  minStockLevel: number;
+
+  @Column({ default: true })
+  isActive: boolean;
+}
+
+@Entity('units')
+export class Unit extends ConfigurableEntity {
+  // Legacy identifier kept for existing records. Unit names are the business key.
+  @Column({ unique: true, nullable: true })
+  code?: string;
+
+  @Column({ unique: true })
   name: string;
 
   // Empty for the root/base unit of a conversion family.
@@ -821,6 +855,15 @@ export class ServiceOrderItem {
   @Column()
   productId: string;
 
+  @Column({ nullable: true })
+  variantId?: string;
+
+  @Column({ nullable: true })
+  variantCode?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  variantAttributes?: Record<string, string>;
+
   @Column()
   itemName: string;
 
@@ -1010,6 +1053,9 @@ export class StockBatch extends ConfigurableEntity {
   @Column()
   productId: string;
 
+  @Column({ nullable: true })
+  variantId?: string;
+
   @Column()
   branchId: string;
 
@@ -1024,6 +1070,11 @@ export class StockBatch extends ConfigurableEntity {
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   remainingQuantity: number;
+
+  // Stock is always held in the product's base unit. This snapshot keeps
+  // batches stable if a product's default unit is later changed.
+  @Column({ nullable: true })
+  baseUnitId?: string;
 
   @Column({ default: 'cai' })
   unit: string;
@@ -2632,6 +2683,7 @@ export const ENTITIES = [
   ZaloMessage,
   Supplier,
   Product,
+  ProductVariant,
   Unit,
   MedicalEpisode,
   Appointment,

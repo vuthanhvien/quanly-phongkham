@@ -31,10 +31,17 @@ interface ProductOption {
   productType: string
   bundleItems: Array<{ productId: string; quantity: number }>
   baseUnitId?: string
+  variantId?: string
+  variantCode?: string
+  variantName?: string
+  variantAttributes?: Record<string, string>
 }
 
 interface OrderLineValue {
   productId?: string
+  variantId?: string
+  variantCode?: string
+  variantAttributes?: Record<string, string>
   itemName?: string
   quantity?: number
   unitPrice?: number
@@ -109,15 +116,19 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       setProductOptions(
         (productsResponse.data.data || []).map((row: Record<string, unknown>) => ({
           value: String(row.id),
-          label: `${row.code || ""} - ${row.name || row.id}`,
-          name: String(row.name || row.id),
+          label: `${row.code || ""}${row.variantCode ? ` / ${row.variantCode}` : ""} - ${row.name || row.id}${row.variantName ? ` - ${row.variantName}` : ""}`,
+          name: String(row.variantName ? `${row.name || ""} - ${row.variantName}` : row.name || row.id),
           sellingPrice: Number(row.sellingPrice || 0),
           productType: String(row.productType || ""),
           bundleItems: normalizeBundleItems(row.bundleItems),
           baseUnitId: row.baseUnitId ? String(row.baseUnitId) : undefined,
+          variantId: row.variantId ? String(row.variantId) : undefined,
+          variantCode: row.variantCode ? String(row.variantCode) : undefined,
+          variantName: row.variantName ? String(row.variantName) : undefined,
+          variantAttributes: row.variantAttributes as Record<string, string> | undefined,
         })),
       )
-      setUnitOptions((unitsResponse.data.data || []).map((row: Record<string, unknown>) => ({ value: String(row.id), label: `${row.code || ""} - ${row.name || row.id}` })))
+      setUnitOptions((unitsResponse.data.data || []).map((row: Record<string, unknown>) => ({ value: String(row.id), label: String(row.name || row.id) })))
       if (!editing && !form.getFieldValue("branchId")) {
         form.setFieldsValue({ branchId: getFirstOptionValue(nextBranchOptions) })
       }
@@ -146,6 +157,9 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
     nextItems[index] = {
       ...nextItems[index],
       productId,
+      variantId: product?.variantId,
+      variantCode: product?.variantCode,
+      variantAttributes: product?.variantAttributes,
       itemName: product?.name,
       unitPrice: product ? Number(nextItems[index]?.unitPrice || product.sellingPrice) : nextItems[index]?.unitPrice,
       quantity: selectedQuantity,
@@ -157,6 +171,9 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
           const componentProduct = productOptions.find((item) => item.value === component.productId)
           return componentProduct ? {
             productId: componentProduct.value,
+            variantId: componentProduct.variantId,
+            variantCode: componentProduct.variantCode,
+            variantAttributes: componentProduct.variantAttributes,
             itemName: componentProduct.name,
             quantity: selectedQuantity * Number(component.quantity || 1),
             unitPrice: 0,
@@ -186,6 +203,9 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       const normalizedItems = normalizeItems(form.getFieldValue("items"))
         .map((item) => ({
           productId: item.productId,
+          variantId: item.variantId,
+          variantCode: item.variantCode,
+          variantAttributes: item.variantAttributes,
           itemName: item.itemName,
           quantity: Number(item.quantity || 0),
           unitPrice: item.isComboComponent ? 0 : Number(item.unitPrice || 0),
@@ -371,6 +391,9 @@ function normalizeItems(value: unknown): OrderLineValue[] {
   if (!Array.isArray(value)) return []
   return value.map((item) => ({
     productId: (item as Record<string, unknown>)?.productId ? String((item as Record<string, unknown>).productId) : undefined,
+    variantId: (item as Record<string, unknown>)?.variantId ? String((item as Record<string, unknown>).variantId) : undefined,
+    variantCode: (item as Record<string, unknown>)?.variantCode ? String((item as Record<string, unknown>).variantCode) : undefined,
+    variantAttributes: (item as Record<string, unknown>)?.variantAttributes as Record<string, string> | undefined,
     itemName: (item as Record<string, unknown>)?.itemName ? String((item as Record<string, unknown>).itemName) : undefined,
     quantity: Number((item as Record<string, unknown>)?.quantity || 0),
     unitPrice: Number((item as Record<string, unknown>)?.unitPrice || 0),
