@@ -18,6 +18,7 @@ type WorkflowDefinition = {
   rejectedStatus?: string
   cancelledStatus?: string
   boardViewport?: { x?: number; y?: number; zoom?: number }
+  boardLayout?: Record<string, { x?: number; y?: number }>
   description?: string
 }
 
@@ -339,8 +340,16 @@ export function WorkflowDefinitionDetailPage() {
 
   async function saveStepPosition(step: WorkflowCanvasStep, position: { boardX: number; boardY: number }) {
     setSteps((current) => current.map((item) => item.id === step.id ? { ...item, ...position } : item))
+    const nextLayout = {
+      ...(definition?.boardLayout || {}),
+      [step.id]: { x: position.boardX, y: position.boardY },
+    }
+    setDefinition((current) => current ? { ...current, boardLayout: nextLayout } : current)
     try {
-      await api.patch(`/records/workflow-steps/${step.id}`, position)
+      await Promise.all([
+        api.patch(`/records/workflow-steps/${step.id}`, position),
+        api.patch(`/records/workflow-definitions/${id}`, { boardLayout: nextLayout }),
+      ])
     } catch (error) {
       console.warn("Không thể lưu vị trí node", error)
     }
@@ -352,6 +361,19 @@ export function WorkflowDefinitionDetailPage() {
       await api.patch(`/records/workflow-definitions/${id}`, { boardViewport: viewport })
     } catch (error) {
       console.warn("Không thể lưu vị trí board", error)
+    }
+  }
+
+  async function saveBoardNodeLayout(nodeId: string, position: { x: number; y: number }) {
+    const nextLayout = {
+      ...(definition?.boardLayout || {}),
+      [nodeId]: position,
+    }
+    setDefinition((current) => current ? { ...current, boardLayout: nextLayout } : current)
+    try {
+      await api.patch(`/records/workflow-definitions/${id}`, { boardLayout: nextLayout })
+    } catch (error) {
+      console.warn("Không thể lưu layout node", error)
     }
   }
 
@@ -401,11 +423,13 @@ export function WorkflowDefinitionDetailPage() {
               children: (
                 <>
                   <WorkflowFlowCanvas
+                    layout={definition?.boardLayout}
                     steps={steps}
                     viewport={definition?.boardViewport}
                     onAddStep={openCreateStep}
                     onEditStep={(step) => openEditStep(step as WorkflowStep)}
                     onInsertAfterStep={(step) => openCreateStepAfter(step as WorkflowStep)}
+                    onLayoutChange={(nodeId, position) => void saveBoardNodeLayout(nodeId, position)}
                     onPositionChange={(step, position) => void saveStepPosition(step, position)}
                     onReorder={(nextSteps) => void reorderSteps(nextSteps)}
                     onViewportChange={(viewport) => void saveBoardViewport(viewport)}

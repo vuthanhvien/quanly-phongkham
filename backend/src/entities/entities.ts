@@ -2302,6 +2302,9 @@ export class WorkflowDefinition extends ConfigurableEntity {
   @Column({ type: 'simple-json', nullable: true })
   boardViewport?: { x?: number; y?: number; zoom?: number };
 
+  @Column({ type: 'simple-json', nullable: true })
+  boardLayout?: Record<string, { x?: number; y?: number }>;
+
   @Column({ type: 'text', nullable: true })
   description?: string;
 }

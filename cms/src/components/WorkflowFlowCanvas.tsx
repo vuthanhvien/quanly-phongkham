@@ -4,16 +4,14 @@ import { useMemo, useState } from "react"
 import {
   Background,
   BackgroundVariant,
-  Controls,
   Handle,
   MarkerType,
   Position,
   ReactFlow,
+  ReactFlowProvider,
   type Edge,
   type Node,
-  type NodeChange,
   type NodeTypes,
-  type Viewport,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 
@@ -36,17 +34,18 @@ export type WorkflowCanvasStep = {
 
 type Props = {
   steps: WorkflowCanvasStep[]
+  layout?: Record<string, { x?: number; y?: number }>
   viewport?: { x?: number; y?: number; zoom?: number }
   onAddStep?: () => void
   onEditStep?: (step: WorkflowCanvasStep) => void
   onInsertAfterStep?: (step: WorkflowCanvasStep) => void
   onPositionChange?: (step: WorkflowCanvasStep, position: { boardX: number; boardY: number }) => void
+  onLayoutChange?: (nodeId: string, position: { x: number; y: number }) => void
   onReorder?: (steps: WorkflowCanvasStep[]) => void
   onViewportChange?: (viewport: { x: number; y: number; zoom: number }) => void
 }
 
 type Lane = { id: string; label: string; index: number }
-type LocalPosition = { boardX: number; boardY: number }
 
 const HEADER_WIDTH = 154
 const LANE_HEIGHT = 138
@@ -64,14 +63,15 @@ const nodeTypes: NodeTypes = {
   swimlane: SwimlaneNode,
 }
 
-export function WorkflowFlowCanvas({ steps, viewport, onAddStep, onEditStep, onInsertAfterStep, onPositionChange, onReorder, onViewportChange }: Props) {
+export function WorkflowFlowCanvas({ steps, layout, onAddStep, onEditStep, onInsertAfterStep, onPositionChange, onLayoutChange, onReorder, onViewportChange }: Props) {
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null)
-  const [localPositions, setLocalPositions] = useState<Record<string, LocalPosition>>({})
 
   const ordered = useMemo(() => [...steps].sort((a, b) => Number(a.stepOrder || 0) - Number(b.stepOrder || 0)), [steps])
   const lanes = useMemo(() => buildLanes(ordered), [ordered])
   const laneMap = useMemo(() => new Map(lanes.map((lane) => [lane.id, lane])), [lanes])
   const selectedStep = ordered.find((step) => step.id === selectedStepId)
+  const flowKey = useMemo(() => ordered.map((step) => `${step.id}:${step.stepOrder}:${step.approveNextStepId || ""}:${step.rejectNextStepId || ""}`).join("|") || "empty-flow", [ordered])
+  const boardHeight = Math.max(lanes.length * LANE_HEIGHT, 360)
 
   const nodes = useMemo<Node[]>(() => {
     const boardWidth = Math.max(FIRST_STEP_X + ordered.length * STEP_GAP + 460, 1280)
@@ -93,37 +93,37 @@ export function WorkflowFlowCanvas({ steps, viewport, onAddStep, onEditStep, onI
       {
         id: "__start",
         type: "startEnd",
-        position: { x: START_X, y: laneCenter(startLane) - 36 },
+        position: layoutPosition(layout, "__start", START_X, laneCenter(startLane) - 36),
         data: { label: "START", tone: "start" },
-        draggable: false,
-        selectable: false,
+        draggable: true,
+        selectable: true,
         zIndex: 2,
       },
       {
         id: "__approved",
         type: "startEnd",
-        position: { x: Math.max(FIRST_STEP_X + ordered.length * STEP_GAP + 190, 760), y: laneCenter(systemLane) - 64 },
+        position: layoutPosition(layout, "__approved", Math.max(FIRST_STEP_X + ordered.length * STEP_GAP + 190, 760), laneCenter(systemLane) - 64),
         data: { label: "APPROVED", tone: "approved" },
-        draggable: false,
-        selectable: false,
+        draggable: true,
+        selectable: true,
         zIndex: 2,
       },
       {
         id: "__rejected",
         type: "startEnd",
-        position: { x: Math.max(FIRST_STEP_X + ordered.length * STEP_GAP + 190, 760), y: laneCenter(systemLane) + 16 },
+        position: layoutPosition(layout, "__rejected", Math.max(FIRST_STEP_X + ordered.length * STEP_GAP + 190, 760), laneCenter(systemLane) + 16),
         data: { label: "REJECTED", tone: "rejected" },
-        draggable: false,
-        selectable: false,
+        draggable: true,
+        selectable: true,
         zIndex: 2,
       },
     ]
 
     ordered.forEach((step, index) => {
       const lane = laneMap.get(stepLaneId(step)) || systemLane
-      const local = localPositions[step.id]
-      const x = Number(local?.boardX ?? step.boardX ?? FIRST_STEP_X + index * STEP_GAP)
-      const y = laneCenter(lane) - TASK_HEIGHT / 2
+      const savedStepPosition = layoutPosition(layout, step.id, FIRST_STEP_X + index * STEP_GAP, laneCenter(lane) - TASK_HEIGHT / 2)
+      const x = Number(step.boardX ?? savedStepPosition.x)
+      const y = Number(step.boardY ?? savedStepPosition.y)
       flowNodes.push({
         id: step.id,
         type: "approvalTask",
@@ -139,20 +139,20 @@ export function WorkflowFlowCanvas({ steps, viewport, onAddStep, onEditStep, onI
       flowNodes.push({
         id: decisionId(step.id),
         type: "decision",
-        position: { x: x + TASK_WIDTH + 48, y: laneCenter(lane) - DECISION_SIZE / 2 },
+        position: layoutPosition(layout, decisionId(step.id), x + TASK_WIDTH + 48, laneCenter(lane) - DECISION_SIZE / 2),
         data: {
           label: "Decision",
           approveLabel: step.approveActionLabel || "Approve",
           rejectLabel: step.rejectActionLabel || "Reject",
         },
-        draggable: false,
-        selectable: false,
+        draggable: true,
+        selectable: true,
         zIndex: 3,
       })
     })
 
     return [...laneNodes, ...flowNodes]
-  }, [laneMap, lanes, localPositions, ordered, selectedStepId])
+  }, [laneMap, lanes, layout, ordered, selectedStepId])
 
   const edges = useMemo<Edge[]>(() => {
     const items: Edge[] = []
@@ -175,43 +175,27 @@ export function WorkflowFlowCanvas({ steps, viewport, onAddStep, onEditStep, onI
     return items
   }, [ordered])
 
-  const defaultViewport: Viewport = {
-    x: typeof viewport?.x === "number" ? viewport.x : 16,
-    y: typeof viewport?.y === "number" ? viewport.y : 32,
-    zoom: typeof viewport?.zoom === "number" ? viewport.zoom : 0.86,
-  }
-
-  function handleNodeChanges(changes: NodeChange[]) {
-    setLocalPositions((current) => {
-      const next = { ...current }
-      changes.forEach((change) => {
-        if (change.type !== "position" || !change.position || !ordered.some((step) => step.id === change.id)) return
-        const step = ordered.find((item) => item.id === change.id)
-        if (!step) return
-        const lane = laneMap.get(stepLaneId(step))
-        next[change.id] = {
-          boardX: Math.round(change.position.x),
-          boardY: Math.round(lane ? laneCenter(lane) - TASK_HEIGHT / 2 : change.position.y),
-        }
-      })
-      return next
-    })
-  }
-
   function handleNodeDragStop(_: unknown, node: Node) {
     const step = ordered.find((item) => item.id === node.id)
-    if (!step) return
+    if (!step) {
+      if (node.id.startsWith("decision-") || node.id.startsWith("__")) {
+        onLayoutChange?.(node.id, {
+          x: Math.round(node.position.x),
+          y: Math.round(node.position.y),
+        })
+      }
+      return
+    }
     const lane = laneMap.get(stepLaneId(step))
     const position = {
       boardX: Math.round(node.position.x),
       boardY: Math.round(lane ? laneCenter(lane) - TASK_HEIGHT / 2 : node.position.y),
     }
-    setLocalPositions((current) => ({ ...current, [step.id]: position }))
     onPositionChange?.(step, position)
     const reordered = [...ordered]
       .sort((a, b) => {
-        const ax = a.id === step.id ? position.boardX : Number(localPositions[a.id]?.boardX ?? a.boardX ?? 0)
-        const bx = b.id === step.id ? position.boardX : Number(localPositions[b.id]?.boardX ?? b.boardX ?? 0)
+        const ax = a.id === step.id ? position.boardX : FIRST_STEP_X + (Number(a.stepOrder || 1) - 1) * STEP_GAP
+        const bx = b.id === step.id ? position.boardX : FIRST_STEP_X + (Number(b.stepOrder || 1) - 1) * STEP_GAP
         return ax - bx
       })
       .map((item, index) => ({ ...item, stepOrder: index + 1 }))
@@ -220,16 +204,18 @@ export function WorkflowFlowCanvas({ steps, viewport, onAddStep, onEditStep, onI
   }
 
   function handleNodeClick(_: unknown, node: Node) {
-    const step = ordered.find((item) => item.id === node.id)
+    const stepId = node.id.startsWith("decision-") ? node.id.replace("decision-", "") : node.id
+    const step = ordered.find((item) => item.id === stepId)
     setSelectedStepId(step?.id || null)
   }
 
   function handleNodeDoubleClick(_: unknown, node: Node) {
-    const step = ordered.find((item) => item.id === node.id)
+    const stepId = node.id.startsWith("decision-") ? node.id.replace("decision-", "") : node.id
+    const step = ordered.find((item) => item.id === stepId)
     if (step) onEditStep?.(step)
   }
 
-  function handleMoveEnd(_: unknown, nextViewport: Viewport) {
+  function handleMoveEnd(_: unknown, nextViewport: { x: number; y: number; zoom: number }) {
     onViewportChange?.({
       x: Math.round(nextViewport.x),
       y: Math.round(nextViewport.y),
@@ -238,28 +224,33 @@ export function WorkflowFlowCanvas({ steps, viewport, onAddStep, onEditStep, onI
   }
 
   return (
-    <div className="workflow-flow-canvas">
-      <ReactFlow
-        className="workflow-flow-canvas__flow"
-        defaultViewport={defaultViewport}
-        edges={edges}
-        fitView={!viewport?.zoom}
-        maxZoom={1.6}
-        minZoom={0.35}
-        nodeTypes={nodeTypes}
-        nodes={nodes}
-        nodesDraggable
-        nodesFocusable
-        onMoveEnd={handleMoveEnd}
-        onNodeClick={handleNodeClick}
-        onNodeDoubleClick={handleNodeDoubleClick}
-        onNodeDragStop={handleNodeDragStop}
-        onNodesChange={handleNodeChanges}
-        panOnDrag
-      >
-        <Background color="rgba(179, 0, 0, 0.16)" gap={24} size={1} variant={BackgroundVariant.Lines} />
-        <Controls showInteractive={false} />
-      </ReactFlow>
+    <div className="workflow-flow-canvas" style={{ height: boardHeight }}>
+      <ReactFlowProvider>
+        <ReactFlow
+          key={flowKey}
+          className="workflow-flow-canvas__flow"
+          defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+          defaultEdges={edges}
+          defaultNodes={nodes}
+          maxZoom={1.6}
+          minZoom={0.35}
+          nodeTypes={nodeTypes}
+          nodesDraggable
+          nodesFocusable
+          onMoveEnd={handleMoveEnd}
+          onNodeClick={handleNodeClick}
+          onNodeDoubleClick={handleNodeDoubleClick}
+          onNodeDragStop={handleNodeDragStop}
+          panOnDrag
+          panOnScroll
+          proOptions={{ hideAttribution: true }}
+          zoomOnDoubleClick
+          zoomOnPinch
+          zoomOnScroll
+        >
+          <Background color="rgba(179, 0, 0, 0.16)" gap={24} size={1} variant={BackgroundVariant.Lines} />
+        </ReactFlow>
+      </ReactFlowProvider>
       <div className="workflow-flow-canvas__toolbar">
         <Space size={6}>
           <Tooltip title="Thêm bước mới">
@@ -339,6 +330,14 @@ function stepLaneId(step: WorkflowCanvasStep) {
 
 function decisionId(stepId: string) {
   return `decision-${stepId}`
+}
+
+function layoutPosition(layout: Record<string, { x?: number; y?: number }> | undefined, nodeId: string, fallbackX: number, fallbackY: number) {
+  const saved = layout?.[nodeId]
+  return {
+    x: Number(saved?.x ?? fallbackX),
+    y: Number(saved?.y ?? fallbackY),
+  }
 }
 
 function ApprovalTaskNode({ data, selected }: any) {
