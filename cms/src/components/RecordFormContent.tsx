@@ -401,7 +401,7 @@ export function RecordFormContent({
             name={field.key}
             rules={[{ required: Boolean(field.required && !field.disabled), message: `Nhập ${field.label}` }]}
           >
-            <FieldInput field={field} lookups={lookups} />
+            <FieldInput field={field} lookups={lookups} resource={resource} />
           </Form.Item>
         </Col>
       ))}
@@ -701,11 +701,13 @@ function widthToSpan(width?: FieldSpec["width"]) {
 function FieldInput({
   field,
   lookups,
+  resource,
   value,
   onChange,
 }: {
   field: FieldSpec
   lookups: LookupMap
+  resource: string
   value?: unknown
   onChange?: (value: unknown) => void
 }) {
@@ -802,16 +804,18 @@ function FieldInput({
         />
       )
     }
+    const isBaseUnitPicker = resource === "units" && field.key === "baseUnitId"
+    const options = buildRelationSelectOptions(lookups, relation.lookupKey || relation.resource, relation.resource)
     return (
       <Select
         allowClear
         disabled={field.disabled}
         showSearch
         optionFilterProp="searchLabel"
-        options={buildRelationSelectOptions(lookups, relation.lookupKey || relation.resource, relation.resource)}
+        options={isBaseUnitPicker ? [{ value: "__BASE_UNIT__", label: "Đơn vị cơ sở (không quy đổi)" }, ...options] : options}
         placeholder={placeholder}
-        value={value}
-        onChange={onChange}
+        value={isBaseUnitPicker && !value ? "__BASE_UNIT__" : value}
+        onChange={(nextValue) => onChange?.(isBaseUnitPicker && nextValue === "__BASE_UNIT__" ? null : nextValue)}
       />
     )
   }

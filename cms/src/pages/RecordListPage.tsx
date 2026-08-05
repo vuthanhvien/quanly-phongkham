@@ -96,6 +96,10 @@ export function RecordListPage() {
   const detailId = searchParams.get("detail")
   const { mutate: deleteRecord } = useDelete()
   const refresh = () => query.query?.refetch?.() || query.refetch?.()
+  const tableRows = useMemo(
+    () => resource === "units" ? buildUnitTree(rows as Record<string, any>[]) : rows,
+    [resource, rows],
+  )
 
   useEffect(() => {
     setCurrentPage(1)
@@ -169,13 +173,15 @@ export function RecordListPage() {
         title: "",
         key: "action",
         fixed: "right" as const,
-        width: screens.md ? 200 : 56,
+        width: screens.md ? (resource === "units" ? 168 : 200) : 56,
         render: (_: unknown, row: Record<string, any>) => {
           const recordId = String(row.id)
+          const isUnitRoot = resource === "units" && !row.baseUnitId
           const menuItems: any[] = []
           if (hasActionAccess(resource, "view")) menuItems.push({ key: "quick-view", icon: <EyeOutlined />, label: "Xem chi tiết", onClick: () => openDetail(recordId) })
           if (hasActionAccess(resource, "view")) menuItems.push({ key: "full-view", icon: <FullscreenOutlined />, label: "Xem đầy đủ", onClick: () => navigate(`/${resource}/${recordId}/full`) })
           if (recordStatus === "active" && hasActionAccess(resource, "update")) menuItems.push({ key: "edit", icon: <EditOutlined />, label: "Chỉnh sửa", onClick: () => setEditingId(recordId) })
+          if (isUnitRoot && recordStatus === "active" && hasActionAccess(resource, "create")) menuItems.push({ key: "add-child", icon: <PlusOutlined />, label: "Thêm đơn vị quy đổi", onClick: () => createChildUnit(recordId) })
           if (recordStatus === "active" && hasActionAccess(resource, "create") && resource !== "files") menuItems.push({ key: "copy", icon: <CopyOutlined />, label: "Nhân bản", onClick: () => void duplicateRecord(recordId) })
           if (resource === "customers" && hasActionAccess(resource, "reveal-phone")) menuItems.push({ key: "phone", icon: <PhoneOutlined />, label: "Xem số điện thoại", onClick: () => void revealPhone(recordId) })
           if (resource === "leads" && !row.convertedCustomerId && hasActionAccess(resource, "convert-to-customer")) menuItems.push({ key: "convert", icon: <SwapOutlined />, label: "Chuyển thành khách hàng", onClick: () => void convertLead(recordId) })
@@ -200,6 +206,11 @@ export function RecordListPage() {
             {recordStatus === "active" && hasActionAccess(resource, "update") && (
               <Tooltip title="Chỉnh sửa">
                 <Button icon={<EditOutlined />} type="text" onClick={() => setEditingId(recordId)} />
+              </Tooltip>
+            )}
+            {isUnitRoot && recordStatus === "active" && hasActionAccess(resource, "create") && (
+              <Tooltip title="Thêm đơn vị quy đổi">
+                <Button icon={<PlusOutlined />} type="text" onClick={() => createChildUnit(recordId)} />
               </Tooltip>
             )}
             {recordStatus === "active" && hasActionAccess(resource, "create") && resource !== "files" && (
@@ -335,6 +346,12 @@ export function RecordListPage() {
     } finally {
       setDuplicatingId(null)
     }
+  }
+
+  function createChildUnit(baseUnitId: string) {
+    setEditingId(null)
+    setDuplicateValues({ baseUnitId, conversionFactor: 1 })
+    setCreating(true)
   }
 
   async function generateAccountingVoucher(currentResource: string, recordId: string) {
@@ -520,7 +537,7 @@ export function RecordListPage() {
       <Card className="table-card">
         <Table
           columns={columns}
-          dataSource={rows}
+          dataSource={tableRows}
           key={`${resource}-${recordStatus}`}
           loading={loading}
           pagination={{
@@ -536,6 +553,8 @@ export function RecordListPage() {
             },
           }}
           rowKey="id"
+          expandable={resource === "units" ? { defaultExpandAllRows: true } : undefined}
+          indentSize={28}
           rowSelection={recordStatus === "active" && hasActionAccess(resource, "delete") ? {
             selectedRowKeys,
             onChange: setSelectedRowKeys,
@@ -756,4 +775,27 @@ function buildDuplicateValues(record: Record<string, unknown>) {
   }
 
   return nextValues
+}
+
+function buildUnitTree(rows: Record<string, any>[]) {
+  const nodes = new Map<string, Record<string, any>>()
+  rows.forEach((row) => nodes.set(String(row.id), { ...row, children: [] }))
+
+  const roots: Record<string, any>[] = []
+  rows.forEach((row) => {
+    const node = nodes.get(String(row.id))!
+    const parentId = String(row.baseUnitId || "")
+    const parent = parentId ? nodes.get(parentId) : undefined
+    if (parent && parent !== node) parent.children.push(node)
+    else roots.push(node)
+  })
+
+  const byName = (left: Record<string, any>, right: Record<string, any>) =>
+    String(left.name || left.code || "").localeCompare(String(right.name || right.code || ""), "vi")
+  roots.sort(byName)
+  nodes.forEach((node) => {
+    if (node.children.length === 0) delete node.children
+    else node.children.sort(byName)
+  })
+  return roots
 }
