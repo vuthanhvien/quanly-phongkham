@@ -257,6 +257,7 @@ export class WorkflowService {
 
     const steps = await this.steps.find({ where: { definitionId: instance.definitionId, isActive: true }, order: { stepOrder: 'ASC' } });
     const currentStep = steps.find((step) => step.id === task.stepId || step.stepOrder === task.stepOrder);
+    const approveTerminal = currentStep?.approveNextStepId === '__REJECT' ? 'rejected' : 'approved';
     const nextStep = currentStep?.approveNextStepId
       ? steps.find((step) => step.id === currentStep.approveNextStepId) || null
       : steps.find((step) => step.stepOrder > task.stepOrder) || null;
@@ -270,11 +271,16 @@ export class WorkflowService {
       return this.instanceDetail(instanceId, user);
     }
 
-    instance.status = 'approved';
+    instance.status = approveTerminal;
     instance.completedAt = new Date();
     await this.instances.save(instance);
-    await this.applyFinalStatus(instance, 'approved', user);
-    await this.actions.save(this.actions.create({ instanceId, action: 'complete', actorUserId: user.id, actorStaffId: user.staffId }));
+    await this.applyFinalStatus(instance, approveTerminal, user);
+    await this.actions.save(this.actions.create({
+      instanceId,
+      action: approveTerminal === 'approved' ? 'complete' : 'approve_to_reject',
+      actorUserId: user.id,
+      actorStaffId: user.staffId,
+    }));
     return this.instanceDetail(instanceId, user);
   }
 

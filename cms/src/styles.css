@@ -3495,7 +3495,8 @@ textarea.ant-input {
 .workflow-flow-canvas {
   position: relative;
   width: 100%;
-  min-height: 360px;
+  height: calc(100vh - 178px);
+  min-height: 640px;
   border: 1px solid rgba(148, 163, 184, 0.36);
   border-radius: 8px;
   background: #f8fafc;

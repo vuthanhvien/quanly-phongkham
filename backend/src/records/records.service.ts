@@ -114,6 +114,7 @@ type ImportBundleSheetConfig = {
   parentField?: string;
   parentCodeColumn?: string;
   matchField?: string;
+  customFields?: Array<Pick<CustomFieldDefinition, 'key' | 'dataType' | 'relationResource' | 'options'>>;
 };
 
 const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
@@ -731,7 +732,7 @@ export class RecordsService {
   }
 
   async exportImportBundle(resource: string, template = false, fake = false, user?: AuthUser, request?: RequestContext) {
-    const config = this.bundleConfig(resource);
+    const config = await this.bundleConfig(resource);
     await this.assertPermission(user, config.main.resource, 'view');
 
     if (template && fake) {
@@ -779,7 +780,7 @@ export class RecordsService {
   }
 
   async importBundle(resource: string, sheets: Record<string, Array<Record<string, unknown>>>, user: AuthUser) {
-    const config = this.bundleConfig(resource);
+    const config = await this.bundleConfig(resource);
     const mainSheetRows = Array.isArray(sheets?.[config.main.sheetName]) ? sheets[config.main.sheetName] : [];
     const parentCache = new Map<string, ConfigurableEntity>();
 
@@ -1078,10 +1079,36 @@ export class RecordsService {
     return RESOURCE_IMPORT_KEYS[resource];
   }
 
-  private bundleConfig(resource: string) {
+  private async bundleConfig(resource: string) {
     const config = IMPORT_BUNDLE_CONFIGS[resource as BundleRootResource];
     if (!config) throw new BadRequestException('Module này chưa hỗ trợ import/export bundle');
-    return config;
+
+    const resources = [config.main.resource, ...config.related.map((sheet) => sheet.resource)];
+    const definitions = await this.fieldDefinitions.find({
+      where: { entityType: In(resources), isActive: true, isArchived: false },
+      order: { sortOrder: 'ASC', createdAt: 'ASC' },
+    });
+    const definitionsByResource = new Map<string, Array<Pick<CustomFieldDefinition, 'key' | 'dataType' | 'relationResource' | 'options'>>>();
+    definitions.forEach((definition) => {
+      const current = definitionsByResource.get(definition.entityType) || [];
+      current.push(definition);
+      definitionsByResource.set(definition.entityType, current);
+    });
+
+    const enrichSheet = (sheet: ImportBundleSheetConfig): ImportBundleSheetConfig => {
+      const customFields = (definitionsByResource.get(sheet.resource) || [])
+        .filter((field) => !sheet.columns.includes(field.key));
+      return {
+        ...sheet,
+        columns: [...sheet.columns, ...customFields.map((field) => field.key)],
+        customFields,
+      };
+    };
+
+    return {
+      main: enrichSheet(config.main),
+      related: config.related.map(enrichSheet),
+    };
   }
 
   private async listBundleRows(resource: string, user?: AuthUser) {
@@ -1114,6 +1141,9 @@ export class RecordsService {
     request?: RequestContext,
   ) {
     const relatedValueCache = new Map<string, string>();
+    const customValuesByRecord = sheetConfig.customFields?.length
+      ? await this.loadCustomFieldsMap(sheetConfig.resource, rows.map((row) => String(row.id || '')).filter(Boolean))
+      : new Map<string, Record<string, unknown>>();
     return Promise.all(
       rows.map(async (row) => {
         const exported: Record<string, unknown> = {};
@@ -1126,10 +1156,11 @@ export class RecordsService {
             exported[column] = parentCodeById.get(String(row[sheetConfig.parentField] || '')) || '';
             continue;
           }
+          const isCustomField = sheetConfig.customFields?.some((field) => field.key === column);
           exported[column] = await this.exportBundleColumnValue(
             sheetConfig.resource,
             column,
-            row[column],
+            isCustomField ? customValuesByRecord.get(String(row.id || ''))?.[column] : row[column],
             relatedValueCache,
             request,
           );
@@ -1140,7 +1171,7 @@ export class RecordsService {
   }
 
   private async buildFakeBundleSheets(resource: BundleRootResource, request?: RequestContext) {
-    const config = this.bundleConfig(resource);
+    const config = await this.bundleConfig(resource);
     const sampleSize = 5;
     const referencePools = await this.loadBundleReferencePools(config);
     const parentCodes = Array.from({ length: sampleSize }, (_, index) => this.generateBundleCode(resource, index));
@@ -1202,6 +1233,9 @@ export class RecordsService {
         const resource = FIELD_RELATION_RESOURCES[column];
         if (resource) relationResources.add(resource);
       });
+      sheet.customFields?.forEach((field) => {
+        if (field.relationResource) relationResources.add(field.relationResource);
+      });
     });
 
     const entries = await Promise.all(
@@ -1241,7 +1275,10 @@ export class RecordsService {
         row[column] = context.parentCode;
         continue;
       }
-      row[column] = this.fakeBundleValue(sheetConfig.resource, column, context);
+      const customField = sheetConfig.customFields?.find((field) => field.key === column);
+      row[column] = customField
+        ? this.fakeBundleCustomFieldValue(customField, context)
+        : this.fakeBundleValue(sheetConfig.resource, column, context);
     }
     return row;
   }
@@ -1314,6 +1351,23 @@ export class RecordsService {
       return `${context.index + 1}`.padStart(10, '0');
     }
     return `Mau ${column} ${context.index + 1}`;
+  }
+
+  private fakeBundleCustomFieldValue(
+    field: Pick<CustomFieldDefinition, 'key' | 'dataType' | 'relationResource' | 'options'>,
+    context: { index: number; referencePools: Record<string, string[]> },
+  ) {
+    if (field.relationResource) {
+      const pool = context.referencePools[field.relationResource] || [];
+      return pool.length > 0 ? pool[context.index % pool.length] : '';
+    }
+    if (field.dataType === 'number') return (context.index + 1) * 100;
+    if (field.dataType === 'boolean') return context.index % 2 === 0;
+    if (field.dataType === 'date') return this.fakeDate(context.index);
+    if (field.dataType === 'datetime') return this.fakeDateTime(context.index);
+    if (field.dataType === 'select' && field.options?.length) return field.options[context.index % field.options.length];
+    if (field.dataType === 'multi-select' && field.options?.length) return field.options.slice(0, Math.min(2, field.options.length));
+    return `Mau ${field.key} ${context.index + 1}`;
   }
 
   private fakeStaffBundleValue(
@@ -1710,26 +1764,55 @@ export class RecordsService {
     parentRecord?: ConfigurableEntity,
   ) {
     const payload: Record<string, unknown> = {};
+    const customFields: Record<string, unknown> = {};
     for (const column of sheetConfig.columns) {
       if (column === 'recordId') continue;
       if (sheetConfig.parentCodeColumn && column === sheetConfig.parentCodeColumn) continue;
       const rawValue = row[column];
       if (rawValue === undefined || rawValue === null || (typeof rawValue === 'string' && rawValue.trim() === '')) continue;
-      payload[column] = await this.resolveBundleImportValue(column, rawValue);
+      const customField = sheetConfig.customFields?.find((field) => field.key === column);
+      const value = await this.resolveBundleImportValue(column, rawValue, customField);
+      if (customField) customFields[column] = value;
+      else payload[column] = value;
     }
+    if (Object.keys(customFields).length > 0) payload.customFields = customFields;
     if (sheetConfig.parentField && parentRecord) {
       payload[sheetConfig.parentField] = String(parentRecord.id);
     }
     return payload;
   }
 
-  private async resolveBundleImportValue(column: string, rawValue: unknown) {
-    const relationResource = FIELD_RELATION_RESOURCES[column];
-    if (!relationResource) return rawValue;
-    if (Array.isArray(rawValue)) {
-      return Promise.all(rawValue.map((value) => this.resolveBundleRelationValue(relationResource, value)));
+  private async resolveBundleImportValue(
+    column: string,
+    rawValue: unknown,
+    customField?: Pick<CustomFieldDefinition, 'key' | 'dataType' | 'relationResource' | 'options'>,
+  ) {
+    const relationResource = customField?.relationResource || FIELD_RELATION_RESOURCES[column];
+    const normalizedValue = customField ? this.normalizeBundleCustomFieldValue(customField, rawValue) : rawValue;
+    if (!relationResource) return normalizedValue;
+    if (Array.isArray(normalizedValue)) {
+      return Promise.all(normalizedValue.map((value) => this.resolveBundleRelationValue(relationResource, value)));
     }
-    return this.resolveBundleRelationValue(relationResource, rawValue);
+    return this.resolveBundleRelationValue(relationResource, normalizedValue);
+  }
+
+  private normalizeBundleCustomFieldValue(
+    field: Pick<CustomFieldDefinition, 'dataType'>,
+    rawValue: unknown,
+  ) {
+    if (field.dataType === 'number') {
+      const parsed = Number(String(rawValue).replace(/,/g, '').trim());
+      return Number.isFinite(parsed) ? parsed : rawValue;
+    }
+    if (field.dataType === 'boolean') {
+      const token = String(rawValue).trim().toLowerCase();
+      if (['true', '1', 'yes'].includes(token)) return true;
+      if (['false', '0', 'no'].includes(token)) return false;
+    }
+    if (field.dataType === 'multi-select' && !Array.isArray(rawValue)) {
+      return String(rawValue).split(',').map((value) => value.trim()).filter(Boolean);
+    }
+    return rawValue;
   }
 
   private async resolveBundleRelationValue(resource: string, rawValue: unknown) {

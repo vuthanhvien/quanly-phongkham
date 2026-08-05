@@ -214,7 +214,7 @@ export function RecordImportPage() {
           label: `${definition.sheetName} (${rows.length})`,
           children: (
             <Table
-              columns={buildBundlePreviewColumns(definition)}
+              columns={buildBundlePreviewColumns(definition, rows)}
               dataSource={rows.map((row, index) => ({ __rowKey: `${definition.sheetName}-${index}`, ...row }))}
               locale={{ emptyText: "Sheet này chưa có dữ liệu" }}
               pagination={{ pageSize: 20, showSizeChanger: true }}
@@ -452,8 +452,15 @@ export function RecordImportPage() {
   )
 }
 
-function buildBundlePreviewColumns(definition: BundleSheetDefinition): ColumnsType<Record<string, unknown>> {
-  return definition.columns.map((column) => ({
+function buildBundlePreviewColumns(
+  definition: BundleSheetDefinition,
+  rows: Array<Record<string, unknown>>,
+): ColumnsType<Record<string, unknown>> {
+  const columns = Array.from(new Set([
+    ...definition.columns,
+    ...rows.flatMap((row) => Object.keys(row)),
+  ]))
+  return columns.map((column) => ({
     title: column,
     dataIndex: column,
     key: column,
@@ -885,8 +892,12 @@ function normalizeBundleSheetRow(
   const normalizedSource = Object.fromEntries(
     Object.entries(rawRow).map(([key, value]) => [String(key).trim(), value]),
   )
+  const fieldByKey = new Map(fields.map((field) => [field.key, field]))
   const row: Record<string, unknown> = {}
-  fields.forEach((field) => {
+  // Related sheets can carry custom fields that are configured dynamically on
+  // the API. Preserve unknown headers so they arrive at the bundle importer.
+  Object.keys(normalizedSource).forEach((key) => {
+    const field = fieldByKey.get(key) || { key, label: key, type: "text" }
     const rawValue = normalizedSource[field.key]
     if (isEmptyValue(rawValue)) return
     const parsed = parseBundleFieldValue(field, rawValue)

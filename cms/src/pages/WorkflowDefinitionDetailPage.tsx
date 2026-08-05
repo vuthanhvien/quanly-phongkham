@@ -452,7 +452,7 @@ export function WorkflowDefinitionDetailPage() {
                     { title: "#", dataIndex: "stepOrder", width: 80 },
                     { title: "Bước duyệt", dataIndex: "name" },
                     { title: "Người duyệt", render: (_, row) => approverLabel(row) },
-                    { title: "Approve", render: (_, row) => stepName(row.approveNextStepId, steps) || "Step kế tiếp" },
+                    { title: "Approve", render: (_, row) => stepName(row.approveNextStepId, steps) || terminalStepLabel(row.approveNextStepId) || "Step kế tiếp" },
                     { title: "Reject", render: (_, row) => row.rejectBehavior === "GOTO_STEP" ? stepName(row.rejectNextStepId, steps) || "-" : "Kết thúc từ chối" },
                     { title: "Trạng thái", render: (_, row) => <Tag color={row.isActive ? "green" : "default"}>{row.isActive ? "Đang dùng" : "Tắt"}</Tag> },
                     {
@@ -691,9 +691,19 @@ function stepName(stepId: string | undefined, steps: WorkflowStep[]) {
   return step ? `${step.stepOrder}. ${step.name}` : ""
 }
 
+function terminalStepLabel(stepId?: string) {
+  if (stepId === "__DONE") return "DONE - Hoàn tất"
+  if (stepId === "__REJECT") return "REJECT - Từ chối"
+  return ""
+}
+
 function stepSelectOptions(steps: WorkflowStep[], currentId?: string) {
-  return steps
+  return [
+    { value: "__DONE", label: "DONE - Hoàn tất" },
+    { value: "__REJECT", label: "REJECT - Từ chối" },
+    ...steps
     .filter((step) => step.id !== currentId)
     .sort((a, b) => Number(a.stepOrder || 0) - Number(b.stepOrder || 0))
-    .map((step) => ({ value: step.id, label: `${step.stepOrder}. ${step.name}` }))
+    .map((step) => ({ value: step.id, label: `${step.stepOrder}. ${step.name}` })),
+  ]
 }

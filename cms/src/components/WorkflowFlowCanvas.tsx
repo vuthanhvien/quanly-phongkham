@@ -71,7 +71,7 @@ export function WorkflowFlowCanvas({ steps, layout, onAddStep, onEditStep, onIns
   const laneMap = useMemo(() => new Map(lanes.map((lane) => [lane.id, lane])), [lanes])
   const selectedStep = ordered.find((step) => step.id === selectedStepId)
   const flowKey = useMemo(() => ordered.map((step) => `${step.id}:${step.stepOrder}:${step.approveNextStepId || ""}:${step.rejectNextStepId || ""}`).join("|") || "empty-flow", [ordered])
-  const boardHeight = Math.max(lanes.length * LANE_HEIGHT, 360)
+  const boardHeight = Math.max(lanes.length * LANE_HEIGHT, 640)
 
   const nodes = useMemo<Node[]>(() => {
     const boardWidth = Math.max(FIRST_STEP_X + ordered.length * STEP_GAP + 460, 1280)
@@ -161,16 +161,29 @@ export function WorkflowFlowCanvas({ steps, layout, onAddStep, onEditStep, onIns
       items.push(makeEdge("__start", firstStep.id, "submit", "Gửi duyệt", "neutral"))
     }
     ordered.forEach((step, index) => {
-      const nextStep = step.approveNextStepId
-        ? ordered.find((item) => item.id === step.approveNextStepId)
-        : ordered[index + 1]
+      const hasExplicitTerminal = ["__DONE", "__REJECT"].includes(String(step.approveNextStepId || ""))
+      const approveTerminal = step.approveNextStepId === "__REJECT" ? "__rejected" : "__approved"
+      const nextStep = hasExplicitTerminal
+        ? undefined
+        : step.approveNextStepId
+          ? ordered.find((item) => item.id === step.approveNextStepId)
+          : ordered[index + 1]
       const rejectStep = step.rejectBehavior === "GOTO_STEP" && step.rejectNextStepId
         ? ordered.find((item) => item.id === step.rejectNextStepId)
         : undefined
 
       items.push(makeEdge(step.id, decisionId(step.id), `task-${step.id}`, "Xử lý", "neutral"))
-      items.push(makeEdge(decisionId(step.id), nextStep?.id || "__approved", `approve-${step.id}`, step.approveActionLabel || "Approve", "approve", "approve"))
-      items.push(makeEdge(decisionId(step.id), rejectStep?.id || "__rejected", `reject-${step.id}`, step.rejectActionLabel || "Reject", "reject", "reject"))
+      items.push(makeEdge(decisionId(step.id), nextStep?.id || approveTerminal, `approve-${step.id}`, step.approveActionLabel || "Approve", "approve", "approve"))
+      // Give every rejection its own horizontal routing lane so branches remain legible.
+      items.push(makeEdge(
+        decisionId(step.id),
+        rejectStep?.id || "__rejected",
+        `reject-${step.id}`,
+        step.rejectActionLabel || "Reject",
+        "reject",
+        "reject",
+        34 + index * 28,
+      ))
     })
     return items
   }, [ordered])
@@ -224,7 +237,7 @@ export function WorkflowFlowCanvas({ steps, layout, onAddStep, onEditStep, onIns
   }
 
   return (
-    <div className="workflow-flow-canvas" style={{ height: boardHeight }}>
+    <div className="workflow-flow-canvas" style={{ minHeight: boardHeight }}>
       <ReactFlowProvider>
         <ReactFlow
           key={flowKey}
@@ -272,7 +285,15 @@ export function WorkflowFlowCanvas({ steps, layout, onAddStep, onEditStep, onIns
   )
 }
 
-function makeEdge(source: string, target: string, id: string, label: string, tone: "approve" | "reject" | "neutral", sourceHandle?: string): Edge {
+function makeEdge(
+  source: string,
+  target: string,
+  id: string,
+  label: string,
+  tone: "approve" | "reject" | "neutral",
+  sourceHandle?: string,
+  routeOffset = 0,
+): Edge {
   const isReject = tone === "reject"
   const isApprove = tone === "approve"
   return {
@@ -282,6 +303,11 @@ function makeEdge(source: string, target: string, id: string, label: string, ton
     sourceHandle,
     type: "smoothstep",
     label,
+    pathOptions: {
+      borderRadius: 10,
+      // Offset differs per reject edge, giving each branch a separate route.
+      offset: routeOffset || 24,
+    },
     markerEnd: {
       type: MarkerType.ArrowClosed,
       color: isApprove ? "#16a34a" : isReject ? "#dc2626" : "#334155",
@@ -300,7 +326,7 @@ function makeEdge(source: string, target: string, id: string, label: string, ton
       fontSize: 11,
       fontWeight: 700,
     },
-  }
+  } as Edge
 }
 
 function buildLanes(steps: WorkflowCanvasStep[]) {

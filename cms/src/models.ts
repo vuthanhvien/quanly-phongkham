@@ -768,7 +768,6 @@ export const baseFields: Record<string, FieldSpec[]> = {
       { value: 'business-trip-requests', label: 'Đơn công tác' },
       { value: 'payment-requests', label: 'Đơn xin thanh toán' },
     ], required: true, width: '50', tableWidth: 220 },
-    { key: 'boardLayout', label: 'Layout board', type: 'textarea', width: '100', tableWidth: 220 },
     { key: 'description', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   'workflow-steps': [
