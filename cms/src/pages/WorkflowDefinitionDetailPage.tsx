@@ -17,6 +17,7 @@ type WorkflowDefinition = {
   approvedStatus?: string
   rejectedStatus?: string
   cancelledStatus?: string
+  boardViewport?: { x?: number; y?: number; zoom?: number }
   description?: string
 }
 
@@ -25,12 +26,21 @@ type WorkflowStep = {
   definitionId: string
   name: string
   stepOrder: number
+  stateKey?: string
+  stateLabel?: string
   approverType: string
   approverStaffId?: string
   approverUserId?: string
   approverRoleKey?: string
   approvalMode?: string
+  approveNextStepId?: string
+  approveActionLabel?: string
+  boardX?: number
+  boardY?: number
   isActive: boolean
+  rejectBehavior?: string
+  rejectActionLabel?: string
+  rejectNextStepId?: string
 }
 
 type WorkflowStepTemplate = {
@@ -42,7 +52,11 @@ type WorkflowStepTemplate = {
   approvedStatus: string
   rejectedStatus: string
   cancelledStatus: string
-  steps: Array<Pick<WorkflowStep, "name" | "approverType" | "approverRoleKey" | "approvalMode" | "isActive">>
+  steps: Array<Pick<WorkflowStep, "name" | "stateKey" | "stateLabel" | "approverType" | "approverRoleKey" | "approvalMode" | "approveActionLabel" | "approveNextStepId" | "boardX" | "boardY" | "isActive" | "rejectBehavior" | "rejectActionLabel" | "rejectNextStepId"> & {
+    key: string
+    approveNextKey?: string
+    rejectNextKey?: string
+  }>
 }
 
 const TARGET_RESOURCES = ["leave-requests", "attendance-adjustment-requests", "business-trip-requests", "payment-requests"]
@@ -65,8 +79,8 @@ const WORKFLOW_STEP_TEMPLATES: WorkflowStepTemplate[] = [
     rejectedStatus: "rejected",
     cancelledStatus: "cancelled",
     steps: [
-      { name: "Leader duyệt ngày nghỉ", approverType: "EMPLOYEE_LEADER", approvalMode: "any", isActive: true },
-      { name: "HR xác nhận phép", approverType: "ROLE", approverRoleKey: "HR", approvalMode: "any", isActive: true },
+      { key: "leader", name: "Leader duyệt ngày nghỉ", stateKey: "leader_review", stateLabel: "Chờ Leader duyệt", approverType: "EMPLOYEE_LEADER", approvalMode: "any", approveActionLabel: "Duyệt phép", approveNextKey: "hr", boardX: -180, boardY: 0, isActive: true, rejectBehavior: "END_REJECT", rejectActionLabel: "Từ chối phép" },
+      { key: "hr", name: "HR xác nhận phép", stateKey: "hr_confirm", stateLabel: "Chờ HR xác nhận", approverType: "ROLE", approverRoleKey: "HR", approvalMode: "any", approveActionLabel: "Xác nhận phép", boardX: 180, boardY: 0, isActive: true, rejectBehavior: "END_REJECT", rejectActionLabel: "Từ chối phép" },
     ],
   },
   {
@@ -79,9 +93,9 @@ const WORKFLOW_STEP_TEMPLATES: WorkflowStepTemplate[] = [
     rejectedStatus: "rejected",
     cancelledStatus: "cancelled",
     steps: [
-      { name: "Mentor xác nhận kế hoạch", approverType: "EMPLOYEE_MENTOR", approvalMode: "any", isActive: true },
-      { name: "Leader duyệt ngày nghỉ", approverType: "EMPLOYEE_LEADER", approvalMode: "any", isActive: true },
-      { name: "HR chốt phép", approverType: "ROLE", approverRoleKey: "HR", approvalMode: "any", isActive: true },
+      { key: "mentor", name: "Mentor xác nhận kế hoạch", stateKey: "mentor_review", stateLabel: "Chờ Mentor xác nhận", approverType: "EMPLOYEE_MENTOR", approvalMode: "any", approveActionLabel: "Xác nhận", approveNextKey: "leader", boardX: -320, boardY: 0, isActive: true, rejectBehavior: "END_REJECT", rejectActionLabel: "Không đồng ý" },
+      { key: "leader", name: "Leader duyệt ngày nghỉ", stateKey: "leader_review", stateLabel: "Chờ Leader duyệt", approverType: "EMPLOYEE_LEADER", approvalMode: "any", approveActionLabel: "Duyệt phép", approveNextKey: "hr", rejectActionLabel: "Yêu cầu mentor xem lại", rejectNextKey: "mentor", boardX: 0, boardY: 0, isActive: true, rejectBehavior: "GOTO_STEP" },
+      { key: "hr", name: "HR chốt phép", stateKey: "hr_confirm", stateLabel: "Chờ HR chốt phép", approverType: "ROLE", approverRoleKey: "HR", approvalMode: "any", approveActionLabel: "Chốt phép", boardX: 320, boardY: 0, isActive: true, rejectBehavior: "END_REJECT", rejectActionLabel: "Từ chối phép" },
     ],
   },
   {
@@ -94,8 +108,8 @@ const WORKFLOW_STEP_TEMPLATES: WorkflowStepTemplate[] = [
     rejectedStatus: "rejected",
     cancelledStatus: "cancelled",
     steps: [
-      { name: "Leader xác nhận lý do", approverType: "EMPLOYEE_LEADER", approvalMode: "any", isActive: true },
-      { name: "HR cập nhật dữ liệu công", approverType: "ROLE", approverRoleKey: "HR", approvalMode: "any", isActive: true },
+      { key: "leader", name: "Leader xác nhận lý do", stateKey: "leader_verify", stateLabel: "Chờ Leader xác nhận", approverType: "EMPLOYEE_LEADER", approvalMode: "any", approveActionLabel: "Xác nhận ca", approveNextKey: "hr", boardX: -180, boardY: 0, isActive: true, rejectBehavior: "END_REJECT", rejectActionLabel: "Từ chối chỉnh công" },
+      { key: "hr", name: "HR cập nhật dữ liệu công", stateKey: "hr_update_attendance", stateLabel: "Chờ HR cập nhật công", approverType: "ROLE", approverRoleKey: "HR", approvalMode: "any", approveActionLabel: "Cập nhật công", rejectActionLabel: "Trả về Leader", rejectNextKey: "leader", boardX: 180, boardY: 0, isActive: true, rejectBehavior: "GOTO_STEP" },
     ],
   },
   {
@@ -108,8 +122,8 @@ const WORKFLOW_STEP_TEMPLATES: WorkflowStepTemplate[] = [
     rejectedStatus: "rejected",
     cancelledStatus: "cancelled",
     steps: [
-      { name: "Leader duyệt lịch trình", approverType: "EMPLOYEE_LEADER", approvalMode: "any", isActive: true },
-      { name: "Kế toán kiểm tra tạm ứng", approverType: "ROLE", approverRoleKey: "ACCOUNTANT", approvalMode: "any", isActive: true },
+      { key: "leader", name: "Leader duyệt lịch trình", stateKey: "leader_trip_review", stateLabel: "Chờ Leader duyệt công tác", approverType: "EMPLOYEE_LEADER", approvalMode: "any", approveActionLabel: "Duyệt lịch trình", approveNextKey: "accounting", boardX: -180, boardY: 0, isActive: true, rejectBehavior: "END_REJECT", rejectActionLabel: "Từ chối công tác" },
+      { key: "accounting", name: "Kế toán kiểm tra tạm ứng", stateKey: "accounting_advance_review", stateLabel: "Chờ kế toán kiểm tra tạm ứng", approverType: "ROLE", approverRoleKey: "ACCOUNTANT", approvalMode: "any", approveActionLabel: "Xác nhận chi phí", rejectActionLabel: "Trả về Leader", rejectNextKey: "leader", boardX: 180, boardY: 0, isActive: true, rejectBehavior: "GOTO_STEP" },
     ],
   },
   {
@@ -122,9 +136,9 @@ const WORKFLOW_STEP_TEMPLATES: WorkflowStepTemplate[] = [
     rejectedStatus: "rejected",
     cancelledStatus: "cancelled",
     steps: [
-      { name: "Leader xác nhận khoản chi", approverType: "EMPLOYEE_LEADER", approvalMode: "any", isActive: true },
-      { name: "Kế toán kiểm tra chứng từ", approverType: "ROLE", approverRoleKey: "ACCOUNTANT", approvalMode: "any", isActive: true },
-      { name: "Admin duyệt thanh toán", approverType: "ROLE", approverRoleKey: "ADMIN", approvalMode: "any", isActive: true },
+      { key: "leader", name: "Leader xác nhận khoản chi", stateKey: "leader_expense_review", stateLabel: "Chờ Leader xác nhận chi", approverType: "EMPLOYEE_LEADER", approvalMode: "any", approveActionLabel: "Xác nhận khoản chi", approveNextKey: "accounting", boardX: -320, boardY: 0, isActive: true, rejectBehavior: "END_REJECT", rejectActionLabel: "Từ chối chi" },
+      { key: "accounting", name: "Kế toán kiểm tra chứng từ", stateKey: "accounting_document_review", stateLabel: "Chờ kế toán kiểm tra chứng từ", approverType: "ROLE", approverRoleKey: "ACCOUNTANT", approvalMode: "any", approveActionLabel: "Chứng từ hợp lệ", approveNextKey: "admin", rejectActionLabel: "Trả về Leader", rejectNextKey: "leader", boardX: 0, boardY: 0, isActive: true, rejectBehavior: "GOTO_STEP" },
+      { key: "admin", name: "Admin duyệt thanh toán", stateKey: "payment_final_approval", stateLabel: "Chờ duyệt thanh toán", approverType: "ROLE", approverRoleKey: "ADMIN", approvalMode: "any", approveActionLabel: "Duyệt thanh toán", rejectActionLabel: "Trả về kế toán", rejectNextKey: "accounting", boardX: 320, boardY: 0, isActive: true, rejectBehavior: "GOTO_STEP" },
     ],
   },
 ]
@@ -146,6 +160,7 @@ export function WorkflowDefinitionDetailPage() {
   const [stepForm] = Form.useForm()
   const targetResource = Form.useWatch("targetResource", definitionForm) || definition?.targetResource
   const statusOptions = useMemo(() => buildStatusOptions(targetResource), [targetResource])
+  const workflowStatusOptions = useMemo(() => mergeStatusOptions(statusOptions, steps), [statusOptions, steps])
 
   useEffect(() => {
     void load()
@@ -207,9 +222,16 @@ export function WorkflowDefinitionDetailPage() {
       definitionId: id,
       name: "",
       stepOrder: steps.length + 1,
+      stateKey: `step_${steps.length + 1}`,
+      stateLabel: "Chờ duyệt",
       approverType: "EMPLOYEE_LEADER",
       approvalMode: "any",
+      approveActionLabel: "Duyệt",
+      boardX: steps.length * 280,
+      boardY: 0,
       isActive: true,
+      rejectActionLabel: "Từ chối",
+      rejectBehavior: "END_REJECT",
     })
     setStepModal(true)
   }
@@ -221,9 +243,16 @@ export function WorkflowDefinitionDetailPage() {
       definitionId: id,
       name: "",
       stepOrder: Number(step.stepOrder || 0) + 1,
+      stateKey: `step_${Number(step.stepOrder || 0) + 1}`,
+      stateLabel: "Chờ duyệt",
       approverType: "EMPLOYEE_LEADER",
       approvalMode: "any",
+      approveActionLabel: "Duyệt",
+      boardX: Number(step.boardX || 0) + 280,
+      boardY: Number(step.boardY || 0),
       isActive: true,
+      rejectActionLabel: "Từ chối",
+      rejectBehavior: "END_REJECT",
     })
     setStepModal(true)
   }
@@ -236,7 +265,8 @@ export function WorkflowDefinitionDetailPage() {
 
   async function saveStep(values: Record<string, unknown>) {
     const stepOrder = Number(values.stepOrder || steps.length + 1)
-    const payload = { ...values, definitionId: id, stepOrder }
+    const payload: Record<string, unknown> = { ...values, definitionId: id, stepOrder }
+    if (payload.rejectBehavior !== "GOTO_STEP") payload.rejectNextStepId = null
     if (editingStep) {
       await api.patch(`/records/workflow-steps/${editingStep.id}`, payload)
     } else {
@@ -268,11 +298,26 @@ export function WorkflowDefinitionDetailPage() {
         description: definition?.description || template.description,
       })
       const startOrder = Math.max(0, ...steps.map((step) => Number(step.stepOrder || 0)))
-      await Promise.all(template.steps.map((step, index) => api.post("/records/workflow-steps", {
-        ...step,
-        definitionId: id,
-        stepOrder: startOrder + index + 1,
-      })))
+      const createdResponses = await Promise.all(template.steps.map((step, index) => {
+        const { key, approveNextKey, rejectNextKey, ...payload } = step
+        return api.post("/records/workflow-steps", {
+          ...payload,
+          definitionId: id,
+          stepOrder: startOrder + index + 1,
+        })
+      }))
+      const createdByKey = new Map(template.steps.map((step, index) => [step.key, createdResponses[index].data.data as WorkflowStep]))
+      await Promise.all(template.steps.map((step) => {
+        const created = createdByKey.get(step.key)
+        if (!created) return Promise.resolve()
+        const approveTarget = step.approveNextKey ? createdByKey.get(step.approveNextKey) : null
+        const rejectTarget = step.rejectNextKey ? createdByKey.get(step.rejectNextKey) : null
+        const payload: Record<string, unknown> = {}
+        if (approveTarget) payload.approveNextStepId = approveTarget.id
+        if (rejectTarget) payload.rejectNextStepId = rejectTarget.id
+        if (Object.keys(payload).length === 0) return Promise.resolve()
+        return api.patch(`/records/workflow-steps/${created.id}`, payload)
+      }))
       message.success(`Đã tạo ${template.steps.length} bước từ ${template.label}`)
       await load()
     } catch (error) {
@@ -287,11 +332,26 @@ export function WorkflowDefinitionDetailPage() {
     setSteps(reordered)
     try {
       await Promise.all(reordered.map((step) => api.patch(`/records/workflow-steps/${step.id}`, { stepOrder: step.stepOrder })))
-      message.success("Đã cập nhật thứ tự flow")
-      await load()
     } catch (error) {
-      message.error("Không thể cập nhật thứ tự flow")
-      await load()
+      console.warn("Không thể lưu thứ tự flow", error)
+    }
+  }
+
+  async function saveStepPosition(step: WorkflowCanvasStep, position: { boardX: number; boardY: number }) {
+    setSteps((current) => current.map((item) => item.id === step.id ? { ...item, ...position } : item))
+    try {
+      await api.patch(`/records/workflow-steps/${step.id}`, position)
+    } catch (error) {
+      console.warn("Không thể lưu vị trí node", error)
+    }
+  }
+
+  async function saveBoardViewport(viewport: { x: number; y: number; zoom: number }) {
+    setDefinition((current) => current ? { ...current, boardViewport: viewport } : current)
+    try {
+      await api.patch(`/records/workflow-definitions/${id}`, { boardViewport: viewport })
+    } catch (error) {
+      console.warn("Không thể lưu vị trí board", error)
     }
   }
 
@@ -342,10 +402,13 @@ export function WorkflowDefinitionDetailPage() {
                 <>
                   <WorkflowFlowCanvas
                     steps={steps}
+                    viewport={definition?.boardViewport}
                     onAddStep={openCreateStep}
                     onEditStep={(step) => openEditStep(step as WorkflowStep)}
                     onInsertAfterStep={(step) => openCreateStepAfter(step as WorkflowStep)}
+                    onPositionChange={(step, position) => void saveStepPosition(step, position)}
                     onReorder={(nextSteps) => void reorderSteps(nextSteps)}
+                    onViewportChange={(viewport) => void saveBoardViewport(viewport)}
                   />
                   <Typography.Text className="workflow-flow-canvas__hint" type="secondary">
                     Kéo node để đổi thứ tự, kéo nền để di chuyển board, cuộn chuột hoặc dùng nút +/- để zoom.
@@ -365,6 +428,8 @@ export function WorkflowDefinitionDetailPage() {
                     { title: "#", dataIndex: "stepOrder", width: 80 },
                     { title: "Bước duyệt", dataIndex: "name" },
                     { title: "Người duyệt", render: (_, row) => approverLabel(row) },
+                    { title: "Approve", render: (_, row) => stepName(row.approveNextStepId, steps) || "Step kế tiếp" },
+                    { title: "Reject", render: (_, row) => row.rejectBehavior === "GOTO_STEP" ? stepName(row.rejectNextStepId, steps) || "-" : "Kết thúc từ chối" },
                     { title: "Trạng thái", render: (_, row) => <Tag color={row.isActive ? "green" : "default"}>{row.isActive ? "Đang dùng" : "Tắt"}</Tag> },
                     {
                       title: "",
@@ -419,32 +484,40 @@ export function WorkflowDefinitionDetailPage() {
             },
             {
               key: "status",
-              label: "Trạng thái duyệt",
+              label: "Vòng đời status",
               children: (
                 <Form form={definitionForm} layout="vertical" onFinish={(values) => void saveDefinition(values)}>
+                  <div className="workflow-status-strip">
+                    <StatusPill tone="draft" label="Submit" value={(definitionForm.getFieldValue("submitStatuses") || ["pending"]).join(", ")} />
+                    {steps.map((step) => (
+                      <StatusPill key={step.id} tone="review" label={step.stateLabel || step.name} value={step.stateKey || `step_${step.stepOrder}`} />
+                    ))}
+                    <StatusPill tone="approved" label="Approved" value={definitionForm.getFieldValue("approvedStatus") || "approved"} />
+                    <StatusPill tone="rejected" label="Rejected" value={definitionForm.getFieldValue("rejectedStatus") || "rejected"} />
+                  </div>
                   <Row gutter={12}>
                     <Col xs={24} md={12}>
-                      <Form.Item name="submitStatuses" label="Status bắt đầu workflow">
-                        <Select mode="tags" options={statusOptions} placeholder="pending, submitted..." />
+                      <Form.Item name="submitStatuses" label="Status bắt đầu flow">
+                        <Select mode="tags" options={workflowStatusOptions} placeholder="pending, submitted..." />
                       </Form.Item>
                     </Col>
                     <Col xs={24} md={12}>
-                      <Form.Item name="approvedStatus" label="Status khi duyệt xong">
-                        <Select options={statusOptions} />
+                      <Form.Item name="approvedStatus" label="Status cuối khi approve">
+                        <Select options={workflowStatusOptions} />
                       </Form.Item>
                     </Col>
                     <Col xs={24} md={12}>
-                      <Form.Item name="rejectedStatus" label="Status khi từ chối">
-                        <Select options={statusOptions} />
+                      <Form.Item name="rejectedStatus" label="Status cuối khi reject">
+                        <Select options={workflowStatusOptions} />
                       </Form.Item>
                     </Col>
                     <Col xs={24} md={12}>
-                      <Form.Item name="cancelledStatus" label="Status khi hủy">
-                        <Select options={statusOptions} />
+                      <Form.Item name="cancelledStatus" label="Status khi cancel">
+                        <Select options={workflowStatusOptions} />
                       </Form.Item>
                     </Col>
                   </Row>
-                  <Button htmlType="submit" loading={saving}>Lưu trạng thái</Button>
+                  <Button htmlType="submit" loading={saving}>Lưu vòng đời status</Button>
                 </Form>
               ),
             },
@@ -477,6 +550,16 @@ export function WorkflowDefinitionDetailPage() {
                 <InputNumber min={1} style={{ width: "100%" }} />
               </Form.Item>
             </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="stateKey" label="Mã trạng thái">
+                <Input placeholder="leader_review, hr_confirm..." />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="stateLabel" label="Tên trạng thái">
+                <Input placeholder="Chờ Leader duyệt" />
+              </Form.Item>
+            </Col>
           </Row>
           <Form.Item name="approverType" label="Kiểu người duyệt" rules={[{ required: true, message: "Chọn kiểu người duyệt" }]}>
             <Select options={APPROVER_TYPES} />
@@ -490,6 +573,46 @@ export function WorkflowDefinitionDetailPage() {
           <Form.Item name="approverRoleKey" label="Role duyệt">
             <Input placeholder="ADMIN, HR, ACCOUNTANT..." />
           </Form.Item>
+          <Row gutter={12}>
+            <Col xs={24} md={12}>
+              <Form.Item name="approveNextStepId" label="Khi approve tới bước">
+                <Select allowClear options={stepSelectOptions(steps, editingStep?.id)} placeholder="Mặc định: step kế tiếp" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="approveActionLabel" label="Tên nút approve">
+                <Input placeholder="Duyệt, Chốt phép, Xác nhận chi phí..." />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="rejectBehavior" label="Khi reject">
+                <Select options={[
+                  { value: "END_REJECT", label: "Kết thúc từ chối" },
+                  { value: "GOTO_STEP", label: "Chuyển tới bước khác" },
+                ]} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="rejectNextStepId" label="Reject tới bước">
+                <Select allowClear options={stepSelectOptions(steps, editingStep?.id)} placeholder="Chọn nếu reject chuyển bước" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="rejectActionLabel" label="Tên nút reject">
+                <Input placeholder="Từ chối, Trả về Leader..." />
+              </Form.Item>
+            </Col>
+            <Col xs={12} md={6}>
+              <Form.Item name="boardX" label="Board X">
+                <InputNumber style={{ width: "100%" }} />
+              </Form.Item>
+            </Col>
+            <Col xs={12} md={6}>
+              <Form.Item name="boardY" label="Board Y">
+                <InputNumber style={{ width: "100%" }} />
+              </Form.Item>
+            </Col>
+          </Row>
           <Form.Item name="isActive" valuePropName="checked">
             <Checkbox>Đang sử dụng bước này</Checkbox>
           </Form.Item>
@@ -511,10 +634,42 @@ function buildStatusOptions(resource?: string) {
   }))
 }
 
+function mergeStatusOptions(baseOptions: Array<{ value: string; label: string }>, steps: WorkflowStep[]) {
+  const options = [...baseOptions]
+  steps.forEach((step) => {
+    const value = String(step.stateKey || "").trim()
+    if (value && !options.some((item) => item.value === value)) {
+      options.push({ value, label: step.stateLabel || value })
+    }
+  })
+  return options
+}
+
+function StatusPill({ label, tone, value }: { label: string; tone: "draft" | "review" | "approved" | "rejected"; value: string }) {
+  return (
+    <div className={`workflow-status-pill workflow-status-pill-${tone}`}>
+      <Typography.Text className="workflow-status-pill__label">{label}</Typography.Text>
+      <Typography.Text className="workflow-status-pill__value">{value}</Typography.Text>
+    </div>
+  )
+}
+
 function approverLabel(step: WorkflowStep) {
   const type = APPROVER_TYPES.find((item) => item.value === step.approverType)?.label || step.approverType
   if (step.approverType === "ROLE") return `${type}: ${step.approverRoleKey || "ADMIN"}`
   if (step.approverType === "FIXED_STAFF") return `${type}: ${step.approverStaffId || "-"}`
   if (step.approverType === "FIXED_USER") return `${type}: ${step.approverUserId || "-"}`
   return type
+}
+
+function stepName(stepId: string | undefined, steps: WorkflowStep[]) {
+  const step = steps.find((item) => item.id === stepId)
+  return step ? `${step.stepOrder}. ${step.name}` : ""
+}
+
+function stepSelectOptions(steps: WorkflowStep[], currentId?: string) {
+  return steps
+    .filter((step) => step.id !== currentId)
+    .sort((a, b) => Number(a.stepOrder || 0) - Number(b.stepOrder || 0))
+    .map((step) => ({ value: step.id, label: `${step.stepOrder}. ${step.name}` }))
 }

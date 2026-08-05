@@ -33,21 +33,21 @@ const DEFAULT_WORKFLOWS: Array<{
   name: string;
   targetResource: WorkflowTargetResource;
   description: string;
-  steps: Array<{ name: string; approverType: string; approverRoleKey?: string }>;
+  steps: Array<{ name: string; approverType: string; approverRoleKey?: string; boardX?: number; boardY?: number; stateKey?: string; stateLabel?: string; approveActionLabel?: string; rejectActionLabel?: string }>;
 }> = [
   {
     code: 'leave-request-default',
     name: 'Duyệt đơn xin nghỉ',
     targetResource: 'leave-requests',
     description: 'Leader hoặc mentor của nhân viên duyệt đơn nghỉ phép.',
-    steps: [{ name: 'Leader/Mentor duyệt', approverType: 'EMPLOYEE_LEADER' }],
+    steps: [{ name: 'Leader/Mentor duyệt', approverType: 'EMPLOYEE_LEADER', boardX: 0, boardY: 0, stateKey: 'leader_review', stateLabel: 'Chờ Leader duyệt' }],
   },
   {
     code: 'attendance-adjustment-default',
     name: 'Duyệt đổi giờ chấm công',
     targetResource: 'attendance-adjustment-requests',
     description: 'Leader hoặc trưởng bộ phận duyệt yêu cầu đổi giờ check-in/check-out.',
-    steps: [{ name: 'Leader duyệt', approverType: 'EMPLOYEE_LEADER' }],
+    steps: [{ name: 'Leader duyệt', approverType: 'EMPLOYEE_LEADER', boardX: 0, boardY: 0, stateKey: 'leader_review', stateLabel: 'Chờ Leader xác nhận' }],
   },
   {
     code: 'business-trip-default',
@@ -55,8 +55,8 @@ const DEFAULT_WORKFLOWS: Array<{
     targetResource: 'business-trip-requests',
     description: 'Leader duyệt trước, sau đó HR/Admin xác nhận.',
     steps: [
-      { name: 'Leader duyệt', approverType: 'EMPLOYEE_LEADER' },
-      { name: 'HR/Admin xác nhận', approverType: 'ROLE', approverRoleKey: 'ADMIN' },
+      { name: 'Leader duyệt', approverType: 'EMPLOYEE_LEADER', boardX: -150, boardY: 0, stateKey: 'leader_review', stateLabel: 'Chờ Leader duyệt' },
+      { name: 'HR/Admin xác nhận', approverType: 'ROLE', approverRoleKey: 'ADMIN', boardX: 150, boardY: 0, stateKey: 'hr_confirm', stateLabel: 'Chờ HR/Admin xác nhận' },
     ],
   },
   {
@@ -65,8 +65,8 @@ const DEFAULT_WORKFLOWS: Array<{
     targetResource: 'payment-requests',
     description: 'Leader duyệt trước, sau đó Admin/Kế toán xác nhận.',
     steps: [
-      { name: 'Leader duyệt', approverType: 'EMPLOYEE_LEADER' },
-      { name: 'Kế toán/Admin xác nhận', approverType: 'ROLE', approverRoleKey: 'ADMIN' },
+      { name: 'Leader duyệt', approverType: 'EMPLOYEE_LEADER', boardX: -150, boardY: 0, stateKey: 'leader_review', stateLabel: 'Chờ Leader duyệt' },
+      { name: 'Kế toán/Admin xác nhận', approverType: 'ROLE', approverRoleKey: 'ADMIN', boardX: 150, boardY: 0, stateKey: 'accounting_review', stateLabel: 'Chờ kế toán xác nhận' },
     ],
   },
 ];
@@ -113,10 +113,16 @@ export class WorkflowService {
         await this.steps.save(config.steps.map((step, index) => this.steps.create({
           definitionId: definition.id,
           name: step.name,
+          stateKey: step.stateKey || `step_${index + 1}`,
+          stateLabel: step.stateLabel || step.name,
           stepOrder: index + 1,
           approverType: step.approverType,
           approverRoleKey: step.approverRoleKey,
           approvalMode: 'any',
+          approveActionLabel: step.approveActionLabel || 'Duyệt',
+          rejectActionLabel: step.rejectActionLabel || 'Từ chối',
+          boardX: step.boardX ?? index * 280,
+          boardY: step.boardY ?? 0,
           isActive: true,
         })));
       }
@@ -169,6 +175,7 @@ export class WorkflowService {
       actorUserId: user?.id,
       actorStaffId: user?.staffId,
     }));
+    await this.applyStepStatus(instance, firstStep);
     await this.createTasksForStep(instance, firstStep);
     return instance;
   }
@@ -187,15 +194,20 @@ export class WorkflowService {
     const definitions = instances.length
       ? await this.definitions.find({ where: instances.map((instance) => ({ id: instance.definitionId })) })
       : [];
+    const steps = instances.length
+      ? await this.steps.find({ where: instances.map((instance) => ({ definitionId: instance.definitionId })) })
+      : [];
     const records = await this.loadTargetRecords(instances);
     return {
       data: mine.map((task) => {
         const instance = instances.find((item) => item.id === task.instanceId);
         const definition = definitions.find((item) => item.id === instance?.definitionId);
+        const step = steps.find((item) => item.id === task.stepId || (item.definitionId === instance?.definitionId && item.stepOrder === task.stepOrder));
         return {
           ...task,
           instance,
           definition,
+          step,
           targetRecord: instance ? records.get(`${instance.targetResource}:${instance.targetRecordId}`) : null,
         };
       }),
@@ -243,17 +255,16 @@ export class WorkflowService {
     const currentPending = await this.tasks.find({ where: { instanceId, stepOrder: task.stepOrder, status: 'pending' } });
     if (currentPending.length > 0) return this.instanceDetail(instanceId, user);
 
-    const nextStep = await this.steps.findOne({
-      where: { definitionId: instance.definitionId, isActive: true },
-      order: { stepOrder: 'ASC' },
-    }).then(async () => {
-      const steps = await this.steps.find({ where: { definitionId: instance.definitionId, isActive: true }, order: { stepOrder: 'ASC' } });
-      return steps.find((step) => step.stepOrder > task.stepOrder) || null;
-    });
+    const steps = await this.steps.find({ where: { definitionId: instance.definitionId, isActive: true }, order: { stepOrder: 'ASC' } });
+    const currentStep = steps.find((step) => step.id === task.stepId || step.stepOrder === task.stepOrder);
+    const nextStep = currentStep?.approveNextStepId
+      ? steps.find((step) => step.id === currentStep.approveNextStepId) || null
+      : steps.find((step) => step.stepOrder > task.stepOrder) || null;
 
     if (nextStep) {
       instance.currentStepOrder = nextStep.stepOrder;
       await this.instances.save(instance);
+      await this.applyStepStatus(instance, nextStep);
       await this.createTasksForStep(instance, nextStep);
       await this.actions.save(this.actions.create({ instanceId, action: 'advance', actorUserId: user.id, actorStaffId: user.staffId }));
       return this.instanceDetail(instanceId, user);
@@ -272,6 +283,22 @@ export class WorkflowService {
     task.status = 'rejected';
     task.actedAt = new Date();
     task.note = note;
+    const steps = await this.steps.find({ where: { definitionId: instance.definitionId, isActive: true }, order: { stepOrder: 'ASC' } });
+    const currentStep = steps.find((step) => step.id === task.stepId || step.stepOrder === task.stepOrder);
+    const rejectNextStep = currentStep?.rejectBehavior === 'GOTO_STEP' && currentStep.rejectNextStepId
+      ? steps.find((step) => step.id === currentStep.rejectNextStepId) || null
+      : null;
+    if (rejectNextStep) {
+      instance.currentStepOrder = rejectNextStep.stepOrder;
+      await Promise.all([
+        this.tasks.save(task),
+        this.instances.save(instance),
+        this.applyStepStatus(instance, rejectNextStep),
+        this.createTasksForStep(instance, rejectNextStep),
+        this.actions.save(this.actions.create({ instanceId, taskId: task.id, action: 'reject_route', actorUserId: user.id, actorStaffId: user.staffId, note })),
+      ]);
+      return this.instanceDetail(instanceId, user);
+    }
     instance.status = 'rejected';
     instance.completedAt = new Date();
     await Promise.all([
@@ -422,6 +449,18 @@ export class WorkflowService {
     if (status === 'approved' && instance.targetResource === 'attendance-adjustment-requests') {
       await this.applyAttendanceAdjustment(record as AttendanceAdjustmentRequest);
     }
+  }
+
+  private async applyStepStatus(instance: WorkflowInstance, step: WorkflowStep) {
+    const stepStatus = String(step.stateKey || '').trim();
+    if (!stepStatus) return;
+    const repo = this.targetRepository(instance.targetResource);
+    const record = await repo.findOne({ where: { id: instance.targetRecordId } });
+    if (!record) return;
+    await repo.save({
+      ...record,
+      status: stepStatus,
+    });
   }
 
   private normalizeStatusList(value?: string[]) {

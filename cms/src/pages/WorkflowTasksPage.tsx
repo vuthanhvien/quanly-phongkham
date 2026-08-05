@@ -11,6 +11,12 @@ type WorkflowTaskRow = {
   status: string
   createdAt: string
   definition?: { name?: string; targetResource?: string }
+  step?: {
+    name?: string
+    stateLabel?: string
+    approveActionLabel?: string
+    rejectActionLabel?: string
+  }
   instance?: {
     id: string
     targetResource: string
@@ -104,7 +110,12 @@ export function WorkflowTasksPage() {
             },
             {
               title: "Luồng",
-              render: (_, row) => row.definition?.name || "-",
+              render: (_, row) => (
+                <Space direction="vertical" size={0}>
+                  <Typography.Text>{row.definition?.name || "-"}</Typography.Text>
+                  <Typography.Text type="secondary">{row.step?.stateLabel || row.step?.name || "Chờ duyệt"}</Typography.Text>
+                </Space>
+              ),
             },
             {
               title: "Trạng thái",
@@ -127,10 +138,10 @@ export function WorkflowTasksPage() {
                       </Button>
                     ) : null}
                     <Button className="primary-glow" icon={<CheckOutlined />} loading={actingId === row.id} type="primary" onClick={() => void approve(row)}>
-                      Duyệt
+                      {row.step?.approveActionLabel || "Duyệt"}
                     </Button>
                     <Button danger icon={<CloseOutlined />} loading={actingId === row.id} onClick={() => reject(row)}>
-                      Từ chối
+                      {row.step?.rejectActionLabel || "Từ chối"}
                     </Button>
                   </Space>
                 )

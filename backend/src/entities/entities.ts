@@ -2299,6 +2299,9 @@ export class WorkflowDefinition extends ConfigurableEntity {
   @Column({ default: 'cancelled' })
   cancelledStatus: string;
 
+  @Column({ type: 'simple-json', nullable: true })
+  boardViewport?: { x?: number; y?: number; zoom?: number };
+
   @Column({ type: 'text', nullable: true })
   description?: string;
 }
@@ -2314,6 +2317,12 @@ export class WorkflowStep extends ConfigurableEntity {
   @Column({ type: 'int', default: 1 })
   stepOrder: number;
 
+  @Column({ nullable: true })
+  stateKey?: string;
+
+  @Column({ nullable: true })
+  stateLabel?: string;
+
   @Column({ default: 'EMPLOYEE_LEADER' })
   approverType: string; // FIXED_USER | FIXED_STAFF | EMPLOYEE_LEADER | EMPLOYEE_MENTOR | DEPARTMENT_MANAGER | ROLE
 
@@ -2328,6 +2337,27 @@ export class WorkflowStep extends ConfigurableEntity {
 
   @Column({ default: 'any' })
   approvalMode: string; // any | all
+
+  @Column({ default: 'Duyệt' })
+  approveActionLabel: string;
+
+  @Column({ default: 'Từ chối' })
+  rejectActionLabel: string;
+
+  @Column({ type: 'int', default: 0 })
+  boardX: number;
+
+  @Column({ type: 'int', default: 0 })
+  boardY: number;
+
+  @Column({ nullable: true })
+  approveNextStepId?: string;
+
+  @Column({ nullable: true })
+  rejectNextStepId?: string;
+
+  @Column({ default: 'END_REJECT' })
+  rejectBehavior: string; // END_REJECT | GOTO_STEP
 
   @Column({ default: true })
   isActive: boolean;

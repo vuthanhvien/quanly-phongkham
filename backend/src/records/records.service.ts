@@ -318,6 +318,8 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   attendanceId: 'attendances',
   definitionId: 'workflow-definitions',
   stepId: 'workflow-steps',
+  approveNextStepId: 'workflow-steps',
+  rejectNextStepId: 'workflow-steps',
   instanceId: 'workflow-instances',
   requesterUserId: 'user-accounts',
   requesterStaffId: 'staff',
