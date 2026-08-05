@@ -1068,7 +1068,7 @@ export class StockBatch extends ConfigurableEntity {
   @Column({ type: 'date', nullable: true })
   expiryDate?: string;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2 })
+  @Column({ type: 'decimal', precision: 15, scale: 6 })
   remainingQuantity: number;
 
   // Stock is always held in the product's base unit. This snapshot keeps
