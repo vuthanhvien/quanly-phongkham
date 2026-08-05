@@ -897,7 +897,7 @@ export class RecordsService {
     return { data: this.protect(resource, record, request) };
   }
 
-  async exportImportBundle (resource: string, template = false, fake = false, user?: AuthUser, request?: RequestContext) {
+  async exportImportBundle (resource: string, template = false, fake = false, user?: AuthUser, request?: RequestContext, sampleSize = 5) {
     const config = await this.bundleConfig(resource);
     await this.assertPermission(user, config.main.resource, 'view');
 
@@ -907,7 +907,7 @@ export class RecordsService {
           resource,
           template,
           fake,
-          sheets: await this.buildFakeBundleSheets(resource as BundleRootResource, request),
+          sheets: await this.buildFakeBundleSheets(resource as BundleRootResource, request, sampleSize),
         },
       };
     }
@@ -1356,9 +1356,9 @@ export class RecordsService {
     );
   }
 
-  private async buildFakeBundleSheets (resource: BundleRootResource, request?: RequestContext) {
+  private async buildFakeBundleSheets (resource: BundleRootResource, request?: RequestContext, requestedSize = 5) {
     const config = await this.bundleConfig(resource);
-    const sampleSize = 5;
+    const sampleSize = Math.max(1, Math.min(500, Math.floor(Number(requestedSize) || 5)));
     const referencePools = await this.loadBundleReferencePools(config);
     const parentCodes = Array.from({ length: sampleSize }, (_, index) => this.generateBundleCode(resource, index));
 

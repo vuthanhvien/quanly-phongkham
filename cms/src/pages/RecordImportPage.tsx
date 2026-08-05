@@ -235,7 +235,7 @@ export function RecordImportPage() {
     }
 
     if (bundleMode) {
-      const response = await api.get(`/records/${resource}/import-bundle`, { params: { template: 1, fake: 1 } })
+      const response = await api.get(`/records/${resource}/import-bundle`, { params: { template: 1, fake: 1, sampleSize: testRowCount } })
       const workbook = buildBundleWorkbookFromApi(response.data.data.sheets || [])
       XLSX.writeFile(workbook, `${resource}-import-template.xlsx`)
       return
@@ -345,19 +345,19 @@ export function RecordImportPage() {
           <Button icon={<DownloadOutlined />} onClick={() => void downloadTemplate()}>
             Tải file mẫu
           </Button>
+          <Select
+            aria-label="Số dòng dữ liệu mẫu"
+            options={[
+              { value: 100, label: '100 dòng' },
+              { value: 250, label: '250 dòng' },
+              { value: 500, label: '500 dòng' },
+            ]}
+            value={testRowCount}
+            onChange={setTestRowCount}
+            style={{ width: 120 }}
+          />
           {!bundleMode ? (
             <>
-              <Select
-                aria-label="Số dòng dữ liệu mẫu"
-                options={[
-                  { value: 100, label: '100 dòng' },
-                  { value: 250, label: '250 dòng' },
-                  { value: 500, label: '500 dòng' },
-                ]}
-                value={testRowCount}
-                onChange={setTestRowCount}
-                style={{ width: 120 }}
-              />
               <Button icon={<ImportOutlined />} onClick={() => void downloadExportData()}>
                 Tải data mẫu + custom fields
               </Button>

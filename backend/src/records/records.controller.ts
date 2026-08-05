@@ -108,9 +108,10 @@ export class RecordsController {
     @Param('resource') resource: string,
     @Query('template') template?: string,
     @Query('fake') fake?: string,
+    @Query('sampleSize') sampleSize?: string,
     @Request() request?: ExpressRequest & { user?: AuthUser },
   ) {
-    return this.records.exportImportBundle(resource, template === '1', fake === '1', request?.user, request);
+    return this.records.exportImportBundle(resource, template === '1', fake === '1', request?.user, request, Number(sampleSize || 5));
   }
 
   @Post('records/:resource/import-bundle')
