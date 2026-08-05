@@ -117,9 +117,15 @@ export function UiSettingsPage() {
   const [initializing, setInitializing] = useState(false)
   const draftAppName = Form.useWatch('appName', form)
   const selectedCompanyType = (Form.useWatch('companyType', form) || settings.companyType || defaultAppUiSettings.companyType) as CompanyType
+  const selectedModules = Form.useWatch('enabledModules', form) || []
 
   useEffect(() => {
-    form.setFieldsValue({ ...defaultAppUiSettings, ...settings })
+    const usesPreset = !settings.hasCustomModuleSelection
+    form.setFieldsValue({
+      ...defaultAppUiSettings,
+      ...settings,
+      enabledModules: usesPreset ? companyTypeModulePresets[settings.companyType] || [] : settings.enabledModules,
+    })
   }, [form, settings])
 
   useEffect(() => {
@@ -129,8 +135,13 @@ export function UiSettingsPage() {
   async function handleSubmit(values: UiSettingsFormValues) {
     setSaving(true)
     try {
+      // Module selection is controlled by grouped checkboxes outside the hidden form field.
+      // Read the live form store so a click immediately followed by Save is not lost.
+      const currentValues = form.getFieldsValue(true) as UiSettingsFormValues
       const next = await save({
         ...values,
+        enabledModules: Array.isArray(currentValues.enabledModules) ? currentValues.enabledModules.map(String) : [],
+        hasCustomModuleSelection: Boolean(currentValues.hasCustomModuleSelection),
         appDescription: typeof values.appDescription === 'string' ? values.appDescription.trim() : '',
       })
       syncDocumentBranding(next)
@@ -147,7 +158,21 @@ export function UiSettingsPage() {
   function handleApplyCompanyPreset() {
     const companyType = (form.getFieldValue('companyType') || defaultAppUiSettings.companyType) as CompanyType
     form.setFieldValue('enabledModules', companyTypeModulePresets[companyType] || [])
+    form.setFieldValue('hasCustomModuleSelection', true)
     message.success('Đã áp preset module theo loại hình công ty')
+  }
+
+  function setGroupModules(moduleKeys: string[], checked: boolean) {
+    const selected = new Set<string>(((form.getFieldValue('enabledModules') || []) as unknown[]).map(String))
+    moduleKeys.forEach((moduleKey) => checked ? selected.add(moduleKey) : selected.delete(moduleKey))
+    form.setFieldsValue({ enabledModules: Array.from(selected), hasCustomModuleSelection: true })
+  }
+
+  function setGroupModuleValues(moduleKeys: string[], values: Array<string | number | boolean>) {
+    const selected = new Set<string>(((form.getFieldValue('enabledModules') || []) as unknown[]).map(String))
+    moduleKeys.forEach((moduleKey) => selected.delete(moduleKey))
+    values.map(String).forEach((moduleKey) => selected.add(moduleKey))
+    form.setFieldsValue({ enabledModules: Array.from(selected), hasCustomModuleSelection: true })
   }
 
   async function handleInitializeIndustryData() {
@@ -235,9 +260,10 @@ export function UiSettingsPage() {
               <Card
                 className="glass-card settings-card"
                 extra={
-                  <Button size="small" type="default" onClick={handleApplyCompanyPreset}>
-                    Áp preset theo loại hình
-                  </Button>
+                  <Space size={8}>
+                    <Button size="small" type="default" onClick={() => { form.setFieldValue('enabledModules', []); form.setFieldValue('hasCustomModuleSelection', true) }}>Bỏ chọn hết</Button>
+                    <Button size="small" type="default" onClick={handleApplyCompanyPreset}>Áp preset theo loại hình</Button>
+                  </Space>
                 }
                 title="Bật / tắt module sử dụng"
               >
@@ -245,26 +271,37 @@ export function UiSettingsPage() {
                   <Typography.Paragraph style={{ margin: 0 }}>
                     `companyType` chỉ là quick action để gợi ý bộ module. Module nào hiển thị thực tế sẽ phụ thuộc vào danh sách bật/tắt bên dưới.
                   </Typography.Paragraph>
-                  <Form.Item name="enabledModules" style={{ marginBottom: 0 }}>
-                    <Checkbox.Group style={{ width: '100%' }}>
-                      <Space direction="vertical" size={14} style={{ width: '100%' }}>
-                        {appModuleGroups.map((group) => (
-                          <div key={group.key}>
-                            <Typography.Title level={5} style={{ marginBottom: 10 }}>
-                              {resolveMenuGroupLabel(group.key, group.label, selectedCompanyType)}
-                            </Typography.Title>
-                            <Row gutter={[12, 12]}>
-                              {group.modules.map((moduleKey) => (
-                                <Col key={moduleKey} md={12} xs={24}>
-                                  <Checkbox value={moduleKey}>{appModuleLabels[moduleKey] || moduleKey}</Checkbox>
-                                </Col>
-                              ))}
-                            </Row>
+                  <Form.Item name="hasCustomModuleSelection" hidden valuePropName="checked"><Checkbox /></Form.Item>
+                  <Form.Item name="enabledModules" hidden><Checkbox.Group /></Form.Item>
+                  <Space direction="vertical" size={14} style={{ width: '100%' }}>
+                    {appModuleGroups.map((group) => {
+                      const selectedCount = group.modules.filter((moduleKey) => selectedModules.includes(moduleKey)).length
+                      const groupValues = group.modules.filter((moduleKey) => selectedModules.includes(moduleKey))
+                      return (
+                        <div key={group.key}>
+                          <Checkbox
+                            checked={selectedCount === group.modules.length}
+                            indeterminate={selectedCount > 0 && selectedCount < group.modules.length}
+                            onChange={(event) => setGroupModules(group.modules, event.target.checked)}
+                            style={{ marginBottom: 10 }}
+                          >
+                            <Typography.Text strong>{resolveMenuGroupLabel(group.key, group.label, selectedCompanyType)}</Typography.Text>
+                          </Checkbox>
+                          <div style={{ paddingLeft: 28 }}>
+                            <Checkbox.Group value={groupValues} style={{ width: '100%' }} onChange={(values) => setGroupModuleValues(group.modules, values)}>
+                              <Row gutter={[12, 12]}>
+                                {group.modules.map((moduleKey) => (
+                                  <Col key={moduleKey} md={12} xs={24}>
+                                    <Checkbox value={moduleKey}>{appModuleLabels[moduleKey] || moduleKey}</Checkbox>
+                                  </Col>
+                                ))}
+                              </Row>
+                            </Checkbox.Group>
                           </div>
-                        ))}
-                      </Space>
-                    </Checkbox.Group>
-                  </Form.Item>
+                        </div>
+                      )
+                    })}
+                  </Space>
                 </Space>
               </Card>
 

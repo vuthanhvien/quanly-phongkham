@@ -7,6 +7,7 @@ export interface AppUiSettings {
   appKey?: string
   companyType: 'clinic' | 'retail' | 'cafe' | 'agriculture' | 'general'
   enabledModules: string[]
+  hasCustomModuleSelection: boolean
   appName: string
   appDescription?: string
   appIconUrl?: string
@@ -64,6 +65,7 @@ export const fontFamilyOptions = [
 export const defaultAppUiSettings: AppUiSettings = {
   companyType: 'clinic',
   enabledModules: [],
+  hasCustomModuleSelection: false,
   appName: 'Thiện Chánh CMS',
   appIconUrl: '',
   primaryColor: '#e889ae',
@@ -109,6 +111,7 @@ export function normalizeAppUiSettings(payload?: Partial<AppUiSettings> | null):
   normalized.enabledModules = Array.isArray(normalized.enabledModules)
     ? Array.from(new Set(normalized.enabledModules.map((item) => String(item || "").trim()).filter(Boolean)))
     : []
+  normalized.hasCustomModuleSelection = normalized.hasCustomModuleSelection === true
 
   normalized.appDescription = normalized.appDescription?.trim() || undefined
   normalized.appIconUrl = normalized.appIconUrl?.trim() || undefined
@@ -158,7 +161,18 @@ export function tablePaddingBySize(size: AppUiSettings['size']) {
   return { block: 10, inline: 12 }
 }
 
+export function layoutMetricsBySize(size: AppUiSettings['size']) {
+  if (size === 'small') {
+    return { spaceXS: 4, spaceSM: 8, spaceMD: 12, spaceLG: 16, spaceXL: 20, cardPadding: 12, contentPadding: 14 }
+  }
+  if (size === 'large') {
+    return { spaceXS: 8, spaceSM: 12, spaceMD: 18, spaceLG: 24, spaceXL: 32, cardPadding: 22, contentPadding: 26 }
+  }
+  return { spaceXS: 6, spaceSM: 10, spaceMD: 16, spaceLG: 20, spaceXL: 26, cardPadding: 16, contentPadding: 20 }
+}
+
 export function syncDocumentBranding(settings: AppUiSettings) {
+  const metrics = layoutMetricsBySize(settings.size)
   const appName = String(settings.appName || defaultAppUiSettings.appName).trim() || defaultAppUiSettings.appName
   document.title = appName
   document.documentElement.dataset.uiTheme = 'light'
@@ -186,6 +200,13 @@ export function syncDocumentBranding(settings: AppUiSettings) {
   document.documentElement.style.setProperty('--app-button-default-border', settings.buttonDefaultBorderColor)
   document.documentElement.style.setProperty('--app-shadow-soft', buildShadowValue(settings, 1))
   document.documentElement.style.setProperty('--app-shadow-strong', buildShadowValue(settings, 1.8))
+  document.documentElement.style.setProperty('--app-space-xs', `${metrics.spaceXS}px`)
+  document.documentElement.style.setProperty('--app-space-sm', `${metrics.spaceSM}px`)
+  document.documentElement.style.setProperty('--app-space-md', `${metrics.spaceMD}px`)
+  document.documentElement.style.setProperty('--app-space-lg', `${metrics.spaceLG}px`)
+  document.documentElement.style.setProperty('--app-space-xl', `${metrics.spaceXL}px`)
+  document.documentElement.style.setProperty('--app-card-padding', `${metrics.cardPadding}px`)
+  document.documentElement.style.setProperty('--app-content-padding', `${metrics.contentPadding}px`)
 
   let description = document.querySelector('meta[name="description"]')
   if (!description) {

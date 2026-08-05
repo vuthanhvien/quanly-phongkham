@@ -38,6 +38,11 @@ export const appModuleGroups: AppModuleGroup[] = [
     modules: ["file-folders", "files"],
   },
   {
+    key: "landing",
+    label: "Landing",
+    modules: ["landing-pages", "landing-forms", "posts", "news", "landing-domains", "landing-config"],
+  },
+  {
     key: "hr",
     label: "Nhân sự",
     modules: [
@@ -77,6 +82,11 @@ export const appModuleGroups: AppModuleGroup[] = [
     ],
   },
   {
+    key: "projects",
+    label: "Dự án & công việc",
+    modules: ["projects", "tasks"],
+  },
+  {
     key: "workflow",
     label: "Workflow duyệt",
     modules: ["workflow-tasks", "workflow-definitions", "workflow-steps", "workflow-instances", "workflow-actions"],
@@ -92,6 +102,10 @@ export const appModuleLabels: Record<AppModuleKey, string> = {
   ...entityLabels,
   ...screenLabels,
   calendar: "Lịch tổng",
+  "landing-pages": "Pages",
+  "landing-forms": "Forms",
+  "landing-domains": "Domains",
+  "landing-config": "Configs",
 }
 
 export const allAppModuleKeys = Array.from(
@@ -165,6 +179,14 @@ export const menuGroupLabelsByCompanyType: Partial<
 export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
   clinic: [
     "calendar",
+    "landing-pages",
+    "landing-forms",
+    "posts",
+    "news",
+    "landing-domains",
+    "landing-config",
+    "projects",
+    "tasks",
     "leads",
     "lead-activities",
     "customers",
@@ -221,6 +243,14 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
   ],
   retail: [
     "calendar",
+    "landing-pages",
+    "landing-forms",
+    "posts",
+    "news",
+    "landing-domains",
+    "landing-config",
+    "projects",
+    "tasks",
     "leads",
     "lead-activities",
     "customers",
@@ -268,6 +298,14 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
   ],
   cafe: [
     "calendar",
+    "landing-pages",
+    "landing-forms",
+    "posts",
+    "news",
+    "landing-domains",
+    "landing-config",
+    "projects",
+    "tasks",
     "leads",
     "lead-activities",
     "customers",
@@ -316,6 +354,14 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
   ],
   agriculture: [
     "calendar",
+    "landing-pages",
+    "landing-forms",
+    "posts",
+    "news",
+    "landing-domains",
+    "landing-config",
+    "projects",
+    "tasks",
     "suppliers",
     "products",
     "product-categories",
@@ -360,6 +406,14 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
   ],
   general: [
     "calendar",
+    "landing-pages",
+    "landing-forms",
+    "posts",
+    "news",
+    "landing-domains",
+    "landing-config",
+    "projects",
+    "tasks",
     "leads",
     "lead-activities",
     "customers",
@@ -418,14 +472,15 @@ export function normalizeEnabledModules(value?: unknown): AppModuleKey[] {
 export function resolveEnabledModules(
   enabledModules: unknown,
   companyType: CompanyType,
+  hasCustomModuleSelection = false,
 ) {
   const normalized = normalizeEnabledModules(enabledModules)
-  if (normalized.length > 0) return normalized
+  if (hasCustomModuleSelection) return normalized
   return companyTypeModulePresets[companyType]
 }
 
-export function isModuleEnabled(moduleKey: string, enabledModules: unknown, companyType: CompanyType) {
-  return resolveEnabledModules(enabledModules, companyType).includes(moduleKey)
+export function isModuleEnabled(moduleKey: string, enabledModules: unknown, companyType: CompanyType, hasCustomModuleSelection = false) {
+  return resolveEnabledModules(enabledModules, companyType, hasCustomModuleSelection).includes(moduleKey)
 }
 
 export function resolveMenuGroupLabel(groupKey: string, fallbackLabel: string, companyType: CompanyType) {

@@ -724,6 +724,7 @@ function FieldInput({
   onChange?: (value: unknown) => void
 }) {
   const placeholder = field.placeholder?.trim() || getDefaultFieldPlaceholder(field)
+  const relation = field.relation || relationFields[field.key]
   if (field.type === "number")
     return (
       <InputNumber
@@ -753,9 +754,12 @@ function FieldInput({
       <Select
         disabled={field.disabled}
         mode="multiple"
-        options={(field.options || []).map((opt) =>
-          typeof opt === "string" ? { value: opt, label: opt } : opt,
-        )}
+        options={relation
+          ? buildRelationSelectOptions(lookups, relation.lookupKey || relation.resource, relation.resource)
+          : (field.options || []).map((opt) => {
+            const item = typeof opt === "string" ? { value: opt, label: opt } : opt
+            return { ...item, searchLabel: String(item.label) }
+          })}
         placeholder={placeholder}
         value={value}
         onChange={onChange}
@@ -804,7 +808,6 @@ function FieldInput({
       />
     )
   }
-  const relation = field.relation || relationFields[field.key]
   if (relation) {
     if (relation.resource === "file-folders") {
       return (

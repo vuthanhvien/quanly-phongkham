@@ -1270,6 +1270,7 @@ export class SettingsService {
   private normalizeAppUiPayload(payload: Partial<AppUiSetting>, fallback?: Partial<AppUiSetting>) {
     const companyType = this.normalizeCompanyType(payload.companyType ?? fallback?.companyType ?? 'clinic');
     const enabledModules = this.normalizeEnabledModules(payload.enabledModules ?? fallback?.enabledModules ?? []);
+    const hasCustomModuleSelection = payload.hasCustomModuleSelection ?? fallback?.hasCustomModuleSelection ?? false;
     const appName = String(payload.appName ?? fallback?.appName ?? 'Thien Chanh CMS').trim();
     if (!appName) {
       throw new BadRequestException('appName là bắt buộc');
@@ -1312,6 +1313,7 @@ export class SettingsService {
       appKey: 'cms',
       companyType,
       enabledModules,
+      hasCustomModuleSelection: Boolean(hasCustomModuleSelection),
       appName,
       appDescription,
       appIconUrl,
@@ -1431,6 +1433,7 @@ export class SettingsService {
       current.appKey !== next.appKey ||
       current.companyType !== next.companyType ||
       JSON.stringify(current.enabledModules || []) !== JSON.stringify(next.enabledModules || []) ||
+      current.hasCustomModuleSelection !== next.hasCustomModuleSelection ||
       current.appName !== next.appName ||
       current.appDescription !== next.appDescription ||
       current.appIconUrl !== next.appIconUrl ||

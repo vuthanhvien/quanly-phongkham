@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
 import { hasResourceAccess, hasScreenAccess, isCurrentUserAdmin } from './access';
 import { authProvider, dataProvider, api, getGlobalBranchFilterIds, onGlobalBranchFilterChange } from './api';
-import { AppUiContext, cardPaddingBySize, controlHeightBySize, defaultAppUiSettings, loadCachedAppUiSettings, normalizeAppUiSettings, persistAppUiSettings, syncDocumentBranding, tablePaddingBySize, useAppUi, type AppUiSettings } from './app-ui';
+import { AppUiContext, cardPaddingBySize, controlHeightBySize, defaultAppUiSettings, layoutMetricsBySize, loadCachedAppUiSettings, normalizeAppUiSettings, persistAppUiSettings, syncDocumentBranding, tablePaddingBySize, useAppUi, type AppUiSettings } from './app-ui';
 import { isModuleEnabled } from './company-types';
 import { Shell } from './components/Shell';
 import { entityLabels } from './models';
@@ -40,6 +40,7 @@ import { UiSettingsPage } from './pages/UiSettingsPage';
 import { WorkflowDefinitionDetailPage } from './pages/WorkflowDefinitionDetailPage';
 import { WorkflowTasksPage } from './pages/WorkflowTasksPage';
 import { ZaloInboxPage } from './pages/ZaloInboxPage';
+import { ProjectBoardPage } from './pages/ProjectBoardPage';
 import { registerToastApi } from './toast';
 
 const resources = Object.entries(entityLabels).map(([name, label]) => ({
@@ -75,20 +76,20 @@ function ScreenGuard({ screen }: { screen: string }) {
 
 function ModuleGuard({ moduleKey }: { moduleKey: string }) {
   const { settings } = useAppUi();
-  return isCurrentUserAdmin() || isModuleEnabled(moduleKey, settings.enabledModules, settings.companyType) ? <Outlet /> : <Navigate to="/" replace />;
+  return isCurrentUserAdmin() || isModuleEnabled(moduleKey, settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection) ? <Outlet /> : <Navigate to="/" replace />;
 }
 
 function ResourceGuard() {
   const { resource = '' } = useParams();
   const { settings } = useAppUi();
-  return hasResourceAccess(resource) && (isCurrentUserAdmin() || isModuleEnabled(resource, settings.enabledModules, settings.companyType))
+  return hasResourceAccess(resource) && (isCurrentUserAdmin() || isModuleEnabled(resource, settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection))
     ? <Outlet />
     : <Navigate to="/" replace />;
 }
 
 function StaticResourceGuard({ resource }: { resource: string }) {
   const { settings } = useAppUi();
-  return hasResourceAccess(resource) && (isCurrentUserAdmin() || isModuleEnabled(resource, settings.enabledModules, settings.companyType))
+  return hasResourceAccess(resource) && (isCurrentUserAdmin() || isModuleEnabled(resource, settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection))
     ? <Outlet />
     : <Navigate to="/" replace />;
 }
@@ -142,6 +143,7 @@ export function App() {
   const controlHeight = controlHeightBySize(appUiSettings.size);
   const cardPadding = cardPaddingBySize(appUiSettings.size);
   const tablePadding = tablePaddingBySize(appUiSettings.size);
+  const layoutMetrics = layoutMetricsBySize(appUiSettings.size);
 
   return (
     <AppUiContext.Provider
@@ -153,6 +155,7 @@ export function App() {
       }}
     >
       <ConfigProvider
+        componentSize={appUiSettings.size === 'medium' ? 'middle' : appUiSettings.size}
         theme={{
           algorithm: theme.defaultAlgorithm,
           token: {
@@ -168,6 +171,23 @@ export function App() {
             colorTextHeading: appUiSettings.titleColor,
             borderRadius: appUiSettings.borderRadius,
             fontFamily: appUiSettings.fontFamily,
+            controlHeight,
+            controlHeightSM: Math.max(28, controlHeight - 4),
+            controlHeightLG: controlHeight + 6,
+            paddingXXS: Math.max(2, layoutMetrics.spaceXS - 2),
+            paddingXS: layoutMetrics.spaceXS,
+            paddingSM: layoutMetrics.spaceSM,
+            padding: layoutMetrics.spaceMD,
+            paddingMD: layoutMetrics.spaceMD,
+            paddingLG: layoutMetrics.spaceLG,
+            paddingXL: layoutMetrics.spaceXL,
+            marginXXS: Math.max(2, layoutMetrics.spaceXS - 2),
+            marginXS: layoutMetrics.spaceXS,
+            marginSM: layoutMetrics.spaceSM,
+            margin: layoutMetrics.spaceMD,
+            marginMD: layoutMetrics.spaceMD,
+            marginLG: layoutMetrics.spaceLG,
+            marginXL: layoutMetrics.spaceXL,
           },
           components: {
             Button: {
@@ -271,6 +291,9 @@ export function App() {
               </Route>
               <Route element={<StaticResourceGuard resource="workflow-tasks" />}>
                 <Route path="/workflow-tasks" element={<WorkflowTasksPage />} />
+              </Route>
+              <Route element={<StaticResourceGuard resource="projects" />}>
+                <Route path="/projects/:id/board" element={<ProjectBoardPage />} />
               </Route>
               <Route element={<StaticResourceGuard resource="workflow-definitions" />}>
                 <Route path="/workflow-definitions/:id/full" element={<WorkflowDefinitionDetailPage />} />

@@ -1,5 +1,6 @@
 import { useDelete, useList } from "@refinedev/core"
 import {
+  AppstoreOutlined,
   AuditOutlined,
   CopyOutlined,
   ClearOutlined,
@@ -179,6 +180,7 @@ export function RecordListPage() {
           const isUnitRoot = resource === "units" && !row.baseUnitId
           const menuItems: any[] = []
           if (hasActionAccess(resource, "view")) menuItems.push({ key: "quick-view", icon: <EyeOutlined />, label: "Xem chi tiết", onClick: () => openDetail(recordId) })
+          if (resource === "projects" && recordStatus === "active") menuItems.push({ key: "board", icon: <AppstoreOutlined />, label: "Mở Kanban", onClick: () => navigate(`/projects/${recordId}/board`) })
           if (hasActionAccess(resource, "view")) menuItems.push({ key: "full-view", icon: <FullscreenOutlined />, label: "Xem đầy đủ", onClick: () => navigate(`/${resource}/${recordId}/full`) })
           if (recordStatus === "active" && hasActionAccess(resource, "update")) menuItems.push({ key: "edit", icon: <EditOutlined />, label: "Chỉnh sửa", onClick: () => setEditingId(recordId) })
           if (isUnitRoot && recordStatus === "active" && hasActionAccess(resource, "create")) menuItems.push({ key: "add-child", icon: <PlusOutlined />, label: "Thêm đơn vị quy đổi", onClick: () => createChildUnit(recordId) })
@@ -196,6 +198,11 @@ export function RecordListPage() {
             {hasActionAccess(resource, "view") && (
               <Tooltip title="Xem chi tiết">
                 <Button icon={<EyeOutlined />} type="text" onClick={() => openDetail(recordId)} />
+              </Tooltip>
+            )}
+            {resource === "projects" && recordStatus === "active" && (
+              <Tooltip title="Mở Kanban">
+                <Button icon={<AppstoreOutlined />} type="text" onClick={() => navigate(`/projects/${recordId}/board`)} />
               </Tooltip>
             )}
             {hasActionAccess(resource, "view") && (

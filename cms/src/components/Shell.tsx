@@ -43,6 +43,7 @@ import { api, getGlobalBranchFilterIds, onGlobalBranchFilterChange, setGlobalBra
 import { useAppUi } from "../app-ui"
 import {
   appModuleGroups,
+  appModuleLabels,
   isModuleEnabled,
   resolveMenuGroupLabel,
   type AppModuleGroup,
@@ -58,6 +59,9 @@ const menuIcons: Record<string, React.ReactNode> = {
   roles: <SettingOutlined />,
   "branch-role-assignments": <DeploymentUnitOutlined />,
   "landing-pages": <GlobalOutlined />,
+  "landing-forms": <FileDoneOutlined />,
+  "landing-domains": <GlobalOutlined />,
+  "landing-config": <SettingOutlined />,
   posts: <FileTextOutlined />,
   news: <ReadOutlined />,
   departments: <SolutionOutlined />,
@@ -93,6 +97,9 @@ const menuIcons: Record<string, React.ReactNode> = {
   'leave-requests': <FileDoneOutlined />,
   'leave-types': <CalendarOutlined />,
   'leave-allocations': <FileDoneOutlined />,
+  projects: <ApartmentOutlined />,
+  landing: <GlobalOutlined />,
+  tasks: <FileDoneOutlined />,
   'attendance-adjustment-requests': <CalendarOutlined />,
   'business-trip-requests': <SolutionOutlined />,
   'payment-requests': <DollarOutlined />,
@@ -118,7 +125,18 @@ const menuGroupIcons: Record<AppModuleGroup["key"], React.ReactNode> = {
   hr: <TeamOutlined />,
   finance: <DollarOutlined />,
   workflow: <AuditOutlined />,
+  projects: <ApartmentOutlined />,
+  landing: <GlobalOutlined />,
   admin: <SettingOutlined />,
+}
+
+const moduleNavigation: Record<string, { path: string; label: string; screen?: string }> = {
+  "landing-pages": { path: "/pages", label: "Pages", screen: "settings" },
+  "landing-forms": { path: "/forms", label: "Forms", screen: "settings" },
+  "landing-domains": { path: "/domains", label: "Domains", screen: "settings" },
+  "landing-config": { path: "/configs", label: "Configs", screen: "settings" },
+  "zalo-inbox": { path: "/zalo-inbox", label: "Hộp thư Zalo", screen: "zalo-inbox" },
+  "accounting-reports": { path: "/accounting-reports", label: "Báo cáo kế toán", screen: "accounting-reports" },
 }
 
 const resourceToGroup = Object.fromEntries(
@@ -233,8 +251,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ...group,
       label: resolveMenuGroupLabel(group.key, group.label, activeCompanyType),
       resources: group.modules.filter((resource) => {
-        if (!entityLabels[resource]) return false
-        if (!isAdmin && !isModuleEnabled(resource, settings.enabledModules, activeCompanyType)) return false
+        if (!entityLabels[resource] && !moduleNavigation[resource]) return false
+        if (moduleNavigation[resource]?.screen && !hasScreenAccess(moduleNavigation[resource].screen!)) return false
+        if (!isModuleEnabled(resource, settings.enabledModules, activeCompanyType, settings.hasCustomModuleSelection)) return false
         return hasResourceAccess(resource)
       }),
     }))
@@ -256,28 +275,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
       label: group.label,
       children: [
         ...group.resources.map((key) => ({
-          key: `/${key}`,
+          key: moduleNavigation[key]?.path || `/${key}`,
           icon: menuIcons[key] || <SolutionOutlined />,
-          label: <Link to={`/${key}`}>{entityLabels[key]}</Link>,
+          label: <Link to={moduleNavigation[key]?.path || `/${key}`}>{moduleNavigation[key]?.label || entityLabels[key] || appModuleLabels[key] || key}</Link>,
         })),
-        ...(group.key === "front-office" && hasScreenAccess("zalo-inbox") && (isAdmin || isModuleEnabled("zalo-inbox", settings.enabledModules, activeCompanyType))
-          ? [
-              {
-                key: "/zalo-inbox",
-                icon: menuIcons["zalo-inbox"],
-                label: <Link to="/zalo-inbox">Hộp thư Zalo</Link>,
-              },
-            ]
-          : []),
-        ...(group.key === "finance" && hasScreenAccess("accounting-reports") && (isAdmin || isModuleEnabled("accounting-reports", settings.enabledModules, activeCompanyType))
-          ? [
-              {
-                key: "/accounting-reports",
-                icon: menuIcons["accounting-reports"],
-                label: <Link to="/accounting-reports">Báo cáo kế toán</Link>,
-              },
-            ]
-          : []),
         ...(group.key === "admin" && hasScreenAccess("settings")
           ? [
               {
@@ -289,19 +290,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
           : []),
       ],
     })),
-    {
-      key: "landing",
-      icon: <GlobalOutlined />,
-      label: "Landing",
-      children: hasScreenAccess("settings") ? [
-        { key: "/pages", icon: <GlobalOutlined />, label: <Link to="/pages">Pages</Link> },
-        { key: "/forms", icon: <FileDoneOutlined />, label: <Link to="/forms">Forms</Link> },
-        { key: "/posts", icon: menuIcons.posts, label: <Link to="/posts">Posts</Link> },
-        { key: "/news", icon: menuIcons.news, label: <Link to="/news">News</Link> },
-        { key: "/domains", icon: <GlobalOutlined />, label: <Link to="/domains">Domains</Link> },
-        { key: "/configs", icon: <SettingOutlined />, label: <Link to="/configs">Configs</Link> },
-      ] : [],
-    },
     {
       key: "system-tools",
       icon: <GoldOutlined />,
@@ -359,7 +347,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ].filter(Boolean),
     },
   ]
-    .filter((item) => item.key !== "/calendar" || isAdmin || isModuleEnabled("calendar", settings.enabledModules, activeCompanyType))
+    .filter((item) => item.key !== "/calendar" || isModuleEnabled("calendar", settings.enabledModules, activeCompanyType, settings.hasCustomModuleSelection))
     .filter((item) => item && (item.key !== "system-tools" || ((item.children as []) || []).length > 0))
   const selected =
     location.pathname === "/"

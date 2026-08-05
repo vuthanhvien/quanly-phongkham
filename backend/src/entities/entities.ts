@@ -1676,6 +1676,9 @@ export class AppUiSetting {
   @Column({ type: 'simple-json', nullable: true })
   enabledModules?: string[];
 
+  @Column({ default: false })
+  hasCustomModuleSelection: boolean;
+
   @Column({ default: 'Thien Chanh CMS' })
   appName: string;
 
@@ -2278,6 +2281,73 @@ export class LeaveAllocation extends ConfigurableEntity {
   note?: string;
 }
 
+@Entity('projects')
+export class Project extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  name: string;
+
+  @Column({ default: 'active' })
+  status: string;
+
+  @Column({ nullable: true })
+  ownerStaffId?: string;
+
+  @Column({ type: 'date', nullable: true })
+  startDate?: string;
+
+  @Column({ type: 'date', nullable: true })
+  endDate?: string;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  kanbanColumns?: Array<{ key: string; name: string; color?: string; allowedToKeys?: string[] }>;
+}
+
+@Entity('tasks')
+export class Task extends ConfigurableEntity {
+  @Column()
+  projectId: string;
+
+  @Column()
+  title: string;
+
+  @Column({ default: 'todo' })
+  status: string;
+
+  @Column({ default: 'medium' })
+  priority: string;
+
+  @Column({ nullable: true })
+  assigneeStaffId?: string;
+
+  @Column({ type: 'date', nullable: true })
+  dueDate?: string;
+
+  @Column({ type: 'int', default: 0 })
+  sortOrder: number;
+
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+}
+
+@Entity('project_members')
+@Index(['projectId', 'staffId'], { unique: true })
+export class ProjectMember extends ConfigurableEntity {
+  @Column()
+  projectId: string;
+
+  @Column()
+  staffId: string;
+
+  @Column({ default: 'member' })
+  role: string;
+}
+
 @Entity('attendance_adjustment_requests')
 export class AttendanceAdjustmentRequest extends ConfigurableEntity {
   @Column()
@@ -2785,6 +2855,9 @@ export const ENTITIES = [
   LeaveRequest,
   LeaveType,
   LeaveAllocation,
+  Project,
+  Task,
+  ProjectMember,
   AttendanceAdjustmentRequest,
   BusinessTripRequest,
   PaymentRequest,

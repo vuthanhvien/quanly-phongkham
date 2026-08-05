@@ -46,6 +46,8 @@ import {
   PaymentRequest,
   PerformanceReview,
   PositionHistory,
+  Project,
+  ProjectMember,
   RecordDraft,
   Product,
   ProductVariant,
@@ -59,6 +61,7 @@ import {
   StaffTraining,
   StockBatch,
   Supplier,
+  Task,
   Treatment,
   User,
   ViewSetting,
@@ -73,6 +76,12 @@ import {
 import { WorkflowService } from '../workflow/workflow.service';
 
 const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print'];
+const DEFAULT_KANBAN_COLUMNS = [
+  { key: 'todo', name: 'Cần làm', color: 'default', allowedToKeys: ['in_progress'] },
+  { key: 'in_progress', name: 'Đang làm', color: 'blue', allowedToKeys: ['todo', 'review'] },
+  { key: 'review', name: 'Chờ duyệt', color: 'orange', allowedToKeys: ['in_progress', 'done'] },
+  { key: 'done', name: 'Hoàn thành', color: 'green', allowedToKeys: ['review'] },
+];
 
 const RESOURCE_ACTIONS: Record<string, string[]> = {
   customers: [...DEFAULT_RESOURCE_ACTIONS, 'reveal-phone'],
@@ -325,6 +334,7 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   approveNextStepId: 'workflow-steps',
   rejectNextStepId: 'workflow-steps',
   instanceId: 'workflow-instances',
+  projectId: 'projects',
   requesterUserId: 'user-accounts',
   requesterStaffId: 'staff',
   assigneeUserId: 'user-accounts',
@@ -471,6 +481,9 @@ export class RecordsService {
     @InjectRepository(LeaveRequest) private readonly leaveRequests: Repository<LeaveRequest>,
     @InjectRepository(LeaveType) private readonly leaveTypes: Repository<LeaveType>,
     @InjectRepository(LeaveAllocation) private readonly leaveAllocations: Repository<LeaveAllocation>,
+    @InjectRepository(Project) private readonly projects: Repository<Project>,
+    @InjectRepository(ProjectMember) private readonly projectMembers: Repository<ProjectMember>,
+    @InjectRepository(Task) private readonly tasks: Repository<Task>,
     @InjectRepository(AttendanceAdjustmentRequest) private readonly attendanceAdjustmentRequests: Repository<AttendanceAdjustmentRequest>,
     @InjectRepository(BusinessTripRequest) private readonly businessTripRequests: Repository<BusinessTripRequest>,
     @InjectRepository(PaymentRequest) private readonly paymentRequests: Repository<PaymentRequest>,
@@ -531,6 +544,9 @@ export class RecordsService {
       'leave-requests': this.leaveRequests,
       'leave-types': this.leaveTypes,
       'leave-allocations': this.leaveAllocations,
+      projects: this.projects,
+      'project-members': this.projectMembers,
+      tasks: this.tasks,
       'attendance-adjustment-requests': this.attendanceAdjustmentRequests,
       'business-trip-requests': this.businessTripRequests,
       'payment-requests': this.paymentRequests,
@@ -716,6 +732,8 @@ export class RecordsService {
         'leave-requests': ['status', 'reason'],
         'leave-types': ['code', 'name', 'description'],
         'leave-allocations': ['leaveTypeCode', 'year', 'note'],
+        projects: ['code', 'name', 'status', 'description'],
+        tasks: ['title', 'status', 'priority', 'description'],
         'attendance-adjustment-requests': ['status', 'reason'],
         'business-trip-requests': ['destination', 'purpose', 'status'],
         'payment-requests': ['title', 'description', 'status'],
@@ -776,6 +794,9 @@ export class RecordsService {
     }
     if (resource === 'products') {
       return this.attachProductVariants(hydrated as Product);
+    }
+    if (resource === 'projects') {
+      return this.attachProjectMembers(hydrated as Project);
     }
     if (resource === 'accounting-vouchers') {
       return this.attachAccountingVoucherLines(hydrated as AccountingVoucher);
@@ -840,6 +861,32 @@ export class RecordsService {
     const record = await this.repository(resource).findOne({ where: { id } });
     if (!record) throw new NotFoundException('Không tìm thấy dữ liệu');
     return record;
+  }
+
+  private async syncProjectMembers(projectId: string, memberStaffIds: unknown[]) {
+    const staffIds = Array.from(new Set(memberStaffIds.map(String).filter(Boolean)));
+    const existing = await this.projectMembers.find({ where: { projectId, isArchived: false } });
+    const existingByStaffId = new Map(existing.map((item) => [item.staffId, item]));
+    const newStaffIds = staffIds.filter((staffId) => !existingByStaffId.has(staffId));
+    if (newStaffIds.length) {
+      const validCount = await this.staff.count({ where: { id: In(newStaffIds), isArchived: false } });
+      if (validCount !== newStaffIds.length) throw new BadRequestException('Có thành viên dự án không hợp lệ');
+      await this.projectMembers.save(newStaffIds.map((staffId) => this.projectMembers.create({ projectId, staffId })));
+    }
+    const removed = existing.filter((item) => !staffIds.includes(item.staffId));
+    if (removed.length) await this.projectMembers.save(removed.map((item) => ({ ...item, isArchived: true })));
+  }
+
+  private async attachProjectMembers(project: Project) {
+    const members = await this.projectMembers.find({ where: { projectId: project.id, isArchived: false } });
+    const staffIds = members.map((member) => member.staffId);
+    const staffRows = staffIds.length ? await this.staff.find({ where: { id: In(staffIds), isArchived: false } }) : [];
+    const staffById = new Map(staffRows.map((staff) => [staff.id, staff]));
+    return {
+      ...project,
+      memberStaffIds: staffIds,
+      members: members.map((member) => ({ ...member, staff: staffById.get(member.staffId) })),
+    };
   }
 
   async find(resource: string, id: string, user?: AuthUser, request?: RequestContext, include?: string) {
@@ -974,6 +1021,7 @@ export class RecordsService {
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
     const record = await this.saveRecord(resource, repository.create(normalized), repository);
+    if (resource === 'projects' && Array.isArray(payload.memberStaffIds)) await this.syncProjectMembers(record.id, payload.memberStaffIds);
     if (resource === 'products') await this.syncProductVariants(record.id, productVariants);
     await this.syncStaffTypeToUserRole(resource, record);
     if (resource === 'service-orders') await this.replaceServiceOrderItems(record.id, serviceOrderItems);
@@ -1044,6 +1092,7 @@ export class RecordsService {
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
     const record = await this.saveRecord(resource, repository.merge(previous, normalized), repository);
+    if (resource === 'projects' && Array.isArray(payload.memberStaffIds)) await this.syncProjectMembers(record.id, payload.memberStaffIds);
     if (resource === 'products' && productVariants) await this.syncProductVariants(record.id, productVariants);
     await this.syncStaffTypeToUserRole(resource, record);
     if (resource === 'service-orders') await this.replaceServiceOrderItems(id, serviceOrderItems);
@@ -3206,7 +3255,7 @@ export class RecordsService {
     return '';
   }
 
-  private async normalize(resource: string, payload: Record<string, unknown>) {
+  private async normalize(resource: string, payload: Record<string, unknown>, creating = false) {
     const value = { ...payload };
     delete value.id;
     delete value.createdAt;
@@ -3240,6 +3289,50 @@ export class RecordsService {
       }
       const leaveType = await this.leaveTypes.findOne({ where: { code: String(value.leaveTypeCode), isArchived: false, isActive: true } });
       if (!leaveType) throw new BadRequestException('Loại nghỉ không tồn tại hoặc đã ngừng áp dụng');
+    }
+    if (resource === 'projects') {
+      delete value.memberStaffIds;
+      value.code = String(value.code || '').trim();
+      value.name = String(value.name || '').trim();
+      value.status = ['active', 'completed', 'on_hold', 'cancelled'].includes(String(value.status)) ? value.status : 'active';
+      if (!value.code || !value.name) throw new BadRequestException('Dự án bắt buộc có mã và tên');
+      if (Array.isArray(value.kanbanColumns)) {
+        const columns = value.kanbanColumns
+          .map((column) => ({
+            key: String((column as Record<string, unknown>).key || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+            name: String((column as Record<string, unknown>).name || '').trim(),
+            color: String((column as Record<string, unknown>).color || 'default'),
+            allowedToKeys: Array.isArray((column as Record<string, unknown>).allowedToKeys)
+              ? (column as Record<string, unknown>).allowedToKeys as string[]
+              : [],
+          }))
+          .filter((column) => column.key && column.name);
+        if (columns.length === 0 || new Set(columns.map((column) => column.key)).size !== columns.length) {
+          throw new BadRequestException('Các cột Kanban cần có mã và tên không trùng nhau');
+        }
+        const keys = new Set(columns.map((column) => column.key));
+        value.kanbanColumns = columns.map((column) => ({
+          ...column,
+          allowedToKeys: Array.from(new Set(column.allowedToKeys.map(String))).filter((key) => keys.has(key) && key !== column.key),
+        }));
+      } else if (creating) {
+        value.kanbanColumns = DEFAULT_KANBAN_COLUMNS;
+      }
+    }
+    if (resource === 'tasks') {
+      value.title = String(value.title || '').trim();
+      value.priority = ['low', 'medium', 'high', 'urgent'].includes(String(value.priority)) ? value.priority : 'medium';
+      value.sortOrder = Number(value.sortOrder || 0);
+      if (!String(value.projectId || '').trim() || !value.title) throw new BadRequestException('Công việc bắt buộc có dự án và tiêu đề');
+      const project = await this.projects.findOne({ where: { id: String(value.projectId), isArchived: false } });
+      if (!project) throw new BadRequestException('Dự án không tồn tại');
+      if (value.assigneeStaffId) {
+        const isMember = await this.projectMembers.exist({ where: { projectId: project.id, staffId: String(value.assigneeStaffId), isArchived: false } });
+        if (!isMember) throw new BadRequestException('Người xử lý cần là thành viên của dự án');
+      }
+      const columnKeys = (Array.isArray(project.kanbanColumns) && project.kanbanColumns.length > 0 ? project.kanbanColumns : DEFAULT_KANBAN_COLUMNS)
+        .map((column) => column.key);
+      value.status = columnKeys.includes(String(value.status)) ? value.status : columnKeys[0];
     }
     if (resource === 'posts' || resource === 'news') {
       value.slug = String(value.slug || '').trim();
@@ -3574,7 +3667,7 @@ export class RecordsService {
 
   private async normalizeInput(resource: string, payload: Record<string, unknown>, creating = false) {
     if (resource !== 'user-accounts') {
-      const value = await this.normalize(resource, payload);
+      const value = await this.normalize(resource, payload, creating);
       if (resource === 'products') {
         await this.normalizeProductBaseUnit(value);
         await this.normalizeProductBundle(value, String(payload.id || ''));
