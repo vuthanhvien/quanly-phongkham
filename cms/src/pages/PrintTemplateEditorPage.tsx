@@ -1,5 +1,5 @@
 import { ArrowLeftOutlined, SaveOutlined } from "@ant-design/icons"
-import { Button, Card, Form, Input, Select, Space, Tooltip, Typography, message } from "antd"
+import { Button, Card, Checkbox, Form, Input, Select, Space, Tooltip, Typography, message } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api"
@@ -18,6 +18,7 @@ interface Template {
   htmlTemplate: string
   templateType?: string
   originalFilename?: string
+  isActive?: boolean
 }
 
 const printRepeatCollections: Record<string, Array<{ key: string; label: string }>> = {
@@ -25,6 +26,36 @@ const printRepeatCollections: Record<string, Array<{ key: string; label: string 
   'accounting-vouchers': [{ key: 'lines', label: 'Dòng hạch toán' }],
   products: [{ key: 'variants', label: 'Biến thể / SKU' }],
   projects: [{ key: 'members', label: 'Thành viên dự án' }],
+}
+
+type TemplateVariableFamily = {
+  key: string
+  label: string
+  variables: ReturnType<typeof buildTemplateVariableOptions>
+}
+
+function groupTemplateVariables(variables: ReturnType<typeof buildTemplateVariableOptions>) {
+  const categories = new Map<string, Map<string, TemplateVariableFamily>>()
+  const suffixPattern = /(_fm_(?:mdy|ymd|dmy)|_fm|_up|_cap)$/
+
+  variables.forEach((variable) => {
+    const familyKey = variable.key.replace(suffixPattern, "")
+    const category = familyKey.includes(".") ? "Thông tin liên kết" : "Thông tin chính"
+    const families = categories.get(category) || new Map<string, TemplateVariableFamily>()
+    const current = families.get(familyKey) || {
+      key: familyKey,
+      label: variables.find((item) => item.key === familyKey)?.label || variable.label.replace(/ - .+$/, ""),
+      variables: [],
+    }
+    current.variables.push(variable)
+    families.set(familyKey, current)
+    categories.set(category, families)
+  })
+
+  return Array.from(categories, ([label, families]) => ({
+    label,
+    families: Array.from(families.values()).sort((left, right) => left.key.localeCompare(right.key)),
+  }))
 }
 
 export function PrintTemplateEditorPage() {
@@ -50,6 +81,10 @@ export function PrintTemplateEditorPage() {
   const templatePresets = useMemo(
     () => PRINT_TEMPLATE_PRESETS.filter((preset) => preset.entityType === entityType),
     [entityType],
+  )
+  const templateVariableGroups = useMemo(
+    () => groupTemplateVariables(templateVariables),
+    [templateVariables],
   )
 
   useEffect(() => {
@@ -97,14 +132,19 @@ export function PrintTemplateEditorPage() {
           entityType,
         })
         message.success("Đã cập nhật mẫu in")
+        await load()
       } else {
-        await api.post("/settings/print-templates", {
+        const response = await api.post("/settings/print-templates", {
           ...values,
           entityType,
         })
         message.success("Đã lưu mẫu in")
+        const templateId = String(response.data.data?.id || "")
+        if (templateId) {
+          navigate(`/settings/print-templates/${templateId}?module=${encodeURIComponent(entityType)}`, { replace: true })
+          return
+        }
       }
-      navigate(`/settings?module=${entityType}`)
     } finally {
       setSaving(false)
     }
@@ -163,28 +203,41 @@ export function PrintTemplateEditorPage() {
             <Form.Item name="name" label="Tên mẫu" rules={[{ required: true }]}>
               <Input />
             </Form.Item>
-            <Form.Item name="htmlTemplate" label="Nội dung mẫu in" rules={[{ required: true }]}>
+            <Form.Item name="isActive" valuePropName="checked" initialValue>
+              <Checkbox>Sử dụng mẫu in này</Checkbox>
+            </Form.Item>
+            <Form.Item name="htmlTemplate" rules={[{ required: true }]}>
               <PrintTiptapEditor variables={templateVariables} repeatCollections={printRepeatCollections[entityType] || []} />
             </Form.Item>
           </Card>
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
-            <Card className="template-preview-card" title="Biến có thể dùng">
-              <Select
-                allowClear
-                showSearch
-                className="template-variable-select"
-                optionFilterProp="search"
-                placeholder="Tìm biến in theo code hoặc label"
-                options={templateVariables.map((variable) => ({
-                  value: variable.key,
-                  label: `${variable.key} - ${variable.label}`,
-                  search: `${variable.key} ${variable.label}`,
-                }))}
-                onSelect={(key) => {
-                  void navigator.clipboard?.writeText(`{{${key}}}`)
-                  message.success(`Đã copy {{${key}}}`)
-                }}
-              />
+            <Card className="template-variable-library" title={`Biến có thể dùng (${templateVariables.length})`}>
+              {templateVariableGroups.map((group) => (
+                <section className="template-variable-group" key={group.label}>
+                  <Typography.Text className="template-variable-group-title" strong>{group.label}</Typography.Text>
+                  {group.families.map((family) => (
+                    <div className="template-variable-family" key={family.key}>
+                      <Typography.Text type="secondary">{family.label}</Typography.Text>
+                      <div className="template-variable-codes">
+                        {family.variables.map((variable) => (
+                          <Tooltip key={variable.key} title={`${variable.label} — bấm để copy`}>
+                            <Button
+                              size="small"
+                              type="text"
+                              onClick={() => {
+                                void navigator.clipboard?.writeText(`{{${variable.key}}}`)
+                                message.success(`Đã copy {{${variable.key}}}`)
+                              }}
+                            >
+                              <code>{`{{${variable.key}}}`}</code>
+                            </Button>
+                          </Tooltip>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              ))}
             </Card>
           </Space>
         </div>

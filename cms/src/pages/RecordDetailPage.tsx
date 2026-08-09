@@ -15,7 +15,7 @@ import {
   Tag,
   Typography,
 } from "antd"
-import { ReactNode, useEffect, useState } from "react"
+import { ReactNode, useCallback, useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftOutlined,
@@ -35,6 +35,8 @@ import {
 } from "@ant-design/icons"
 import { api } from "../api"
 import { hasActionAccess, hasResourceAccess } from "../access"
+import { isModuleEnabled } from "../company-types"
+import { useAppUi } from "../app-ui"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
@@ -46,7 +48,6 @@ import {
   getFieldCatalog,
   getStoredUserRole,
   getVisibleFieldConfigs,
-  resolveModuleEnabled,
   ViewSettingRecord,
 } from "../view-settings"
 
@@ -88,6 +89,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   const id = props.id ?? params.id ?? ""
   const embedded = Boolean(props.embedded)
   const navigate = useNavigate()
+  const { settings } = useAppUi()
   const [toast, toastContextHolder] = message.useMessage()
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [related, setRelated] = useState<RelatedBlock[]>([])
@@ -101,6 +103,14 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   const [mainEdit, setMainEdit] = useState<MainRecordEditState | null>(null)
   const [quickCreateBlock, setQuickCreateBlock] = useState<RelatedBlock | null>(null)
   const { mutate: deleteRecord } = useDelete()
+  const canShowRelatedResource = useCallback((relatedResource: string) =>
+    isModuleEnabled(
+      relatedResource,
+      settings.enabledModules,
+      settings.companyType || "clinic",
+      settings.hasCustomModuleSelection,
+    ) && hasResourceAccess(relatedResource),
+  [settings.companyType, settings.enabledModules, settings.hasCustomModuleSelection])
 
   useEffect(() => {
     let mounted = true
@@ -108,7 +118,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
     const activeRole = getStoredUserRole()
     Promise.all([
       api.get(`/records/${resource}/${id}`, { params: { include: '*' } }),
-      loadRelated(resource, id, activeRole),
+      loadRelated(resource, id, activeRole, canShowRelatedResource),
       api.get("/settings/custom-fields", { params: { entityType: resource } }),
       api.get("/settings/views", { params: { entityType: resource } }),
     ]).then(([recordResponse, relatedResponse, fieldResponse, viewResponse]) => {
@@ -147,7 +157,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
     return () => {
       mounted = false
     }
-  }, [resource, id])
+  }, [resource, id, canShowRelatedResource])
 
   if (!record && !loading) {
     return <Empty description="Không tìm thấy bản ghi" />
@@ -398,8 +408,18 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                         dataIndex: field.key,
                         key: field.key,
                         width: field.tableWidth,
-                        render: (_: unknown, row: Record<string, any>) =>
-                          <RecordValueView compact field={field} fileLookups={fileLookups} lookups={lookups} value={resolveRecordFieldValue(row, field)} />,
+                        render: (_: unknown, row: Record<string, any>) => {
+                          const value = (
+                            <RecordValueView compact field={field} fileLookups={fileLookups} lookups={lookups} value={resolveRecordFieldValue(row, field)} />
+                          )
+                          const opensDetail = ["code", "name", "fullName", "title"].includes(field.key)
+                            && hasActionAccess(block.resource, "view")
+                          return opensDetail ? (
+                            <Typography.Link onClick={() => void openRelatedDetail(block, String(row.id))}>
+                              {value}
+                            </Typography.Link>
+                          ) : value
+                        },
                       })),
                       {
                         title: "",
@@ -723,7 +743,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
 
   async function reloadRelatedBlocks() {
     const activeRole = getStoredUserRole()
-    const nextRelated = await loadRelated(resource, id, activeRole)
+    const nextRelated = await loadRelated(resource, id, activeRole, canShowRelatedResource)
     setRelated(nextRelated)
     setLookups({})
     const visibleFields = [
@@ -787,6 +807,7 @@ async function loadRelated(
   resource: string,
   id: string,
   role: string,
+  canShowResource: (resource: string) => boolean,
 ): Promise<RelatedBlock[]> {
   if (resource === "leads") {
     const specs = [
@@ -796,7 +817,7 @@ async function loadRelated(
         field: "leadId",
       },
     ]
-    return loadBlocks(specs, id, role)
+    return loadBlocks(specs, id, role, canShowResource)
   }
   if (resource === "customers") {
     const specs = [
@@ -836,7 +857,7 @@ async function loadRelated(
         field: "customerId",
       },
     ]
-    return loadBlocks(specs, id, role)
+    return loadBlocks(specs, id, role, canShowResource)
   }
   if (resource === "staff") {
     const specs = [
@@ -921,7 +942,7 @@ async function loadRelated(
         field: "staffName",
       },
     ]
-    return loadBlocks(specs, id, role)
+    return loadBlocks(specs, id, role, canShowResource)
   }
   return []
 }
@@ -934,12 +955,13 @@ async function loadBlocks(
   }>,
   id: string,
   role: string,
+  canShowResource: (resource: string) => boolean,
 ) {
   const responses = await Promise.all(
     specs.map(async (spec) => {
-      // Đây là cùng nguồn quyền mà menu dùng. Nếu role không có quyền vào
-      // module thì không được tạo tab liên kết, kể cả khi đang ở detail khác.
-      if (!hasResourceAccess(spec.resource)) return null
+      // Luôn dùng đúng điều kiện của menu, để tab liên kết không trở thành
+      // lối truy cập vòng qua cấu hình module và role hiện tại.
+      if (!canShowResource(spec.resource)) return null
 
       const [recordResponse, fieldResponse, viewResponse, printResponse] = await Promise.all([
         api
@@ -970,10 +992,6 @@ async function loadBlocks(
         })
       })
       const views = viewResponse.data.data as ViewSettingRecord[]
-
-      // Tab liên kết là một điểm vào module, nên phải tuân theo cấu hình
-      // hiển thị theo role giống menu điều hướng.
-      if (!resolveModuleEnabled(views, role)) return null
 
       return {
         rows,

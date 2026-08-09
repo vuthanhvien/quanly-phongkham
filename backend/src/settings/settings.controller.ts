@@ -342,10 +342,24 @@ export class SettingsController {
     return { data: await this.settings.saveDocxTemplate(file, payload, request?.user) };
   }
 
+  @Patch('print-templates/:id/docx')
+  @UseInterceptors(FileInterceptor('file'))
+  async replaceDocxTemplate(@Param('id') id: string, @UploadedFile() file: any, @Body() payload: { name?: string }, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.replaceDocxTemplate(id, file, payload, request?.user) };
+  }
+
   @Get('print-templates/:id/render/:recordId')
   @Header('Content-Type', 'text/html; charset=utf-8')
   render(@Param('id') id: string, @Param('recordId') recordId: string) {
     return this.settings.renderTemplate(id, recordId);
+  }
+
+  @Get('print-templates/:id/docx/source')
+  async downloadDocxSource(@Param('id') id: string, @Request() request: { user: AuthUser }, @Res() response: Response) {
+    const result = await this.settings.downloadDocxTemplateSource(id, request.user);
+    response.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    response.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(result.filename)}"`);
+    response.send(result.buffer);
   }
 
   @Get('print-templates/:id/docx/:recordId')

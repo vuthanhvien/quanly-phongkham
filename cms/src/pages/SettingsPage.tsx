@@ -4,6 +4,7 @@ import {
   AlignRightOutlined,
   BoldOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   HolderOutlined,
   ItalicOutlined,
@@ -29,6 +30,7 @@ import {
   Popconfirm,
   Select,
   Space,
+  Switch,
   Table,
   Tabs,
   Tag,
@@ -43,6 +45,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { buildGroupedModuleOptions } from "../company-types"
+import { getInputPatternLabel, INPUT_PATTERN_OPTIONS } from "../input-patterns"
 import { getApiErrorMessage } from "../utils/apiError"
 import { baseFields, CustomField, DynamicRole, entityLabels, FieldSpec, getResourceActionOptions, normalizeSelectOption, permissionLabels, relationFields, type SelectOption } from "../models"
 import {
@@ -71,6 +74,7 @@ interface Template {
   htmlTemplate: string
   templateType?: string
   originalFilename?: string
+  isActive?: boolean
 }
 
 interface TemplatePreset {
@@ -648,14 +652,11 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   const [docxTemplateForm] = Form.useForm()
   const [docxTemplateModal, setDocxTemplateModal] = useState(false)
   const [docxFile, setDocxFile] = useState<File | null>(null)
+  const [docxTemplateTarget, setDocxTemplateTarget] = useState<Template | null>(null)
 
   const fieldCatalog = useMemo(
     () => getFieldCatalog(entityType, fields),
     [entityType, fields],
-  )
-  const templateVariables = useMemo(
-    () => buildTemplateVariableOptions(entityType, fieldCatalog),
-    [entityType, fieldCatalog],
   )
   const selectableRoles = useMemo(
     () => getRoleOptions(views, [selectedRole, ...dynamicRoles.map((role) => role.key)]),
@@ -842,13 +843,19 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     if (!docxFile) { message.error("Chọn file DOCX mẫu"); return }
     const formData = new FormData()
     formData.append("file", docxFile)
-    formData.append("entityType", entityType)
     formData.append("name", String(values.name || ""))
     try {
-      await api.post("/settings/print-templates/docx", formData)
-      message.success("Đã lưu mẫu DOCX")
+      if (docxTemplateTarget) {
+        await api.patch(`/settings/print-templates/${docxTemplateTarget.id}/docx`, formData)
+        message.success("Đã thay file DOCX")
+      } else {
+        formData.append("entityType", entityType)
+        await api.post("/settings/print-templates/docx", formData)
+        message.success("Đã lưu mẫu DOCX")
+      }
       setDocxTemplateModal(false)
       setDocxFile(null)
+      setDocxTemplateTarget(null)
       docxTemplateForm.resetFields()
       await load()
     } catch (error) { message.error(getApiErrorMessage(error, "Không thể lưu mẫu DOCX")) }
@@ -864,6 +871,39 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
 
   function openEditTemplate(template: Template) {
     navigate(`/settings/print-templates/${template.id}?module=${entityType}`)
+  }
+
+  function openDocxTemplateUpload(template?: Template) {
+    setDocxTemplateTarget(template || null)
+    setDocxFile(null)
+    docxTemplateForm.setFieldsValue({ name: template?.name || "" })
+    setDocxTemplateModal(true)
+  }
+
+  async function updateTemplateActive(template: Template, isActive: boolean) {
+    try {
+      await api.patch(`/settings/print-templates/${template.id}`, { isActive })
+      setTemplates((current) => current.map((item) => item.id === template.id ? { ...item, isActive } : item))
+      toast.success(isActive ? "Đã bật sử dụng mẫu in" : "Đã tắt sử dụng mẫu in")
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Không thể cập nhật trạng thái mẫu in"))
+    }
+  }
+
+  async function downloadDocxTemplate(template: Template) {
+    try {
+      const response = await api.get(`/settings/print-templates/${template.id}/docx/source`, { responseType: "blob" })
+      const url = URL.createObjectURL(response.data)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = template.originalFilename || `${template.name}.docx`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Không thể tải file DOCX"))
+    }
   }
 
   const updateConfig = useCallback((
@@ -913,9 +953,11 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
           <Typography.Title level={3}>{section === "roles" ? "Hiển thị theo role / module" : "Mẫu in"}</Typography.Title>
         <Space wrap>
           <Select
+            showSearch
+            optionFilterProp="label"
             value={entityType}
             onChange={setEntityType}
-            style={{ width: 240 }}
+            style={{ width: 420 }}
             options={buildGroupedModuleOptions(permissionLabels)}
           />
           {section === "roles" && (
@@ -1030,25 +1072,9 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
               children: (
                 <div className="settings-tab-panel">
                   <div className="settings-tab-header">
-                    <Select
-                      allowClear
-                      showSearch
-                      className="template-variable-select"
-                      optionFilterProp="search"
-                      placeholder="Tìm biến in theo code hoặc label"
-                      options={templateVariables.map((variable) => ({
-                        value: variable.key,
-                        label: `${variable.key} - ${variable.label}`,
-                        search: `${variable.key} ${variable.label}`,
-                      }))}
-                      onSelect={(key) => {
-                        void navigator.clipboard?.writeText(`{{${key}}}`)
-                        message.success(`Đã copy {{${key}}}`)
-                      }}
-                    />
                     <Space wrap>
                       <Button onClick={openCreateTemplate}>Thêm mẫu</Button>
-                      <Button onClick={() => setDocxTemplateModal(true)}>Tải mẫu DOCX</Button>
+                      <Button onClick={() => openDocxTemplateUpload()}>Tải mẫu DOCX</Button>
                       {templatePresets.length > 0 && (
                         <Button onClick={() => openCreateTemplateFromPreset(templatePresets[0])}>
                           Tạo từ mẫu có sẵn
@@ -1072,60 +1098,48 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                     </div>
                   )}
                   <Divider />
-                  <div className="template-layout">
-                    <div>
-                      <Table
-                        size="small"
-                        pagination={false}
-                        rowKey="id"
-                        dataSource={templates}
-                        scroll={{ x: "max-content" }}
-                        columns={[
-                          { title: "Tên mẫu", dataIndex: "name" },
-                          {
-                            title: "Xem nhanh",
-                            render: (_, row) => (
-                              <Typography.Paragraph
-                                ellipsis={{ rows: 2 }}
-                                style={{ marginBottom: 0, maxWidth: 360 }}
-                              >
-                                {row.templateType === "DOCX" ? `DOCX: ${row.originalFilename || row.name}` : row.htmlTemplate}
-                              </Typography.Paragraph>
-                            ),
-                          },
-                          {
-                            title: "",
-                            render: (_, row) => (
-                              row.templateType === "DOCX" ? (
-                                <Typography.Text type="secondary">Tải mẫu mới để thay thế</Typography.Text>
-                              ) : (
-                                <Button type="link" onClick={() => openEditTemplate(row)}>
-                                  Sửa
-                                </Button>
-                              )
-                            ),
-                          },
-                        ]}
-                      />
-                    </div>
-                    <Card className="template-preview-card" title="Xem trước nhanh">
-                      <div
-                        className="template-preview-surface"
-                        dangerouslySetInnerHTML={{
-                          __html:
-                            templates[0]?.htmlTemplate ||
-                            "<p>Chưa có mẫu in cho model này.</p>",
-                        }}
-                      />
-                    </Card>
-                  </div>
+                  <Table
+                    size="small"
+                    pagination={false}
+                    rowKey="id"
+                    dataSource={templates}
+                    scroll={{ x: "max-content" }}
+                    columns={[
+                      { title: "Tên mẫu", dataIndex: "name" },
+                      {
+                        title: "Sử dụng",
+                        dataIndex: "isActive",
+                        width: 120,
+                        render: (value, row) => <Switch checked={value !== false} onChange={(checked) => void updateTemplateActive(row, checked)} />,
+                      },
+                      {
+                        title: "Thao tác",
+                        width: 128,
+                        align: "right",
+                        render: (_, row) => (
+                          row.templateType === "DOCX" ? (
+                            <Space size={2}>
+                              <Tooltip title="Tải file gốc">
+                                <Button type="text" icon={<DownloadOutlined />} onClick={() => void downloadDocxTemplate(row)} />
+                              </Tooltip>
+                              <Button type="link" onClick={() => openDocxTemplateUpload(row)}>Tải lại</Button>
+                            </Space>
+                          ) : (
+                            <Button type="link" onClick={() => openEditTemplate(row)}>
+                              Sửa
+                            </Button>
+                          )
+                        ),
+                      },
+                    ]}
+                  />
                 </div>
               ),
             },
           ].filter((item) => item.key === (section === "roles" ? "view-config" : "print-templates"))}
         />
       </Card>
-      <Modal title="Tải mẫu in DOCX" open={docxTemplateModal} footer={null} onCancel={() => { setDocxTemplateModal(false); setDocxFile(null) }}>
+      <Modal title={docxTemplateTarget ? "Tải lại file DOCX" : "Tải mẫu in DOCX"} open={docxTemplateModal} footer={null} onCancel={() => { setDocxTemplateModal(false); setDocxFile(null); setDocxTemplateTarget(null) }}>
         <Typography.Paragraph type="secondary">Dùng placeholder liền mạch như <code>{"{{fullName}}"}</code>, <code>{"{{code}}"}</code>. Khi in, hệ thống sẽ thay dữ liệu và tải DOCX kết quả.</Typography.Paragraph>
         <Form form={docxTemplateForm} layout="vertical" onFinish={saveDocxTemplate}>
           <Form.Item name="name" label="Tên mẫu" rules={[{ required: true }]}><Input placeholder="Phiếu thông tin khách hàng" /></Form.Item>
@@ -1134,7 +1148,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
               <Button>Chọn file DOCX</Button>
             </Upload>
           </Form.Item>
-          <Button className="primary-glow" htmlType="submit" type="primary">Lưu mẫu DOCX</Button>
+          <Button className="primary-glow" htmlType="submit" type="primary">{docxTemplateTarget ? "Thay file DOCX" : "Lưu mẫu DOCX"}</Button>
         </Form>
       </Modal>
     </>
@@ -1305,6 +1319,12 @@ function ViewConfigTable({
         width: 100,
         render: (value) => value ? "Có" : "Không",
       })
+      columns.push({
+        title: "Mẫu nhập",
+        dataIndex: "inputPattern",
+        width: 140,
+        render: (value) => getInputPatternLabel(value) || "Không có",
+      })
     }
   }
   columns.push({
@@ -1437,6 +1457,15 @@ function FieldConfigEditor({
       {viewType === "FORM" && <>
         <Form.Item label="Gợi ý nhập">
           <Input value={field.placeholder} onChange={(event) => update({ placeholder: event.target.value })} placeholder="Gợi ý nhập liệu" />
+        </Form.Item>
+        <Form.Item label="Mẫu nhập">
+          <Select
+            allowClear
+            placeholder="Không có"
+            value={field.inputPattern}
+            onChange={(value) => update({ inputPattern: value || "" })}
+            options={INPUT_PATTERN_OPTIONS}
+          />
         </Form.Item>
         <Form.Item label="Giá trị mặc định">
           <Input value={Array.isArray(field.defaultValue) ? field.defaultValue.join(", ") : field.defaultValue === undefined || field.defaultValue === null ? "" : String(field.defaultValue)} onChange={(event) => update({ defaultValue: parseDefaultValue(field.type, event.target.value) })} placeholder="Giá trị mặc định" />

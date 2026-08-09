@@ -1185,6 +1185,36 @@ export class SettingsService {
     return this.templates.save(this.templates.merge(saved, { docxPath }));
   }
 
+  async replaceDocxTemplate(id: string, file: any, payload: { name?: string }, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    if (!file) throw new BadRequestException('Cần chọn file DOCX');
+    if (!file.originalname.toLowerCase().endsWith('.docx')) throw new BadRequestException('Chỉ hỗ trợ file .docx');
+
+    const template = await this.templates.findOne({ where: { id, templateType: 'DOCX' } });
+    if (!template) throw new NotFoundException('Không tìm thấy mẫu DOCX');
+
+    const directory = join(process.cwd(), 'storage', 'print-templates');
+    await fs.mkdir(directory, { recursive: true });
+    const docxPath = join(directory, `${template.id}.docx`);
+    await fs.writeFile(docxPath, file.buffer);
+
+    template.docxPath = docxPath;
+    template.originalFilename = basename(file.originalname);
+    if (payload.name?.trim()) template.name = payload.name.trim();
+    return this.templates.save(template);
+  }
+
+  async downloadDocxTemplateSource(id: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const template = await this.templates.findOne({ where: { id, templateType: 'DOCX' } });
+    if (!template?.docxPath) throw new NotFoundException('Không tìm thấy file DOCX');
+
+    return {
+      buffer: await fs.readFile(template.docxPath),
+      filename: template.originalFilename || `${template.name}.docx`,
+    };
+  }
+
   async renderDocxTemplate(templateId: string, recordId: string) {
     const template = await this.templates.findOne({ where: { id: templateId, isActive: true, templateType: 'DOCX' } });
     if (!template?.docxPath) throw new NotFoundException('Không tìm thấy mẫu DOCX');

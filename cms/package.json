@@ -25,8 +25,10 @@
     "antd": "^5.26.0",
     "axios": "^1.10.0",
     "dayjs": "^1.11.13",
+    "imask": "^7.6.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-imask": "^7.6.1",
     "react-router-dom": "^7.6.2",
     "three": "^0.185.1",
     "xlsx": "^0.18.5"

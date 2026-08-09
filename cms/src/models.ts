@@ -38,6 +38,7 @@ export interface FieldSpec {
   disabled?: boolean;
   description?: string;
   placeholder?: string;
+  inputPattern?: string;
   relation?: RelationSpec;
   customTableId?: string;
 }
@@ -714,8 +715,8 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
     { key: 'branchId', label: 'Chi nhánh', width: '50', tableWidth: 190 },
     { key: 'date', label: 'Ngày', type: 'date', required: true, width: '33', tableWidth: 150 },
-    { key: 'checkIn', label: 'Giờ vào', width: '33', tableWidth: 120 },
-    { key: 'checkOut', label: 'Giờ ra', width: '33', tableWidth: 120 },
+    { key: 'checkIn', label: 'Giờ vào', placeholder: 'HH:MM', inputPattern: 'time-hh-mm', width: '33', tableWidth: 120 },
+    { key: 'checkOut', label: 'Giờ ra', placeholder: 'HH:MM', inputPattern: 'time-hh-mm', width: '33', tableWidth: 120 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'present', label: 'Có mặt' }, { value: 'absent', label: 'Vắng' }, { value: 'late', label: 'Đi trễ' }, { value: 'half_day', label: 'Nửa ngày' }, { value: 'holiday', label: 'Nghỉ lễ' }], required: true, width: '33', tableWidth: 140 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
@@ -772,8 +773,8 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'branchId', label: 'Chi nhánh', width: '50', tableWidth: 190 },
     { key: 'attendanceId', label: 'Bản ghi chấm công', width: '50', tableWidth: 240 },
     { key: 'date', label: 'Ngày cần chỉnh', type: 'date', required: true, width: '33', tableWidth: 150 },
-    { key: 'requestedCheckIn', label: 'Giờ vào đề nghị', width: '33', tableWidth: 150 },
-    { key: 'requestedCheckOut', label: 'Giờ ra đề nghị', width: '33', tableWidth: 150 },
+    { key: 'requestedCheckIn', label: 'Giờ vào đề nghị', placeholder: 'HH:MM', inputPattern: 'time-hh-mm', width: '33', tableWidth: 150 },
+    { key: 'requestedCheckOut', label: 'Giờ ra đề nghị', placeholder: 'HH:MM', inputPattern: 'time-hh-mm', width: '33', tableWidth: 150 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'draft', label: 'Nháp' }, { value: 'pending', label: 'Chờ duyệt' }, { value: 'approved', label: 'Đã duyệt' }, { value: 'rejected', label: 'Từ chối' }, { value: 'cancelled', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'reason', label: 'Lý do', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'approvedById', label: 'Người duyệt', width: '50', tableWidth: 220 },

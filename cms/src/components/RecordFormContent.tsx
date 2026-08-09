@@ -29,13 +29,16 @@ import {
 import { UserOutlined } from "@ant-design/icons"
 import { useEffect, useMemo, useState } from "react"
 import dayjs from "dayjs"
+import { IMaskInput } from "react-imask"
 import { api, resolveFileUrl } from "../api"
+import { controlHeightBySize, useAppUi } from "../app-ui"
 import { FileUploadPanel } from "./FileUploadPanel"
 import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
 import { getRelationMetaMap, loadRelationOptions, LookupMap, RelationLookupRecord } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
 import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
 import { getFirstLookupValue } from "../utils/branchDefaults"
+import { getInputPatternConfig, isInputPatternComplete } from "../input-patterns"
 import { toastError, toastSuccess } from "../toast"
 import { buildLocalDateTime, currentLocalDate, currentLocalDateTime, normalizeDateTimeValueForInput, normalizeDateValueForInput, parseClinicDateTime } from "../utils/datetime"
 import { buildFolderPathMap, buildFolderTree, FolderTreeNode, normalizeFileFolderRows } from "../utils/fileFolders"
@@ -411,7 +414,14 @@ export function RecordFormContent({
               </Space>
             ) : field.label}
             name={field.key}
-            rules={[{ required: Boolean(field.required && !field.disabled), message: `Nhập ${field.label}` }]}
+            rules={[
+              { required: Boolean(field.required && !field.disabled), message: `Nhập ${field.label}` },
+              ...(field.inputPattern ? [{
+                validator: (_rule: unknown, value: unknown) => isInputPatternComplete(field.inputPattern, value)
+                  ? Promise.resolve()
+                  : Promise.reject(new Error(`${field.label} phải đúng định dạng HH:MM`)),
+              }] : []),
+            ]}
           >
             <FieldInput field={field} lookups={lookups} resource={resource} />
           </Form.Item>
@@ -541,18 +551,18 @@ function WorkSchedulePeriodFields() {
         <Form.Item
           label="Giờ bắt đầu"
           name="scheduleStartTime"
-          rules={[{ required: true, message: "Chọn giờ bắt đầu" }]}
+          rules={timeInputRules("giờ bắt đầu")}
         >
-          <Input type="time" />
+          <TimeInput />
         </Form.Item>
       </Col>
       <Col xs={24} md={6}>
         <Form.Item
           label="Giờ kết thúc"
           name="scheduleEndTime"
-          rules={[{ required: true, message: "Chọn giờ kết thúc" }]}
+          rules={timeInputRules("giờ kết thúc")}
         >
-          <Input type="time" />
+          <TimeInput />
         </Form.Item>
       </Col>
       <Col xs={24} md={12}>
@@ -597,9 +607,9 @@ function AppointmentDateTimeFields({ form }: { form: ReturnType<typeof Form.useF
         <Form.Item
           label="Giờ bắt đầu"
           name="appointmentStartTime"
-          rules={[{ required: true, message: "Chọn giờ bắt đầu" }]}
+          rules={timeInputRules("giờ bắt đầu")}
         >
-          <Input type="time" />
+          <TimeInput />
         </Form.Item>
       </Col>
       <Col xs={24} md={12}>
@@ -615,13 +625,51 @@ function AppointmentDateTimeFields({ form }: { form: ReturnType<typeof Form.useF
         <Form.Item
           label="Giờ kết thúc"
           name="appointmentEndTime"
-          rules={useCustomEndTime ? [{ required: true, message: "Chọn giờ kết thúc" }] : []}
+          rules={useCustomEndTime ? timeInputRules("giờ kết thúc") : []}
         >
-          <Input disabled={!useCustomEndTime} type="time" />
+          <TimeInput disabled={!useCustomEndTime} />
         </Form.Item>
       </Col>
     </>
   )
+}
+
+function TimeInput({
+  disabled,
+  value,
+  onChange,
+}: {
+  disabled?: boolean
+  value?: string
+  onChange?: (value: string) => void
+}) {
+  const { settings } = useAppUi()
+  const inputPattern = getInputPatternConfig("time-hh-mm")
+  if (!inputPattern) return null
+
+  return (
+    <IMaskInput
+      blocks={inputPattern.blocks}
+      className="ant-input"
+      disabled={disabled}
+      mask={inputPattern.mask}
+      placeholder="HH:MM"
+      style={{ width: "100%", height: controlHeightBySize(settings.size), borderRadius: settings.borderRadius }}
+      value={value || ""}
+      onAccept={(nextValue) => onChange?.(nextValue)}
+    />
+  )
+}
+
+function timeInputRules(label: string, required = true) {
+  return [
+    { required, message: `Nhập ${label}` },
+    {
+      validator: (_rule: unknown, value: unknown) => isInputPatternComplete("time-hh-mm", value)
+        ? Promise.resolve()
+        : Promise.reject(new Error(`${label} phải đúng định dạng HH:MM`)),
+    },
+  ]
 }
 
 function buildAppointmentEditorValues(values: Record<string, unknown>) {
@@ -723,6 +771,7 @@ function FieldInput({
   value?: unknown
   onChange?: (value: unknown) => void
 }) {
+  const { settings } = useAppUi()
   const placeholder = field.placeholder?.trim() || getDefaultFieldPlaceholder(field)
   const relation = field.relation || relationFields[field.key]
   if (field.type === "number")
@@ -732,7 +781,7 @@ function FieldInput({
         formatter={field.key === "year" ? undefined : formatNumberInput}
         parser={field.key === "year" ? undefined : parseNumberInput}
         placeholder={placeholder}
-        style={{ width: "100%" }}
+        style={{ width: "100%", height: controlHeightBySize(settings.size), borderRadius: settings.borderRadius }}
         value={value as number | undefined}
         onChange={onChange}
       />
@@ -864,6 +913,21 @@ function FieldInput({
         onChange={(e) => onChange?.(e.target.value)}
       />
     )
+  const inputPattern = getInputPatternConfig(field.inputPattern)
+  if (inputPattern) {
+    return (
+      <IMaskInput
+        blocks={inputPattern.blocks}
+        className="ant-input"
+        disabled={field.disabled}
+        mask={inputPattern.mask}
+        placeholder={placeholder}
+        style={{ width: "100%", height: controlHeightBySize(settings.size), borderRadius: settings.borderRadius }}
+        value={String(value ?? "")}
+        onAccept={(nextValue) => onChange?.(nextValue)}
+      />
+    )
+  }
   return (
     <Input
       disabled={field.disabled}

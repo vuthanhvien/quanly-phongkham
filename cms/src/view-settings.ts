@@ -380,6 +380,10 @@ export function buildFieldLayoutConfigs(
         typeof entry.placeholder === 'string' && entry.placeholder.trim()
           ? entry.placeholder
           : undefined,
+      inputPattern:
+        typeof entry.inputPattern === 'string'
+          ? entry.inputPattern
+          : base.inputPattern,
       defaultValue:
         entry.defaultValue !== undefined
           ? entry.defaultValue
@@ -445,6 +449,7 @@ export function serializeViewConfig(
     if (Array.isArray(field.options) && field.options.length > 0) next.options = field.options
     if (field.description?.trim()) next.description = field.description.trim()
     if (field.placeholder?.trim()) next.placeholder = field.placeholder.trim()
+    if (field.inputPattern !== undefined) next.inputPattern = field.inputPattern.trim()
     if (field.defaultValue !== undefined && field.defaultValue !== '') {
       next.defaultValue = field.defaultValue
     }
