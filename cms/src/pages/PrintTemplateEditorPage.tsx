@@ -1,10 +1,10 @@
 import { ArrowLeftOutlined, PrinterOutlined, SaveOutlined } from "@ant-design/icons"
-import { Button, Card, Checkbox, Form, Input, Modal, Select, Space, Tooltip, Typography, message } from "antd"
+import { Button, Card, Checkbox, Form, Input, Modal, Select, Space, Tooltip, Tree, Typography, message } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { PrintTinyMceEditor } from "../components/PrintTinyMceEditor"
-import { CustomField } from "../models"
+import { baseFields, CustomField } from "../models"
 import { getFieldCatalog } from "../view-settings"
 import {
   buildTemplateVariableOptions,
@@ -19,13 +19,43 @@ interface Template {
   templateType?: string
   originalFilename?: string
   isActive?: boolean
+  pageWidth?: "A4" | "88mm" | "58mm"
 }
 
-const printRepeatCollections: Record<string, Array<{ key: string; label: string }>> = {
-  'service-orders': [{ key: 'items', label: 'Dòng đơn hàng / dịch vụ' }],
-  'accounting-vouchers': [{ key: 'lines', label: 'Dòng hạch toán' }],
-  products: [{ key: 'variants', label: 'Biến thể / SKU' }],
-  projects: [{ key: 'members', label: 'Thành viên dự án' }],
+type PrintRepeatCollection = { key: string; label: string; resource: string }
+
+const printRepeatCollections: Record<string, PrintRepeatCollection[]> = {
+  'service-orders': [{ key: 'items', label: 'Dòng đơn hàng / dịch vụ', resource: 'service-order-items' }],
+  'accounting-vouchers': [{ key: 'lines', label: 'Dòng hạch toán', resource: 'accounting-voucher-lines' }],
+  products: [{ key: 'variants', label: 'Biến thể / SKU', resource: 'product-variants' }],
+  projects: [{ key: 'members', label: 'Thành viên dự án', resource: 'project-members' }],
+  customers: [
+    { key: 'appointments', label: 'Lịch hẹn', resource: 'appointments' },
+    { key: 'medicalEpisodes', label: 'Hồ sơ bệnh án', resource: 'medical-episodes' },
+    { key: 'treatments', label: 'Liệu trình', resource: 'treatments' },
+    { key: 'consultations', label: 'Thăm khám', resource: 'consultations' },
+    { key: 'serviceOrders', label: 'Đơn hàng / dịch vụ', resource: 'service-orders' },
+    { key: 'customerImages', label: 'Hình ảnh - chẩn đoán', resource: 'customer-images' },
+    { key: 'invoices', label: 'Phiếu thu / hóa đơn', resource: 'invoices' },
+  ],
+  staff: [
+    { key: 'checkinMonth', label: 'Chấm công trong tháng hiện tại', resource: 'attendances' },
+    { key: 'attendances', label: 'Toàn bộ chấm công', resource: 'attendances' },
+    { key: 'workContracts', label: 'Hợp đồng lao động', resource: 'work-contracts' },
+    { key: 'staffInsurances', label: 'Bảo hiểm', resource: 'staff-insurances' },
+    { key: 'leaveRequests', label: 'Nghỉ phép', resource: 'leave-requests' },
+    { key: 'attendanceAdjustments', label: 'Đổi giờ chấm công', resource: 'attendance-adjustment-requests' },
+    { key: 'businessTrips', label: 'Đơn công tác', resource: 'business-trip-requests' },
+    { key: 'paymentRequests', label: 'Xin thanh toán', resource: 'payment-requests' },
+    { key: 'payrolls', label: 'Bảng lương', resource: 'payrolls' },
+    { key: 'workSchedules', label: 'Lịch làm việc', resource: 'work-schedules' },
+    { key: 'staffRewards', label: 'Khen thưởng & kỷ luật', resource: 'staff-rewards' },
+    { key: 'staffTrainings', label: 'Đào tạo & chứng chỉ', resource: 'staff-trainings' },
+    { key: 'performanceReviews', label: 'Đánh giá hiệu suất', resource: 'performance-reviews' },
+    { key: 'positionHistories', label: 'Lịch sử thăng tiến', resource: 'position-histories' },
+    { key: 'branchRoleAssignments', label: 'Quyền theo chi nhánh', resource: 'branch-role-assignments' },
+    { key: 'userAccounts', label: 'Tài khoản đăng nhập', resource: 'user-accounts' },
+  ],
 }
 
 type TemplateVariableFamily = {
@@ -74,6 +104,7 @@ export function PrintTemplateEditorPage() {
   const [previewRecordId, setPreviewRecordId] = useState<string>()
   const [previewLoading, setPreviewLoading] = useState(false)
   const editing = id !== "new"
+  const pageWidth = Form.useWatch("pageWidth", form) || "A4"
 
   const fieldCatalog = useMemo(
     () => getFieldCatalog(entityType, customFields),
@@ -87,13 +118,37 @@ export function PrintTemplateEditorPage() {
     () => PRINT_TEMPLATE_PRESETS.filter((preset) => preset.entityType === entityType),
     [entityType],
   )
+  const repeatCollections = useMemo(
+    () => printRepeatCollections[entityType] || [],
+    [entityType],
+  )
+  const repeatVariableGroups = useMemo(() => repeatCollections.map((collection) => {
+    const fields = baseFields[collection.resource] || []
+    const variables = [
+      { key: "@index", label: "Số thứ tự" },
+      { key: "item.name", label: "Tên / nội dung" },
+      { key: "item.code", label: "Mã / trạng thái" },
+      ...fields.map((field) => ({ key: `item.${field.key}`, label: field.label })),
+    ].filter((variable, index, all) => all.findIndex((item) => item.key === variable.key) === index)
+    return {
+      label: `Bảng lặp · ${collection.label}`,
+      families: variables.map((variable) => ({ ...variable, variables: [variable] })),
+    }
+  }), [repeatCollections])
   const templateVariableGroups = useMemo(() => {
     const query = variableSearch.trim().toLowerCase()
-    const matchingVariables = query
-      ? templateVariables.filter((variable) => `${variable.key} ${variable.label}`.toLowerCase().includes(query))
-      : templateVariables
-    return groupTemplateVariables(matchingVariables)
-  }, [templateVariables, variableSearch],
+    const groups = [...groupTemplateVariables(templateVariables), ...repeatVariableGroups]
+    if (!query) return groups
+    return groups.map((group) => ({
+      ...group,
+      families: group.families
+        .map((family) => ({
+          ...family,
+          variables: family.variables.filter((variable) => `${family.label} ${variable.key} ${variable.label}`.toLowerCase().includes(query)),
+        }))
+        .filter((family) => family.variables.length > 0),
+    })).filter((group) => group.families.length > 0)
+  }, [templateVariables, repeatVariableGroups, variableSearch],
   )
 
   useEffect(() => {
@@ -118,7 +173,7 @@ export function PrintTemplateEditorPage() {
           navigate(`/settings?module=${entityType}`)
           return
         }
-        form.setFieldsValue(template)
+        form.setFieldsValue({ ...template, pageWidth: template.pageWidth || "A4" })
         return
       }
 
@@ -126,6 +181,7 @@ export function PrintTemplateEditorPage() {
       form.setFieldsValue({
         name: preset?.label || "",
         htmlTemplate: preset?.htmlTemplate || DEFAULT_PRINT_TEMPLATE_HTML,
+        pageWidth: "A4",
       })
     } finally {
       setLoading(false)
@@ -201,6 +257,7 @@ export function PrintTemplateEditorPage() {
         entityType,
         recordId: previewRecordId,
         htmlTemplate: form.getFieldValue("htmlTemplate"),
+        pageWidth,
       }, { responseType: "text" })
       printWindow.document.write(`<!doctype html><html><head><title>In thử mẫu</title></head><body><div class="print-sheet">${response.data}</div><script>window.print()</script></body></html>`)
       printWindow.document.close()
@@ -240,6 +297,17 @@ export function PrintTemplateEditorPage() {
           </Form.Item>
           <Form.Item name="isActive" noStyle valuePropName="checked" initialValue>
             <Checkbox>Sử dụng mẫu in này</Checkbox>
+          </Form.Item>
+          <Form.Item name="pageWidth" noStyle initialValue="A4">
+            <Select
+              aria-label="Khổ giấy"
+              options={[
+                { value: "A4", label: "A4" },
+                { value: "88mm", label: "K80 · 88 mm" },
+                { value: "58mm", label: "K58 · 58 mm" },
+              ]}
+              style={{ width: 132 }}
+            />
           </Form.Item>
           <Button
             icon={<PrinterOutlined />}
@@ -294,7 +362,11 @@ export function PrintTemplateEditorPage() {
             </Form.Item>
           )}
           <Form.Item name="htmlTemplate" rules={[{ required: true }]}>
-            <PrintTinyMceEditor variables={templateVariables} repeatCollections={printRepeatCollections[entityType] || []} />
+            <PrintTinyMceEditor
+              pageWidth={pageWidth as "A4" | "88mm" | "58mm"}
+              variables={templateVariables}
+              repeatCollections={repeatCollections}
+            />
           </Form.Item>
         </Card>
         <Space direction="vertical" size={16} style={{ width: "100%" }}>
@@ -305,32 +377,40 @@ export function PrintTemplateEditorPage() {
               value={variableSearch}
               onChange={(event) => setVariableSearch(event.target.value)}
             />
-            {templateVariableGroups.map((group) => (
-              <section className="template-variable-group" key={group.label}>
-                <Typography.Text className="template-variable-group-title" strong>{group.label}</Typography.Text>
-                {group.families.map((family) => (
-                  <div className="template-variable-family" key={family.key}>
-                    <Typography.Text strong>{family.label}</Typography.Text>
-                    <div className="template-variable-codes">
-                      {family.variables.map((variable) => (
-                        <Tooltip key={variable.key} title={`${variable.label} — bấm để copy`}>
-                          <Button
-                            size="small"
-                            type="text"
-                            onClick={() => {
-                              void navigator.clipboard?.writeText(`{{${variable.key}}}`)
-                              message.success(`Đã copy {{${variable.key}}}`)
-                            }}
-                          >
-                            <code>{variable.key}</code>
-                          </Button>
-                        </Tooltip>
-                      ))}
+            <Tree
+              blockNode
+              defaultExpandAll
+              selectable={false}
+              showLine
+              treeData={templateVariableGroups.map((group, groupIndex) => ({
+                key: `group-${groupIndex}-${group.label}`,
+                title: <Typography.Text className="template-variable-group-title" strong>{group.label}</Typography.Text>,
+                children: group.families.map((family, familyIndex) => ({
+                  key: `field-${groupIndex}-${familyIndex}-${family.key}`,
+                  title: (
+                    <div className="template-variable-row">
+                      <Typography.Text>{family.label}</Typography.Text>
+                      <div className="template-variable-codes">
+                        {family.variables.map((variable) => (
+                          <Tooltip key={variable.key} title={`${variable.label} — bấm để copy`}>
+                            <Button
+                              size="small"
+                              type="text"
+                              onClick={() => {
+                                void navigator.clipboard?.writeText(`{{${variable.key}}}`)
+                                message.success(`Đã copy {{${variable.key}}}`)
+                              }}
+                            >
+                              <code>{variable.key}</code>
+                            </Button>
+                          </Tooltip>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </section>
-            ))}
+                  ),
+                })),
+              }))}
+            />
           </Card>
         </Space>
       </div>

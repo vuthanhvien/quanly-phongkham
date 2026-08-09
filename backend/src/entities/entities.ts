@@ -1596,6 +1596,9 @@ export class PrintTemplate {
   templateType: string;
 
   @Column({ nullable: true })
+  pageWidth?: string;
+
+  @Column({ nullable: true })
   docxPath?: string;
 
   @Column({ nullable: true })

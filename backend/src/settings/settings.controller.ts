@@ -339,7 +339,7 @@ export class SettingsController {
   @Post('print-templates/render-preview')
   @Header('Content-Type', 'text/html; charset=utf-8')
   renderPreview(
-    @Body() payload: { entityType?: string; htmlTemplate?: string; recordId?: string },
+    @Body() payload: { entityType?: string; htmlTemplate?: string; recordId?: string; pageWidth?: string },
     @Request() request?: { user: AuthUser },
   ) {
     return this.settings.renderTemplatePreview(payload, request?.user);

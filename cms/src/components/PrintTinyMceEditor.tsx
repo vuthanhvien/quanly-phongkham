@@ -7,6 +7,19 @@ interface PrintTinyMceEditorProps {
   onChange?: (value: string) => void
   variables: TemplateVariableOption[]
   repeatCollections?: Array<{ key: string; label: string }>
+  pageWidth?: "A4" | "88mm" | "58mm"
+}
+
+function repeatTableCaption(collection: string) {
+  return `<caption class="print-repeat-marker" contenteditable="false">↻ Bảng lặp: ${collection}</caption>`
+}
+
+function layoutGrid(columnWidths: number[]) {
+  const columns = columnWidths.length
+  const cells = Array.from({ length: columns }, (_, index) => (
+    `<td style="border:0;overflow-wrap:anywhere;padding:0 ${index === columns - 1 ? "0" : "10px"} 0 0;vertical-align:top;width:${columnWidths[index]}%;">Nội dung cột ${index + 1}</td>`
+  )).join("")
+  return `<table class="print-layout-grid" role="presentation" style="border-collapse:collapse;border:0;table-layout:fixed;margin:0 0 14px;width:100%;"><tbody><tr>${cells}</tr></tbody></table>`
 }
 
 function repeatTableBlock(collection: string) {
@@ -16,9 +29,32 @@ function repeatTableBlock(collection: string) {
       ? { text: "Diễn giải", textKey: "lineDescription", amount: "Phát sinh Nợ", amountKey: "debitAmount_fm" }
       : collection === "variants"
         ? { text: "Biến thể", textKey: "name", amount: "Giá bán", amountKey: "sellingPrice_fm" }
-        : { text: "Nội dung", textKey: "name", amount: "Giá trị", amountKey: "amount_fm" }
+        : collection === "checkinMonth"
+          ? { text: "Ngày chấm công", textKey: "item.date_fm", amount: "Giờ vào", amountKey: "item.checkIn" }
+        : { text: "Tên / nội dung", textKey: "item.name", amount: "Mã / trạng thái", amountKey: "item.code" }
+
+  if (collection === "checkinMonth") {
+    return `<table style="border-collapse:collapse;width:100%;margin:0 0 18px;">
+  ${repeatTableCaption(collection)}
+  <thead><tr>
+    <th style="border:1px solid #ddd;padding:8px;text-align:left;width:48px;">STT</th>
+    <th style="border:1px solid #ddd;padding:8px;text-align:left;">Ngày</th>
+    <th style="border:1px solid #ddd;padding:8px;text-align:left;">Giờ vào</th>
+    <th style="border:1px solid #ddd;padding:8px;text-align:left;">Giờ ra</th>
+    <th style="border:1px solid #ddd;padding:8px;text-align:left;">Trạng thái</th>
+  </tr></thead>
+  <tbody><tr data-print-each="${collection}">
+    <td style="border:1px solid #ddd;padding:8px;">{{@index}}</td>
+    <td style="border:1px solid #ddd;padding:8px;">{{item.date_fm}}</td>
+    <td style="border:1px solid #ddd;padding:8px;">{{item.checkIn}}</td>
+    <td style="border:1px solid #ddd;padding:8px;">{{item.checkOut}}</td>
+    <td style="border:1px solid #ddd;padding:8px;">{{item.status}}</td>
+  </tr></tbody>
+</table>`
+  }
 
   return `<table style="border-collapse:collapse;width:100%;margin:0 0 18px;">
+  ${repeatTableCaption(collection)}
   <thead><tr>
     <th style="border:1px solid #ddd;padding:8px;text-align:left;width:48px;">STT</th>
     <th style="border:1px solid #ddd;padding:8px;text-align:left;">${columns.text}</th>
@@ -73,10 +109,12 @@ function registerClassNameButton(editor: TinyMceEditor) {
   })
 }
 
-export function PrintTinyMceEditor({ value, onChange, variables, repeatCollections = [] }: PrintTinyMceEditorProps) {
+export function PrintTinyMceEditor({ value, onChange, variables, repeatCollections = [], pageWidth = "A4" }: PrintTinyMceEditorProps) {
+  const pageWidthValue = pageWidth === "58mm" ? "58mm" : pageWidth === "88mm" ? "88mm" : "210mm"
   return (
     <div className="print-tinymce-editor">
       <Editor
+        key={`print-editor-${pageWidth}`}
         licenseKey="gpl"
         tinymceScriptSrc="/tinymce/tinymce.min.js"
         value={value || ""}
@@ -85,7 +123,7 @@ export function PrintTinyMceEditor({ value, onChange, variables, repeatCollectio
           height: 900,
           menubar: "file edit view insert format tools table help",
           plugins: "advlist anchor autolink charmap code fullscreen help image insertdatetime link lists media nonbreaking pagebreak preview searchreplace table visualblocks visualchars wordcount",
-          toolbar: "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media | table tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow tableinsertcolbefore tableinsertcolafter tabledeletecol | printvariable printrepeat cssclass | pagebreak charmap | removeformat code preview fullscreen",
+          toolbar: "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media | table printlayout tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow tableinsertcolbefore tableinsertcolafter tabledeletecol | printvariable printrepeat cssclass | pagebreak charmap | removeformat code preview fullscreen",
           toolbar_mode: "wrap",
           branding: false,
           promotion: false,
@@ -98,7 +136,7 @@ export function PrintTinyMceEditor({ value, onChange, variables, repeatCollectio
           table_sizing_mode: "responsive",
           table_default_attributes: { border: "1" },
           table_default_styles: { "border-collapse": "collapse", width: "100%" },
-          content_style: "body { box-sizing:border-box; color:#111827; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:1.55; margin:0 auto; max-width:794px; padding:56px; } table { border-collapse:collapse; width:100%; } td,th { border:1px solid #d1d5db; min-width:1em; padding:8px; vertical-align:top; } th { background:#f3f4f6; } .text-center { text-align:center; } .text-right { text-align:right; } .no-border td,.no-border th { border:0; } .signature { margin-top:48px; text-align:center; }",
+          content_style: `body { --print-page-width:${pageWidthValue}; background:#e9edf1; box-sizing:border-box; color:#111827; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:1.55; margin:0; min-height:calc(100vh - 64px); padding:32px 0; position:relative; } body::before { background:#fff; box-shadow:0 3px 16px rgba(15,23,42,.14); content:""; inset:32px auto 32px 50%; min-height:297mm; position:absolute; transform:translateX(-50%); width:var(--print-page-width); z-index:0; } body > * { box-sizing:border-box; margin-left:auto; margin-right:auto; max-width:var(--print-page-width); padding-left:${pageWidth === "A4" ? "14mm" : "3mm"}; padding-right:${pageWidth === "A4" ? "14mm" : "3mm"}; position:relative; z-index:1; } body > table { margin-left:auto !important; margin-right:auto !important; } table { border-collapse:collapse; width:100%; } td,th { border:1px solid #d1d5db; min-width:1em; padding:8px; vertical-align:top; } th { background:#f3f4f6; } .print-layout-grid td { border:1px dashed #cbd5e1 !important; } .print-repeat-marker { caption-side:top; background:#eef7ef; border:1px solid #b9ddbe; border-bottom:0; border-radius:5px 5px 0 0; color:#296233; font-size:11px; font-weight:600; letter-spacing:.01em; padding:4px 8px; text-align:left; } .text-center { text-align:center; } .text-right { text-align:right; } .no-border td,.no-border th { border:0; } .signature { margin-top:48px; text-align:center; }`,
           setup: (editor) => {
             registerClassNameButton(editor)
             editor.ui.registry.addMenuButton("printvariable", {
@@ -115,6 +153,21 @@ export function PrintTinyMceEditor({ value, onChange, variables, repeatCollectio
                 type: "menuitem",
                 text: collection.label,
                 onAction: () => editor.insertContent(repeatTableBlock(collection.key)),
+              }))),
+            })
+            editor.ui.registry.addMenuButton("printlayout", {
+              text: "Bố cục",
+              fetch: (callback) => callback([
+                { text: "2 cột · 50 / 50", widths: [50, 50] },
+                { text: "2 cột · 75 / 25", widths: [75, 25] },
+                { text: "2 cột · 25 / 75", widths: [25, 75] },
+                { text: "3 cột", widths: [33.33, 33.33, 33.34] },
+                { text: "3 cột · 25 / 50 / 25", widths: [25, 50, 25] },
+                { text: "4 cột", widths: [25, 25, 25, 25] },
+              ].map((layout) => ({
+                type: "menuitem",
+                text: layout.text,
+                onAction: () => editor.insertContent(layoutGrid(layout.widths)),
               }))),
             })
           },

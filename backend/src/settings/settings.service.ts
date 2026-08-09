@@ -1169,12 +1169,15 @@ export class SettingsService {
     const template = await this.templates.findOne({ where: { id: templateId, isActive: true } });
     if (!template) throw new NotFoundException('Không tìm thấy mẫu in');
     const record = await this.records.findRaw(template.entityType, recordId, '*') as Record<string, unknown>;
-    const data = this.buildPrintContext(record);
-    return Handlebars.compile(this.expandPrintRepeatingRows(template.htmlTemplate))(data);
+    const data = await this.buildPrintContext(record, template.entityType);
+    return this.wrapPrintPage(
+      Handlebars.compile(this.expandPrintRepeatingRows(template.htmlTemplate))(data),
+      template.pageWidth,
+    );
   }
 
   async renderTemplatePreview(
-    payload: { entityType?: string; htmlTemplate?: string; recordId?: string },
+    payload: { entityType?: string; htmlTemplate?: string; recordId?: string; pageWidth?: string },
     user?: AuthUser,
   ) {
     this.assertSettingsAccess(user);
@@ -1182,8 +1185,11 @@ export class SettingsService {
       throw new BadRequestException('Model, nội dung mẫu in và bản ghi là bắt buộc');
     }
     const record = await this.records.findRaw(payload.entityType, payload.recordId, '*') as Record<string, unknown>;
-    const data = this.buildPrintContext(record);
-    return Handlebars.compile(this.expandPrintRepeatingRows(payload.htmlTemplate))(data);
+    const data = await this.buildPrintContext(record, payload.entityType);
+    return this.wrapPrintPage(
+      Handlebars.compile(this.expandPrintRepeatingRows(payload.htmlTemplate))(data),
+      payload.pageWidth,
+    );
   }
 
   async saveDocxTemplate(file: any, payload: { entityType?: string; name?: string }, user?: AuthUser) {
@@ -1233,7 +1239,7 @@ export class SettingsService {
     const template = await this.templates.findOne({ where: { id: templateId, isActive: true, templateType: 'DOCX' } });
     if (!template?.docxPath) throw new NotFoundException('Không tìm thấy mẫu DOCX');
     const record = await this.records.findRaw(template.entityType, recordId, '*') as Record<string, unknown>;
-    const data = this.buildPrintContext(record);
+    const data = await this.buildPrintContext(record, template.entityType);
     const source = await fs.readFile(template.docxPath);
     return { buffer: renderDocxTemplate(source, data), filename: `${template.name}-${recordId}.docx` };
   }
@@ -1281,29 +1287,48 @@ export class SettingsService {
     if (!template?.pdfPath) throw new NotFoundException('Không tìm thấy mẫu PDF');
     const record = await this.records.findRaw(template.entityType, recordId, '*') as Record<string, unknown>;
     const source = await fs.readFile(template.pdfPath);
-    return { buffer: await renderPdfTemplateFile(source, this.buildPrintContext(record)), filename: `${template.name}-${recordId}.pdf` };
+    return { buffer: await renderPdfTemplateFile(source, await this.buildPrintContext(record, template.entityType)), filename: `${template.name}-${recordId}.pdf` };
   }
 
-  private buildPrintContext(record: Record<string, unknown>) {
+  private async buildPrintContext(record: Record<string, unknown>, entityType?: string) {
     const context = this.enrichPrintObject({ ...record, ...((record.customFields || {}) as Record<string, unknown>) });
     Object.entries(context).forEach(([key, value]) => {
       if (Array.isArray(value)) {
-        context[key] = value.map((item) => item && typeof item === 'object'
-          ? this.enrichPrintObject(item as Record<string, unknown>)
-          : item,
-        );
+        context[key] = value.map((item) => {
+          if (!item || typeof item !== 'object') return item;
+          const enriched = this.enrichPrintObject(item as Record<string, unknown>);
+          return { ...enriched, item: enriched };
+        });
         return;
       }
       if (value && typeof value === 'object') context[key] = this.enrichPrintObject(value as Record<string, unknown>);
     });
+    if ((entityType === 'staff' || entityType === 'customers') && record.id) {
+      const collections = await this.records.getPrintRepeatCollections(entityType, String(record.id));
+      Object.entries(collections).forEach(([key, rows]) => {
+        context[key] = rows.map((row) => {
+          const enriched = this.enrichPrintObject(row);
+          return { ...enriched, item: enriched };
+        });
+      });
+    }
     return context;
   }
 
   private expandPrintRepeatingRows(html: string) {
-    return String(html || '').replace(
+    return String(html || '')
+      // Marker only helps identify repeat tables while editing in TinyMCE.
+      .replace(/<caption[^>]*class=(['"])[^'"]*\bprint-repeat-marker\b[^'"]*\1[^>]*>[\s\S]*?<\/caption>/gi, '')
+      .replace(
       /<tr([^>]*?)\sdata-print-each=(['"])([a-zA-Z0-9_.-]+)\2([^>]*)>([\s\S]*?)<\/tr>/gi,
       (_match, before, _quote, collection, after, rowContent) => `{{#each ${collection}}}<tr${before}${after}>${rowContent}</tr>{{/each}}`,
-    );
+      );
+  }
+
+  private wrapPrintPage(html: string, pageWidth?: string) {
+    const width = pageWidth === '58mm' ? '58mm' : pageWidth === '88mm' ? '88mm' : '210mm';
+    const pageSize = width === '210mm' ? 'A4' : `${width} auto`;
+    return `<style>@page { size: ${pageSize}; margin: 0; } .print-sheet { box-sizing: border-box; margin: 0 auto; padding: ${width === '210mm' ? '14mm' : '3mm'}; width: ${width}; } .print-sheet table { max-width: 100%; }</style>${html}`;
   }
 
   private enrichPrintObject(record: Record<string, unknown>) {

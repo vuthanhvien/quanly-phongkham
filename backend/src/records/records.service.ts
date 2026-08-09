@@ -4,7 +4,7 @@ import { hash } from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { extname, join } from 'path';
-import { FindOptionsWhere, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual, Not, QueryFailedError, Repository } from 'typeorm';
+import { Between, FindOptionsWhere, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual, Not, QueryFailedError, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
 import {
   Appointment,
@@ -564,6 +564,61 @@ export class RecordsService {
     const repository = map[resource];
     if (!repository) throw new NotFoundException('Phân hệ không tồn tại');
     return repository;
+  }
+
+  async getPrintRepeatCollections(resource: string, recordId: string) {
+    const specs: Record<string, Array<{ key: string; resource: string; parentField: string; currentMonth?: boolean }>> = {
+      customers: [
+        { key: 'appointments', resource: 'appointments', parentField: 'customerId' },
+        { key: 'medicalEpisodes', resource: 'medical-episodes', parentField: 'customerId' },
+        { key: 'treatments', resource: 'treatments', parentField: 'customerId' },
+        { key: 'consultations', resource: 'consultations', parentField: 'customerId' },
+        { key: 'serviceOrders', resource: 'service-orders', parentField: 'customerId' },
+        { key: 'customerImages', resource: 'customer-images', parentField: 'customerId' },
+        { key: 'invoices', resource: 'invoices', parentField: 'customerId' },
+      ],
+      staff: [
+        { key: 'workContracts', resource: 'work-contracts', parentField: 'staffId' },
+        { key: 'staffInsurances', resource: 'staff-insurances', parentField: 'staffId' },
+        { key: 'checkinMonth', resource: 'attendances', parentField: 'staffId', currentMonth: true },
+        { key: 'attendances', resource: 'attendances', parentField: 'staffId' },
+        { key: 'leaveRequests', resource: 'leave-requests', parentField: 'staffId' },
+        { key: 'attendanceAdjustments', resource: 'attendance-adjustment-requests', parentField: 'staffId' },
+        { key: 'businessTrips', resource: 'business-trip-requests', parentField: 'staffId' },
+        { key: 'paymentRequests', resource: 'payment-requests', parentField: 'staffId' },
+        { key: 'payrolls', resource: 'payrolls', parentField: 'staffId' },
+        { key: 'workSchedules', resource: 'work-schedules', parentField: 'staffId' },
+        { key: 'staffRewards', resource: 'staff-rewards', parentField: 'staffId' },
+        { key: 'staffTrainings', resource: 'staff-trainings', parentField: 'staffId' },
+        { key: 'performanceReviews', resource: 'performance-reviews', parentField: 'staffId' },
+        { key: 'positionHistories', resource: 'position-histories', parentField: 'staffId' },
+        { key: 'branchRoleAssignments', resource: 'branch-role-assignments', parentField: 'staffId' },
+        { key: 'userAccounts', resource: 'user-accounts', parentField: 'staffId' },
+      ],
+    };
+    const startOfMonth = new Date();
+    const firstDate = `${startOfMonth.getFullYear()}-${String(startOfMonth.getMonth() + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() + 1, 0);
+    const lastDate = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+
+    const entries = await Promise.all((specs[resource] || []).map(async (spec) => {
+      const where: Record<string, unknown> = { [spec.parentField]: recordId, isArchived: false };
+      if (spec.currentMonth) where.date = Between(firstDate, lastDate);
+      const rows = await this.repository(spec.resource).find({
+        where: where as FindOptionsWhere<ConfigurableEntity>,
+        order: spec.currentMonth ? { date: 'ASC' } : { createdAt: 'DESC' },
+        take: 500,
+      });
+      return [spec.key, rows.map((row) => {
+        const item = row as unknown as Record<string, unknown>;
+        return {
+          ...item,
+          name: item.name || item.fullName || item.title || item.serviceName || item.trainingName || item.description || item.date || item.code || String(item.id || ''),
+          code: item.code || item.status || String(item.id || ''),
+        };
+      })] as const;
+    }));
+    return Object.fromEntries(entries) as Record<string, Record<string, unknown>[]>;
   }
 
   private draftTitle (resource: string, payload: Record<string, unknown>) {
