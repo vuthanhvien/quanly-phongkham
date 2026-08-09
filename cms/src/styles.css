@@ -1523,6 +1523,10 @@ body {
   overflow-y: auto;
 }
 
+.template-variable-library {
+  font-size: 11px;
+}
+
 .template-variable-group {
   display: grid;
   gap: 8px;
@@ -1530,7 +1534,7 @@ body {
 
 .template-variable-group-title {
   color: var(--app-title);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .template-variable-family {
@@ -1538,6 +1542,10 @@ body {
   display: grid;
   gap: 5px;
   padding-left: 10px;
+}
+
+.template-variable-family .ant-typography {
+  font-size: 11px;
 }
 
 .template-variable-codes {
@@ -1551,6 +1559,10 @@ body {
   border-radius: 6px;
   height: auto;
   padding: 2px 6px;
+}
+
+.template-variable-codes code {
+  font-size: 10px;
 }
 
 .template-preview-surface {
@@ -1616,78 +1628,10 @@ body {
   content: "Soạn nội dung mẫu in tại đây...";
 }
 
-.print-tiptap-editor {
+.print-tinymce-editor .tox-tinymce {
   border: 1px solid var(--app-line);
   border-radius: var(--app-radius);
   overflow: hidden;
-}
-
-.print-tiptap-editor__toolbar {
-  background: var(--app-muted);
-  border-bottom: 1px solid var(--app-line);
-  padding: 8px;
-}
-
-.print-tiptap-editor__block-select {
-  min-width: 120px;
-}
-
-.print-tiptap-editor__variable-select {
-  min-width: 240px;
-  width: min(100%, 380px);
-}
-
-.print-tiptap-editor__canvas {
-  background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.035) 1px, transparent 1px),
-    linear-gradient(rgba(0, 0, 0, 0.035) 1px, transparent 1px),
-    #f1f3f5;
-  background-size: 24px 24px;
-  padding: 18px;
-}
-
-.print-tiptap-editor .tiptap {
-  background: #fff;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
-  color: #111827;
-  line-height: 1.55;
-  margin: 0 auto;
-  min-height: 900px;
-  outline: none;
-  padding: 56px;
-  width: min(100%, 794px);
-}
-
-.print-tiptap-editor .tiptap p {
-  margin: 0 0 8px;
-}
-
-.print-tiptap-editor .tiptap h1,
-.print-tiptap-editor .tiptap h2,
-.print-tiptap-editor .tiptap h3 {
-  color: #111827;
-  line-height: 1.2;
-  margin: 0 0 10px;
-}
-
-.print-tiptap-editor .tiptap table {
-  border-collapse: collapse;
-  margin: 10px 0;
-  table-layout: fixed;
-  width: 100%;
-}
-
-.print-tiptap-editor .tiptap th,
-.print-tiptap-editor .tiptap td {
-  border: 1px solid #d1d5db;
-  min-width: 1em;
-  padding: 8px;
-  vertical-align: top;
-}
-
-.print-tiptap-editor .tiptap th {
-  background: #f3f4f6;
-  font-weight: 700;
 }
 
 .template-preset-grid {

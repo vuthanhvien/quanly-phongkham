@@ -8,11 +8,13 @@ import { AppModule } from './app.module';
 import { ErrorLogExceptionFilter } from './common/error-log.exception-filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
   const uploadsRoot = join(process.cwd(), 'storage', 'uploads');
   mkdirSync(uploadsRoot, { recursive: true });
   app.setGlobalPrefix('api');
   app.enableCors({ origin: true, credentials: true });
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: false }));
   app.useGlobalFilters(new ErrorLogExceptionFilter());
   app.use('/uploads', express.static(uploadsRoot));

@@ -33,7 +33,14 @@ export class ErrorLogExceptionFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const request = http.getRequest<Request & { user?: { id?: string; email?: string } }>();
     const response = http.getResponse<Response>();
-    const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+    const externalStatus = typeof exception === 'object' && exception !== null
+      ? Number((exception as { status?: unknown }).status)
+      : NaN;
+    const status = exception instanceof HttpException
+      ? exception.getStatus()
+      : Number.isInteger(externalStatus) && externalStatus >= 400 && externalStatus < 600
+        ? externalStatus
+        : HttpStatus.INTERNAL_SERVER_ERROR;
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       // Logging deliberately happens asynchronously: an unavailable disk must
@@ -47,7 +54,10 @@ export class ErrorLogExceptionFilter implements ExceptionFilter {
 
   private responseBody(exception: unknown, status: number) {
     if (!(exception instanceof HttpException)) {
-      return { statusCode: status, message: 'Internal server error' };
+      return {
+        statusCode: status,
+        message: status === HttpStatus.PAYLOAD_TOO_LARGE ? 'Dữ liệu import vượt quá giới hạn cho phép' : 'Internal server error',
+      };
     }
 
     const exceptionResponse = exception.getResponse();

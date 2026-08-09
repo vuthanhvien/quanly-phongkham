@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "copy:tinymce": "node scripts/copy-tinymce-assets.mjs",
+    "postinstall": "npm run copy:tinymce"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",
@@ -13,14 +15,7 @@
     "@monaco-editor/react": "^4.7.0",
     "@refinedev/core": "^5.0.5",
     "@refinedev/react-router": "^2.0.2",
-    "@tiptap/extension-table": "^3.29.2",
-    "@tiptap/extension-table-cell": "^3.29.2",
-    "@tiptap/extension-table-header": "^3.29.2",
-    "@tiptap/extension-table-row": "^3.29.2",
-    "@tiptap/extension-text-align": "^3.29.2",
-    "@tiptap/extension-underline": "^3.29.2",
-    "@tiptap/react": "^3.29.2",
-    "@tiptap/starter-kit": "^3.29.2",
+    "@tinymce/tinymce-react": "^6.3.0",
     "@xyflow/react": "^12.11.2",
     "antd": "^5.26.0",
     "axios": "^1.10.0",
@@ -31,6 +26,7 @@
     "react-imask": "^7.6.1",
     "react-router-dom": "^7.6.2",
     "three": "^0.185.1",
+    "tinymce": "^8.8.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

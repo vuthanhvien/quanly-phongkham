@@ -10,6 +10,7 @@ import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefiniti
 import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
 import { renderDocxTemplate } from './docx-template';
+import { assertPdfHasReadableText, renderPdfTemplate as renderPdfTemplateFile } from './pdf-template';
 
 const DEFAULT_ROLE_SCOPE = 'ALL';
 const SYSTEM_ROLES = ['ADMIN', 'STAFF', 'DOCTOR'];
@@ -1172,6 +1173,19 @@ export class SettingsService {
     return Handlebars.compile(this.expandPrintRepeatingRows(template.htmlTemplate))(data);
   }
 
+  async renderTemplatePreview(
+    payload: { entityType?: string; htmlTemplate?: string; recordId?: string },
+    user?: AuthUser,
+  ) {
+    this.assertSettingsAccess(user);
+    if (!payload.entityType || !payload.htmlTemplate || !payload.recordId) {
+      throw new BadRequestException('Model, nội dung mẫu in và bản ghi là bắt buộc');
+    }
+    const record = await this.records.findRaw(payload.entityType, payload.recordId, '*') as Record<string, unknown>;
+    const data = this.buildPrintContext(record);
+    return Handlebars.compile(this.expandPrintRepeatingRows(payload.htmlTemplate))(data);
+  }
+
   async saveDocxTemplate(file: any, payload: { entityType?: string; name?: string }, user?: AuthUser) {
     this.assertSettingsAccess(user);
     if (!file || !payload.entityType || !payload.name) throw new BadRequestException('Cần chọn model, tên mẫu và file DOCX');
@@ -1222,6 +1236,52 @@ export class SettingsService {
     const data = this.buildPrintContext(record);
     const source = await fs.readFile(template.docxPath);
     return { buffer: renderDocxTemplate(source, data), filename: `${template.name}-${recordId}.docx` };
+  }
+
+  async savePdfTemplate(file: any, payload: { entityType?: string; name?: string }, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    if (!file || !payload.entityType || !payload.name) throw new BadRequestException('Cần chọn model, tên mẫu và file PDF');
+    if (!file.originalname.toLowerCase().endsWith('.pdf') || file.mimetype !== 'application/pdf') throw new BadRequestException('Chỉ hỗ trợ file .pdf');
+    try { await assertPdfHasReadableText(file.buffer); } catch (error) { throw new BadRequestException((error as Error).message); }
+    const template = this.templates.create({ entityType: payload.entityType, name: payload.name, htmlTemplate: '', templateType: 'PDF', originalFilename: basename(file.originalname) });
+    const saved = await this.templates.save(template);
+    const directory = join(process.cwd(), 'storage', 'print-templates');
+    await fs.mkdir(directory, { recursive: true });
+    const pdfPath = join(directory, `${saved.id}.pdf`);
+    await fs.writeFile(pdfPath, file.buffer);
+    return this.templates.save(this.templates.merge(saved, { pdfPath }));
+  }
+
+  async replacePdfTemplate(id: string, file: any, payload: { name?: string }, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    if (!file) throw new BadRequestException('Cần chọn file PDF');
+    if (!file.originalname.toLowerCase().endsWith('.pdf') || file.mimetype !== 'application/pdf') throw new BadRequestException('Chỉ hỗ trợ file .pdf');
+    try { await assertPdfHasReadableText(file.buffer); } catch (error) { throw new BadRequestException((error as Error).message); }
+    const template = await this.templates.findOne({ where: { id, templateType: 'PDF' } });
+    if (!template) throw new NotFoundException('Không tìm thấy mẫu PDF');
+    const directory = join(process.cwd(), 'storage', 'print-templates');
+    await fs.mkdir(directory, { recursive: true });
+    const pdfPath = join(directory, `${template.id}.pdf`);
+    await fs.writeFile(pdfPath, file.buffer);
+    template.pdfPath = pdfPath;
+    template.originalFilename = basename(file.originalname);
+    if (payload.name?.trim()) template.name = payload.name.trim();
+    return this.templates.save(template);
+  }
+
+  async downloadPdfTemplateSource(id: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const template = await this.templates.findOne({ where: { id, templateType: 'PDF' } });
+    if (!template?.pdfPath) throw new NotFoundException('Không tìm thấy file PDF');
+    return { buffer: await fs.readFile(template.pdfPath), filename: template.originalFilename || `${template.name}.pdf` };
+  }
+
+  async renderPdfTemplate(templateId: string, recordId: string) {
+    const template = await this.templates.findOne({ where: { id: templateId, isActive: true, templateType: 'PDF' } });
+    if (!template?.pdfPath) throw new NotFoundException('Không tìm thấy mẫu PDF');
+    const record = await this.records.findRaw(template.entityType, recordId, '*') as Record<string, unknown>;
+    const source = await fs.readFile(template.pdfPath);
+    return { buffer: await renderPdfTemplateFile(source, this.buildPrintContext(record)), filename: `${template.name}-${recordId}.pdf` };
   }
 
   private buildPrintContext(record: Record<string, unknown>) {

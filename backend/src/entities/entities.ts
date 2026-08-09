@@ -1599,6 +1599,9 @@ export class PrintTemplate {
   docxPath?: string;
 
   @Column({ nullable: true })
+  pdfPath?: string;
+
+  @Column({ nullable: true })
   originalFilename?: string;
 
   @Column({ default: true })

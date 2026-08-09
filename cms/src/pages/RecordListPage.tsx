@@ -73,8 +73,9 @@ export function RecordListPage() {
   const [pageSize, setPageSize] = useState(50)
   const [displayFields, setDisplayFields] = useState<FieldLayoutConfig[]>([])
   const [templates, setTemplates] = useState<
-    Array<{ id: string; name: string; templateType?: string }>
+    Array<{ id: string; name: string; templateType?: string; isActive?: boolean }>
   >([])
+  const [printTarget, setPrintTarget] = useState<{ recordId: string; templateId?: string } | null>(null)
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [duplicateValues, setDuplicateValues] = useState<Record<string, unknown> | undefined>(undefined)
@@ -221,7 +222,11 @@ export function RecordListPage() {
           getStoredUserRole(),
         )
         setDisplayFields(tableFields)
-        setTemplates(prints.data.data)
+        setTemplates(
+          (prints.data.data || []).filter(
+            (template: { isActive?: boolean }) => template.isActive !== false,
+          ),
+        )
         return hasFileField(tableFields) ? loadFileLookupMap() : Promise.resolve({})
       })
       .then((nextFileLookups) => {
@@ -293,7 +298,7 @@ export function RecordListPage() {
           if (["invoices", "expenses", "payrolls"].includes(resource) && hasActionAccess(resource, "generate-accounting-voucher")) menuItems.push({ key: "voucher", icon: <AuditOutlined />, label: "Tạo chứng từ kế toán", onClick: () => void generateAccountingVoucher(resource, recordId) })
           if (resource === "accounting-vouchers" && row.status !== "POSTED" && hasActionAccess(resource, "post")) menuItems.push({ key: "post", icon: <AuditOutlined />, label: "Ghi sổ", onClick: () => void postAccountingVoucher(recordId) })
           if (resource === "accounting-vouchers" && row.status === "POSTED" && hasActionAccess(resource, "unpost")) menuItems.push({ key: "unpost", icon: <SwapOutlined />, label: "Bỏ ghi sổ", onClick: () => void unpostAccountingVoucher(recordId) })
-          if (templates[0] && hasActionAccess(resource, "print")) menuItems.push({ key: "print", icon: <PrinterOutlined />, label: "In biểu mẫu", onClick: () => void printRecord(templates[0], recordId) })
+          if (templates.length > 0 && hasActionAccess(resource, "print")) menuItems.push({ key: "print", icon: <PrinterOutlined />, label: "In biểu mẫu", onClick: () => openPrintTemplatePicker(recordId) })
           if (recordStatus === "active" && hasActionAccess(resource, "delete")) menuItems.push({ key: "archive", danger: true, icon: <DeleteOutlined />, label: "Lưu trữ", onClick: () => Modal.confirm({ title: "Lưu trữ bản ghi này?", content: "Bản ghi sẽ được chuyển vào tab Lưu trữ.", okText: "Lưu trữ", okButtonProps: { danger: true }, onOk: () => new Promise<void>((resolve) => deleteRecord({ resource, id: row.id }, { onSuccess: () => { message.success("Đã lưu trữ"); refresh(); resolve() }, onError: () => resolve() })) }) })
           return <>
           <span className="record-row-actions-mobile"><Dropdown menu={{ items: menuItems }} trigger={["click"]}><Button type="text" icon={<MoreOutlined />} aria-label="Thao tác" /></Dropdown></span>
@@ -363,12 +368,12 @@ export function RecordListPage() {
                 <Button icon={<SwapOutlined />} type="text" onClick={() => unpostAccountingVoucher(row.id)} />
               </Tooltip>
             )}
-            {templates[0] && hasActionAccess(resource, "print") && (
+            {templates.length > 0 && hasActionAccess(resource, "print") && (
               <Tooltip title="In biểu mẫu">
                 <Button
                   icon={<PrinterOutlined />}
                   type="text"
-                  onClick={() => printRecord(templates[0], row.id)}
+                  onClick={() => openPrintTemplatePicker(recordId)}
                 />
               </Tooltip>
             )}
@@ -419,6 +424,16 @@ export function RecordListPage() {
       URL.revokeObjectURL(url)
       return
     }
+    if (template.templateType === "PDF") {
+      const response = await api.get(`/settings/print-templates/${template.id}/pdf/${recordId}`, { responseType: "blob" })
+      const url = URL.createObjectURL(response.data)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = "mau-in.pdf"
+      anchor.click()
+      URL.revokeObjectURL(url)
+      return
+    }
     const html = (
       await api.get(
         `/settings/print-templates/${template.id}/render/${recordId}`,
@@ -432,6 +447,26 @@ export function RecordListPage() {
       )
       windowRef.document.close()
     }
+  }
+
+  function openPrintTemplatePicker(recordId: string) {
+    if (templates.length === 0) {
+      message.info("Chưa có mẫu in đang sử dụng")
+      return
+    }
+    setPrintTarget({ recordId, templateId: templates[0].id })
+  }
+
+  function confirmPrintTemplate() {
+    if (!printTarget?.templateId) return
+    const template = templates.find((item) => item.id === printTarget.templateId)
+    if (!template) {
+      message.error("Không tìm thấy mẫu in đã chọn")
+      return
+    }
+    const recordId = printTarget.recordId
+    setPrintTarget(null)
+    void printRecord(template, recordId)
   }
 
   async function revealPhone(recordId: string) {
@@ -748,6 +783,35 @@ export function RecordListPage() {
         onOk={() => void archiveSelected()}
       >
         Các bản ghi chỉ bị ẩn, không bị xóa khỏi cơ sở dữ liệu.
+      </Modal>
+      <Modal
+        destroyOnHidden
+        open={Boolean(printTarget)}
+        title="Chọn mẫu in"
+        okText="In biểu mẫu"
+        okButtonProps={{ disabled: !printTarget?.templateId }}
+        onCancel={() => setPrintTarget(null)}
+        onOk={confirmPrintTemplate}
+      >
+        <Typography.Paragraph type="secondary">
+          Chọn biểu mẫu muốn in cho bản ghi này.
+        </Typography.Paragraph>
+        <Select
+          showSearch
+          optionFilterProp="label"
+          placeholder="Chọn mẫu in"
+          style={{ width: "100%" }}
+          value={printTarget?.templateId}
+          onChange={(templateId) =>
+            setPrintTarget((current) =>
+              current ? { ...current, templateId } : current,
+            )
+          }
+          options={templates.map((template) => ({
+            value: template.id,
+            label: `${template.name}${["DOCX", "PDF"].includes(template.templateType || "") ? ` (${template.templateType})` : ""}`,
+          }))}
+        />
       </Modal>
       <Modal
         className="quick-drawer"

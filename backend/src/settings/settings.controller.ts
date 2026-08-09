@@ -336,6 +336,15 @@ export class SettingsController {
     return { data: await this.settings.updateTemplate(id, payload, request?.user) };
   }
 
+  @Post('print-templates/render-preview')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  renderPreview(
+    @Body() payload: { entityType?: string; htmlTemplate?: string; recordId?: string },
+    @Request() request?: { user: AuthUser },
+  ) {
+    return this.settings.renderTemplatePreview(payload, request?.user);
+  }
+
   @Post('print-templates/docx')
   @UseInterceptors(FileInterceptor('file'))
   async createDocxTemplate(@UploadedFile() file: any, @Body() payload: { entityType?: string; name?: string }, @Request() request?: { user: AuthUser }) {
@@ -346,6 +355,18 @@ export class SettingsController {
   @UseInterceptors(FileInterceptor('file'))
   async replaceDocxTemplate(@Param('id') id: string, @UploadedFile() file: any, @Body() payload: { name?: string }, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.replaceDocxTemplate(id, file, payload, request?.user) };
+  }
+
+  @Post('print-templates/pdf')
+  @UseInterceptors(FileInterceptor('file'))
+  async createPdfTemplate(@UploadedFile() file: any, @Body() payload: { entityType?: string; name?: string }, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.savePdfTemplate(file, payload, request?.user) };
+  }
+
+  @Patch('print-templates/:id/pdf')
+  @UseInterceptors(FileInterceptor('file'))
+  async replacePdfTemplate(@Param('id') id: string, @UploadedFile() file: any, @Body() payload: { name?: string }, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.replacePdfTemplate(id, file, payload, request?.user) };
   }
 
   @Get('print-templates/:id/render/:recordId')
@@ -366,6 +387,22 @@ export class SettingsController {
   async renderDocx(@Param('id') id: string, @Param('recordId') recordId: string, @Res() response: Response) {
     const result = await this.settings.renderDocxTemplate(id, recordId);
     response.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    response.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(result.filename)}"`);
+    response.send(result.buffer);
+  }
+
+  @Get('print-templates/:id/pdf/source')
+  async downloadPdfSource(@Param('id') id: string, @Request() request: { user: AuthUser }, @Res() response: Response) {
+    const result = await this.settings.downloadPdfTemplateSource(id, request.user);
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(result.filename)}"`);
+    response.send(result.buffer);
+  }
+
+  @Get('print-templates/:id/pdf/:recordId')
+  async renderPdf(@Param('id') id: string, @Param('recordId') recordId: string, @Res() response: Response) {
+    const result = await this.settings.renderPdfTemplate(id, recordId);
+    response.setHeader('Content-Type', 'application/pdf');
     response.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(result.filename)}"`);
     response.send(result.buffer);
   }

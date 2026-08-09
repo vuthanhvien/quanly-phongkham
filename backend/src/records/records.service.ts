@@ -1548,6 +1548,9 @@ export class RecordsService {
     if (column === 'date' || column.endsWith('Date') || column === 'joinedAt' || column === 'dateOfBirth' || column === 'effectiveDate' || column === 'expiryDate') {
       return this.fakeDate(context.index);
     }
+    if (resource === 'appointments' && (column === 'startTime' || column === 'endTime')) {
+      return this.fakeAppointmentDateTime(context.index, column === 'endTime');
+    }
     if (column.endsWith('At') || column === 'startTime' || column === 'endTime' || column === 'scheduledAt' || column === 'consultedAt' || column === 'capturedAt') {
       return this.fakeDateTime(context.index, column === 'endTime' ? 1 : 0);
     }
@@ -1712,6 +1715,13 @@ export class RecordsService {
 
   private fakeDateTime (index: number, extraHours = 0) {
     const date = new Date(Date.UTC(2026, 0, 1 + index, 8 + extraHours, 0, 0));
+    return date.toISOString().slice(0, 16);
+  }
+
+  private fakeAppointmentDateTime (index: number, isEnd = false) {
+    const dayOffset = Math.floor(index / 8);
+    const slot = index % 8;
+    const date = new Date(Date.UTC(2026, 0, 1 + dayOffset, 8 + slot, isEnd ? 45 : 0, 0));
     return date.toISOString().slice(0, 16);
   }
 
@@ -2595,7 +2605,10 @@ export class RecordsService {
       }
     }
 
-    const fiscalSetting = await this.accountingFiscalSettings.findOne({ order: { createdAt: 'ASC' } });
+    const [fiscalSetting] = await this.accountingFiscalSettings.find({
+      order: { createdAt: 'ASC' },
+      take: 1,
+    });
     if (!fiscalSetting) {
       await this.accountingFiscalSettings.save(
         this.accountingFiscalSettings.create({
@@ -2970,7 +2983,10 @@ export class RecordsService {
   }
 
   private async getFiscalSetting () {
-    const fiscalSetting = await this.accountingFiscalSettings.findOne({ order: { createdAt: 'ASC' } });
+    const [fiscalSetting] = await this.accountingFiscalSettings.find({
+      order: { createdAt: 'ASC' },
+      take: 1,
+    });
     if (!fiscalSetting) {
       throw new BadRequestException('Chưa cấu hình accounting-fiscal-settings');
     }

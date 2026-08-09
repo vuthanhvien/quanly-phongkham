@@ -1,9 +1,9 @@
-import { ArrowLeftOutlined, SaveOutlined } from "@ant-design/icons"
-import { Button, Card, Checkbox, Form, Input, Select, Space, Tooltip, Typography, message } from "antd"
+import { ArrowLeftOutlined, PrinterOutlined, SaveOutlined } from "@ant-design/icons"
+import { Button, Card, Checkbox, Form, Input, Modal, Select, Space, Tooltip, Typography, message } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api"
-import { PrintTiptapEditor } from "../components/PrintTiptapEditor"
+import { PrintTinyMceEditor } from "../components/PrintTinyMceEditor"
 import { CustomField } from "../models"
 import { getFieldCatalog } from "../view-settings"
 import {
@@ -68,6 +68,11 @@ export function PrintTemplateEditorPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [customFields, setCustomFields] = useState<CustomField[]>([])
+  const [variableSearch, setVariableSearch] = useState("")
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewRecords, setPreviewRecords] = useState<Array<Record<string, unknown>>>([])
+  const [previewRecordId, setPreviewRecordId] = useState<string>()
+  const [previewLoading, setPreviewLoading] = useState(false)
   const editing = id !== "new"
 
   const fieldCatalog = useMemo(
@@ -82,9 +87,13 @@ export function PrintTemplateEditorPage() {
     () => PRINT_TEMPLATE_PRESETS.filter((preset) => preset.entityType === entityType),
     [entityType],
   )
-  const templateVariableGroups = useMemo(
-    () => groupTemplateVariables(templateVariables),
-    [templateVariables],
+  const templateVariableGroups = useMemo(() => {
+    const query = variableSearch.trim().toLowerCase()
+    const matchingVariables = query
+      ? templateVariables.filter((variable) => `${variable.key} ${variable.label}`.toLowerCase().includes(query))
+      : templateVariables
+    return groupTemplateVariables(matchingVariables)
+  }, [templateVariables, variableSearch],
   )
 
   useEffect(() => {
@@ -159,8 +168,59 @@ export function PrintTemplateEditorPage() {
     })
   }
 
+  async function openPrintPreview() {
+    const htmlTemplate = String(form.getFieldValue("htmlTemplate") || "").trim()
+    if (!htmlTemplate) {
+      message.warning("Nhập nội dung mẫu in trước khi in thử")
+      return
+    }
+    setPreviewOpen(true)
+    setPreviewRecordId(undefined)
+    setPreviewLoading(true)
+    try {
+      const response = await api.get(`/records/${entityType}`, { params: { pageSize: 100, include: "*" } })
+      setPreviewRecords(response.data.data || [])
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  async function printPreview() {
+    if (!previewRecordId) {
+      message.warning("Chọn một bản ghi để in thử")
+      return
+    }
+    const printWindow = window.open("", "_blank")
+    if (!printWindow) {
+      message.error("Trình duyệt đang chặn cửa sổ in")
+      return
+    }
+    setPreviewLoading(true)
+    try {
+      const response = await api.post("/settings/print-templates/render-preview", {
+        entityType,
+        recordId: previewRecordId,
+        htmlTemplate: form.getFieldValue("htmlTemplate"),
+      }, { responseType: "text" })
+      printWindow.document.write(`<!doctype html><html><head><title>In thử mẫu</title></head><body><div class="print-sheet">${response.data}</div><script>window.print()</script></body></html>`)
+      printWindow.document.close()
+      setPreviewOpen(false)
+    } catch {
+      printWindow.close()
+      message.error("Không thể tạo bản in thử")
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  function previewRecordLabel(record: Record<string, unknown>) {
+    const main = record.code || record.fullName || record.name || record.title || record.email || record.id
+    const secondary = [record.code, record.fullName || record.name].filter(Boolean).join(" — ")
+    return secondary || String(main || "Bản ghi")
+  }
+
   return (
-    <div>
+    <Form form={form} layout="vertical" onFinish={saveTemplate}>
       <div className="page-header">
         <Space align="center" size={10}>
           <Tooltip title="Quay lại">
@@ -174,74 +234,106 @@ export function PrintTemplateEditorPage() {
             {editing ? "Cập nhật mẫu in HTML" : "Thêm mẫu in HTML"}
           </Typography.Title>
         </Space>
-        <Button
-          className="primary-glow"
-          icon={<SaveOutlined />}
-          loading={saving}
-          type="primary"
-          onClick={() => form.submit()}
-        >
-          Lưu mẫu
-        </Button>
+        <Space size={10} wrap>
+          <Form.Item name="name" noStyle rules={[{ required: true, message: "Nhập tên mẫu" }]}>
+            <Input placeholder="Tên mẫu in" style={{ width: 260 }} />
+          </Form.Item>
+          <Form.Item name="isActive" noStyle valuePropName="checked" initialValue>
+            <Checkbox>Sử dụng mẫu in này</Checkbox>
+          </Form.Item>
+          <Button
+            icon={<PrinterOutlined />}
+            onClick={() => void openPrintPreview()}
+          >
+            In thử
+          </Button>
+          <Button
+            className="primary-glow"
+            icon={<SaveOutlined />}
+            loading={saving}
+            type="primary"
+            onClick={() => form.submit()}
+          >
+            Lưu mẫu
+          </Button>
+        </Space>
       </div>
-      <Form form={form} layout="vertical" onFinish={saveTemplate}>
-        <div className="template-page-layout">
-          <Card className="glass-card" loading={loading}>
-            {templatePresets.length > 0 && (
-              <Form.Item label="Mẫu có sẵn">
-                <Select
-                  allowClear
-                  placeholder="Chọn mẫu để nạp nhanh vào editor"
-                  options={templatePresets.map((preset) => ({
-                    value: preset.key,
-                    label: preset.label,
-                  }))}
-                  onChange={(value) => value && applyPreset(String(value))}
-                />
-              </Form.Item>
-            )}
-            <Form.Item name="name" label="Tên mẫu" rules={[{ required: true }]}>
-              <Input />
+      <Modal
+        confirmLoading={previewLoading}
+        okText="In thử"
+        onCancel={() => setPreviewOpen(false)}
+        onOk={() => void printPreview()}
+        open={previewOpen}
+        title="Chọn bản ghi để in thử"
+      >
+        <Select
+          autoFocus
+          loading={previewLoading}
+          onChange={setPreviewRecordId}
+          optionFilterProp="label"
+          options={previewRecords.map((record) => ({ label: previewRecordLabel(record), value: String(record.id) }))}
+          placeholder="Tìm và chọn bản ghi"
+          showSearch
+          style={{ width: "100%" }}
+          value={previewRecordId}
+        />
+      </Modal>
+      <div className="template-page-layout">
+        <Card className="glass-card" loading={loading}>
+          {templatePresets.length > 0 && (
+            <Form.Item label="Mẫu có sẵn">
+              <Select
+                allowClear
+                placeholder="Chọn mẫu để nạp nhanh vào editor"
+                options={templatePresets.map((preset) => ({
+                  value: preset.key,
+                  label: preset.label,
+                }))}
+                onChange={(value) => value && applyPreset(String(value))}
+              />
             </Form.Item>
-            <Form.Item name="isActive" valuePropName="checked" initialValue>
-              <Checkbox>Sử dụng mẫu in này</Checkbox>
-            </Form.Item>
-            <Form.Item name="htmlTemplate" rules={[{ required: true }]}>
-              <PrintTiptapEditor variables={templateVariables} repeatCollections={printRepeatCollections[entityType] || []} />
-            </Form.Item>
-          </Card>
-          <Space direction="vertical" size={16} style={{ width: "100%" }}>
-            <Card className="template-variable-library" title={`Biến có thể dùng (${templateVariables.length})`}>
-              {templateVariableGroups.map((group) => (
-                <section className="template-variable-group" key={group.label}>
-                  <Typography.Text className="template-variable-group-title" strong>{group.label}</Typography.Text>
-                  {group.families.map((family) => (
-                    <div className="template-variable-family" key={family.key}>
-                      <Typography.Text type="secondary">{family.label}</Typography.Text>
-                      <div className="template-variable-codes">
-                        {family.variables.map((variable) => (
-                          <Tooltip key={variable.key} title={`${variable.label} — bấm để copy`}>
-                            <Button
-                              size="small"
-                              type="text"
-                              onClick={() => {
-                                void navigator.clipboard?.writeText(`{{${variable.key}}}`)
-                                message.success(`Đã copy {{${variable.key}}}`)
-                              }}
-                            >
-                              <code>{`{{${variable.key}}}`}</code>
-                            </Button>
-                          </Tooltip>
-                        ))}
-                      </div>
+          )}
+          <Form.Item name="htmlTemplate" rules={[{ required: true }]}>
+            <PrintTinyMceEditor variables={templateVariables} repeatCollections={printRepeatCollections[entityType] || []} />
+          </Form.Item>
+        </Card>
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          <Card className="template-variable-library" title={`Biến có thể dùng (${templateVariables.length})`}>
+            <Input.Search
+              allowClear
+              placeholder="Tìm mã hoặc tên biến"
+              value={variableSearch}
+              onChange={(event) => setVariableSearch(event.target.value)}
+            />
+            {templateVariableGroups.map((group) => (
+              <section className="template-variable-group" key={group.label}>
+                <Typography.Text className="template-variable-group-title" strong>{group.label}</Typography.Text>
+                {group.families.map((family) => (
+                  <div className="template-variable-family" key={family.key}>
+                    <Typography.Text strong>{family.label}</Typography.Text>
+                    <div className="template-variable-codes">
+                      {family.variables.map((variable) => (
+                        <Tooltip key={variable.key} title={`${variable.label} — bấm để copy`}>
+                          <Button
+                            size="small"
+                            type="text"
+                            onClick={() => {
+                              void navigator.clipboard?.writeText(`{{${variable.key}}}`)
+                              message.success(`Đã copy {{${variable.key}}}`)
+                            }}
+                          >
+                            <code>{variable.key}</code>
+                          </Button>
+                        </Tooltip>
+                      ))}
                     </div>
-                  ))}
-                </section>
-              ))}
-            </Card>
-          </Space>
-        </div>
-      </Form>
-    </div>
+                  </div>
+                ))}
+              </section>
+            ))}
+          </Card>
+        </Space>
+      </div>
+    </Form>
   )
 }

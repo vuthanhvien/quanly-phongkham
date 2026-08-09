@@ -1,4 +1,4 @@
-import { ArrowLeftOutlined, DownloadOutlined, ImportOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons"
+import { ArrowLeftOutlined, DeleteOutlined, DownloadOutlined, ImportOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons"
 import { faker } from "@faker-js/faker"
 import { Alert, Button, Card, Select, Space, Table, Tabs, Tag, Typography, Upload, message } from "antd"
 import type { UploadProps } from "antd"
@@ -131,7 +131,7 @@ export function RecordImportPage() {
       try {
         if (bundleMode) {
           const definitions = buildBundleSheetDefinitions(resource, importableFields)
-          const parsed = await parseBundleImportFile(file, definitions, baseKeySet)
+          const parsed = await parseBundleImportFile(file, definitions, baseKeySet, importableFields)
           if (parsed.previewRows.length === 0 && parsed.stats.every((item) => item.count === 0)) {
             message.warning("Tệp nhập chưa có dữ liệu hợp lệ")
             return false
@@ -201,8 +201,26 @@ export function RecordImportPage() {
         render: (_: unknown, row: ImportDraftRow) =>
           displayValue(field, row.preview[field.key], lookups),
       })),
+      {
+        title: "Thao tác",
+        key: "actions",
+        fixed: "right",
+        width: 88,
+        render: (_: unknown, row: ImportDraftRow) => (
+          <Button
+            danger
+            disabled={row.__saved}
+            icon={<DeleteOutlined />}
+            size="small"
+            type="text"
+            onClick={() => removeDraftRow(row)}
+          >
+            Xóa
+          </Button>
+        ),
+      },
     ],
-    [importableFields, lookups],
+    [importableFields, lookups, bundleMode, resource],
   )
 
   const bundleTabItems = useMemo(
@@ -214,8 +232,8 @@ export function RecordImportPage() {
           label: `${definition.sheetName} (${rows.length})`,
           children: (
             <Table
-              columns={buildBundlePreviewColumns(definition, rows)}
-              dataSource={rows.map((row, index) => ({ __rowKey: `${definition.sheetName}-${index}`, ...row }))}
+              columns={buildBundlePreviewColumns(definition, rows, (index) => removeBundleRow(definition.sheetName, index))}
+              dataSource={rows.map((row, index) => ({ __bundleIndex: index, __rowKey: `${definition.sheetName}-${index}`, ...row }))}
               locale={{ emptyText: "Sheet này chưa có dữ liệu" }}
               pagination={{ pageSize: 20, showSizeChanger: true }}
               rowKey="__rowKey"
@@ -225,8 +243,48 @@ export function RecordImportPage() {
           ),
         }
       }),
-    [bundleDefinitions, bundleSheets],
+    [bundleDefinitions, bundleSheets, resource],
   )
+
+  function removeDraftRow(row: ImportDraftRow) {
+    setDraftRows((current) => current.filter((item) => item.__rowKey !== row.__rowKey))
+    if (!bundleMode) return
+
+    const customerCode = String(row.payload.code || row.preview.code || "").trim()
+    if (!customerCode) return
+    setBundleSheets((current) => {
+      const next = Object.fromEntries(
+        Object.entries(current).map(([sheetName, rows]) => [
+          sheetName,
+          sheetName === resource
+            ? rows.filter((item) => String(item.code || "").trim() !== customerCode)
+            : rows.filter((item) => String(item.customerCode || "").trim() !== customerCode),
+        ]),
+      )
+      setBundleSheetStats(Object.entries(next).map(([name, rows]) => ({ name, count: rows.length })))
+      return next
+    })
+  }
+
+  function removeBundleRow(sheetName: string, rowIndex: number) {
+    const removed = bundleSheets[sheetName]?.[rowIndex]
+    if (!removed) return
+    if (sheetName === resource) {
+      const matchingDraft = draftRows.find((row) => String(row.payload.code || row.preview.code || "").trim() === String(removed.code || "").trim())
+      if (matchingDraft) {
+        removeDraftRow(matchingDraft)
+        return
+      }
+    }
+    setBundleSheets((current) => {
+      const next = {
+        ...current,
+        [sheetName]: (current[sheetName] || []).filter((_, index) => index !== rowIndex),
+      }
+      setBundleSheetStats(Object.entries(next).map(([name, rows]) => ({ name, count: rows.length })))
+      return next
+    })
+  }
 
   async function downloadTemplate() {
     if (importableFields.length === 0) {
@@ -343,11 +401,13 @@ export function RecordImportPage() {
             Quay lại danh sách
           </Button>
           <Button icon={<DownloadOutlined />} onClick={() => void downloadTemplate()}>
-            Tải file mẫu
+            {bundleMode ? "Tải data mẫu" : "Tải file mẫu"}
           </Button>
           <Select
             aria-label="Số dòng dữ liệu mẫu"
             options={[
+              { value: 10, label: '10 dòng' },
+              { value: 50, label: '50 dòng' },
               { value: 100, label: '100 dòng' },
               { value: 250, label: '250 dòng' },
               { value: 500, label: '500 dòng' },
@@ -468,18 +528,32 @@ export function RecordImportPage() {
 function buildBundlePreviewColumns(
   definition: BundleSheetDefinition,
   rows: Array<Record<string, unknown>>,
+  onRemove: (rowIndex: number) => void,
 ): ColumnsType<Record<string, unknown>> {
   const columns = Array.from(new Set([
     ...definition.columns,
     ...rows.flatMap((row) => Object.keys(row)),
   ]))
-  return columns.map((column) => ({
+  return [
+    ...columns.map((column) => ({
     title: column,
     dataIndex: column,
     key: column,
     width: Math.max(140, Math.min(260, column.length * 12)),
     render: (value: unknown) => formatBundlePreviewValue(value),
-  }))
+    })),
+    {
+      title: "Thao tác",
+      key: "actions",
+      fixed: "right",
+      width: 88,
+      render: (_: unknown, row) => (
+        <Button danger icon={<DeleteOutlined />} size="small" type="text" onClick={() => onRemove(Number(row.__bundleIndex))}>
+          Xóa
+        </Button>
+      ),
+    },
+  ]
 }
 
 function formatBundlePreviewValue(value: unknown) {
@@ -807,6 +881,7 @@ async function parseBundleImportFile(
   file: File,
   definitions: BundleSheetDefinition[],
   baseKeySet: Set<string>,
+  mainFields: FieldSpec[],
 ) {
   const buffer = await file.arrayBuffer()
   const workbook = XLSX.read(buffer, { type: "array", cellDates: false })
@@ -820,9 +895,6 @@ async function parseBundleImportFile(
       : []
 
     if (definition.resource === definitions[0].resource) {
-      const mainFields = definition.columns
-        .map((key) => (baseFields[definition.resource] || []).find((field) => field.key === key))
-        .filter(Boolean) as FieldSpec[]
       previewRows = rows
         .map((rawRow, index) => normalizeBundlePreviewRow(rawRow, index, mainFields, baseKeySet))
         .filter(Boolean) as ImportDraftRow[]

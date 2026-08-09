@@ -2,7 +2,7 @@ import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
-import { DeepPartial, IsNull, Repository } from 'typeorm';
+import { DeepPartial, IsNull, Like, Repository } from 'typeorm';
 import { TenantDataSourceService } from '../tenant/tenant-data-source.service';
 import {
   Appointment,
@@ -131,6 +131,13 @@ function timeValue(offsetHours: number, offsetMinutes = 0) {
   return new Date(Date.UTC(2025, 0, 1, 8 + (offsetHours % 8), offsetMinutes, 0, 0));
 }
 
+function appointmentTimeValue(index: number) {
+  const sequence = Math.max(0, index - 1);
+  const dayOffset = Math.floor(sequence / 8);
+  const slot = sequence % 8;
+  return new Date(Date.UTC(2025, 0, 1 + dayOffset, 8 + slot, 0, 0, 0));
+}
+
 function boolFlag(index: number, cycle = 2) {
   return index % cycle !== 0;
 }
@@ -182,6 +189,7 @@ export class SeedService implements OnApplicationBootstrap {
     await this.cleanupLegacyBranchRoleAssignments();
     const context = await this.ensureCoreSeed();
     await this.ensureBaseSettings();
+    await this.normalizeBulkAppointmentTimes();
     await this.seedLargeDataIfEnabled(context);
   }
 
@@ -684,7 +692,9 @@ export class SeedService implements OnApplicationBootstrap {
       const pic = staff[(index - 1) % staff.length];
       const room = rooms[(index - 1) % Math.max(rooms.length, 1)];
       const equipment = equipments[(index - 1) % Math.max(equipments.length, 1)];
-      const start = timeValue(index % 10, (index * 5) % 60);
+      // Mỗi lịch chiếm riêng một slot 45 phút, nên seed data không thể trùng giờ
+      // dù có cùng bác sĩ, phòng hoặc thiết bị.
+      const start = appointmentTimeValue(index);
       const end = new Date(start.getTime() + 45 * 60 * 1000);
       return {
         customerId: customer.id,
@@ -700,6 +710,25 @@ export class SeedService implements OnApplicationBootstrap {
         note: `Lich hen bulk ${index}`,
       };
     }, 'appointments');
+  }
+
+  private async normalizeBulkAppointmentTimes() {
+    const appointments = await this.appointments.find({
+      where: { note: Like('Lich hen bulk %') },
+      order: { createdAt: 'ASC' },
+    });
+    const changed = appointments.map((appointment, index) => {
+      const startTime = appointmentTimeValue(index + 1);
+      const endTime = new Date(startTime.getTime() + 45 * 60 * 1000);
+      if (appointment.startTime?.getTime() === startTime.getTime() && appointment.endTime?.getTime() === endTime.getTime()) {
+        return null;
+      }
+      appointment.startTime = startTime;
+      appointment.endTime = endTime;
+      return appointment;
+    }).filter((appointment): appointment is Appointment => appointment !== null);
+
+    if (changed.length > 0) await this.appointments.save(changed);
   }
 
   private async seedWorkSchedules(target: number, staff: Staff[], branches: Branch[], rooms: Room[]) {

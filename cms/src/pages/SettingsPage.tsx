@@ -653,6 +653,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   const [docxTemplateModal, setDocxTemplateModal] = useState(false)
   const [docxFile, setDocxFile] = useState<File | null>(null)
   const [docxTemplateTarget, setDocxTemplateTarget] = useState<Template | null>(null)
+  const [uploadedTemplateType, setUploadedTemplateType] = useState<"DOCX" | "PDF">("DOCX")
 
   const fieldCatalog = useMemo(
     () => getFieldCatalog(entityType, fields),
@@ -840,25 +841,26 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   }
 
   async function saveDocxTemplate(values: Record<string, unknown>) {
-    if (!docxFile) { message.error("Chọn file DOCX mẫu"); return }
+    const fileTypeLabel = uploadedTemplateType === "PDF" ? "PDF" : "DOCX"
+    if (!docxFile) { message.error(`Chọn file ${fileTypeLabel} mẫu`); return }
     const formData = new FormData()
     formData.append("file", docxFile)
     formData.append("name", String(values.name || ""))
     try {
       if (docxTemplateTarget) {
-        await api.patch(`/settings/print-templates/${docxTemplateTarget.id}/docx`, formData)
-        message.success("Đã thay file DOCX")
+        await api.patch(`/settings/print-templates/${docxTemplateTarget.id}/${uploadedTemplateType.toLowerCase()}`, formData)
+        message.success(`Đã thay file ${fileTypeLabel}`)
       } else {
         formData.append("entityType", entityType)
-        await api.post("/settings/print-templates/docx", formData)
-        message.success("Đã lưu mẫu DOCX")
+        await api.post(`/settings/print-templates/${uploadedTemplateType.toLowerCase()}`, formData)
+        message.success(`Đã lưu mẫu ${fileTypeLabel}`)
       }
       setDocxTemplateModal(false)
       setDocxFile(null)
       setDocxTemplateTarget(null)
       docxTemplateForm.resetFields()
       await load()
-    } catch (error) { message.error(getApiErrorMessage(error, "Không thể lưu mẫu DOCX")) }
+    } catch (error) { message.error(getApiErrorMessage(error, `Không thể lưu mẫu ${fileTypeLabel}`)) }
   }
 
   function openCreateTemplate() {
@@ -874,6 +876,15 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   }
 
   function openDocxTemplateUpload(template?: Template) {
+    setUploadedTemplateType("DOCX")
+    setDocxTemplateTarget(template || null)
+    setDocxFile(null)
+    docxTemplateForm.setFieldsValue({ name: template?.name || "" })
+    setDocxTemplateModal(true)
+  }
+
+  function openPdfTemplateUpload(template?: Template) {
+    setUploadedTemplateType("PDF")
     setDocxTemplateTarget(template || null)
     setDocxFile(null)
     docxTemplateForm.setFieldsValue({ name: template?.name || "" })
@@ -890,19 +901,20 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     }
   }
 
-  async function downloadDocxTemplate(template: Template) {
+  async function downloadDocumentTemplate(template: Template) {
     try {
-      const response = await api.get(`/settings/print-templates/${template.id}/docx/source`, { responseType: "blob" })
+      const extension = template.templateType === "PDF" ? "pdf" : "docx"
+      const response = await api.get(`/settings/print-templates/${template.id}/${extension}/source`, { responseType: "blob" })
       const url = URL.createObjectURL(response.data)
       const link = document.createElement("a")
       link.href = url
-      link.download = template.originalFilename || `${template.name}.docx`
+      link.download = template.originalFilename || `${template.name}.${extension}`
       document.body.appendChild(link)
       link.click()
       link.remove()
       URL.revokeObjectURL(url)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Không thể tải file DOCX"))
+      toast.error(getApiErrorMessage(error, "Không thể tải file mẫu"))
     }
   }
 
@@ -1075,6 +1087,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                     <Space wrap>
                       <Button onClick={openCreateTemplate}>Thêm mẫu</Button>
                       <Button onClick={() => openDocxTemplateUpload()}>Tải mẫu DOCX</Button>
+                      <Button onClick={() => openPdfTemplateUpload()}>Tải mẫu PDF</Button>
                       {templatePresets.length > 0 && (
                         <Button onClick={() => openCreateTemplateFromPreset(templatePresets[0])}>
                           Tạo từ mẫu có sẵn
@@ -1117,12 +1130,12 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                         width: 128,
                         align: "right",
                         render: (_, row) => (
-                          row.templateType === "DOCX" ? (
+                          ["DOCX", "PDF"].includes(row.templateType || "HTML") ? (
                             <Space size={2}>
                               <Tooltip title="Tải file gốc">
-                                <Button type="text" icon={<DownloadOutlined />} onClick={() => void downloadDocxTemplate(row)} />
+                                <Button type="text" icon={<DownloadOutlined />} onClick={() => void downloadDocumentTemplate(row)} />
                               </Tooltip>
-                              <Button type="link" onClick={() => openDocxTemplateUpload(row)}>Tải lại</Button>
+                              <Button type="link" onClick={() => row.templateType === "PDF" ? openPdfTemplateUpload(row) : openDocxTemplateUpload(row)}>Tải lại</Button>
                             </Space>
                           ) : (
                             <Button type="link" onClick={() => openEditTemplate(row)}>
@@ -1139,16 +1152,20 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
           ].filter((item) => item.key === (section === "roles" ? "view-config" : "print-templates"))}
         />
       </Card>
-      <Modal title={docxTemplateTarget ? "Tải lại file DOCX" : "Tải mẫu in DOCX"} open={docxTemplateModal} footer={null} onCancel={() => { setDocxTemplateModal(false); setDocxFile(null); setDocxTemplateTarget(null) }}>
-        <Typography.Paragraph type="secondary">Dùng placeholder liền mạch như <code>{"{{fullName}}"}</code>, <code>{"{{code}}"}</code>. Khi in, hệ thống sẽ thay dữ liệu và tải DOCX kết quả.</Typography.Paragraph>
+      <Modal title={docxTemplateTarget ? `Tải lại file ${uploadedTemplateType}` : `Tải mẫu in ${uploadedTemplateType}`} open={docxTemplateModal} footer={null} onCancel={() => { setDocxTemplateModal(false); setDocxFile(null); setDocxTemplateTarget(null) }}>
+        <Typography.Paragraph type="secondary">
+          {uploadedTemplateType === "PDF"
+            ? <>PDF phải có lớp văn bản (không phải file scan). Dùng placeholder riêng một đoạn như <code>{"{{fullName}}"}</code>, <code>{"{{code}}"}</code>; khi in, hệ thống sẽ thay dữ liệu và tải PDF kết quả có thể tìm/copy văn bản.</>
+            : <>Dùng placeholder liền mạch như <code>{"{{fullName}}"}</code>, <code>{"{{code}}"}</code>. Khi in, hệ thống sẽ thay dữ liệu và tải DOCX kết quả.</>}
+        </Typography.Paragraph>
         <Form form={docxTemplateForm} layout="vertical" onFinish={saveDocxTemplate}>
           <Form.Item name="name" label="Tên mẫu" rules={[{ required: true }]}><Input placeholder="Phiếu thông tin khách hàng" /></Form.Item>
-          <Form.Item label="File DOCX" required>
-            <Upload accept=".docx" maxCount={1} beforeUpload={(file) => { setDocxFile(file); return false }} onRemove={() => setDocxFile(null)}>
-              <Button>Chọn file DOCX</Button>
+          <Form.Item label={`File ${uploadedTemplateType}`} required>
+            <Upload accept={uploadedTemplateType === "PDF" ? ".pdf,application/pdf" : ".docx"} maxCount={1} beforeUpload={(file) => { setDocxFile(file); return false }} onRemove={() => setDocxFile(null)}>
+              <Button>{`Chọn file ${uploadedTemplateType}`}</Button>
             </Upload>
           </Form.Item>
-          <Button className="primary-glow" htmlType="submit" type="primary">{docxTemplateTarget ? "Thay file DOCX" : "Lưu mẫu DOCX"}</Button>
+          <Button className="primary-glow" htmlType="submit" type="primary">{docxTemplateTarget ? `Thay file ${uploadedTemplateType}` : `Lưu mẫu ${uploadedTemplateType}`}</Button>
         </Form>
       </Modal>
     </>
