@@ -64,6 +64,11 @@ export class RecordsController {
     return this.records.generateSourceAccountingVoucher('payrolls', id, request.user);
   }
 
+  @Post('records/staff/:id/create-account')
+  createStaffAccount(@Param('id') id: string, @Body() payload: { email?: string; username?: string; password?: string; role?: string; branchId?: string }, @Request() request: { user: AuthUser }) {
+    return this.records.createStaffAccount(id, payload, request.user);
+  }
+
   @Post('records/files/upload')
   @UseInterceptors(FilesInterceptor('files', 50))
   uploadFiles(

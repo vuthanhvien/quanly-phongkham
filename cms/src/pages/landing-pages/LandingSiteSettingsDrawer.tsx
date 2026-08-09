@@ -1,5 +1,5 @@
 import { PlusOutlined } from '@ant-design/icons'
-import { Button, Card, Col, Flex, Form, Input, InputNumber, Modal, Row, Select, Space, Switch, Tabs, Tag, Typography } from 'antd'
+import { Button, Card, Col, Flex, Form, Input, InputNumber, Row, Select, Space, Switch, Tabs, Tag, Typography } from 'antd'
 import { createContext, useContext } from 'react'
 import { ImagePickerInput } from '../../components/ImagePickerInput'
 import type { FooterColumn, LandingGlobalSetting, NavItem, SocialLink } from './site-settings'
@@ -107,13 +107,11 @@ function NavEditorTree({
   )
 }
 
-export function LandingSiteSettingsDrawer() {
+export function LandingSiteSettingsPanel() {
   const {
-    open,
     settings,
     globalSaving,
     menuSaving,
-    onClose,
     onSaveGlobal,
     onSaveMenu,
     onUpdate,
@@ -130,14 +128,11 @@ export function LandingSiteSettingsDrawer() {
   } = useLandingSiteSettings()
 
   return (
-    <Modal
-      title="Cài đặt site"
-      width={860}
-      open={open}
-      onCancel={onClose}
-      className="quick-drawer"
-      footer={<Button type="primary" loading={globalSaving} onClick={onSaveGlobal}>Lưu cài đặt</Button>}
-    >
+    <Card className="glass-card detail-card">
+      <Flex align="center" justify="space-between" gap={12} wrap="wrap" style={{ marginBottom: 16 }}>
+        <Typography.Text type="secondary">Thiết lập biểu trưng, menu, đầu trang và chân trang dùng chung cho toàn bộ website.</Typography.Text>
+        <Button className="primary-glow" type="primary" loading={globalSaving} onClick={onSaveGlobal}>Lưu cài đặt</Button>
+      </Flex>
       <Tabs
         className="settings-inner-tabs"
         size="small"
@@ -268,7 +263,7 @@ export function LandingSiteSettingsDrawer() {
                 {(settings.footerSocialLinks ?? []).map((s) => (
                   <Row key={s.id} gutter={8} align="middle">
                     <Col span={7}>
-                      <Input size="small" value={s.platform} placeholder="Facebook" onChange={(e) => onUpdateSocialLink(s.id, { platform: e.target.value })} />
+                      <Input size="small" value={s.platform} placeholder="Nền tảng (ví dụ: Facebook)" onChange={(e) => onUpdateSocialLink(s.id, { platform: e.target.value })} />
                     </Col>
                     <Col span={14}>
                       <Input size="small" value={s.url} placeholder="https://facebook.com/..." onChange={(e) => onUpdateSocialLink(s.id, { url: e.target.value })} />
@@ -284,6 +279,6 @@ export function LandingSiteSettingsDrawer() {
           },
         ]}
       />
-    </Modal>
+    </Card>
   )
 }

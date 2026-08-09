@@ -3,6 +3,7 @@ import { Button, Card, Checkbox, Col, Dropdown, Form, Input, InputNumber, Modal,
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { api } from "../api"
+import { buildGroupedModuleOptions } from "../company-types"
 import { ModalTitleBar } from "../components/ModalTitleBar"
 import { WorkflowFlowCanvas, type WorkflowCanvasStep } from "../components/WorkflowFlowCanvas"
 import { entityLabels, getFieldLabel } from "../models"
@@ -65,7 +66,7 @@ const APPROVER_TYPES = [
   { value: "EMPLOYEE_LEADER", label: "Leader nhân viên" },
   { value: "EMPLOYEE_MENTOR", label: "Mentor nhân viên" },
   { value: "DEPARTMENT_MANAGER", label: "Trưởng phòng ban" },
-  { value: "ROLE", label: "Theo role" },
+  { value: "ROLE", label: "Theo vai trò" },
   { value: "FIXED_STAFF", label: "Nhân sự cố định" },
   { value: "FIXED_USER", label: "User cố định" },
 ]
@@ -419,7 +420,7 @@ export function WorkflowDefinitionDetailPage() {
           items={[
             {
               key: "board",
-              label: "Flow board",
+              label: "Sơ đồ quy trình",
               children: (
                 <>
                   <WorkflowFlowCanvas
@@ -452,8 +453,8 @@ export function WorkflowDefinitionDetailPage() {
                     { title: "#", dataIndex: "stepOrder", width: 80 },
                     { title: "Bước duyệt", dataIndex: "name" },
                     { title: "Người duyệt", render: (_, row) => approverLabel(row) },
-                    { title: "Approve", render: (_, row) => stepName(row.approveNextStepId, steps) || terminalStepLabel(row.approveNextStepId) || "Step kế tiếp" },
-                    { title: "Reject", render: (_, row) => row.rejectBehavior === "GOTO_STEP" ? stepName(row.rejectNextStepId, steps) || "-" : "Kết thúc từ chối" },
+                    { title: "Phê duyệt", render: (_, row) => stepName(row.approveNextStepId, steps) || terminalStepLabel(row.approveNextStepId) || "Bước kế tiếp" },
+                    { title: "Từ chối", render: (_, row) => row.rejectBehavior === "GOTO_STEP" ? stepName(row.rejectNextStepId, steps) || "-" : "Kết thúc từ chối" },
                     { title: "Trạng thái", render: (_, row) => <Tag color={row.isActive ? "green" : "default"}>{row.isActive ? "Đang dùng" : "Tắt"}</Tag> },
                     {
                       title: "",
@@ -488,7 +489,7 @@ export function WorkflowDefinitionDetailPage() {
                     </Col>
                     <Col xs={24} md={8}>
                       <Form.Item name="targetResource" label="Loại chứng từ" rules={[{ required: true, message: "Chọn loại chứng từ" }]}>
-                        <Select options={TARGET_RESOURCES.map((value) => ({ value, label: entityLabels[value] || value }))} />
+                        <Select options={buildGroupedModuleOptions(entityLabels, TARGET_RESOURCES)} />
                       </Form.Item>
                     </Col>
                     <Col xs={24} md={16}>

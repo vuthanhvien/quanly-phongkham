@@ -19,18 +19,18 @@ export const appModuleGroups: AppModuleGroup[] = [
   {
     key: "front-office",
     label: "Lễ tân & CRM",
-    modules: ["leads", "lead-activities", "customers", "appointments", "zalo-inbox"],
+    modules: ["appointments", "customers", "zalo-inbox", "leads", "lead-activities"],
   },
   {
     key: "clinical",
     label: "Chuyên môn điều trị",
     companyTypes: ["clinic"],
-    modules: ["medical-episodes", "consultations", "service-orders", "customer-images", "treatments", "rooms", "equipments"],
+    modules: ["consultations", "medical-episodes", "service-orders", "treatments", "customer-images", "rooms", "equipments"],
   },
   {
     key: "inventory",
     label: "Kho & mua hàng",
-    modules: ["suppliers", "products", "product-categories", "units", "stock-batches"],
+    modules: ["products", "stock-batches", "suppliers", "product-categories", "units"],
   },
   {
     key: "documents",
@@ -39,27 +39,27 @@ export const appModuleGroups: AppModuleGroup[] = [
   },
   {
     key: "landing",
-    label: "Landing",
-    modules: ["landing-pages", "landing-forms", "posts", "news", "landing-domains", "landing-config"],
+    label: "Trang đích",
+    modules: ["landing-pages", "landing-forms", "posts", "news", "landing-config", "landing-domains"],
   },
   {
     key: "hr",
     label: "Nhân sự",
     modules: [
-      "work-contracts",
-      "staff-insurances",
       "attendances",
       "leave-requests",
-      "leave-types",
-      "leave-allocations",
       "attendance-adjustment-requests",
-      "business-trip-requests",
       "work-schedules",
+      "business-trip-requests",
+      "staff",
+      "work-contracts",
+      "staff-insurances",
+      "leave-allocations",
+      "leave-types",
       "staff-rewards",
       "staff-trainings",
       "performance-reviews",
       "position-histories",
-      "staff",
       "departments",
     ],
   },
@@ -69,16 +69,16 @@ export const appModuleGroups: AppModuleGroup[] = [
     modules: [
       "invoices",
       "expenses",
-      "commissions",
-      "payrolls",
       "payment-requests",
+      "payrolls",
+      "commissions",
+      "accounting-vouchers",
+      "accounting-reports",
+      "accounting-voucher-lines",
       "accounting-periods",
       "accounting-chart-accounts",
       "accounting-fiscal-settings",
       "accounting-cash-flow-mappings",
-      "accounting-vouchers",
-      "accounting-voucher-lines",
-      "accounting-reports",
     ],
   },
   {
@@ -89,12 +89,12 @@ export const appModuleGroups: AppModuleGroup[] = [
   {
     key: "workflow",
     label: "Workflow duyệt",
-    modules: ["workflow-tasks", "workflow-definitions", "workflow-steps", "workflow-instances", "workflow-actions"],
+    modules: ["workflow-tasks", "workflow-instances", "workflow-definitions", "workflow-steps", "workflow-actions"],
   },
   {
     key: "admin",
     label: "Quản trị",
-    modules: ["branches", "user-accounts", "calendar"],
+    modules: ["calendar", "user-accounts", "branches"],
   },
 ]
 
@@ -111,6 +111,23 @@ export const appModuleLabels: Record<AppModuleKey, string> = {
 export const allAppModuleKeys = Array.from(
   new Set(appModuleGroups.flatMap((group) => group.modules)),
 )
+
+export function buildGroupedModuleOptions(labels: Record<string, string>, keys = Object.keys(labels)) {
+  const included = new Set(keys)
+  const grouped = new Set<string>()
+  const options = appModuleGroups
+    .map((group) => {
+      const children = group.modules
+        .filter((key) => included.has(key) && Boolean(labels[key]))
+        .map((key) => ({ value: key, label: labels[key] }))
+      children.forEach((item) => grouped.add(item.value))
+      return children.length ? { label: group.label, options: children } : null
+    })
+    .filter(Boolean) as Array<{ label: string; options: Array<{ value: string; label: string }> }>
+  const remaining = keys.filter((key) => !grouped.has(key) && Boolean(labels[key])).map((key) => ({ value: key, label: labels[key] }))
+  if (remaining.length) options.push({ label: "Khác", options: remaining })
+  return options
+}
 
 export const companyTypeDashboardCopy: Record<
   CompanyType,

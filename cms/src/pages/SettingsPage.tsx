@@ -4,11 +4,15 @@ import {
   AlignRightOutlined,
   BoldOutlined,
   DeleteOutlined,
+  EditOutlined,
   HolderOutlined,
   ItalicOutlined,
+  KeyOutlined,
+  LinkOutlined,
   FileTextOutlined,
   OrderedListOutlined,
   PlusOutlined,
+  ProfileOutlined,
   SettingOutlined,
   TableOutlined,
   UnderlineOutlined,
@@ -22,11 +26,14 @@ import {
   Form,
   Input,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Table,
   Tabs,
   Tag,
+  TreeSelect,
+  Tooltip,
   Typography,
   Upload,
   message,
@@ -35,6 +42,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { api } from "../api"
+import { buildGroupedModuleOptions } from "../company-types"
 import { getApiErrorMessage } from "../utils/apiError"
 import { baseFields, CustomField, DynamicRole, entityLabels, FieldSpec, getResourceActionOptions, normalizeSelectOption, permissionLabels, relationFields, type SelectOption } from "../models"
 import {
@@ -48,6 +56,7 @@ import {
   hasExactRoleSetting,
   normalizeRole,
   resolveAllowedActions,
+  resolveActionSetting,
   resolveViewSetting,
   resolveModuleEnabled,
   serializeViewConfig,
@@ -618,11 +627,12 @@ export function PrintHtmlEditor({
   )
 }
 
-export function SettingsPage() {
+export function SettingsPage({ section = "roles" }: { section?: "roles" | "print" }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [entityType, setEntityType] = useState(() => searchParams.get("module") || "customers")
   const [selectedRole, setSelectedRole] = useState(() => normalizeRole(searchParams.get("role") || getStoredUserRole()))
+  const [expandedRoleKeys, setExpandedRoleKeys] = useState<string[]>([])
   const [moduleEnabled, setModuleEnabled] = useState(true)
   const [fields, setFields] = useState<CustomField[]>([])
   const [views, setViews] = useState<ViewSettingRecord[]>([])
@@ -632,6 +642,8 @@ export function SettingsPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [dynamicRoles, setDynamicRoles] = useState<DynamicRole[]>([])
   const [allowedActions, setAllowedActions] = useState<string[]>([])
+  const [reuseInherited, setReuseInherited] = useState<Record<ViewType, boolean>>({ TABLE: false, FORM: false, DETAIL: false })
+  const [reuseActionInherited, setReuseActionInherited] = useState(false)
   const [toast, toastContextHolder] = message.useMessage()
   const [docxTemplateForm] = Form.useForm()
   const [docxTemplateModal, setDocxTemplateModal] = useState(false)
@@ -657,16 +669,6 @@ export function SettingsPage() {
     () => views.some((view) => normalizeRole(view.role) === selectedRole),
     [selectedRole, views],
   )
-  const viewStatus = useMemo(
-    () =>
-      Object.fromEntries(
-        VIEW_TYPES.map((viewType) => [
-          viewType,
-          hasExactRoleSetting(views, viewType, selectedRole),
-        ]),
-      ) as Record<ViewType, boolean>,
-    [views, selectedRole],
-  )
   const actionOptions = useMemo(
     () => getResourceActionOptions(entityType),
     [entityType],
@@ -685,6 +687,59 @@ export function SettingsPage() {
       ) as Record<ViewType, string>,
     [dynamicRoles, selectedRole, views],
   )
+  const actionSource = useMemo(() => normalizeRole(resolveActionSetting(views, selectedRole, dynamicRoles)?.role || DEFAULT_ROLE_SCOPE), [dynamicRoles, selectedRole, views])
+
+  const roleTreeData = useMemo(() => {
+    const allRoles = Array.from(new Set([...selectableRoles, ...dynamicRoles.map((role) => normalizeRole(role.key))]))
+    const defaultRoleLabels: Record<string, string> = {
+      ALL: "Tất cả",
+      ADMIN: "Quản trị viên",
+      STAFF: "Nhân viên",
+      DOCTOR: "Bác sĩ",
+    }
+    const childrenByParent = new Map<string, string[]>()
+    dynamicRoles.forEach((role) => {
+      const key = normalizeRole(role.key)
+      const parent = normalizeRole(role.roleMain)
+      childrenByParent.set(parent, [...(childrenByParent.get(parent) || []), key])
+    })
+    type RoleTreeNode = { value: string; title: React.ReactNode; searchTitle: string; children?: RoleTreeNode[] }
+    const buildNode = (role: string, seen = new Set<string>()): RoleTreeNode => {
+      const dynamic = dynamicRoles.find((item) => normalizeRole(item.key) === role)
+      const children = (childrenByParent.get(role) || []).filter((child) => !seen.has(child)).map((child) => buildNode(child, new Set([...seen, role])))
+      const title = dynamic ? `${dynamic.name} (${role})` : defaultRoleLabels[role] || role
+      const isActionInherited = role !== DEFAULT_ROLE_SCOPE && !views.some((view) => normalizeRole(view.role) === role && (view.viewType === "ACTION" || (view.viewType === "TABLE" && Array.isArray(view.config?.allowedActions))))
+      const statusItems = [
+        { icon: <KeyOutlined />, inherited: isActionInherited, label: "Thao tác" },
+        { icon: <TableOutlined />, inherited: role !== DEFAULT_ROLE_SCOPE && !hasExactRoleSetting(views, "TABLE", role), label: "Bảng" },
+        { icon: <FileTextOutlined />, inherited: role !== DEFAULT_ROLE_SCOPE && !hasExactRoleSetting(views, "FORM", role), label: "Biểu mẫu" },
+        { icon: <ProfileOutlined />, inherited: role !== DEFAULT_ROLE_SCOPE && !hasExactRoleSetting(views, "DETAIL", role), label: "Chi tiết" },
+      ]
+      return {
+        value: role,
+        searchTitle: title,
+        title: <span className="role-tree-node-title"><span>{title}</span><span className="role-tree-node-status">{statusItems.map((item) => <Tooltip key={item.label} title={`${item.label}: ${item.inherited ? "đang kế thừa" : "cấu hình riêng"}`}><span className={item.inherited ? "is-inherited" : "is-custom"}>{item.icon}</span></Tooltip>)}</span></span>,
+        children: children.length ? children : undefined,
+      }
+    }
+    const rootChildren = allRoles
+      .filter((role) => role !== DEFAULT_ROLE_SCOPE && !dynamicRoles.some((item) => normalizeRole(item.key) === role && allRoles.includes(normalizeRole(item.roleMain))))
+      .map((role) => buildNode(role))
+    const allNode = buildNode(DEFAULT_ROLE_SCOPE)
+    return [{ ...allNode, children: [...(allNode.children || []), ...rootChildren] }]
+  }, [dynamicRoles, selectableRoles, views])
+
+  useEffect(() => {
+    const keys: string[] = []
+    const collectKeys = (nodes: Array<{ value: string; children?: unknown[] }>) => {
+      nodes.forEach((node) => {
+        keys.push(node.value)
+        collectKeys((node.children || []) as Array<{ value: string; children?: unknown[] }>)
+      })
+    }
+    collectKeys(roleTreeData)
+    setExpandedRoleKeys(keys)
+  }, [roleTreeData])
 
   useEffect(() => {
     const moduleFromUrl = searchParams.get("module") || "customers"
@@ -733,6 +788,12 @@ export function SettingsPage() {
         "DETAIL",
       ),
     )
+    setReuseInherited({
+      TABLE: selectedRole !== DEFAULT_ROLE_SCOPE && !hasExactRoleSetting(views, "TABLE", selectedRole),
+      FORM: selectedRole !== DEFAULT_ROLE_SCOPE && !hasExactRoleSetting(views, "FORM", selectedRole),
+      DETAIL: selectedRole !== DEFAULT_ROLE_SCOPE && !hasExactRoleSetting(views, "DETAIL", selectedRole),
+    })
+    setReuseActionInherited(selectedRole !== DEFAULT_ROLE_SCOPE && !views.some((view) => normalizeRole(view.role) === selectedRole && (view.viewType === "ACTION" || (view.viewType === "TABLE" && Array.isArray(view.config?.allowedActions)))))
   }, [dynamicRoles, entityType, fieldCatalog, selectedRole, views])
 
   async function load() {
@@ -750,20 +811,18 @@ export function SettingsPage() {
 
   async function saveView() {
     try {
-      await Promise.all([
-        api.put(`/settings/views/${entityType}/TABLE`, {
+      await Promise.all([...VIEW_TYPES.map((viewType) => {
+        if (reuseInherited[viewType]) {
+          return api.delete(`/settings/views/${entityType}`, { params: { role: selectedRole, viewType } })
+        }
+        const config = viewType === "TABLE" ? tableConfig : viewType === "FORM" ? formConfig : detailConfig
+        return api.put(`/settings/views/${entityType}/${viewType}`, {
           role: selectedRole,
-          config: serializeViewConfig("TABLE", tableConfig, moduleEnabled, allowedActions),
-        }),
-        api.put(`/settings/views/${entityType}/FORM`, {
-          role: selectedRole,
-          config: serializeViewConfig("FORM", formConfig, moduleEnabled, allowedActions),
-        }),
-        api.put(`/settings/views/${entityType}/DETAIL`, {
-          role: selectedRole,
-          config: serializeViewConfig("DETAIL", detailConfig, moduleEnabled, allowedActions),
-        }),
-      ])
+          config: serializeViewConfig(viewType, config, moduleEnabled, undefined, viewType === "TABLE"),
+        })
+      }), reuseActionInherited
+        ? api.delete(`/settings/views/${entityType}`, { params: { role: selectedRole, viewType: "ACTION" } })
+        : api.put(`/settings/views/${entityType}/ACTION`, { role: selectedRole, config: { allowedActions } })])
       toast.success("Đã lưu cấu hình module theo role")
       await load()
     } catch (error) {
@@ -851,34 +910,36 @@ export function SettingsPage() {
     <>
       {toastContextHolder}
       <div className="page-header">
-          <Typography.Title level={3}>Cấu hình động</Typography.Title>
+          <Typography.Title level={3}>{section === "roles" ? "Hiển thị theo role / module" : "Mẫu in"}</Typography.Title>
         <Space wrap>
           <Select
             value={entityType}
             onChange={setEntityType}
             style={{ width: 240 }}
-            options={Object.entries(permissionLabels).map(([value, label]) => ({
-              value,
-              label,
-            }))}
+            options={buildGroupedModuleOptions(permissionLabels)}
           />
-          <Select
-            style={{ width: 220 }}
-            value={selectedRole}
-            onChange={(value) => setSelectedRole(normalizeRole(value))}
-            options={selectableRoles.map((role) => ({
-              value: role,
-              label:
-                dynamicRoles.find((item) => item.key === role)?.name
-                  ? `${dynamicRoles.find((item) => item.key === role)?.name} (${role})`
-                  : role,
-            }))}
-          />
+          {section === "roles" && (
+            <TreeSelect
+              className="role-tree-select"
+              dropdownClassName="role-tree-select-dropdown"
+              dropdownStyle={{ minWidth: 380 }}
+              style={{ width: 380 }}
+              value={selectedRole}
+              onChange={(value) => setSelectedRole(normalizeRole(value))}
+              treeData={roleTreeData}
+              treeDefaultExpandAll
+              treeExpandedKeys={expandedRoleKeys}
+              treeNodeFilterProp="searchTitle"
+              showSearch
+              onTreeExpand={(keys) => setExpandedRoleKeys(keys as string[])}
+            />
+          )}
         </Space>
       </div>
       <Card className="glass-card settings-card">
         <Tabs
           className="settings-tabs"
+          tabBarStyle={{ display: "none" }}
           items={[
             {
               key: "view-config",
@@ -892,87 +953,57 @@ export function SettingsPage() {
                 <div className="settings-tab-panel">
                   <div className="settings-tab-header settings-tab-header-wrap">
                     <Typography.Text>
-                      Module hiện tại là <strong>{permissionLabels[entityType] || entityType}</strong>. <strong>{DEFAULT_ROLE_SCOPE}</strong> là config gốc. Chuỗi áp dụng cho role đang chọn là <strong>{[...inheritanceChain].reverse().join(" -> ")}</strong>, nghĩa là hệ thống đọc từ role hiện tại lên main role rồi mới về <strong>{DEFAULT_ROLE_SCOPE}</strong> nếu chưa có config riêng.
+                      Đang cấu hình <strong>{permissionLabels[entityType] || entityType}</strong> cho vai trò <strong>{selectedRole}</strong>. Chuỗi kế thừa: <strong>{inheritanceChain.join(" → ")}</strong>.
                     </Typography.Text>
-                    <Checkbox
-                      checked={moduleEnabled}
-                      onChange={(event) => setModuleEnabled(event.target.checked)}
-                    >
-                      Cho phép role sử dụng module này
-                    </Checkbox>
+                    {!reuseInherited.TABLE && (
+                      <Checkbox checked={moduleEnabled} onChange={(event) => setModuleEnabled(event.target.checked)}>
+                        Cho phép role sử dụng module này
+                      </Checkbox>
+                    )}
                   </div>
-                  <Space wrap>
-                    <Tag color={moduleEnabled ? "green" : "red"}>
-                      Module: {moduleEnabled ? "Được dùng" : "Bị khóa"}
-                    </Tag>
-                    <Tag color="blue">
-                      Actions: {allowedActions.length ? allowedActions.join(", ") : "Không có"}
-                    </Tag>
-                    {VIEW_TYPES.map((viewType) => (
-                      <Tag
-                        color={viewStatus[viewType] ? "green" : "gold"}
-                        key={viewType}
-                      >
-                        {viewType}: {viewStatus[viewType] ? "riêng theo role" : `đang kế thừa ${viewSources[viewType]}`}
-                      </Tag>
-                    ))}
-                  </Space>
-                  <Card size="small" title="Action theo role" style={{ marginTop: 16 }}>
-                    <Checkbox
-                      checked={allowedActions.length === actionOptions.length}
-                      indeterminate={allowedActions.length > 0 && allowedActions.length < actionOptions.length}
-                      onChange={(event) => setAllowedActions(event.target.checked ? actionOptions.map((item) => item.key) : [])}
-                      style={{ marginBottom: 10 }}
-                    >
-                      Chọn tất cả action
-                    </Checkbox>
-                    <Checkbox.Group
-                      options={actionOptions.map((item) => ({
-                        label: item.label,
-                        value: item.key,
-                      }))}
-                      value={allowedActions}
-                      onChange={(values) => setAllowedActions(values.map(String))}
-                    />
-                  </Card>
                   <Tabs
                     className="settings-inner-tabs"
                     items={[
                       {
-                        key: "TABLE",
-                        label: "Bảng",
+                        key: "ACTIONS",
+                        label: <span className="settings-view-tab-label">Thao tác theo vai trò {reuseActionInherited && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(actionSource)}`}><LinkOutlined /></Tooltip>}</span>,
                         children: (
-                          <ViewConfigTable
-                            dataSource={tableConfig}
-                            viewType="TABLE"
-                            onChange={updateConfig}
-                            onReorder={reorderConfig}
-                          />
+                          <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseActionInherited} source={formatRoleLabel(actionSource)} onReuseChange={setReuseActionInherited}>
+                          <Card size="small">
+                            <Checkbox
+                              checked={allowedActions.length === actionOptions.length}
+                              indeterminate={allowedActions.length > 0 && allowedActions.length < actionOptions.length}
+                              onChange={(event) => setAllowedActions(event.target.checked ? actionOptions.map((item) => item.key) : [])}
+                              style={{ marginBottom: 10 }}
+                            >
+                              Chọn tất cả action
+                            </Checkbox>
+                            <Checkbox.Group
+                              options={actionOptions.map((item) => ({
+                                label: item.label,
+                                value: item.key,
+                              }))}
+                              value={allowedActions}
+                              onChange={(values) => setAllowedActions(values.map(String))}
+                            />
+                          </Card>
+                          </ViewOverridePanel>
                         ),
+                      },
+                      {
+                        key: "TABLE",
+                        label: <span className="settings-view-tab-label">Bảng {reuseInherited.TABLE && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.TABLE)}`}><LinkOutlined /></Tooltip>}</span>,
+                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.TABLE} source={formatRoleLabel(viewSources.TABLE)} onReuseChange={(checked) => setReuseInherited((current) => ({ ...current, TABLE: checked }))}><ViewConfigTable dataSource={tableConfig} viewType="TABLE" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
                       },
                       {
                         key: "FORM",
-                        label: "Form nhập liệu",
-                        children: (
-                          <ViewConfigTable
-                            dataSource={formConfig}
-                            viewType="FORM"
-                            onChange={updateConfig}
-                            onReorder={reorderConfig}
-                          />
-                        ),
+                        label: <span className="settings-view-tab-label">Form nhập liệu {reuseInherited.FORM && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.FORM)}`}><LinkOutlined /></Tooltip>}</span>,
+                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.FORM} source={formatRoleLabel(viewSources.FORM)} onReuseChange={(checked) => setReuseInherited((current) => ({ ...current, FORM: checked }))}><ViewConfigTable dataSource={formConfig} viewType="FORM" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
                       },
                       {
                         key: "DETAIL",
-                        label: "Thông tin chi tiết",
-                        children: (
-                          <ViewConfigTable
-                            dataSource={detailConfig}
-                            viewType="DETAIL"
-                            onChange={updateConfig}
-                            onReorder={reorderConfig}
-                          />
-                        ),
+                        label: <span className="settings-view-tab-label">Thông tin chi tiết {reuseInherited.DETAIL && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.DETAIL)}`}><LinkOutlined /></Tooltip>}</span>,
+                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.DETAIL} source={formatRoleLabel(viewSources.DETAIL)} onReuseChange={(checked) => setReuseInherited((current) => ({ ...current, DETAIL: checked }))}><ViewConfigTable dataSource={detailConfig} viewType="DETAIL" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
                       },
                     ]}
                   />
@@ -983,13 +1014,6 @@ export function SettingsPage() {
                       onClick={saveView}
                     >
                       Lưu cấu hình hiển thị cho module
-                    </Button>
-                    <Button
-                      danger
-                      disabled={!hasRoleConfig}
-                      onClick={() => void resetInheritedView()}
-                    >
-                      Lưu trữ config hiện tại để ẩn trên giao diện
                     </Button>
                   </Space>
                 </div>
@@ -1084,7 +1108,7 @@ export function SettingsPage() {
                         ]}
                       />
                     </div>
-                    <Card className="template-preview-card" title="Preview nhanh">
+                    <Card className="template-preview-card" title="Xem trước nhanh">
                       <div
                         className="template-preview-surface"
                         dangerouslySetInnerHTML={{
@@ -1098,7 +1122,7 @@ export function SettingsPage() {
                 </div>
               ),
             },
-          ]}
+          ].filter((item) => item.key === (section === "roles" ? "view-config" : "print-templates"))}
         />
       </Card>
       <Modal title="Tải mẫu in DOCX" open={docxTemplateModal} footer={null} onCancel={() => { setDocxTemplateModal(false); setDocxFile(null) }}>
@@ -1117,6 +1141,35 @@ export function SettingsPage() {
   )
 }
 
+function ViewOverridePanel({
+  canReuse,
+  reused,
+  source,
+  onReuseChange,
+  children,
+}: {
+  canReuse: boolean
+  reused: boolean
+  source: string
+  onReuseChange: (checked: boolean) => void
+  children: React.ReactNode
+}) {
+  return (
+    <Space direction="vertical" size={12} style={{ width: "100%" }}>
+      <Checkbox disabled={!canReuse} checked={reused} onChange={(event) => onReuseChange(event.target.checked)}>
+        Dùng lại cấu hình từ <strong>{source}</strong>
+      </Checkbox>
+      {reused ? (
+        <Typography.Text type="secondary">Đang kế thừa cấu hình của {source}. Bỏ chọn để tạo cấu hình riêng cho role hiện tại.</Typography.Text>
+      ) : children}
+    </Space>
+  )
+}
+
+function formatRoleLabel(role: string) {
+  return ({ ALL: "Tất cả", ADMIN: "Quản trị viên", STAFF: "Nhân viên", DOCTOR: "Bác sĩ" } as Record<string, string>)[role] || role
+}
+
 function ViewConfigTable({
   dataSource,
   viewType,
@@ -1133,6 +1186,8 @@ function ViewConfigTable({
   onReorder?: (viewType: ViewType, fromKey: string, toKey: string) => void
 }) {
   const [draggingKey, setDraggingKey] = useState<string | null>(null)
+  const [editingField, setEditingField] = useState<FieldLayoutConfig | null>(null)
+  const [optionEdit, setOptionEdit] = useState<{ fieldKey: string; index: number; value: string; label: string } | null>(null)
   const tableComponents = useMemo(
     () => ({
       body: {
@@ -1185,39 +1240,23 @@ function ViewConfigTable({
         ) : null,
     },
     {
-      title: (
-        <Checkbox
-          checked={dataSource.length > 0 && dataSource.every((row) => row.visible)}
-          indeterminate={dataSource.some((row) => row.visible) && dataSource.some((row) => !row.visible)}
-          onChange={(event) => {
-            dataSource.forEach((row) => onChange(viewType, row.key, { visible: event.target.checked }))
-          }}
-          style={{ whiteSpace: "nowrap" }}
-        >
-          Hiển thị
-        </Checkbox>
-      ),
+      title: "Hiển thị",
       dataIndex: "visible",
-      width: 132,
-      render: (value, row) => (
-        <Checkbox
-          checked={value}
-          onChange={(event) =>
-            onChange(viewType, row.key, { visible: event.target.checked })
-          }
-        />
-      ),
+      width: 100,
+      render: (value, row) => <Checkbox checked={value} onChange={(event) => onChange(viewType, row.key, { visible: event.target.checked })} aria-label={`Hiển thị ${row.label}`} />,
     },
     {
-      title: "Field",
+      title: "Trường",
       key: "field",
-      width: 220,
-      render: (_, row) => (
-        <Space direction="vertical" size={0}>
-          <Typography.Text strong>{row.label}</Typography.Text>
-          <Typography.Text type="secondary">{row.key}</Typography.Text>
-        </Space>
-      ),
+      width: 180,
+      dataIndex: "label",
+      render: (value) => <Typography.Text strong>{value}</Typography.Text>,
+    },
+    {
+      title: "Mã trường",
+      dataIndex: "key",
+      width: 160,
+      render: (value) => <Typography.Text type="secondary">{value}</Typography.Text>,
     },
     {
       title: "Loại",
@@ -1227,283 +1266,195 @@ function ViewConfigTable({
     },
     {
       title: "Nhãn hiển thị",
-      key: "label",
-      render: (_, row) => (
-        <Input
-          value={row.label}
-          onChange={(event) =>
-            onChange(viewType, row.key, { label: event.target.value })
-          }
-          placeholder="Tên field hiển thị"
-        />
-      ),
+      dataIndex: "label",
+      width: 180,
+    },
+    {
+      title: "Định dạng",
+      dataIndex: "displayFormat",
+      width: 120,
+      render: (value) => value || "Mặc định",
     },
   ]
-
-  if (viewType !== "TABLE") {
-    columns.push(
-      {
-        title: "Tab",
-        key: "tab",
-        width: 180,
-        render: (_, row) => (
-          <Input
-            value={row.tab}
-            onChange={(event) => onChange(viewType, row.key, { tab: event.target.value })}
-            placeholder="Ví dụ: Thông tin chung"
-          />
-        ),
-      },
-      {
-        title: "Format",
-        key: "displayFormat",
-        width: 170,
-        render: (_, row) => (
-          <Select
-            allowClear
-            placeholder="Mặc định"
-            value={row.displayFormat}
-            onChange={(value) =>
-              onChange(viewType, row.key, {
-                displayFormat: value as FieldLayoutConfig["displayFormat"] | undefined,
-              })
-            }
-            options={[
-              { value: "currency", label: "Tiền tệ" },
-              { value: "number", label: "Số" },
-              { value: "percent", label: "Phần trăm" },
-            ]}
-          />
-        ),
-      },
-      {
-        title: "Mô tả / hướng dẫn",
-        key: "description",
-        render: (_, row) => (
-          <Input.TextArea
-            autoSize={{ minRows: 1, maxRows: 3 }}
-            value={row.description}
-            onChange={(event) =>
-              onChange(viewType, row.key, { description: event.target.value })
-            }
-            placeholder="Nội dung hướng dẫn hiển thị cho field"
-          />
-        ),
-      },
-      {
-        title: "Width",
-        key: "width",
-        width: 150,
-        render: (_, row) => (
-          <Select
-            value={row.width || "100"}
-            onChange={(value) =>
-              onChange(viewType, row.key, {
-                width: value as FieldLayoutConfig["width"],
-              })
-            }
-            options={[
-              { value: "25", label: "1/4" },
-              { value: "33", label: "1/3" },
-              { value: "50", label: "1/2" },
-              { value: "66", label: "2/3" },
-              { value: "100", label: "Full" },
-            ]}
-          />
-        ),
-      },
-    )
-  }
-
   if (viewType === "TABLE") {
+    columns.push({
+      title: "Rộng cột",
+      dataIndex: "tableWidth",
+      width: 120,
+      render: (value) => value ? `${value}px` : "Mặc định",
+    })
+  } else {
     columns.push(
       {
-        title: "Format",
-        key: "displayFormat",
-        width: 170,
-        render: (_, row) => (
-          <Select
-            allowClear
-            placeholder="Mặc định"
-            value={row.displayFormat}
-            onChange={(value) =>
-              onChange(viewType, row.key, {
-                displayFormat: value as FieldLayoutConfig["displayFormat"] | undefined,
-              })
-            }
-            options={[
-              { value: "currency", label: "Tiền tệ" },
-              { value: "number", label: "Số" },
-              { value: "percent", label: "Phần trăm" },
-            ]}
-          />
-        ),
+        title: "Thẻ",
+        dataIndex: "tab",
+        width: 160,
+        render: (value) => value || "Không có",
       },
       {
-        title: "Width cột (px)",
-        key: "tableWidth",
-        width: 160,
-        render: (_, row) => (
-          <Input
-            inputMode="numeric"
-            value={row.tableWidth === undefined ? "" : String(row.tableWidth)}
-            onChange={(event) => {
-              const nextValue = event.target.value.replace(/[^\d]/g, "")
-              onChange(viewType, row.key, {
-                tableWidth: nextValue ? Number(nextValue) : undefined,
-              })
-            }}
-            placeholder="Ví dụ 180"
-          />
-        ),
+        title: "Kích thước",
+        dataIndex: "width",
+        width: 120,
+        render: (value) => value ? `${value}%` : "Mặc định",
       },
     )
-  }
-
-  if (viewType === "FORM") {
-    columns.push(
-      {
-        title: "Placeholder",
-        key: "placeholder",
-        width: 220,
-        render: (_, row) => (
-          <Input
-            value={row.placeholder}
-            onChange={(event) => onChange(viewType, row.key, { placeholder: event.target.value })}
-            placeholder="Ví dụ: Nhập số điện thoại"
-          />
-        ),
-      },
-      {
-        title: "Options",
-        key: "options",
-        render: (_, row) => {
-          if (row.type !== "select" && row.type !== "multi-select") {
-            return <Typography.Text type="secondary">-</Typography.Text>
-          }
-          const editableOptions = normalizeEditableOptions(row.options)
-          return (
-            <div className="settings-options-editor">
-              {editableOptions.length === 0 ? (
-                <Typography.Text type="secondary">Chưa có option</Typography.Text>
-              ) : (
-                editableOptions.map((option, optionIndex) => (
-                  <div className="settings-option-row" key={`${row.key}-${optionIndex}`}>
-                    <Input
-                      className="settings-option-input"
-                      value={option.value}
-                      onChange={(event) =>
-                        onChange(viewType, row.key, {
-                          options: updateSelectOptionAt(row.options, optionIndex, { value: event.target.value }),
-                        })
-                      }
-                      placeholder="Value"
-                    />
-                    <Input
-                      className="settings-option-input"
-                      value={option.label}
-                      onChange={(event) =>
-                        onChange(viewType, row.key, {
-                          options: updateSelectOptionAt(row.options, optionIndex, { label: event.target.value }),
-                        })
-                      }
-                      placeholder="Label hiển thị"
-                    />
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() =>
-                        onChange(viewType, row.key, {
-                          options: removeSelectOptionAt(row.options, optionIndex),
-                        })
-                      }
-                    />
-                  </div>
-                ))
-              )}
-              <Space size={8} wrap>
-                <Button
-                  size="small"
-                  icon={<PlusOutlined />}
-                  onClick={() =>
-                    onChange(viewType, row.key, {
-                      options: appendSelectOption(row.options),
-                    })
-                  }
-                >
-                  Thêm option
-                </Button>
-                {editableOptions.length > 0 ? (
-                  <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-                    Gợi ý: nếu `label` trùng `value`, hệ thống sẽ lưu dạng ngắn gọn.
-                  </Typography.Text>
-                ) : null}
-              </Space>
-            </div>
-          )
-        },
-      },
-      {
-        title: "Default data",
-        key: "defaultValue",
-        render: (_, row) => (
-          <Input
-            value={
-              Array.isArray(row.defaultValue)
-                ? row.defaultValue.join(", ")
-                : row.defaultValue === undefined || row.defaultValue === null
-                  ? ""
-                  : String(row.defaultValue)
-            }
-            onChange={(event) =>
-              onChange(viewType, row.key, {
-                defaultValue: parseDefaultValue(row.type, event.target.value),
-              })
-            }
-            placeholder="Giá trị mặc định"
-          />
-        ),
-      },
-      {
-        title: "Placeholder",
-        key: "placeholder",
-        render: (_, row) => (
-          <Input
-            value={row.placeholder}
-            onChange={(event) =>
-              onChange(viewType, row.key, { placeholder: event.target.value })
-            }
-            placeholder="Gợi ý nhập liệu"
-          />
-        ),
-      },
-      {
+    if (viewType === "FORM") {
+      columns.push({
         title: "Khóa sửa",
         dataIndex: "disabled",
         width: 100,
-        render: (value, row) => (
-          <Checkbox
-            checked={Boolean(value)}
-            onChange={(event) =>
-              onChange(viewType, row.key, { disabled: event.target.checked })
-            }
-          />
-        ),
-      },
-    )
+        render: (value) => value ? "Có" : "Không",
+      })
+    }
   }
+  columns.push({
+    title: "Thao tác",
+    key: "actions",
+    width: 148,
+    fixed: "right",
+    render: (_, row) => row.visible ? (
+      <Space size={0}>
+        <Button type="text" icon={<EditOutlined />} onClick={() => setEditingField({ ...row })}>Sửa</Button>
+        <Popconfirm title={`Ẩn “${row.label}” khỏi giao diện này?`} okText="Ẩn" cancelText="Hủy" onConfirm={() => onChange(viewType, row.key, { visible: false })}>
+          <Button type="text" danger icon={<DeleteOutlined />}>Xóa</Button>
+        </Popconfirm>
+      </Space>
+    ) : <Button type="text" onClick={() => onChange(viewType, row.key, { visible: true })}>Khôi phục</Button>,
+  })
 
   return (
-    <Table
-      columns={columns}
-      components={tableComponents}
-      dataSource={dataSource}
-      pagination={false}
-      rowKey="key"
-      scroll={{ x: "max-content" }}
-      size="small"
-    />
+    <>
+      <Table columns={columns} components={tableComponents} dataSource={dataSource} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" />
+      <Modal
+        open={Boolean(editingField)}
+        title={`Chỉnh sửa field${editingField ? `: ${editingField.label}` : ""}`}
+        okText="Lưu"
+        cancelText="Hủy"
+        width={720}
+        onCancel={() => setEditingField(null)}
+        onOk={() => {
+          if (!editingField) return
+          const { key, ...patch } = editingField
+          onChange(viewType, key, patch)
+          setEditingField(null)
+        }}
+      >
+        {editingField && <FieldConfigEditor field={editingField} viewType={viewType} availableTabs={Array.from(new Set(dataSource.map((item) => item.tab?.trim()).filter((tab): tab is string => Boolean(tab))))} onChange={setEditingField} onEditOption={setOptionEdit} />}
+      </Modal>
+      <Modal
+        open={Boolean(optionEdit)}
+        title="Sửa option"
+        okText="Lưu"
+        onCancel={() => setOptionEdit(null)}
+        onOk={() => {
+          if (!optionEdit) return
+          setEditingField((field) => field?.key === optionEdit.fieldKey
+            ? { ...field, options: updateSelectOptionAt(field.options, optionEdit.index, optionEdit) }
+            : field)
+          setOptionEdit(null)
+        }}
+      >
+        <Form layout="vertical">
+        <Form.Item label="Giá trị"><Input value={optionEdit?.value} onChange={(event) => setOptionEdit((current) => current ? { ...current, value: event.target.value } : current)} /></Form.Item>
+          <Form.Item label="Nhãn hiển thị"><Input value={optionEdit?.label} onChange={(event) => setOptionEdit((current) => current ? { ...current, label: event.target.value } : current)} /></Form.Item>
+        </Form>
+      </Modal>
+    </>
+  )
+}
+
+function FieldConfigEditor({
+  field,
+  viewType,
+  availableTabs,
+  onChange,
+  onEditOption,
+}: {
+  field: FieldLayoutConfig
+  viewType: ViewType
+  availableTabs: string[]
+  onChange: (field: FieldLayoutConfig) => void
+  onEditOption: (option: { fieldKey: string; index: number; value: string; label: string }) => void
+}) {
+  const [isNewTab, setIsNewTab] = useState(false)
+  const update = (patch: Partial<FieldLayoutConfig>) => onChange({ ...field, ...patch })
+  const formatOptions = [
+    { value: "currency", label: "Tiền tệ" },
+    { value: "number", label: "Số" },
+    { value: "percent", label: "Phần trăm" },
+  ]
+  const editableOptions = normalizeEditableOptions(field.options)
+
+  return (
+    <Form layout="vertical">
+      <Form.Item label="Trường">
+        <Input value={`${field.label} (${field.key})`} disabled />
+      </Form.Item>
+      {viewType === "FORM" && <Form.Item><Checkbox checked={Boolean(field.disabled)} onChange={(event) => update({ disabled: event.target.checked })}>Khóa sửa</Checkbox></Form.Item>}
+      <Form.Item label="Nhãn hiển thị">
+        <Input value={field.label} onChange={(event) => update({ label: event.target.value })} placeholder="Tên field hiển thị" />
+      </Form.Item>
+      <Form.Item label="Định dạng hiển thị">
+        <Select allowClear placeholder="Mặc định" value={field.displayFormat} onChange={(value) => update({ displayFormat: value as FieldLayoutConfig["displayFormat"] | undefined })} options={formatOptions} />
+      </Form.Item>
+      {viewType === "TABLE" ? (
+        <Form.Item label="Độ rộng cột (px)">
+          <Input inputMode="numeric" value={field.tableWidth === undefined ? "" : String(field.tableWidth)} onChange={(event) => {
+            const value = event.target.value.replace(/[^\d]/g, "")
+            update({ tableWidth: value ? Number(value) : undefined })
+          }} placeholder="Ví dụ 180" />
+        </Form.Item>
+      ) : <>
+        <Form.Item label="Thẻ">
+          <Select
+            value={isNewTab ? "__new__" : field.tab || "__none__"}
+            onChange={(value) => {
+              if (value === "__new__") {
+                setIsNewTab(true)
+                update({ tab: undefined })
+              } else {
+                setIsNewTab(false)
+                update({ tab: value === "__none__" ? undefined : value })
+              }
+            }}
+            options={[
+              { value: "__none__", label: "Không có" },
+              { value: "__new__", label: "Mới" },
+              ...availableTabs.map((tab) => ({ value: tab, label: tab })),
+            ]}
+          />
+          {isNewTab && <Input style={{ marginTop: 8 }} value={field.tab} onChange={(event) => update({ tab: event.target.value })} placeholder="Nhập tên tab mới" autoFocus />}
+        </Form.Item>
+        <Form.Item label="Độ rộng">
+          <Select value={field.width || "100"} onChange={(value) => update({ width: value as FieldLayoutConfig["width"] })} options={[
+            { value: "25", label: "1/4" }, { value: "33", label: "1/3" }, { value: "50", label: "1/2" }, { value: "66", label: "2/3" }, { value: "100", label: "Toàn bộ" },
+          ]} />
+        </Form.Item>
+        <Form.Item label="Mô tả / hướng dẫn">
+          <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} value={field.description} onChange={(event) => update({ description: event.target.value })} placeholder="Nội dung hướng dẫn hiển thị cho field" />
+        </Form.Item>
+      </>}
+      {viewType === "FORM" && <>
+        <Form.Item label="Gợi ý nhập">
+          <Input value={field.placeholder} onChange={(event) => update({ placeholder: event.target.value })} placeholder="Gợi ý nhập liệu" />
+        </Form.Item>
+        <Form.Item label="Giá trị mặc định">
+          <Input value={Array.isArray(field.defaultValue) ? field.defaultValue.join(", ") : field.defaultValue === undefined || field.defaultValue === null ? "" : String(field.defaultValue)} onChange={(event) => update({ defaultValue: parseDefaultValue(field.type, event.target.value) })} placeholder="Giá trị mặc định" />
+        </Form.Item>
+        {(field.type === "select" || field.type === "multi-select") && <Form.Item label="Lựa chọn">
+          <div className="settings-options-editor">
+            {editableOptions.length === 0 ? <Typography.Text type="secondary">Chưa có option</Typography.Text> : editableOptions.map((option, index) => (
+              <div className="settings-option-row" key={`${field.key}-${index}`}>
+                <div className="settings-option-summary"><strong>{option.label}</strong>{option.label !== option.value && <span>{option.value}</span>}</div>
+                <Button type="text" icon={<EditOutlined />} onClick={() => onEditOption({ fieldKey: field.key, index, value: option.value, label: option.label })} />
+                <Button type="text" danger icon={<DeleteOutlined />} onClick={() => update({ options: removeSelectOptionAt(field.options, index) })} />
+              </div>
+            ))}
+            <Button size="small" icon={<PlusOutlined />} onClick={() => update({ options: appendSelectOption(field.options) })}>Thêm option</Button>
+          </div>
+        </Form.Item>}
+      </>}
+    </Form>
   )
 }
 

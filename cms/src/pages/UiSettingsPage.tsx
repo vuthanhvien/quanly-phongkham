@@ -117,15 +117,19 @@ export function UiSettingsPage() {
   const [initializing, setInitializing] = useState(false)
   const draftAppName = Form.useWatch('appName', form)
   const selectedCompanyType = (Form.useWatch('companyType', form) || settings.companyType || defaultAppUiSettings.companyType) as CompanyType
-  const selectedModules = Form.useWatch('enabledModules', form) || []
+  const [selectedModules, setSelectedModules] = useState<string[]>([])
+  const [hasCustomModuleSelection, setHasCustomModuleSelection] = useState(false)
 
   useEffect(() => {
     const usesPreset = !settings.hasCustomModuleSelection
+    const enabledModules = usesPreset ? companyTypeModulePresets[settings.companyType] || [] : settings.enabledModules
     form.setFieldsValue({
       ...defaultAppUiSettings,
       ...settings,
-      enabledModules: usesPreset ? companyTypeModulePresets[settings.companyType] || [] : settings.enabledModules,
+      enabledModules,
     })
+    setSelectedModules(enabledModules.map(String))
+    setHasCustomModuleSelection(!usesPreset)
   }, [form, settings])
 
   useEffect(() => {
@@ -134,14 +138,14 @@ export function UiSettingsPage() {
 
   async function handleSubmit(values: UiSettingsFormValues) {
     setSaving(true)
+    const modulePayload = {
+      enabledModules: selectedModules,
+      hasCustomModuleSelection,
+    }
     try {
-      // Module selection is controlled by grouped checkboxes outside the hidden form field.
-      // Read the live form store so a click immediately followed by Save is not lost.
-      const currentValues = form.getFieldsValue(true) as UiSettingsFormValues
       const next = await save({
         ...values,
-        enabledModules: Array.isArray(currentValues.enabledModules) ? currentValues.enabledModules.map(String) : [],
-        hasCustomModuleSelection: Boolean(currentValues.hasCustomModuleSelection),
+        ...modulePayload,
         appDescription: typeof values.appDescription === 'string' ? values.appDescription.trim() : '',
       })
       syncDocumentBranding(next)
@@ -153,26 +157,34 @@ export function UiSettingsPage() {
 
   function handleResetDefaults() {
     form.setFieldsValue(defaultAppUiSettings)
+    setSelectedModules(companyTypeModulePresets[defaultAppUiSettings.companyType])
+    setHasCustomModuleSelection(false)
   }
 
   function handleApplyCompanyPreset() {
     const companyType = (form.getFieldValue('companyType') || defaultAppUiSettings.companyType) as CompanyType
-    form.setFieldValue('enabledModules', companyTypeModulePresets[companyType] || [])
-    form.setFieldValue('hasCustomModuleSelection', true)
+    setSelectedModules((companyTypeModulePresets[companyType] || []).map(String))
+    setHasCustomModuleSelection(true)
     message.success('Đã áp preset module theo loại hình công ty')
   }
 
   function setGroupModules(moduleKeys: string[], checked: boolean) {
-    const selected = new Set<string>(((form.getFieldValue('enabledModules') || []) as unknown[]).map(String))
-    moduleKeys.forEach((moduleKey) => checked ? selected.add(moduleKey) : selected.delete(moduleKey))
-    form.setFieldsValue({ enabledModules: Array.from(selected), hasCustomModuleSelection: true })
+    setSelectedModules((current) => {
+      const selected = new Set(current)
+      moduleKeys.forEach((moduleKey) => checked ? selected.add(moduleKey) : selected.delete(moduleKey))
+      return Array.from(selected)
+    })
+    setHasCustomModuleSelection(true)
   }
 
-  function setGroupModuleValues(moduleKeys: string[], values: Array<string | number | boolean>) {
-    const selected = new Set<string>(((form.getFieldValue('enabledModules') || []) as unknown[]).map(String))
-    moduleKeys.forEach((moduleKey) => selected.delete(moduleKey))
-    values.map(String).forEach((moduleKey) => selected.add(moduleKey))
-    form.setFieldsValue({ enabledModules: Array.from(selected), hasCustomModuleSelection: true })
+  function setModuleChecked(moduleKey: string, checked: boolean) {
+    setSelectedModules((current) => {
+      const selected = new Set(current)
+      if (checked) selected.add(moduleKey)
+      else selected.delete(moduleKey)
+      return Array.from(selected)
+    })
+    setHasCustomModuleSelection(true)
   }
 
   async function handleInitializeIndustryData() {
@@ -261,7 +273,7 @@ export function UiSettingsPage() {
                 className="glass-card settings-card"
                 extra={
                   <Space size={8}>
-                    <Button size="small" type="default" onClick={() => { form.setFieldValue('enabledModules', []); form.setFieldValue('hasCustomModuleSelection', true) }}>Bỏ chọn hết</Button>
+                    <Button size="small" type="default" onClick={() => { setSelectedModules([]); setHasCustomModuleSelection(true) }}>Bỏ chọn hết</Button>
                     <Button size="small" type="default" onClick={handleApplyCompanyPreset}>Áp preset theo loại hình</Button>
                   </Space>
                 }
@@ -269,10 +281,8 @@ export function UiSettingsPage() {
               >
                 <Space direction="vertical" size={16} style={{ width: '100%' }}>
                   <Typography.Paragraph style={{ margin: 0 }}>
-                    `companyType` chỉ là quick action để gợi ý bộ module. Module nào hiển thị thực tế sẽ phụ thuộc vào danh sách bật/tắt bên dưới.
+                    Loại cty chỉ là quick action để gợi ý bộ module. Module nào hiển thị thực tế sẽ phụ thuộc vào danh sách bật/tắt bên dưới.
                   </Typography.Paragraph>
-                  <Form.Item name="hasCustomModuleSelection" hidden valuePropName="checked"><Checkbox /></Form.Item>
-                  <Form.Item name="enabledModules" hidden><Checkbox.Group /></Form.Item>
                   <Space direction="vertical" size={14} style={{ width: '100%' }}>
                     {appModuleGroups.map((group) => {
                       const selectedCount = group.modules.filter((moduleKey) => selectedModules.includes(moduleKey)).length
@@ -288,15 +298,18 @@ export function UiSettingsPage() {
                             <Typography.Text strong>{resolveMenuGroupLabel(group.key, group.label, selectedCompanyType)}</Typography.Text>
                           </Checkbox>
                           <div style={{ paddingLeft: 28 }}>
-                            <Checkbox.Group value={groupValues} style={{ width: '100%' }} onChange={(values) => setGroupModuleValues(group.modules, values)}>
-                              <Row gutter={[12, 12]}>
-                                {group.modules.map((moduleKey) => (
-                                  <Col key={moduleKey} md={12} xs={24}>
-                                    <Checkbox value={moduleKey}>{appModuleLabels[moduleKey] || moduleKey}</Checkbox>
-                                  </Col>
-                                ))}
-                              </Row>
-                            </Checkbox.Group>
+                            <Row gutter={[12, 12]}>
+                              {group.modules.map((moduleKey) => (
+                                <Col key={moduleKey} md={12} xs={24}>
+                                  <Checkbox
+                                    checked={groupValues.includes(moduleKey)}
+                                    onChange={(event) => setModuleChecked(moduleKey, event.target.checked)}
+                                  >
+                                    {appModuleLabels[moduleKey] || moduleKey}
+                                  </Checkbox>
+                                </Col>
+                              ))}
+                            </Row>
                           </div>
                         </div>
                       )
@@ -445,7 +458,7 @@ export function UiSettingsPage() {
                       Điều hướng
                     </div>
                     <div style={{ display: 'grid', gap: 6 }}>
-                      <div style={{ padding: '8px 10px', borderRadius: preview.borderRadius - 2, color: preview.menuTextColor }}>Dashboard</div>
+                      <div style={{ padding: '8px 10px', borderRadius: preview.borderRadius - 2, color: preview.menuTextColor }}>Tổng quan</div>
                       <div
                         style={{
                           padding: '8px 10px',

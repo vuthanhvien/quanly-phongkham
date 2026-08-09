@@ -461,12 +461,12 @@ function buildMetrics(
       trend: `${customerRows.filter((item) => isSameDay(item.createdAt, today)).length} mới hôm nay`,
     },
     {
-      title: "Lead đang xử lý",
+      title: "Khách tiềm năng đang xử lý",
       value: openLeads.length,
-      suffix: "lead",
+      suffix: "khách tiềm năng",
       icon: <LineChartOutlined />,
       tone: "gold",
-      trend: `${leadRows.filter((item) => item.status === "NEW").length} lead mới`,
+      trend: `${leadRows.filter((item) => item.status === "NEW").length} khách tiềm năng mới`,
     },
     {
       title: "Liệu trình active",

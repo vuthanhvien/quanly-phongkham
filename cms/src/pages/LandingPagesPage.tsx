@@ -38,7 +38,6 @@ import { ImagePickerInput } from '../components/ImagePickerInput'
 import type { LandingBlock, LandingBlockType, LandingContentItem, LandingFormField, LandingPage, LandingSectionWidth, LandingSlide } from '../models'
 import { LandingThemeEditor } from './LandingThemePage'
 import { BlockComposerModal, BlockComposerProvider } from './landing-pages/BlockComposerModal'
-import { LandingSiteSettingsDrawer, LandingSiteSettingsProvider } from './landing-pages/LandingSiteSettingsDrawer'
 import { SectionsTreeCard } from './landing-pages/SectionsTreeCard'
 import {
   blockTypeIcons,
@@ -845,7 +844,7 @@ export function LandingPagesPage() {
                 icon={<DesktopOutlined />}
                 type={previewDevice === 'desktop' ? 'primary' : 'default'}
                 onClick={() => setPreviewDevice('desktop')}
-              >Desktop</Button>
+              >Máy tính</Button>
               <Button
                 icon={<TabletOutlined />}
                 type={previewDevice === 'tablet' ? 'primary' : 'default'}
@@ -880,34 +879,6 @@ export function LandingPagesPage() {
           </div>
         </div>
       </div>
-      <LandingSiteSettingsProvider
-        value={{
-          open: globalOpen,
-          settings: globalSettings,
-          globalSaving,
-          menuSaving,
-          onClose: () => setGlobalOpen(false),
-          onSaveGlobal: () => void saveGlobalSettings(),
-          onSaveMenu: () => void saveMenuSettings(),
-          onUpdate: updateGlobal,
-          onAddRootNavItem: addRootNavItem,
-          onPatchTreeNavItem: patchTreeNavItem,
-          onAddTreeNavChild: addTreeNavChild,
-          onRemoveTreeNavItem: removeTreeNavItem,
-          onAddFooterColumn: addFooterColumn,
-          onUpdateFooterColumn: updateFooterColumn,
-          onRemoveFooterColumn: removeFooterColumn,
-          onAddFooterLink: addFooterLink,
-          onUpdateFooterLink: updateFooterLink,
-          onRemoveFooterLink: removeFooterLink,
-          onAddSocialLink: addSocialLink,
-          onUpdateSocialLink: updateSocialLink,
-          onRemoveSocialLink: removeSocialLink,
-        }}
-      >
-        <LandingSiteSettingsDrawer />
-      </LandingSiteSettingsProvider>
-
       <BlockComposerProvider
         value={{
           open: Boolean(blockComposer),

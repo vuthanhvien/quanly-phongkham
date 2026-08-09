@@ -74,9 +74,9 @@ export function CustomTableDataPage() {
         </Space>
         <Space>
           <Upload accept=".xlsx,.xls" showUploadList={false} beforeUpload={importRows}>
-            <Button icon={<UploadOutlined />}>Import Excel</Button>
+            <Button icon={<UploadOutlined />}>Nhập Excel</Button>
           </Upload>
-          <Button icon={<DownloadOutlined />} onClick={exportRows}>Export Excel</Button>
+          <Button icon={<DownloadOutlined />} onClick={exportRows}>Xuất Excel</Button>
           <Button icon={<PlusOutlined />} type="primary" onClick={() => setCreateOpen(true)}>Thêm nhanh</Button>
           <Button onClick={() => navigate('/custom-tables')}>Quay lại</Button>
         </Space>

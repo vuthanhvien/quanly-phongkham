@@ -34,7 +34,7 @@ import {
   TeamOutlined,
 } from "@ant-design/icons"
 import { api } from "../api"
-import { hasActionAccess } from "../access"
+import { hasActionAccess, hasResourceAccess } from "../access"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
@@ -46,6 +46,7 @@ import {
   getFieldCatalog,
   getStoredUserRole,
   getVisibleFieldConfigs,
+  resolveModuleEnabled,
   ViewSettingRecord,
 } from "../view-settings"
 
@@ -217,11 +218,11 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
               <Button icon={<ArrowLeftOutlined />}>Quay lại</Button>
             </Link>
             {resource === "leads" && !record?.convertedCustomerId && hasActionAccess(resource, "convert-to-customer") && (
-              <Tooltip title="Chuyển lead thành khách hàng">
+              <Tooltip title="Chuyển khách tiềm năng thành khách hàng">
                 <Button
                   onClick={async () => {
                     const response = await convertLead(id)
-                    message.success("Đã chuyển lead thành khách hàng")
+                    message.success("Đã chuyển khách tiềm năng thành khách hàng")
                     navigate(`/customers?detail=${response.data.data.id}`)
                   }}
                 >
@@ -748,7 +749,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
 
   async function convertRelatedLead(recordId: string) {
     const response = await convertLead(recordId)
-    message.success("Đã chuyển lead thành khách hàng")
+    message.success("Đã chuyển khách tiềm năng thành khách hàng")
     await reloadRelatedBlocks()
     navigate(`/customers/${response.data.data.id}`)
   }
@@ -790,7 +791,7 @@ async function loadRelated(
   if (resource === "leads") {
     const specs = [
       {
-        title: "Nhật ký chăm lead",
+        title: "Nhật ký chăm sóc khách tiềm năng",
         resource: "lead-activities",
         field: "leadId",
       },
@@ -936,6 +937,10 @@ async function loadBlocks(
 ) {
   const responses = await Promise.all(
     specs.map(async (spec) => {
+      // Đây là cùng nguồn quyền mà menu dùng. Nếu role không có quyền vào
+      // module thì không được tạo tab liên kết, kể cả khi đang ở detail khác.
+      if (!hasResourceAccess(spec.resource)) return null
+
       const [recordResponse, fieldResponse, viewResponse, printResponse] = await Promise.all([
         api
           .get(`/records/${spec.resource}`, { params: { pageSize: 100, include: '*' } })
@@ -966,6 +971,10 @@ async function loadBlocks(
       })
       const views = viewResponse.data.data as ViewSettingRecord[]
 
+      // Tab liên kết là một điểm vào module, nên phải tuân theo cấu hình
+      // hiển thị theo role giống menu điều hướng.
+      if (!resolveModuleEnabled(views, role)) return null
+
       return {
         rows,
         tableFields: getVisibleFieldConfigs(catalog, views, "TABLE", role),
@@ -974,15 +983,15 @@ async function loadBlocks(
       }
     }),
   )
-  return specs.map((spec, index) => ({
+  return responses.flatMap((response, index) => response ? [{
     title: specs[index].title,
-    resource: spec.resource,
-    relationField: spec.field,
-    rows: responses[index].rows,
-    tableFields: responses[index].tableFields,
-    detailFields: responses[index].detailFields,
-    printTemplateId: responses[index].printTemplateId,
-  }))
+    resource: specs[index].resource,
+    relationField: specs[index].field,
+    rows: response.rows,
+    tableFields: response.tableFields,
+    detailFields: response.detailFields,
+    printTemplateId: response.printTemplateId,
+  }] : [])
 }
 
 async function convertLead(id: string) {
@@ -1126,7 +1135,7 @@ function buildDetailSummaryItems(
     ["name", <FileTextOutlined />],
     ["fullName", <FileTextOutlined />],
     ["customerId", <TeamOutlined />, "Khách hàng"],
-    ["leadId", <TeamOutlined />, "Lead"],
+    ["leadId", <TeamOutlined />, "Khách tiềm năng"],
     ["staffId", <TeamOutlined />, "Nhân viên"],
     ["doctorStaffId", <TeamOutlined />, "Bác sĩ"],
     ["assignedStaffId", <TeamOutlined />, "Phụ trách"],

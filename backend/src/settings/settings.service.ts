@@ -1,12 +1,12 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import Handlebars from 'handlebars';
 import { basename, join } from 'path';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, ItemCategory, LandingDomain, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, Product, Unit, User, ViewSetting } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, GoogleDriveConnection, ItemCategory, LandingDomain, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, Product, Unit, User, ViewSetting } from '../entities/entities';
 import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
 import { renderDocxTemplate } from './docx-template';
@@ -56,6 +56,12 @@ const DEFAULT_APP_UI_COLORS = {
 } as const;
 const APP_MODULE_KEYS = [
   'calendar',
+  'landing-pages',
+  'landing-forms',
+  'posts',
+  'news',
+  'landing-domains',
+  'landing-config',
   'leads',
   'lead-activities',
   'customers',
@@ -79,6 +85,10 @@ const APP_MODULE_KEYS = [
   'staff-insurances',
   'attendances',
   'leave-requests',
+  'leave-types',
+  'leave-allocations',
+  'attendance-adjustment-requests',
+  'business-trip-requests',
   'work-schedules',
   'staff-rewards',
   'staff-trainings',
@@ -90,6 +100,7 @@ const APP_MODULE_KEYS = [
   'expenses',
   'commissions',
   'payrolls',
+  'payment-requests',
   'accounting-periods',
   'accounting-chart-accounts',
   'accounting-fiscal-settings',
@@ -99,6 +110,13 @@ const APP_MODULE_KEYS = [
   'accounting-reports',
   'branches',
   'user-accounts',
+  'projects',
+  'tasks',
+  'workflow-definitions',
+  'workflow-steps',
+  'workflow-instances',
+  'workflow-tasks',
+  'workflow-actions',
 ] as const;
 
 const INDUSTRY_DATASETS = {
@@ -172,6 +190,7 @@ export class SettingsService {
     @InjectRepository(LandingForm) private readonly landingForms: Repository<LandingForm>,
     @InjectRepository(LandingFormSubmission) private readonly landingFormSubmissions: Repository<LandingFormSubmission>,
     @InjectRepository(AppUiSetting) private readonly appUiSettings: Repository<AppUiSetting>,
+    @InjectRepository(GoogleDriveConnection) private readonly googleDriveConnections: Repository<GoogleDriveConnection>,
     @InjectRepository(ChatbotSetting) private readonly chatbotSettings: Repository<ChatbotSetting>,
     @InjectRepository(DynamicRoleDefinition) private readonly roles: Repository<DynamicRoleDefinition>,
     @InjectRepository(User) private readonly users: Repository<User>,
@@ -183,6 +202,250 @@ export class SettingsService {
     @InjectRepository(Product) private readonly products: Repository<Product>,
     private readonly records: RecordsService,
   ) {}
+
+  async getGoogleDriveConnection(user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const connection = await this.googleDriveConnections.findOne({ where: { connectionKey: 'company' } });
+    return {
+      configured: this.isGoogleDriveConfigured(),
+      connected: Boolean(connection?.isConnected && connection.refreshTokenEncrypted),
+      accountEmail: connection?.accountEmail || undefined,
+      connectedAt: connection?.isConnected ? connection.updatedAt : undefined,
+    };
+  }
+
+  async beginGoogleDriveConnection(user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    this.assertGoogleDriveConfigured();
+    const state = randomBytes(32).toString('hex');
+    const existing = await this.googleDriveConnections.findOne({ where: { connectionKey: 'company' } });
+    const connection = existing
+      ? this.googleDriveConnections.merge(existing, { oauthState: state })
+      : this.googleDriveConnections.create({ connectionKey: 'company', oauthState: state });
+    await this.googleDriveConnections.save(connection);
+
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_DRIVE_CLIENT_ID!.trim(),
+      redirect_uri: this.googleDriveRedirectUri(),
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/userinfo.email',
+      access_type: 'offline',
+      prompt: 'consent',
+      state,
+    });
+    return { authorizationUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` };
+  }
+
+  async completeGoogleDriveConnection(code?: string, state?: string, error?: string) {
+    if (error) throw new BadRequestException(`Google Drive: ${error}`);
+    if (!code || !state) throw new BadRequestException('Google Drive không trả về mã xác thực hợp lệ');
+    const connection = await this.googleDriveConnections.findOne({ where: { connectionKey: 'company' } });
+    if (!connection || !connection.oauthState || connection.oauthState !== state) {
+      throw new BadRequestException('Phiên kết nối Google Drive không hợp lệ hoặc đã hết hạn');
+    }
+    this.assertGoogleDriveConfigured();
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_DRIVE_CLIENT_ID!.trim(),
+        client_secret: process.env.GOOGLE_DRIVE_CLIENT_SECRET!.trim(),
+        redirect_uri: this.googleDriveRedirectUri(),
+        grant_type: 'authorization_code',
+      }),
+    });
+    const tokens = await tokenResponse.json() as { access_token?: string; refresh_token?: string; expires_in?: number; error_description?: string };
+    if (!tokenResponse.ok || !tokens.access_token) {
+      throw new BadRequestException(tokens.error_description || 'Không thể lấy quyền truy cập Google Drive');
+    }
+    const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    const profile = await profileResponse.json() as { email?: string };
+    const refreshToken = tokens.refresh_token || (connection.refreshTokenEncrypted ? this.decryptGoogleDriveValue(connection.refreshTokenEncrypted) : '');
+    if (!refreshToken) throw new BadRequestException('Google không cấp refresh token. Hãy thử lại và chấp nhận quyền truy cập.');
+    await this.googleDriveConnections.save(this.googleDriveConnections.merge(connection, {
+      accountEmail: profile.email || undefined,
+      accessTokenEncrypted: this.encryptGoogleDriveValue(tokens.access_token),
+      refreshTokenEncrypted: this.encryptGoogleDriveValue(refreshToken),
+      accessTokenExpiresAt: new Date(Date.now() + Number(tokens.expires_in || 3600) * 1000),
+      oauthState: undefined,
+      isConnected: true,
+    }));
+  }
+
+  async disconnectGoogleDrive(user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const connection = await this.googleDriveConnections.findOne({ where: { connectionKey: 'company' } });
+    if (!connection) return;
+    await this.googleDriveConnections.save(this.googleDriveConnections.merge(connection, {
+      accountEmail: null as unknown as string,
+      accessTokenEncrypted: null as unknown as string,
+      refreshTokenEncrypted: null as unknown as string,
+      accessTokenExpiresAt: null as unknown as Date,
+      oauthState: null as unknown as string,
+      isConnected: false,
+    }));
+  }
+
+  async listGoogleDriveFiles(query?: string, pageToken?: string, parentId = 'root', user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const connection = await this.googleDriveConnections.findOne({ where: { connectionKey: 'company', isConnected: true } });
+    if (!connection?.refreshTokenEncrypted) throw new BadRequestException('Google Drive công ty chưa được kết nối');
+    const accessToken = await this.getGoogleDriveAccessToken(connection);
+    const searchText = String(query || '').trim().replace(/'/g, "\\'");
+    const filters = [`trashed = false`, `'${String(parentId || 'root').replace(/'/g, "\\'")}' in parents`];
+    if (searchText) filters.push(`name contains '${searchText}'`);
+    const params = new URLSearchParams({
+      q: filters.join(' and '),
+      fields: 'nextPageToken,files(id,name,mimeType,size,modifiedTime,webViewLink,thumbnailLink,parents)',
+      orderBy: 'folder,name_natural',
+      pageSize: '100',
+      corpora: 'allDrives',
+      includeItemsFromAllDrives: 'true',
+      supportsAllDrives: 'true',
+    });
+    if (pageToken) params.set('pageToken', pageToken);
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const payload = await response.json() as { files?: Record<string, unknown>[]; nextPageToken?: string; error?: { message?: string } };
+    if (!response.ok) throw new BadRequestException(payload.error?.message || 'Không thể đọc file từ Google Drive');
+    return {
+      files: (payload.files || []).map((file) => ({
+        id: String(file.id || ''),
+        title: String(file.name || ''),
+        originalName: String(file.name || ''),
+        publicUrl: String(file.webViewLink || `https://drive.google.com/open?id=${file.id}`),
+        mimeType: String(file.mimeType || ''),
+        sizeBytes: Number(file.size || 0),
+        modifiedTime: file.modifiedTime,
+        thumbnailUrl: file.thumbnailLink,
+      })),
+      nextPageToken: payload.nextPageToken,
+    };
+  }
+
+  async listGoogleDriveFolders(user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const connection = await this.googleDriveConnections.findOne({ where: { connectionKey: 'company', isConnected: true } });
+    if (!connection?.refreshTokenEncrypted) throw new BadRequestException('Google Drive công ty chưa được kết nối');
+    const accessToken = await this.getGoogleDriveAccessToken(connection);
+    const folders: Array<{ id: string; name: string; parentId: string | null }> = [];
+    const aboutResponse = await fetch('https://www.googleapis.com/drive/v3/about?fields=rootFolderId', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const about = await aboutResponse.json() as { rootFolderId?: string; error?: { message?: string } };
+    if (!aboutResponse.ok || !about.rootFolderId) throw new BadRequestException(about.error?.message || 'Không thể xác định thư mục gốc Google Drive');
+    let pageToken: string | undefined;
+
+    do {
+      const params = new URLSearchParams({
+        q: "trashed = false and mimeType = 'application/vnd.google-apps.folder'",
+        fields: 'nextPageToken,files(id,name,parents)',
+        orderBy: 'name_natural',
+        pageSize: '1000',
+        corpora: 'allDrives',
+        includeItemsFromAllDrives: 'true',
+        supportsAllDrives: 'true',
+      });
+      if (pageToken) params.set('pageToken', pageToken);
+      const response = await fetch(`https://www.googleapis.com/drive/v3/files?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const payload = await response.json() as { files?: Record<string, unknown>[]; nextPageToken?: string; error?: { message?: string } };
+      if (!response.ok) throw new BadRequestException(payload.error?.message || 'Không thể đọc thư mục Google Drive');
+      folders.push(...(payload.files || []).map((folder) => ({
+        id: String(folder.id || ''),
+        name: String(folder.name || folder.id || ''),
+        parentId: Array.isArray(folder.parents) && folder.parents[0] ? String(folder.parents[0]) : null,
+      })));
+      pageToken = payload.nextPageToken;
+    } while (pageToken);
+
+    const byId = new Map(folders.map((folder) => [folder.id, folder]));
+    const belongsToCompanyDrive = (folder: { id: string; parentId: string | null }, visited = new Set<string>()): boolean => {
+      if (!folder.parentId || visited.has(folder.id)) return false;
+      if (folder.parentId === about.rootFolderId || folder.parentId === 'root') return true;
+      visited.add(folder.id);
+      const parent = byId.get(folder.parentId);
+      return parent ? belongsToCompanyDrive(parent, visited) : false;
+    };
+
+    return { folders: folders.filter((folder) => belongsToCompanyDrive(folder)) };
+  }
+
+  async downloadGoogleDriveFile(id: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const accessToken = await this.getConnectedGoogleDriveAccessToken();
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) await this.googleDriveResponse(response, 'Không thể tải file từ Google Drive');
+    return {
+      buffer: Buffer.from(await response.arrayBuffer()),
+      contentType: response.headers.get('content-type') || 'application/octet-stream',
+      contentDisposition: response.headers.get('content-disposition') || '',
+    };
+  }
+
+  async createGoogleDriveFolder(payload: { name?: string; parentId?: string }, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const name = String(payload.name || '').trim();
+    if (!name) throw new BadRequestException('Nhập tên folder');
+    const accessToken = await this.getConnectedGoogleDriveAccessToken();
+    const response = await fetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [payload.parentId || 'root'] }),
+    });
+    return this.googleDriveResponse(response, 'Không thể tạo folder Google Drive');
+  }
+
+  async uploadGoogleDriveFile(file: { originalname?: string; mimetype?: string; buffer?: Buffer }, parentId: string | undefined, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    if (!file?.buffer?.length) throw new BadRequestException('Chưa có file hợp lệ để upload');
+    const accessToken = await this.getConnectedGoogleDriveAccessToken();
+    const boundary = `erpclinic-${randomBytes(12).toString('hex')}`;
+    const metadata = JSON.stringify({ name: String(file.originalname || 'untitled'), parents: [parentId || 'root'] });
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`),
+      Buffer.from(`--${boundary}\r\nContent-Type: ${file.mimetype || 'application/octet-stream'}\r\n\r\n`),
+      file.buffer,
+      Buffer.from(`\r\n--${boundary}--`),
+    ]);
+    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body,
+    });
+    return this.googleDriveResponse(response, 'Không thể upload file lên Google Drive');
+  }
+
+  async renameGoogleDriveItem(id: string, name: string | undefined, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const normalizedName = String(name || '').trim();
+    if (!normalizedName) throw new BadRequestException('Nhập tên file hoặc folder');
+    const accessToken = await this.getConnectedGoogleDriveAccessToken();
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?supportsAllDrives=true`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: normalizedName }),
+    });
+    return this.googleDriveResponse(response, 'Không thể đổi tên trên Google Drive');
+  }
+
+  async deleteGoogleDriveItem(id: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const accessToken = await this.getConnectedGoogleDriveAccessToken();
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?supportsAllDrives=true`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) await this.googleDriveResponse(response, 'Không thể xóa trên Google Drive');
+    return { id };
+  }
 
   async getLandingGlobalSettings() {
     const existing = await this.landingGlobalSettings.findOne({ where: { settingKey: 'default' } });
@@ -395,10 +658,10 @@ export class SettingsService {
     return this.views.save(setting);
   }
 
-  async deleteViews(entityType: string, role?: string, user?: AuthUser) {
+  async deleteViews(entityType: string, role?: string, viewType?: string, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const normalizedRole = normalizeRole(role);
-    const settings = await this.views.find({ where: { entityType, role: normalizedRole } });
+    const settings = await this.views.find({ where: { entityType, role: normalizedRole, ...(viewType ? { viewType } : {}) } });
     if (!settings.length) {
       return { entityType, role: normalizedRole, deleted: 0 };
     }
@@ -906,7 +1169,7 @@ export class SettingsService {
     if (!template) throw new NotFoundException('Không tìm thấy mẫu in');
     const record = await this.records.findRaw(template.entityType, recordId, '*') as Record<string, unknown>;
     const data = this.buildPrintContext(record);
-    return Handlebars.compile(template.htmlTemplate)(data);
+    return Handlebars.compile(this.expandPrintRepeatingRows(template.htmlTemplate))(data);
   }
 
   async saveDocxTemplate(file: any, payload: { entityType?: string; name?: string }, user?: AuthUser) {
@@ -934,10 +1197,23 @@ export class SettingsService {
   private buildPrintContext(record: Record<string, unknown>) {
     const context = this.enrichPrintObject({ ...record, ...((record.customFields || {}) as Record<string, unknown>) });
     Object.entries(context).forEach(([key, value]) => {
-      if (!value || Array.isArray(value) || typeof value !== 'object') return;
-      context[key] = this.enrichPrintObject(value as Record<string, unknown>);
+      if (Array.isArray(value)) {
+        context[key] = value.map((item) => item && typeof item === 'object'
+          ? this.enrichPrintObject(item as Record<string, unknown>)
+          : item,
+        );
+        return;
+      }
+      if (value && typeof value === 'object') context[key] = this.enrichPrintObject(value as Record<string, unknown>);
     });
     return context;
+  }
+
+  private expandPrintRepeatingRows(html: string) {
+    return String(html || '').replace(
+      /<tr([^>]*?)\sdata-print-each=(['"])([a-zA-Z0-9_.-]+)\2([^>]*)>([\s\S]*?)<\/tr>/gi,
+      (_match, before, _quote, collection, after, rowContent) => `{{#each ${collection}}}<tr${before}${after}>${rowContent}</tr>{{/each}}`,
+    );
   }
 
   private enrichPrintObject(record: Record<string, unknown>) {
@@ -1253,6 +1529,82 @@ export class SettingsService {
     const account = await this.users.findOne({ where: { id: userId } });
     if (!account) throw new NotFoundException('Không tìm thấy user');
     return account.staffId || undefined;
+  }
+
+  private async getConnectedGoogleDriveAccessToken() {
+    const connection = await this.googleDriveConnections.findOne({ where: { connectionKey: 'company', isConnected: true } });
+    if (!connection?.refreshTokenEncrypted) throw new BadRequestException('Google Drive công ty chưa được kết nối');
+    return this.getGoogleDriveAccessToken(connection);
+  }
+
+  private async googleDriveResponse(response: Response, fallbackMessage: string) {
+    const payload = await response.json() as { error?: { message?: string } } & Record<string, unknown>;
+    if (!response.ok) throw new BadRequestException(payload.error?.message || fallbackMessage);
+    return payload;
+  }
+
+  private isGoogleDriveConfigured() {
+    return Boolean(
+      process.env.GOOGLE_DRIVE_CLIENT_ID?.trim()
+      && process.env.GOOGLE_DRIVE_CLIENT_SECRET?.trim()
+      && process.env.GOOGLE_DRIVE_REDIRECT_URI?.trim(),
+    );
+  }
+
+  private assertGoogleDriveConfigured() {
+    if (!this.isGoogleDriveConfigured()) {
+      throw new BadRequestException('Chưa cấu hình GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET hoặc GOOGLE_DRIVE_REDIRECT_URI');
+    }
+  }
+
+  private googleDriveRedirectUri() {
+    return process.env.GOOGLE_DRIVE_REDIRECT_URI!.trim();
+  }
+
+  private googleDriveCipherKey() {
+    const secret = process.env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY || process.env.JWT_SECRET;
+    if (!secret?.trim()) throw new BadRequestException('Thiếu GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY hoặc JWT_SECRET để mã hóa token');
+    return createHash('sha256').update(secret).digest();
+  }
+
+  private encryptGoogleDriveValue(value: string) {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', this.googleDriveCipherKey(), iv);
+    const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+    return `${iv.toString('base64')}.${cipher.getAuthTag().toString('base64')}.${encrypted.toString('base64')}`;
+  }
+
+  private decryptGoogleDriveValue(value: string) {
+    const [ivRaw, authTagRaw, encryptedRaw] = String(value || '').split('.');
+    if (!ivRaw || !authTagRaw || !encryptedRaw) throw new BadRequestException('Token Google Drive đã lưu không hợp lệ');
+    const decipher = createDecipheriv('aes-256-gcm', this.googleDriveCipherKey(), Buffer.from(ivRaw, 'base64'));
+    decipher.setAuthTag(Buffer.from(authTagRaw, 'base64'));
+    return Buffer.concat([decipher.update(Buffer.from(encryptedRaw, 'base64')), decipher.final()]).toString('utf8');
+  }
+
+  private async getGoogleDriveAccessToken(connection: GoogleDriveConnection) {
+    if (connection.accessTokenEncrypted && connection.accessTokenExpiresAt && connection.accessTokenExpiresAt.getTime() > Date.now() + 60_000) {
+      return this.decryptGoogleDriveValue(connection.accessTokenEncrypted);
+    }
+    this.assertGoogleDriveConfigured();
+    const refreshToken = this.decryptGoogleDriveValue(connection.refreshTokenEncrypted!);
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: process.env.GOOGLE_DRIVE_CLIENT_ID!.trim(),
+        client_secret: process.env.GOOGLE_DRIVE_CLIENT_SECRET!.trim(),
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+    const payload = await response.json() as { access_token?: string; expires_in?: number; error_description?: string };
+    if (!response.ok || !payload.access_token) throw new BadRequestException(payload.error_description || 'Google Drive đã hết quyền truy cập. Hãy kết nối lại.');
+    await this.googleDriveConnections.save(this.googleDriveConnections.merge(connection, {
+      accessTokenEncrypted: this.encryptGoogleDriveValue(payload.access_token),
+      accessTokenExpiresAt: new Date(Date.now() + Number(payload.expires_in || 3600) * 1000),
+    }));
+    return payload.access_token;
   }
 
   private async ensureAppUiSettings() {

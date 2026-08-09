@@ -467,7 +467,7 @@ export function ZaloInboxPage() {
                         </div>
                         <Space size={6} wrap>
                           <Tag color={statusColor(account.connectionStatus)}>{statusLabel(account.connectionStatus)}</Tag>
-                          {account.listenerActive ? <Tag color="green">Listener ON</Tag> : <Tag>Listener OFF</Tag>}
+                          {account.listenerActive ? <Tag color="green">Đang lắng nghe</Tag> : <Tag>Đã tắt lắng nghe</Tag>}
                         </Space>
                         <div className="zalo-account-actions">
                           <Button
@@ -566,12 +566,12 @@ export function ZaloInboxPage() {
                       <Space size={8} wrap>
                         <Typography.Text strong>{item.displayName}</Typography.Text>
                         {item.customerId ? <Tag color="blue">Đã link KH</Tag> : null}
-                        {item.leadId ? <Tag color="purple">Đã link Lead</Tag> : null}
+                        {item.leadId ? <Tag color="purple">Đã liên kết khách tiềm năng</Tag> : null}
                       </Space>
                     }
                     description={
                       <Space direction="vertical" size={2}>
-                        <Typography.Text type="secondary">{item.lastMessageText || "Chưa có nội dung preview"}</Typography.Text>
+                        <Typography.Text type="secondary">{item.lastMessageText || "Chưa có nội dung xem trước"}</Typography.Text>
                         <Typography.Text type="secondary">
                           {item.lastMessageAt ? formatDateTime(item.lastMessageAt) : "Chưa có thời gian"}
                         </Typography.Text>
@@ -621,14 +621,14 @@ export function ZaloInboxPage() {
                     allowClear
                     className="zalo-link-select"
                     options={leadOptions}
-                    placeholder="Link lead"
+                    placeholder="Liên kết khách tiềm năng"
                     showSearch
                     value={selectedConversation.leadId}
                     onChange={(value) => setSelectedConversation((current) => (current ? { ...current, leadId: value } : current))}
                   />
                   <Input
                     className="zalo-link-select"
-                    placeholder="Số điện thoại để tạo lead sau này"
+                    placeholder="Số điện thoại để tạo khách tiềm năng sau này"
                     value={selectedConversation.contactPhone}
                     onChange={(event) =>
                       setSelectedConversation((current) =>

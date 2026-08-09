@@ -459,7 +459,7 @@ export function RecordFormContent({
                 {items.map(({ key, name }) => (
                   <Space key={key} align="start" style={{ display: "flex", marginBottom: 8 }}>
                     <Form.Item name={[name, "branchId"]} rules={[{ required: true, message: "Chọn chi nhánh" }]}><Select style={{ minWidth: 210 }} options={branchRoleOptions} placeholder="Chi nhánh" /></Form.Item>
-                    <Form.Item name={[name, "roleKeys"]} rules={[{ required: true, message: "Chọn role" }]}><Select mode="multiple" style={{ minWidth: 280 }} options={systemRoleOptions} placeholder="Roles" /></Form.Item>
+                    <Form.Item name={[name, "roleKeys"]} rules={[{ required: true, message: "Chọn vai trò" }]}><Select mode="multiple" style={{ minWidth: 280 }} options={systemRoleOptions} placeholder="Vai trò" /></Form.Item>
                     <Button danger onClick={() => remove(name)}>Bỏ</Button>
                   </Space>
                 ))}
@@ -1096,15 +1096,15 @@ function FileSelectInput({
             <div className="image-library-toolbar">
               <Input.Search
                 allowClear
-                placeholder="Tìm theo tên file, đuôi file hoặc folder"
+                placeholder="Tìm theo tên tệp, đuôi tệp hoặc thư mục"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
-              <Button onClick={() => setOpenUpload(true)}>Upload file mới</Button>
+              <Button onClick={() => setOpenUpload(true)}>Tải tệp mới lên</Button>
             </div>
             <div className="image-library-current-folder">
               <Typography.Text type="secondary">
-                {selectedFolderId ? folderPathMap[selectedFolderId] || "Folder đã chọn" : "Đang xem tất cả folder"}
+                {selectedFolderId ? folderPathMap[selectedFolderId] || "Thư mục đã chọn" : "Đang xem tất cả thư mục"}
               </Typography.Text>
             </div>
             <div className="image-library-content">
@@ -1138,7 +1138,7 @@ function FileSelectInput({
                         )}
                         <div className="image-library-card-copy">
                           <strong>{option.title}</strong>
-                          <span>{option.folderLabel || "Không có folder"}</span>
+                          <span>{option.folderLabel || "Không có thư mục"}</span>
                         </div>
                       </button>
                     )
@@ -1159,14 +1159,14 @@ function FileSelectInput({
                           )}
                           <div className="file-preview-copy">
                             <strong>{item.title}</strong>
-                            <span>{item.folderLabel || "Không có folder"}</span>
+                            <span>{item.folderLabel || "Không có thư mục"}</span>
                           </div>
                         </div>
                       ))}
                     </div>
                   </>
                 ) : (
-                  <Empty description="Chọn một hoặc nhiều file để xem preview" />
+                  <Empty description="Chọn một hoặc nhiều tệp để xem trước" />
                 )}
               </div>
             </div>
@@ -1178,7 +1178,7 @@ function FileSelectInput({
         footer={null}
         maskClosable={false}
         open={openUpload}
-        title="Upload file vào folder"
+        title="Tải tệp lên thư mục"
         width={screens.md ? 620 : "calc(100vw - 16px)"}
         onCancel={() => setOpenUpload(false)}
       >
@@ -1386,7 +1386,7 @@ function ImageLibrarySelectInput({
             <div className="image-library-toolbar">
               <Input.Search
                 allowClear
-                placeholder="Tìm theo tên ảnh hoặc folder"
+                placeholder="Tìm theo tên ảnh hoặc thư mục"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -1395,8 +1395,8 @@ function ImageLibrarySelectInput({
             <div className="image-library-current-folder">
               <Typography.Text type="secondary">
                 {selectedFolderId
-                  ? folderPathMap[selectedFolderId] || "Folder đã chọn"
-                  : "Đang xem tất cả folder"}
+                  ? folderPathMap[selectedFolderId] || "Thư mục đã chọn"
+                  : "Đang xem tất cả thư mục"}
               </Typography.Text>
             </div>
             <div className="image-library-content">
@@ -1424,7 +1424,7 @@ function ImageLibrarySelectInput({
                         <img alt={option.title} src={option.previewUrl} />
                         <div className="image-library-card-copy">
                           <strong>{option.title.replace(` ${option.folderLabel || ""}`, "")}</strong>
-                          <span>{option.folderLabel || "Không có folder"}</span>
+                          <span>{option.folderLabel || "Không có thư mục"}</span>
                         </div>
                       </button>
                     )
@@ -1445,10 +1445,10 @@ function ImageLibrarySelectInput({
                       }}
                     />
                     <Typography.Title level={5}>{multiple ? `${draftValues.length} hình ảnh đang chọn` : selectedDraft.title.replace(` ${selectedDraft.folderLabel || ""}`, "")}</Typography.Title>
-                    <Typography.Text type="secondary">{selectedDraft.folderLabel || "Không có folder"}</Typography.Text>
+                    <Typography.Text type="secondary">{selectedDraft.folderLabel || "Không có thư mục"}</Typography.Text>
                   </>
                 ) : (
-                  <Empty description="Chọn một ảnh để xem preview" />
+                  <Empty description="Chọn một ảnh để xem trước" />
                 )}
               </div>
             </div>

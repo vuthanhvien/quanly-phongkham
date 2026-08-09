@@ -59,15 +59,21 @@ export function resolveAllowedActions(
   role?: string,
   dynamicRoles: DynamicRole[] = [],
 ) {
-  const matched = resolveViewFromChain(
-    views,
-    (view) => Array.isArray(view.config?.allowedActions),
-    role,
-    dynamicRoles,
-  )
+  const matched = resolveActionSetting(views, role, dynamicRoles)
   const allowedActions = matched?.config?.allowedActions
   if (Array.isArray(allowedActions)) return allowedActions.map(String)
   return getResourceActionOptions(resource).map((item) => item.key)
+}
+
+export function resolveActionSetting(views: ViewSettingRecord[], role?: string, dynamicRoles: DynamicRole[] = []) {
+  const chain = getRoleInheritanceChain(role, dynamicRoles)
+  for (const inheritedRole of chain) {
+    const actionSetting = views.find((view) => view.viewType === 'ACTION' && normalizeRole(view.role) === inheritedRole)
+    if (Array.isArray(actionSetting?.config?.allowedActions)) return actionSetting
+    const legacyTableSetting = views.find((view) => view.viewType === 'TABLE' && normalizeRole(view.role) === inheritedRole && Array.isArray(view.config?.allowedActions))
+    if (legacyTableSetting) return legacyTableSetting
+  }
+  return undefined
 }
 
 function getModuleEnabledValue(view: ViewSettingRecord | undefined) {
@@ -425,6 +431,7 @@ export function serializeViewConfig(
   configs: FieldLayoutConfig[],
   moduleEnabled = true,
   allowedActions?: string[],
+  includeModuleSettings = true,
 ) {
   const items = configs.map((field) => {
     const next: Record<string, unknown> = {
@@ -450,7 +457,6 @@ export function serializeViewConfig(
     return next
   })
 
-  return viewType === 'TABLE'
-    ? { columns: items, moduleEnabled, allowedActions }
-    : { fields: items, moduleEnabled, allowedActions }
+  const config = viewType === 'TABLE' ? { columns: items } : { fields: items }
+  return includeModuleSettings ? { ...config, moduleEnabled, allowedActions } : config
 }

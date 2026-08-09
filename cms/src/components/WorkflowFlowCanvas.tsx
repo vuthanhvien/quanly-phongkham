@@ -141,7 +141,7 @@ export function WorkflowFlowCanvas({ steps, layout, onAddStep, onEditStep, onIns
         type: "decision",
         position: layoutPosition(layout, decisionId(step.id), x + TASK_WIDTH + 48, laneCenter(lane) - DECISION_SIZE / 2),
         data: {
-          label: "Decision",
+          label: "Quyết định",
           approveLabel: step.approveActionLabel || "Approve",
           rejectLabel: step.rejectActionLabel || "Reject",
         },
@@ -330,12 +330,12 @@ function makeEdge(
 }
 
 function buildLanes(steps: WorkflowCanvasStep[]) {
-  const lanes: Lane[] = [{ id: "requester", label: "Requester", index: 0 }]
+  const lanes: Lane[] = [{ id: "requester", label: "Người yêu cầu", index: 0 }]
   steps.forEach((step) => {
     const id = stepLaneId(step)
     if (!lanes.some((lane) => lane.id === id)) lanes.push({ id, label: approverLabel(step), index: lanes.length })
   })
-  lanes.push({ id: "system", label: "System", index: lanes.length })
+  lanes.push({ id: "system", label: "Hệ thống", index: lanes.length })
   return lanes.map((lane, index) => ({ ...lane, index }))
 }
 

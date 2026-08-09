@@ -26,7 +26,21 @@ interface PrintTiptapEditorProps {
   value?: string
   onChange?: (value: string) => void
   variables: TemplateVariableOption[]
+  repeatCollections?: Array<{ key: string; label: string }>
 }
+
+const PrintTableRow = TableRow.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      printEach: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-print-each"),
+        renderHTML: (attributes) => attributes.printEach ? { "data-print-each": attributes.printEach } : {},
+      },
+    }
+  },
+})
 
 const HEADER_BLOCK = `
 <section class="print-block print-block-header" style="border-bottom:2px solid #111;padding:0 0 14px;margin:0 0 18px;">
@@ -88,14 +102,40 @@ const FOOTER_BLOCK = `
 </section>
 `
 
-export function PrintTiptapEditor({ value, onChange, variables }: PrintTiptapEditorProps) {
+function repeatTableBlock(collection: string) {
+  const columns = collection === 'items'
+    ? { text: 'Tên hàng / dịch vụ', textKey: 'itemName', amount: 'Thành tiền', amountKey: 'lineTotal_fm' }
+    : collection === 'lines'
+      ? { text: 'Diễn giải', textKey: 'lineDescription', amount: 'Phát sinh Nợ', amountKey: 'debitAmount_fm' }
+      : collection === 'variants'
+        ? { text: 'Biến thể', textKey: 'name', amount: 'Giá bán', amountKey: 'sellingPrice_fm' }
+        : { text: 'Nội dung', textKey: 'name', amount: 'Giá trị', amountKey: 'amount_fm' }
+  return `
+<table style="border-collapse:collapse;width:100%;margin:0 0 18px;">
+  <thead><tr>
+    <th style="border:1px solid #ddd;padding:8px;text-align:left;width:48px;">STT</th>
+    <th style="border:1px solid #ddd;padding:8px;text-align:left;">${columns.text}</th>
+    <th style="border:1px solid #ddd;padding:8px;text-align:right;width:96px;">Số lượng</th>
+    <th style="border:1px solid #ddd;padding:8px;text-align:right;width:128px;">${columns.amount}</th>
+  </tr></thead>
+  <tbody><tr data-print-each="${collection}">
+    <td style="border:1px solid #ddd;padding:8px;">{{@index}}</td>
+    <td style="border:1px solid #ddd;padding:8px;">{{${columns.textKey}}}</td>
+    <td style="border:1px solid #ddd;padding:8px;text-align:right;">{{quantity_fm}}</td>
+    <td style="border:1px solid #ddd;padding:8px;text-align:right;">{{${columns.amountKey}}}</td>
+  </tr></tbody>
+</table>
+`
+}
+
+export function PrintTiptapEditor({ value, onChange, variables, repeatCollections = [] }: PrintTiptapEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit,
       Underline,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Table.configure({ resizable: true }),
-      TableRow,
+      PrintTableRow,
       TableHeader,
       TableCell,
     ],
@@ -118,6 +158,10 @@ export function PrintTiptapEditor({ value, onChange, variables }: PrintTiptapEdi
 
   function insertHtml(html: string) {
     editor?.chain().focus().insertContent(html).run()
+  }
+
+  function insertColumnLayout(columns: number) {
+    editor?.chain().focus().insertTable({ rows: 1, cols: columns, withHeaderRow: false }).run()
   }
 
   return (
@@ -164,10 +208,30 @@ export function PrintTiptapEditor({ value, onChange, variables }: PrintTiptapEdi
           <Button icon={<AlignLeftOutlined />} size="small" onClick={() => editor.chain().focus().setTextAlign("left").run()} />
           <Button icon={<AlignCenterOutlined />} size="small" onClick={() => editor.chain().focus().setTextAlign("center").run()} />
           <Button icon={<AlignRightOutlined />} size="small" onClick={() => editor.chain().focus().setTextAlign("right").run()} />
-          <Button size="small" icon={<FileTextOutlined />} onClick={() => insertHtml(HEADER_BLOCK)}>Header</Button>
+          <Button size="small" icon={<FileTextOutlined />} onClick={() => insertHtml(HEADER_BLOCK)}>Đầu trang</Button>
           <Button size="small" onClick={() => insertHtml(CONTENT_BLOCK)}>Nội dung</Button>
-          <Button size="small" icon={<TableOutlined />} onClick={() => insertHtml(TABLE_BLOCK)}>Table</Button>
-          <Button size="small" onClick={() => insertHtml(FOOTER_BLOCK)}>Footer</Button>
+          <Button size="small" icon={<TableOutlined />} onClick={() => insertHtml(TABLE_BLOCK)}>Bảng</Button>
+          <Select
+            className="print-tiptap-editor__block-select"
+            options={[
+              { value: 2, label: "Chia 2 cột" },
+              { value: 3, label: "Chia 3 cột" },
+              { value: 4, label: "Chia 4 cột" },
+            ]}
+            placeholder="Chia cột"
+            size="small"
+            onSelect={(columns) => insertColumnLayout(Number(columns))}
+          />
+          {repeatCollections.length > 0 && (
+            <Select
+              className="print-tiptap-editor__variable-select"
+              options={repeatCollections.map((collection) => ({ value: collection.key, label: `${collection.key} - ${collection.label}` }))}
+              placeholder="Chèn table lặp"
+              size="small"
+              onSelect={(collection) => insertHtml(repeatTableBlock(String(collection)))}
+            />
+          )}
+          <Button size="small" onClick={() => insertHtml(FOOTER_BLOCK)}>Chân trang</Button>
           <Select
             allowClear
             showSearch

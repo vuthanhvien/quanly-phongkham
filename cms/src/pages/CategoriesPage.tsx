@@ -207,7 +207,7 @@ export function CategoriesPage() {
       setImportResult(res.data as ImportResult)
       await load()
     } catch (err: unknown) {
-      void message.error(getApiErrorMessage(err, "Import thất bại"))
+      void message.error(getApiErrorMessage(err, "Nhập dữ liệu thất bại"))
     } finally {
       setImporting(false)
     }
@@ -295,13 +295,13 @@ export function CategoriesPage() {
   ]
 
   const importPreviewColumns = [
-    { title: "code", dataIndex: "code", key: "code", width: 120 },
-    { title: "name", dataIndex: "name", key: "name" },
-    { title: "parentCode", dataIndex: "parentCode", key: "parentCode", width: 120 },
-    { title: "description", dataIndex: "description", key: "description" },
-    { title: "sortOrder", dataIndex: "sortOrder", key: "sortOrder", width: 80 },
+    { title: "Mã", dataIndex: "code", key: "code", width: 120 },
+    { title: "Tên", dataIndex: "name", key: "name" },
+    { title: "Mã danh mục cha", dataIndex: "parentCode", key: "parentCode", width: 120 },
+    { title: "Mô tả", dataIndex: "description", key: "description" },
+    { title: "Thứ tự", dataIndex: "sortOrder", key: "sortOrder", width: 80 },
     {
-      title: "isActive",
+      title: "Đang sử dụng",
       dataIndex: "isActive",
       key: "isActive",
       width: 80,
@@ -400,7 +400,7 @@ export function CategoriesPage() {
         title={
           <ModalTitleBar
             fullscreen={fullscreenPopup === "import"}
-            title="Import Ngành / Nhóm / Loại"
+            title="Nhập Ngành / Nhóm / Loại"
             onToggleFullscreen={() => setFullscreenPopup((current) => current === "import" ? null : "import")}
           />
         }

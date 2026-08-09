@@ -30,7 +30,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState, type Key } from "react"
 import * as XLSX from "xlsx"
 import { api } from "../api"
-import { appModuleGroups } from "../company-types"
+import { buildGroupedModuleOptions } from "../company-types"
 import { ModalTitleBar } from "../components/ModalTitleBar"
 import { CustomField, entityLabels } from "../models"
 
@@ -52,33 +52,7 @@ const RELATIVE_RESOURCE_OPTIONS = Object.entries(entityLabels).map(
   ([value, label]) => ({ value, label }),
 )
 
-const CUSTOM_FIELD_ENTITY_OPTIONS = buildCustomFieldEntityOptions()
-
-function buildCustomFieldEntityOptions() {
-  const groupedResources = new Set<string>()
-  const groups = appModuleGroups
-    .map((group) => {
-      const options = group.modules
-        .filter((resource) => Boolean(entityLabels[resource]))
-        .map((resource) => {
-          groupedResources.add(resource)
-          return { value: resource, label: entityLabels[resource] }
-        })
-
-      return options.length > 0 ? { label: group.label, options } : null
-    })
-    .filter(Boolean) as Array<{ label: string; options: Array<{ value: string; label: string }> }>
-
-  const remainingOptions = Object.entries(entityLabels)
-    .filter(([resource]) => !groupedResources.has(resource))
-    .map(([value, label]) => ({ value, label }))
-
-  if (remainingOptions.length > 0) {
-    groups.push({ label: "Quản trị & dữ liệu hệ thống", options: remainingOptions })
-  }
-
-  return groups
-}
+const CUSTOM_FIELD_ENTITY_OPTIONS = buildGroupedModuleOptions(entityLabels)
 
 export function CustomFieldsPage() {
   const [entityType, setEntityType] = useState("customers")
@@ -280,7 +254,7 @@ export function CustomFieldsPage() {
 
   async function confirmImport(mode: "create" | "upsert") {
     if (importPayload.length === 0) {
-      message.warning("File import chưa có dữ liệu hợp lệ")
+      message.warning("Tệp nhập chưa có dữ liệu hợp lệ")
       return
     }
     setImportModal(false)
@@ -358,10 +332,10 @@ export function CustomFieldsPage() {
           <Dropdown
             dropdownRender={() => (
               <Card size="small" styles={{ body: { display: "grid", gap: 4, minWidth: 190 } }}>
-                <Button icon={<UploadOutlined />} type="text" onClick={() => openBatch("create")}>Add multi</Button>
-                <Button icon={<UploadOutlined />} type="text" onClick={() => openBatch("upsert")}>Update multi</Button>
-                <Button icon={<DownloadOutlined />} type="text" onClick={exportFields}>Export cấu hình</Button>
-                <Button icon={<DownloadOutlined />} type="text" onClick={exportSampleFields}>Tải data test</Button>
+                <Button icon={<UploadOutlined />} type="text" onClick={() => openBatch("create")}>Thêm nhiều trường</Button>
+                <Button icon={<UploadOutlined />} type="text" onClick={() => openBatch("upsert")}>Cập nhật nhiều trường</Button>
+                <Button icon={<DownloadOutlined />} type="text" onClick={exportFields}>Xuất cấu hình</Button>
+                <Button icon={<DownloadOutlined />} type="text" onClick={exportSampleFields}>Tải dữ liệu mẫu</Button>
                 <Upload {...uploadProps}>
                   <Button block icon={<ImportOutlined />} type="text">Nhập file</Button>
                 </Upload>
@@ -391,7 +365,7 @@ export function CustomFieldsPage() {
           scroll={{ x: "max-content" }}
           columns={[
             { title: "Nhãn", dataIndex: "label" },
-            { title: "Key", dataIndex: "key" },
+            { title: "Mã trường", dataIndex: "key" },
             { title: "Kiểu", dataIndex: "dataType" },
             {
               title: "Liên kết",
@@ -498,7 +472,7 @@ export function CustomFieldsPage() {
         title={
           <ModalTitleBar
             fullscreen={fullscreenPopup === "batch"}
-            title={batchMode === "create" ? "Add multi custom fields" : "Update multi custom fields"}
+            title={batchMode === "create" ? "Thêm nhiều trường tuỳ biến" : "Cập nhật nhiều trường tuỳ biến"}
             onToggleFullscreen={() => setFullscreenPopup((current) => current === "batch" ? null : "batch")}
           />
         }
@@ -515,8 +489,8 @@ export function CustomFieldsPage() {
         width={fullscreenPopup === "batch" ? "calc(100vw - 24px)" : 1440}
       >
         <Typography.Paragraph type="secondary">
-          Chỉnh nhiều field trực tiếp theo dạng bảng. `Add multi` dùng để thêm
-          mới hàng loạt, `Update multi` mở toàn bộ field hiện có để sửa đồng
+          Chỉnh nhiều trường trực tiếp theo dạng bảng. `Thêm nhiều trường` dùng để thêm
+          mới hàng loạt, `Cập nhật nhiều trường` mở toàn bộ trường hiện có để sửa đồng
           loạt.
         </Typography.Paragraph>
         <Space style={{ marginBottom: 16 }}>
@@ -596,17 +570,17 @@ export function CustomFieldsPage() {
           scroll={{ x: "max-content", y: 360 }}
           dataSource={importPayload}
           columns={[
-            { title: "Label", dataIndex: "label" },
-            { title: "Key", dataIndex: "key" },
-            { title: "Type", dataIndex: "dataType" },
+            { title: "Nhãn", dataIndex: "label" },
+            { title: "Mã trường", dataIndex: "key" },
+            { title: "Kiểu dữ liệu", dataIndex: "dataType" },
             {
-              title: "Options",
+              title: "Lựa chọn",
               dataIndex: "options",
               render: (value) =>
                 Array.isArray(value) ? value.join(", ") : value || "-",
             },
             {
-              title: "Relation",
+              title: "Liên kết",
               dataIndex: "relationResource",
               render: (value) => value || "-",
             },
@@ -723,7 +697,7 @@ function parseBatchPayload(text: string): ParsedFieldInput[] {
   if (source.startsWith("[")) {
     const parsed = JSON.parse(source)
     if (!Array.isArray(parsed)) {
-      throw new Error("JSON import phải là array")
+      throw new Error("JSON nhập phải là mảng dữ liệu")
     }
     return parsed.map(normalizeParsedField)
   }
@@ -802,7 +776,7 @@ function buildBatchColumns(
       ),
     },
     {
-      title: "Key",
+      title: "Mã trường",
       dataIndex: "key",
       width: 220,
       render: (_, row) => (
@@ -849,7 +823,7 @@ function buildBatchColumns(
       ),
     },
     {
-      title: "Options",
+      title: "Lựa chọn",
       dataIndex: "options",
       width: 260,
       render: (_, row) =>

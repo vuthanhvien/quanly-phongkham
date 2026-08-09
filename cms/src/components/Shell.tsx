@@ -131,10 +131,10 @@ const menuGroupIcons: Record<AppModuleGroup["key"], React.ReactNode> = {
 }
 
 const moduleNavigation: Record<string, { path: string; label: string; screen?: string }> = {
-  "landing-pages": { path: "/pages", label: "Pages", screen: "settings" },
-  "landing-forms": { path: "/forms", label: "Forms", screen: "settings" },
-  "landing-domains": { path: "/domains", label: "Domains", screen: "settings" },
-  "landing-config": { path: "/configs", label: "Configs", screen: "settings" },
+  "landing-pages": { path: "/pages", label: "Trang đích", screen: "settings" },
+  "landing-forms": { path: "/forms", label: "Biểu mẫu", screen: "settings" },
+  "landing-domains": { path: "/domains", label: "Tên miền", screen: "settings" },
+  "landing-config": { path: "/configs", label: "Cấu hình", screen: "settings" },
   "zalo-inbox": { path: "/zalo-inbox", label: "Hộp thư Zalo", screen: "zalo-inbox" },
   "accounting-reports": { path: "/accounting-reports", label: "Báo cáo kế toán", screen: "accounting-reports" },
 }
@@ -282,6 +282,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
         ...(group.key === "admin" && hasScreenAccess("settings")
           ? [
               {
+                key: "/role-module-settings",
+                icon: <SettingOutlined />,
+                label: <Link to="/role-module-settings">Hiển thị theo role/module</Link>,
+              },
+              {
                 key: "/roles",
                 icon: menuIcons.roles,
                 label: <Link to="/roles">Vai trò & Phân quyền</Link>,
@@ -295,6 +300,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
       icon: <GoldOutlined />,
       label: "Công cụ hệ thống",
       children: [
+        hasScreenAccess("settings")
+          ? {
+              key: "/print-templates",
+              icon: <FileTextOutlined />,
+              label: <Link to="/print-templates">Mẫu in</Link>,
+            }
+          : null,
         hasScreenAccess("settings")
           ? {
               key: "/ui-settings",
@@ -330,13 +342,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
               label: <Link to="/locations">Master Data Địa chỉ</Link>,
             }
           : null,
-        hasScreenAccess("settings")
-          ? {
-              key: "/settings",
-              icon: <SettingOutlined />,
-              label: <Link to="/settings">Cấu hình động</Link>,
-            }
-          : null,
         hasScreenAccess("audit-logs")
           ? {
               key: "/audit-logs",
@@ -370,7 +375,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     (["/pages", "/forms", "/posts", "/news", "/domains", "/configs"].some((path) => location.pathname.startsWith(path))
       ? "landing"
       : undefined) ||
-    (location.pathname === "/roles"
+    (location.pathname === "/roles" || location.pathname === "/role-module-settings"
       ? "admin"
       : undefined),
     location.pathname.startsWith("/settings") ||
@@ -380,6 +385,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     location.pathname.startsWith("/chatbot-settings") ||
     location.pathname.startsWith("/custom-fields") ||
     location.pathname.startsWith("/custom-tables") ||
+    location.pathname.startsWith("/print-templates") ||
     location.pathname.startsWith("/locations") ||
     location.pathname.startsWith("/audit-logs")
       ? "system-tools"

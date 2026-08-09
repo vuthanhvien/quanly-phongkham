@@ -310,7 +310,7 @@ export function BlockComposerModal() {
 
           {composer.block.type === 'form' ? (
             <Space direction="vertical" size={10} style={{ width: '100%' }}>
-              <Form.Item label="Landing Form" extra="Form được tạo trong mục Landing Forms" style={{ marginBottom: 0 }}>
+              <Form.Item label="Biểu mẫu trang đích" extra="Biểu mẫu được tạo trong mục Biểu mẫu trang đích" style={{ marginBottom: 0 }}>
                 <Select allowClear placeholder="Chọn Landing Form" value={composer.block.formId} options={landingForms.map((form) => ({ value: form.id, label: `${form.title} — ${form.name}` }))} onChange={(formId) => onUpdateBlock({ formId })} />
               </Form.Item>
               <Row gutter={12}>
@@ -335,7 +335,7 @@ export function BlockComposerModal() {
                 <Select
                   value={composer.block.targetResource || 'leads'}
                   options={[
-                    { value: 'leads', label: 'Tạo Lead' },
+                    { value: 'leads', label: 'Tạo khách tiềm năng' },
                     { value: 'appointments', label: 'Tạo lịch hẹn' },
                     { value: 'service-orders', label: 'Tạo đơn hàng' },
                   ]}

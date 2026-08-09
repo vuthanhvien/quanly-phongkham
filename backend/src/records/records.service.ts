@@ -1036,6 +1036,30 @@ export class RecordsService {
     return { data: this.protect(resource, hydrated) };
   }
 
+  async createStaffAccount(staffId: string, payload: { email?: string; username?: string; password?: string; role?: string; branchId?: string }, user: AuthUser) {
+    await this.assertPermission(user, 'user-accounts', 'create');
+    const staff = await this.staff.findOne({ where: { id: staffId, isArchived: false } });
+    if (!staff) throw new NotFoundException('Không tìm thấy nhân viên');
+    const existing = await this.users.findOne({ where: { staffId } })
+      || (staff.userId ? await this.users.findOne({ where: { id: staff.userId } }) : null);
+    if (existing) throw new BadRequestException('Nhân viên này đã có tài khoản liên kết');
+
+    const normalized = await this.normalizeInput('user-accounts', {
+      email: payload.email || staff.email,
+      username: payload.username,
+      password: payload.password,
+      role: payload.role || this.resolveStaffType(staff),
+      branchId: payload.branchId,
+      staffId: staff.id,
+      fullName: staff.fullName,
+    }, true);
+    const account = await this.users.save(this.users.create(normalized as Partial<User>));
+    staff.userId = account.id;
+    await this.staff.save(staff);
+    await this.audit(user, 'CREATE_ACCOUNT', 'staff', staff.id, { userId: account.id });
+    return { data: this.protect('user-accounts', account as unknown as ConfigurableEntity) };
+  }
+
   async listDrafts (resource: string, user: AuthUser) {
     this.repository(resource); // validates the resource without touching its records
     await this.assertPermission(user, resource, 'create');
@@ -3168,7 +3192,7 @@ export class RecordsService {
         { staffId: In(staffIds) },
         ...(userIds.length ? [{ id: In(userIds) }] : []),
       ],
-      select: ['id', 'staffId', 'role'],
+      select: ['id', 'staffId', 'email', 'username', 'role', 'isActive'],
       take: Math.max(100, staffIds.length * 2),
     });
     return records.map((record) => {
@@ -3177,6 +3201,13 @@ export class RecordsService {
         ...record,
         type: this.resolveStaffType(record),
         userRole: matchedUser?.role || undefined,
+        linkedAccount: matchedUser ? {
+          id: matchedUser.id,
+          email: matchedUser.email,
+          username: matchedUser.username,
+          role: matchedUser.role,
+          isActive: matchedUser.isActive,
+        } : undefined,
       } as Staff;
     });
   }
@@ -3637,6 +3668,20 @@ export class RecordsService {
     for (const filter of filters) {
       const customField = customByKey.get(filter.field);
       if (customField) {
+        if (customField.relationResource) {
+          const relationIds = await this.findRelationIdsByKeyword(customField.relationResource, String(filter.value));
+          const values = await this.customFieldValues.find({
+            where: { entityType: resource, fieldKey: filter.field },
+            select: ['recordId', 'valueText'],
+          });
+          const matchingIds = values
+            .filter((row) => relationIds.has(String(this.parseCustomFieldValue(row.valueText, customField.dataType))))
+            .map((row) => row.recordId);
+          where = this.mergeWhere(where, {
+            id: In(matchingIds.length > 0 ? matchingIds : ['__no_advanced_relation_match__']),
+          } as FindOptionsWhere<ConfigurableEntity>);
+          continue;
+        }
         const normalizedFilter = filter.operator === 'number'
           ? { ...filter, operator: this.advancedNumericOperator(filter.value), value: this.advancedFilterValue(filter.value, 'number') }
           : filter;
@@ -3654,6 +3699,14 @@ export class RecordsService {
       }
 
       if (!columnNames.has(filter.field)) continue;
+      const relationResource = FIELD_RELATION_RESOURCES[filter.field];
+      if (relationResource) {
+        const relationIds = await this.findRelationIdsByKeyword(relationResource, String(filter.value));
+        where = this.mergeWhere(where, {
+          [filter.field]: In(relationIds.size > 0 ? Array.from(relationIds) : ['__no_advanced_relation_match__']),
+        } as FindOptionsWhere<ConfigurableEntity>);
+        continue;
+      }
       const column = repository.metadata.columns.find((item) => item.propertyName === filter.field);
       const value = this.advancedFilterValue(filter.value, String(column?.type || ''));
       const operator = filter.operator === 'number' ? this.advancedNumericOperator(filter.value) : filter.operator;
@@ -3661,6 +3714,21 @@ export class RecordsService {
       where = this.mergeWhere(where, { [filter.field]: condition } as FindOptionsWhere<ConfigurableEntity>);
     }
     return where;
+  }
+
+  private async findRelationIdsByKeyword(resource: string, keyword: string) {
+    const normalizedKeyword = keyword.trim();
+    if (!normalizedKeyword) return new Set<string>();
+    const repository = this.repository(resource);
+    const searchableColumns = ['code', 'name', 'fullName', 'title', 'email', 'username', 'slug', 'accountNumber', 'shortName']
+      .filter((field) => repository.metadata.columns.some((column) => column.propertyName === field));
+    if (searchableColumns.length === 0) return new Set<string>();
+    const rows = await repository.find({
+      where: searchableColumns.map((field) => ({ [field]: ILike(`%${normalizedKeyword}%`) })) as FindOptionsWhere<ConfigurableEntity>[],
+      select: ['id'],
+      take: 5000,
+    });
+    return new Set(rows.map((row) => String(row.id)));
   }
 
   private parseAdvancedFilters (rawFilters?: string) {

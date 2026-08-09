@@ -1776,6 +1776,40 @@ export class AppUiSetting {
   updatedAt: Date;
 }
 
+/** One company-wide Google Drive connection per tenant database. */
+@Entity('google_drive_connections')
+export class GoogleDriveConnection {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ default: 'company', unique: true })
+  connectionKey: string;
+
+  @Column({ nullable: true })
+  accountEmail?: string;
+
+  @Column({ type: 'text', nullable: true })
+  accessTokenEncrypted?: string;
+
+  @Column({ type: 'text', nullable: true })
+  refreshTokenEncrypted?: string;
+
+  @Column({ nullable: true })
+  accessTokenExpiresAt?: Date;
+
+  @Column({ type: 'text', nullable: true })
+  oauthState?: string;
+
+  @Column({ default: false })
+  isConnected: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
 @Entity('landing_form_submissions')
 export class LandingFormSubmission {
   @PrimaryGeneratedColumn('uuid')
@@ -2838,6 +2872,7 @@ export const ENTITIES = [
   LandingDomain,
   LandingForm,
   AppUiSetting,
+  GoogleDriveConnection,
   LandingFormSubmission,
   AuditLog,
   RecordDraft,

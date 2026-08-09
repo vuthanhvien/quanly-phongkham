@@ -1,9 +1,10 @@
 import { BankOutlined, DollarOutlined, FundOutlined, RiseOutlined } from "@ant-design/icons"
-import { Button, Card, Col, DatePicker, Row, Select, Space, Statistic, Table, Tabs, Typography, message } from "antd"
+import { Button, Card, Col, DatePicker, Modal, Row, Select, Space, Statistic, Table, Tabs, Typography, message } from "antd"
 import type { TabsProps } from "antd"
 import dayjs, { Dayjs } from "dayjs"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
+import { hasActionAccess } from "../access"
 import { getFirstOptionValue } from "../utils/branchDefaults"
 import { getApiErrorMessage } from "../utils/apiError"
 
@@ -41,6 +42,9 @@ export function AccountingReportsPage() {
   const [branchId, setBranchId] = useState<string>()
   const [periodId, setPeriodId] = useState<string>()
   const [accountId, setAccountId] = useState<string>()
+  const [bootstrapping, setBootstrapping] = useState(false)
+  const [bootstrapModalOpen, setBootstrapModalOpen] = useState(false)
+  const canBootstrapAccounting = hasActionAccess("accounting-chart-accounts", "create")
 
   useEffect(() => {
     void loadLookups()
@@ -84,6 +88,20 @@ export function AccountingReportsPage() {
     }
   }
 
+  async function bootstrapAccounting() {
+    setBootstrapping(true)
+    try {
+      const response = await api.post("/records/accounting/bootstrap-vn")
+      const result = response.data?.data || {}
+      message.success(`Đã khởi tạo ${result.accountsSeeded || 0} tài khoản và ${result.cashFlowMappingsSeeded || 0} mã dòng tiền`)
+      await loadLookups()
+      await loadReport()
+      setBootstrapModalOpen(false)
+    } finally {
+      setBootstrapping(false)
+    }
+  }
+
   function buildParams(reportKey: ReportKey) {
     const params: Record<string, string> = {}
     if (fromDate) params.fromDate = fromDate.format("YYYY-MM-DD")
@@ -106,6 +124,11 @@ export function AccountingReportsPage() {
             Xem sổ cái, phát sinh, dòng tiền và công nợ theo dữ liệu đã ghi sổ.
           </Typography.Text>
         </div>
+        {canBootstrapAccounting && (
+          <Button loading={bootstrapping} onClick={() => setBootstrapModalOpen(true)}>
+            Khởi tạo dữ liệu kế toán VN
+          </Button>
+        )}
       </div>
 
       <Card className="glass-card detail-card" style={{ marginBottom: 16 }}>
@@ -192,6 +215,19 @@ export function AccountingReportsPage() {
           scroll={{ x: "max-content" }}
         />
       </Card>
+
+      <Modal
+        cancelText="Hủy"
+        confirmLoading={bootstrapping}
+        okButtonProps={{ className: "primary-glow", type: "primary" }}
+        okText="Khởi tạo"
+        open={bootstrapModalOpen}
+        title="Khởi tạo dữ liệu kế toán Việt Nam?"
+        onCancel={() => setBootstrapModalOpen(false)}
+        onOk={() => void bootstrapAccounting()}
+      >
+        Hệ thống sẽ bổ sung hệ thống tài khoản, mã dòng tiền và thiết lập tài chính mẫu. Dữ liệu hiện có không bị xóa.
+      </Modal>
     </>
   )
 }

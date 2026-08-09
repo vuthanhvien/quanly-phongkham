@@ -60,7 +60,7 @@ export function LandingDomainsPage() {
 
   return <>
     <div className="page-header">
-      <Typography.Title level={3}>Domain Landing</Typography.Title>
+      <Typography.Title level={3}>Tên miền trang đích</Typography.Title>
       <Button className="primary-glow" icon={<PlusOutlined />} type="primary" onClick={openCreate}>Thêm domain</Button>
     </div>
     <Card className="table-card">
@@ -71,7 +71,7 @@ export function LandingDomainsPage() {
         rowKey="domain"
         columns={[
           { title: "Tên", dataIndex: "name" },
-          { title: "Domain", dataIndex: "domain", render: (domain: string) => <Space><GlobalOutlined /><strong>{domain}</strong></Space> },
+          { title: "Tên miền", dataIndex: "domain", render: (domain: string) => <Space><GlobalOutlined /><strong>{domain}</strong></Space> },
           { title: "", width: 90, render: (_value, row) => <Space size={2}>
             <Tooltip title="Sửa"><Button icon={<EditOutlined />} type="text" onClick={() => openEdit(row)} /></Tooltip>
             <Popconfirm cancelText="Hủy" okButtonProps={{ danger: true }} okText="Gỡ" title={`Gỡ domain ${row.domain}?`} onConfirm={() => void remove(row.domain)}>

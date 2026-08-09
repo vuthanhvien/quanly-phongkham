@@ -79,7 +79,7 @@ interface QuickActionItem {
 }
 
 const EVENT_TYPE_OPTIONS: Array<{ label: string; value: PlannerEventType }> = [
-  { label: "Booking", value: "appointment" },
+  { label: "Lịch hẹn", value: "appointment" },
   { label: "Ca làm", value: "schedule" },
   { label: "Xin nghỉ", value: "leave" },
   { label: "Chấm công", value: "attendance" },

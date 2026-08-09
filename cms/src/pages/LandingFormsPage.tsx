@@ -2,6 +2,7 @@ import { CheckOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Card, Checkbox, Drawer, Form, Input, Modal, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
+import { buildGroupedModuleOptions } from '../company-types'
 import { ModalTitleBar } from '../components/ModalTitleBar'
 import { baseFields, entityLabels, type FieldSpec, type LandingFormField } from '../models'
 import { createId } from '../utils/createId'
@@ -44,7 +45,7 @@ export function LandingFormsPage() {
     try {
       const formsResponse = await api.get('/settings/landing-forms')
       setItems(formsResponse.data.data || [])
-    } catch (error) { message.error(getApiErrorMessage(error, 'Không tải được Landing Forms')) }
+    } catch (error) { message.error(getApiErrorMessage(error, 'Không tải được biểu mẫu trang đích')) }
     finally { setLoading(false) }
   }
 
@@ -94,11 +95,11 @@ export function LandingFormsPage() {
   }
 
   return <>
-    <div className="page-header"><Typography.Title level={3}>Landing Forms</Typography.Title><Button className="primary-glow" type="primary" icon={<PlusOutlined />} onClick={openCreate}>Tạo form</Button></div>
+    <div className="page-header"><Typography.Title level={3}>Biểu mẫu trang đích</Typography.Title><Button className="primary-glow" type="primary" icon={<PlusOutlined />} onClick={openCreate}>Tạo biểu mẫu</Button></div>
     <Card className="glass-card"><Table rowKey="id" loading={loading} dataSource={items} columns={[
       { title: 'Tên form', dataIndex: 'name' }, { title: 'Tiêu đề', dataIndex: 'title' },
-      { title: 'Model', render: (_value, item) => <Tag>{entityLabels[item.targetResource] || item.targetResource}</Tag> },
-      { title: 'Fields', render: (_value, item) => item.fields?.length || 0 },
+      { title: 'Đối tượng', render: (_value, item) => <Tag>{entityLabels[item.targetResource] || item.targetResource}</Tag> },
+      { title: 'Số trường', render: (_value, item) => item.fields?.length || 0 },
       { title: '', width: 70, render: (_value, item) => <Tooltip title="Xem submissions"><Button type="text" icon={<EyeOutlined />} onClick={() => void showSubmissions(item)} /></Tooltip> },
     ]} /></Card>
     <Modal
@@ -115,7 +116,7 @@ export function LandingFormsPage() {
     >
       <Form form={form} layout="vertical" onFinish={(values) => void createForm(values)}>
         <Space style={{ display: 'flex' }}><Form.Item name="name" label="Tên form" rules={[{ required: true }]}><Input /></Form.Item><Form.Item name="title" label="Tiêu đề hiển thị" rules={[{ required: true }]}><Input /></Form.Item></Space>
-        <Form.Item name="targetResource" label="Model lưu sau khi duyệt" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" onChange={onModelChange} options={Object.keys(baseFields).map((key) => ({ value: key, label: entityLabels[key] || key }))} /></Form.Item>
+        <Form.Item name="targetResource" label="Model lưu sau khi duyệt" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" onChange={onModelChange} options={buildGroupedModuleOptions(entityLabels, Object.keys(baseFields))} /></Form.Item>
         <Form.Item name="fieldKeys" label="Field hiển thị cho người dùng" rules={[{ required: true, message: 'Chọn ít nhất một field' }]}><Checkbox.Group style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }} options={modelFields.map((field) => ({ value: field.key, label: `${field.label}${field.required ? ' *' : ''}` }))} /></Form.Item>
         <Form.Item name="description" label="Mô tả"><Input.TextArea /></Form.Item>
         <Space><Button className="primary-glow" htmlType="submit" loading={saving} type="primary">Tạo form</Button><Button onClick={() => { setOpen(false); setFullscreenPopup(false) }}>Hủy</Button></Space>

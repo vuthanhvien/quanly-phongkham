@@ -20,6 +20,13 @@ interface Template {
   originalFilename?: string
 }
 
+const printRepeatCollections: Record<string, Array<{ key: string; label: string }>> = {
+  'service-orders': [{ key: 'items', label: 'Dòng đơn hàng / dịch vụ' }],
+  'accounting-vouchers': [{ key: 'lines', label: 'Dòng hạch toán' }],
+  products: [{ key: 'variants', label: 'Biến thể / SKU' }],
+  projects: [{ key: 'members', label: 'Thành viên dự án' }],
+}
+
 export function PrintTemplateEditorPage() {
   const { id = "new" } = useParams()
   const [searchParams] = useSearchParams()
@@ -27,7 +34,6 @@ export function PrintTemplateEditorPage() {
   const entityType = searchParams.get("module") || "customers"
   const presetKey = searchParams.get("preset") || ""
   const [form] = Form.useForm()
-  const templateHtml = Form.useWatch("htmlTemplate", form)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [customFields, setCustomFields] = useState<CustomField[]>([])
@@ -158,18 +164,10 @@ export function PrintTemplateEditorPage() {
               <Input />
             </Form.Item>
             <Form.Item name="htmlTemplate" label="Nội dung mẫu in" rules={[{ required: true }]}>
-              <PrintTiptapEditor variables={templateVariables} />
+              <PrintTiptapEditor variables={templateVariables} repeatCollections={printRepeatCollections[entityType] || []} />
             </Form.Item>
           </Card>
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
-            <Card className="template-preview-card" title="Preview trực tiếp">
-              <div
-                className="template-preview-surface"
-                dangerouslySetInnerHTML={{
-                  __html: templateHtml || "<p>Nhập nội dung mẫu in để xem preview tại đây.</p>",
-                }}
-              />
-            </Card>
             <Card className="template-preview-card" title="Biến có thể dùng">
               <Select
                 allowClear

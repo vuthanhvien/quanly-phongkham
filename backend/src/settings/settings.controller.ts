@@ -5,6 +5,10 @@ import { AuthUser, Public } from '../common/auth';
 import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, DynamicRoleDefinition, LandingForm, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
 import { SettingsService } from './settings.service';
 
+function escapeHtml(value: string) {
+  return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character] || character));
+}
+
 @Controller('settings')
 export class SettingsController {
   constructor(private readonly settings: SettingsService) {}
@@ -72,9 +76,10 @@ export class SettingsController {
   async deleteViews(
     @Param('entityType') entityType: string,
     @Query('role') role?: string,
+    @Query('viewType') viewType?: string,
     @Request() request?: { user: AuthUser },
   ) {
-    return { data: await this.settings.deleteViews(entityType, role, request?.user) };
+    return { data: await this.settings.deleteViews(entityType, role, viewType, request?.user) };
   }
 
   @Get('print-templates')
@@ -187,6 +192,78 @@ export class SettingsController {
   @Post('app-ui/initialize-industry-data')
   async initializeIndustryData(@Body() payload: { companyType?: string }, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.initializeIndustryData(payload?.companyType, request?.user) };
+  }
+
+  @Get('google-drive')
+  async googleDrive(@Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.getGoogleDriveConnection(request?.user) };
+  }
+
+  @Post('google-drive/connect')
+  async connectGoogleDrive(@Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.beginGoogleDriveConnection(request?.user) };
+  }
+
+  @Post('google-drive/disconnect')
+  async disconnectGoogleDrive(@Request() request?: { user: AuthUser }) {
+    await this.settings.disconnectGoogleDrive(request?.user);
+    return { data: { connected: false } };
+  }
+
+  @Get('google-drive/files')
+  async googleDriveFiles(@Query('q') query: string | undefined, @Query('pageToken') pageToken: string | undefined, @Query('parentId') parentId: string | undefined, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.listGoogleDriveFiles(query, pageToken, parentId, request?.user) };
+  }
+
+  @Get('google-drive/folders')
+  async googleDriveFolders(@Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.listGoogleDriveFolders(request?.user) };
+  }
+
+  @Get('google-drive/files/:id/download')
+  async downloadGoogleDriveFile(@Param('id') id: string, @Request() request: { user: AuthUser }, @Res() response: Response) {
+    const file = await this.settings.downloadGoogleDriveFile(id, request.user);
+    response.setHeader('Content-Type', file.contentType);
+    response.setHeader('Content-Disposition', file.contentDisposition || 'attachment');
+    response.send(file.buffer);
+  }
+
+  @Post('google-drive/folders')
+  async createGoogleDriveFolder(@Body() payload: { name?: string; parentId?: string }, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.createGoogleDriveFolder(payload, request?.user) };
+  }
+
+  @Post('google-drive/files/upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadGoogleDriveFile(@UploadedFile() file: any, @Body('parentId') parentId: string | undefined, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.uploadGoogleDriveFile(file, parentId, request?.user) };
+  }
+
+  @Patch('google-drive/files/:id')
+  async renameGoogleDriveItem(@Param('id') id: string, @Body('name') name: string | undefined, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.renameGoogleDriveItem(id, name, request?.user) };
+  }
+
+  @Delete('google-drive/files/:id')
+  async deleteGoogleDriveItem(@Param('id') id: string, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.deleteGoogleDriveItem(id, request?.user) };
+  }
+
+  @Public()
+  @Get('google-drive/callback')
+  async googleDriveCallback(
+    @Query('code') code: string | undefined,
+    @Query('state') state: string | undefined,
+    @Query('error') error: string | undefined,
+    @Res() response: Response,
+  ) {
+    try {
+      await this.settings.completeGoogleDriveConnection(code, state, error);
+      response.type('html').send('<!doctype html><html><body style="font-family:Arial,sans-serif;padding:32px;color:#173d1c"><h2>Đã kết nối Google Drive</h2><p>Drive này sẽ được dùng chung cho công ty. Bạn có thể đóng cửa sổ này.</p><script>window.opener&&window.opener.postMessage({type:"google-drive-connected"}, window.location.origin)</script></body></html>');
+    } catch (callbackError) {
+      const detail = callbackError instanceof Error ? callbackError.message : 'Không thể kết nối Google Drive';
+      response.status(400).type('html').send(`<!doctype html><html><body style="font-family:Arial,sans-serif;padding:32px;color:#a8071a"><h2>Kết nối Google Drive chưa thành công</h2><p>${escapeHtml(detail)}</p><p>Đóng cửa sổ này rồi thử lại.</p></body></html>`);
+    }
   }
 
   @Get('chatbot')

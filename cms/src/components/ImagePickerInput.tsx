@@ -75,7 +75,7 @@ export function ImagePickerInput({ value = "", onChange, placeholder = "https://
         </Tooltip>
         {value && (
           <img
-            alt="preview"
+            alt="Xem trước"
             src={value}
             style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4, border: "1px solid #d9d9d9", flexShrink: 0 }}
             onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}

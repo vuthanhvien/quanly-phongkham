@@ -115,7 +115,7 @@ export function FileUploadPanel({
       createFolderForm.resetFields()
       createFolderForm.setFieldValue("parentId", createdFolder.id)
       setShowCreateFolder(false)
-      message.success("Đã tạo folder mới")
+      message.success("Đã tạo thư mục mới")
     } finally {
       setCreatingFolder(false)
     }
@@ -124,16 +124,16 @@ export function FileUploadPanel({
   return (
     <Form form={form} layout="vertical" onFinish={(values) => void submit(values)}>
       <Typography.Paragraph type="secondary">
-        File phải được upload vào folder trước rồi mới được chọn vào record.
+        Tệp phải được tải lên thư mục trước rồi mới được chọn vào bản ghi.
       </Typography.Paragraph>
       {multiple && (
         <Typography.Paragraph type="secondary">
-          Có thể kéo nhiều file cùng lúc. Tất cả file sẽ được lưu vào cùng folder đang chọn.
+          Có thể kéo nhiều tệp cùng lúc. Tất cả tệp sẽ được lưu vào cùng thư mục đang chọn.
         </Typography.Paragraph>
       )}
       <div className="upload-folder-block">
         <div className="upload-folder-block-head">
-          <Typography.Text strong>Folder upload</Typography.Text>
+          <Typography.Text strong>Thư mục tải lên</Typography.Text>
           <Button
             icon={<FolderAddOutlined />}
             type={showCreateFolder ? "default" : "dashed"}
@@ -145,13 +145,13 @@ export function FileUploadPanel({
               }
             }}
           >
-            {showCreateFolder ? "Ẩn tạo folder" : "Tạo folder mới"}
+            {showCreateFolder ? "Ẩn tạo thư mục" : "Tạo thư mục mới"}
           </Button>
         </div>
-        <Form.Item name="folderId" rules={[{ required: true, message: "Chọn folder upload" }]}>
+        <Form.Item name="folderId" rules={[{ required: true, message: "Chọn thư mục tải lên" }]}>
           <TreeSelect
             allowClear
-            placeholder="Chọn folder"
+            placeholder="Chọn thư mục"
             showSearch
             treeData={folders}
             treeDefaultExpandAll
@@ -167,24 +167,24 @@ export function FileUploadPanel({
             >
               <div className="upload-folder-create-grid">
                 <Form.Item
-                  label="Mã folder"
+                  label="Mã thư mục"
                   name="code"
-                  rules={[{ required: true, message: "Nhập mã folder" }]}
+                  rules={[{ required: true, message: "Nhập mã thư mục" }]}
                 >
                   <Input placeholder="VD: HSKH-2026" />
                 </Form.Item>
                 <Form.Item
-                  label="Tên folder"
+                  label="Tên thư mục"
                   name="name"
-                  rules={[{ required: true, message: "Nhập tên folder" }]}
+                  rules={[{ required: true, message: "Nhập tên thư mục" }]}
                 >
-                  <Input placeholder="Tên folder mới" />
+                  <Input placeholder="Tên thư mục mới" />
                 </Form.Item>
               </div>
-              <Form.Item label="Folder cha" name="parentId">
+              <Form.Item label="Thư mục cha" name="parentId">
                 <TreeSelect
                   allowClear
-                  placeholder="Tạo ở folder gốc"
+                  placeholder="Tạo ở thư mục gốc"
                   showSearch
                   treeData={folders}
                   treeDefaultExpandAll
@@ -232,12 +232,12 @@ export function FileUploadPanel({
             <InboxOutlined />
           </p>
           <p className="ant-upload-text">Kéo file vào đây hoặc bấm để chọn {multiple ? "nhiều file" : "file"}</p>
-          <p className="ant-upload-hint">Hệ thống sẽ lưu file vào folder bạn đã chọn.</p>
+          <p className="ant-upload-hint">Hệ thống sẽ lưu tệp vào thư mục bạn đã chọn.</p>
         </Upload.Dragger>
       </Form.Item>
       <Space>
         <Button className="primary-glow" htmlType="submit" icon={<UploadOutlined />} loading={submitting} type="primary">
-          {multiple ? "Upload file" : "Upload và chọn"}
+          {multiple ? "Tải tệp lên" : "Tải lên và chọn"}
         </Button>
         <Button onClick={onCancel}>Hủy</Button>
       </Space>

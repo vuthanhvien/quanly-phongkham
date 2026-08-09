@@ -15,12 +15,14 @@ import {
   PrinterOutlined,
   SwapOutlined,
   PlusOutlined,
+  UserAddOutlined,
 } from "@ant-design/icons"
 import {
   Button,
   Card,
   Checkbox,
   Dropdown,
+  Form,
   Grid,
   Input,
   Modal,
@@ -28,6 +30,7 @@ import {
   Select,
   Space,
   Table,
+  Tag,
   Tabs,
   Tooltip,
   Typography,
@@ -46,7 +49,7 @@ import { ProductForm } from "../components/ProductForm"
 import { StockBatchForm } from "../components/StockBatchForm"
 import { CustomField, entityLabels, normalizeSelectOption } from "../models"
 import { RecordDetailPage } from "./RecordDetailPage"
-import { displayValue, FileLookupMap, hasFileField, loadFileLookupMap, LookupMap, resolveRecordFieldValue } from "../relations"
+import { displayValue, FileLookupMap, getRelationSpec, hasFileField, loadFileLookupMap, LookupMap, resolveRecordFieldValue } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
 import * as XLSX from "xlsx"
 import {
@@ -84,6 +87,9 @@ export function RecordListPage() {
   const [archiveSelectedOpen, setArchiveSelectedOpen] = useState(false)
   const [archivingSelected, setArchivingSelected] = useState(false)
   const [cloningSelected, setCloningSelected] = useState(false)
+  const [staffAccountStaff, setStaffAccountStaff] = useState<Record<string, any> | null>(null)
+  const [staffAccountSubmitting, setStaffAccountSubmitting] = useState(false)
+  const [staffAccountForm] = Form.useForm()
   const advancedFilterPayload = useMemo(() => {
     const filters = Object.entries(advancedFilters)
       .filter(([, filter]) => filter.value !== undefined && filter.value !== null && String(filter.value).trim() !== "")
@@ -147,6 +153,7 @@ export function RecordListPage() {
     const current = advancedFilters[field.key] || { operator: defaultAdvancedOperator(field) }
     const selectOptions = (field.options || []).map(normalizeSelectOption)
     const isOptionField = (field.type === "select" || field.type === "multi-select") && selectOptions.length > 0
+    const isRelation = Boolean(getRelationSpec(field))
 
     return (
       <div className="advanced-column-filter" onClick={(event) => event.stopPropagation()}>
@@ -184,7 +191,7 @@ export function RecordListPage() {
             allowClear
             aria-label={`Lọc ${field.label}`}
             className="advanced-column-value"
-            placeholder="Tìm trong cột"
+            placeholder={isRelation ? "Tên / mã" : "Tìm trong cột"}
             size="small"
             value={String(current.value || "")}
             onChange={(event) => updateAdvancedFilter(field, { value: event.target.value })}
@@ -251,6 +258,20 @@ export function RecordListPage() {
           </Space>
         ),
       })),
+      ...(resource === "staff" ? [{
+        title: "Tài khoản liên kết",
+        key: "linkedAccount",
+        width: 230,
+        render: (_: unknown, row: Record<string, any>) => {
+          const account = row.linkedAccount as { email?: string; username?: string; role?: string; isActive?: boolean } | undefined
+          return account ? (
+            <Space direction="vertical" size={0}>
+              <Typography.Text>{account.email || account.username}</Typography.Text>
+              <Tag color={account.isActive === false ? "default" : "green"}>{account.role || "STAFF"}{account.isActive === false ? " · Tạm khóa" : ""}</Tag>
+            </Space>
+          ) : <Typography.Text type="secondary">Chưa có tài khoản</Typography.Text>
+        },
+      }] : []),
       {
         title: "",
         key: "action",
@@ -268,6 +289,7 @@ export function RecordListPage() {
           if (recordStatus === "active" && hasActionAccess(resource, "create") && resource !== "files") menuItems.push({ key: "copy", icon: <CopyOutlined />, label: "Nhân bản", onClick: () => void duplicateRecord(recordId) })
           if (resource === "customers" && hasActionAccess(resource, "reveal-phone")) menuItems.push({ key: "phone", icon: <PhoneOutlined />, label: "Xem số điện thoại", onClick: () => void revealPhone(recordId) })
           if (resource === "leads" && !row.convertedCustomerId && hasActionAccess(resource, "convert-to-customer")) menuItems.push({ key: "convert", icon: <SwapOutlined />, label: "Chuyển thành khách hàng", onClick: () => void convertLead(recordId) })
+          if (resource === "staff" && !row.linkedAccount && recordStatus === "active" && hasActionAccess("user-accounts", "create")) menuItems.push({ key: "create-account", icon: <UserAddOutlined />, label: "Tạo tài khoản", onClick: () => openStaffAccountModal(row) })
           if (["invoices", "expenses", "payrolls"].includes(resource) && hasActionAccess(resource, "generate-accounting-voucher")) menuItems.push({ key: "voucher", icon: <AuditOutlined />, label: "Tạo chứng từ kế toán", onClick: () => void generateAccountingVoucher(resource, recordId) })
           if (resource === "accounting-vouchers" && row.status !== "POSTED" && hasActionAccess(resource, "post")) menuItems.push({ key: "post", icon: <AuditOutlined />, label: "Ghi sổ", onClick: () => void postAccountingVoucher(recordId) })
           if (resource === "accounting-vouchers" && row.status === "POSTED" && hasActionAccess(resource, "unpost")) menuItems.push({ key: "unpost", icon: <SwapOutlined />, label: "Bỏ ghi sổ", onClick: () => void unpostAccountingVoucher(recordId) })
@@ -319,6 +341,11 @@ export function RecordListPage() {
             {resource === "leads" && !row.convertedCustomerId && hasActionAccess(resource, "convert-to-customer") && (
               <Tooltip title="Chuyển thành khách hàng">
                 <Button icon={<SwapOutlined />} type="text" onClick={() => convertLead(row.id)} />
+              </Tooltip>
+            )}
+            {resource === "staff" && !row.linkedAccount && recordStatus === "active" && hasActionAccess("user-accounts", "create") && (
+              <Tooltip title="Tạo tài khoản liên kết">
+                <Button icon={<UserAddOutlined />} type="text" onClick={() => openStaffAccountModal(row)} />
               </Tooltip>
             )}
             {["invoices", "expenses", "payrolls"].includes(resource) && hasActionAccess(resource, "generate-accounting-voucher") && (
@@ -416,9 +443,33 @@ export function RecordListPage() {
 
   async function convertLead(recordId: string) {
     const response = await api.post(`/records/leads/${recordId}/convert-to-customer`)
-    message.success("Đã chuyển lead thành khách hàng")
+    message.success("Đã chuyển khách tiềm năng thành khách hàng")
     refresh()
     navigate(`/customers?detail=${response.data.data.id}`)
+  }
+
+  function openStaffAccountModal(staff: Record<string, any>) {
+    setStaffAccountStaff(staff)
+    staffAccountForm.setFieldsValue({
+      email: staff.email || "",
+      username: String(staff.code || "").toLowerCase(),
+      role: ["ADMIN", "DOCTOR", "STAFF"].includes(String(staff.type || "").toUpperCase()) ? String(staff.type).toUpperCase() : "STAFF",
+      password: "",
+    })
+  }
+
+  async function createStaffAccount(values: { email: string; username?: string; password: string; role: string }) {
+    if (!staffAccountStaff) return
+    setStaffAccountSubmitting(true)
+    try {
+      await api.post(`/records/staff/${staffAccountStaff.id}/create-account`, values)
+      message.success("Đã tạo tài khoản liên kết")
+      setStaffAccountStaff(null)
+      staffAccountForm.resetFields()
+      refresh()
+    } finally {
+      setStaffAccountSubmitting(false)
+    }
   }
 
   async function duplicateRecord(recordId: string) {
@@ -575,7 +626,7 @@ export function RecordListPage() {
                 items: [
                   { key: "archive", danger: true, icon: <DeleteOutlined />, label: "Lưu trữ" },
                   { key: "export", icon: <DownloadOutlined />, label: "Xuất Excel" },
-                  ...(hasActionAccess(resource, "create") ? [{ key: "clone", icon: <CopyOutlined />, label: "Clone" }] : []),
+                  ...(hasActionAccess(resource, "create") ? [{ key: "clone", icon: <CopyOutlined />, label: "Nhân bản" }] : []),
                   { type: "divider" },
                   { key: "clear", icon: <ClearOutlined />, label: "Bỏ chọn tất cả" },
                 ],
@@ -608,12 +659,12 @@ export function RecordListPage() {
             <Tooltip title="Tạo bản ghi mới">
               <Button
                 className="primary-glow mobile-icon-button"
-                aria-label={resource === "files" ? "Upload file" : "Thêm nhanh"}
+                aria-label={resource === "files" ? "Tải tệp lên" : "Thêm nhanh"}
                 icon={<PlusOutlined />}
                 type="primary"
                 onClick={() => setCreating(true)}
               >
-                {resource === "files" ? "Upload file" : "Thêm nhanh"}
+                {resource === "files" ? "Tải tệp lên" : "Thêm nhanh"}
               </Button>
             </Tooltip>
           )}
@@ -661,6 +712,31 @@ export function RecordListPage() {
           scroll={{ x: "max-content" }}
         />
       </Card>
+      <Modal
+        destroyOnHidden
+        okButtonProps={{ className: "primary-glow", type: "primary" }}
+        okText="Tạo tài khoản"
+        open={Boolean(staffAccountStaff)}
+        title={`Tạo tài khoản${staffAccountStaff ? ` cho ${staffAccountStaff.fullName || staffAccountStaff.code}` : ""}`}
+        confirmLoading={staffAccountSubmitting}
+        onCancel={() => { setStaffAccountStaff(null); staffAccountForm.resetFields() }}
+        onOk={() => void staffAccountForm.submit()}
+      >
+        <Form form={staffAccountForm} layout="vertical" onFinish={(values: { email: string; username?: string; password: string; role: string }) => void createStaffAccount(values)}>
+          <Form.Item label="Email đăng nhập" name="email" rules={[{ required: true, type: "email", message: "Nhập email hợp lệ" }]}>
+            <Input autoComplete="email" />
+          </Form.Item>
+          <Form.Item label="Tên đăng nhập" name="username">
+            <Input autoComplete="username" />
+          </Form.Item>
+          <Form.Item label="Mật khẩu ban đầu" name="password" rules={[{ required: true, min: 6, message: "Mật khẩu tối thiểu 6 ký tự" }]}>
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item label="Vai trò hệ thống" name="role" rules={[{ required: true }]}>
+            <Select options={[{ value: "STAFF", label: "Nhân viên" }, { value: "DOCTOR", label: "Bác sĩ" }, { value: "ADMIN", label: "Quản trị" }]} />
+          </Form.Item>
+        </Form>
+      </Modal>
       <Modal
         cancelText="Hủy"
         confirmLoading={archivingSelected}

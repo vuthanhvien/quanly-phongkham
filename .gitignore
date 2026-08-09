@@ -1,6 +1,8 @@
 node_modules
 dist
 .env
+.env.demo
+.env.production
 .DS_Store
 coverage
 *.log

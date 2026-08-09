@@ -120,7 +120,7 @@ export function RecordImportPage() {
         setLookups(nextLookups)
       })
       .catch(() => {
-        message.error("Không tải được cấu hình import")
+        message.error("Không tải được cấu hình nhập dữ liệu")
       })
       .finally(() => setLoading(false))
   }, [resource, unsupported])
@@ -133,7 +133,7 @@ export function RecordImportPage() {
           const definitions = buildBundleSheetDefinitions(resource, importableFields)
           const parsed = await parseBundleImportFile(file, definitions, baseKeySet)
           if (parsed.previewRows.length === 0 && parsed.stats.every((item) => item.count === 0)) {
-            message.warning("File import chưa có dữ liệu hợp lệ")
+            message.warning("Tệp nhập chưa có dữ liệu hợp lệ")
             return false
           }
           setBundleSheets(parsed.sheets)
@@ -144,13 +144,13 @@ export function RecordImportPage() {
         }
         const rows = await parseImportFile(file, importableFields, baseKeySet, resolvers)
         if (rows.length === 0) {
-          message.warning("File import chưa có dòng dữ liệu hợp lệ")
+          message.warning("Tệp nhập chưa có dòng dữ liệu hợp lệ")
           return false
         }
         setDraftRows(rows)
         message.success(`Đã đọc ${rows.length} dòng từ file Excel`)
       } catch (error) {
-        message.error(error instanceof Error ? error.message : "Không đọc được file import")
+        message.error(error instanceof Error ? error.message : "Không đọc được tệp nhập")
       }
       return false
     },
@@ -274,7 +274,7 @@ export function RecordImportPage() {
       }
       const totalRows = Object.values(bundleSheets).reduce((sum, rows) => sum + rows.length, 0)
       if (totalRows === 0) {
-        message.warning("Chưa có dòng nào để import")
+        message.warning("Chưa có dòng nào để nhập")
         return
       }
       setSaving(true)
@@ -284,11 +284,11 @@ export function RecordImportPage() {
         message.success(
           importedSheets.length > 0
             ? `Đã import ${importedSheets.reduce((sum: number, item: { count: number }) => sum + Number(item.count || 0), 0)} dòng`
-            : "Đã import dữ liệu",
+            : "Đã nhập dữ liệu",
         )
         setTimeout(() => navigate(`/${resource}`), 400)
       } catch (error: any) {
-        message.error(getApiErrorMessage(error, "Import dữ liệu thất bại"))
+        message.error(getApiErrorMessage(error, "Nhập dữ liệu thất bại"))
       } finally {
         setSaving(false)
       }
@@ -364,11 +364,11 @@ export function RecordImportPage() {
             </>
           ) : (
             <Button icon={<ImportOutlined />} onClick={() => void downloadExportData()}>
-              Export data hiện có
+              Xuất dữ liệu hiện có
             </Button>
           )}
           <Upload {...uploadProps}>
-            <Button icon={<UploadOutlined />}>Upload file</Button>
+            <Button icon={<UploadOutlined />}>Tải tệp lên</Button>
           </Upload>
           <Button
             className="primary-glow"
@@ -387,16 +387,16 @@ export function RecordImportPage() {
         <Card className="glass-card settings-card" loading={loading}>
           {unsupported ? (
             <Alert
-              message="Module này chưa hỗ trợ import"
-              description="Hiện tại màn import dùng cho các resource CRUD tiêu chuẩn. Module file upload và đơn hàng dịch vụ cần luồng riêng."
+              message="Phân hệ này chưa hỗ trợ nhập dữ liệu"
+              description="Hiện tại màn nhập dữ liệu dùng cho các đối tượng CRUD tiêu chuẩn. Phân hệ tải tệp và đơn hàng dịch vụ cần luồng riêng."
               showIcon
               type="warning"
             />
           ) : (
             <Space direction="vertical" size={14} style={{ width: "100%" }}>
               <Alert
-                message="Flow import"
-                description="1. Tải file mẫu. 2. Điền dữ liệu trong sheet ImportData. 3. Upload để xem lại trên bảng. 4. Bấm Lưu dữ liệu để tạo bản ghi."
+                message="Quy trình nhập dữ liệu"
+                description="1. Tải tệp mẫu. 2. Điền dữ liệu trong trang tính ImportData. 3. Tải tệp lên để xem lại trên bảng. 4. Bấm Lưu dữ liệu để tạo bản ghi."
                 showIcon
                 type="info"
               />
@@ -436,8 +436,8 @@ export function RecordImportPage() {
         ) : null}
         {draftRows.length === 0 ? (
           <Alert
-            message="Chưa có dữ liệu preview"
-            description="Sau khi upload file Excel, hệ thống sẽ hiển thị bảng preview tại đây trước khi lưu."
+            message="Chưa có dữ liệu xem trước"
+            description="Sau khi tải tệp Excel lên, hệ thống sẽ hiển thị bảng xem trước tại đây trước khi lưu."
             showIcon
             type="info"
           />
@@ -605,7 +605,7 @@ function buildBundleFieldGuide(sheetName: string, column: string) {
   if (column === "username") return "Nhập username đăng nhập nếu muốn dùng thay cho email."
   if (column.toLowerCase().includes("staffid")) return "Nhập mã nhân viên."
   if (column.toLowerCase().includes("customerid")) return "Nhập mã khách hàng."
-  if (column.toLowerCase().includes("leadid")) return "Nhập mã lead."
+  if (column.toLowerCase().includes("leadid")) return "Nhập mã khách tiềm năng."
   if (column.toLowerCase().includes("departmentid")) return "Nhập mã phòng ban."
   if (column.toLowerCase().includes("invoiceid")) return "Nhập mã hóa đơn."
   return "Điền theo đúng dữ liệu đang export từ hệ thống."

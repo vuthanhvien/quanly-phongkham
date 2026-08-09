@@ -23,6 +23,7 @@ import { LandingPagesPage } from './pages/LandingPagesPage';
 import { LandingPageListPage } from './pages/LandingPageListPage';
 import { LandingFormsPage } from './pages/LandingFormsPage';
 import { LandingDomainsPage } from './pages/LandingDomainsPage';
+import { LandingSiteSettingsPage } from './pages/LandingSiteSettingsPage';
 import { RecordDetailPage } from './pages/RecordDetailPage';
 import { RecordFormPage } from './pages/RecordFormPage';
 import { RecordImportPage } from './pages/RecordImportPage';
@@ -253,13 +254,15 @@ export function App() {
                 <Route path="/custom-tables" element={<CustomTablesPage />} />
                 <Route path="/custom-tables/:id/data" element={<CustomTableDataPage />} />
                 <Route path="/locations" element={<LocationsPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/role-module-settings" element={<SettingsPage section="roles" />} />
+                <Route path="/print-templates" element={<SettingsPage section="print" />} />
+                <Route path="/settings" element={<Navigate to="/role-module-settings" replace />} />
                 <Route path="/settings/print-templates/:id" element={<PrintTemplateEditorPage />} />
                 <Route path="/pages" element={<LandingPageListPage />} />
                 <Route path="/pages/:id" element={<LandingPagesPage />} />
                 <Route path="/forms" element={<LandingFormsPage />} />
                 <Route path="/domains" element={<LandingDomainsPage />} />
-                <Route path="/configs" element={<LandingPagesPage />} />
+                <Route path="/configs" element={<LandingSiteSettingsPage />} />
                 <Route path="/landing/pages/*" element={<Navigate to="/pages" replace />} />
                 <Route path="/landing/forms" element={<Navigate to="/forms" replace />} />
                 <Route path="/landing/domains" element={<Navigate to="/domains" replace />} />
