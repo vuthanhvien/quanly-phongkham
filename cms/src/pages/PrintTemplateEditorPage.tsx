@@ -3,6 +3,7 @@ import { Button, Card, Checkbox, Form, Input, Modal, Select, Space, Tooltip, Tre
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api"
+import { printHtmlInPlace } from "../utils/printHtml"
 import { PrintTinyMceEditor } from "../components/PrintTinyMceEditor"
 import { baseFields, CustomField } from "../models"
 import { getFieldCatalog } from "../view-settings"
@@ -246,11 +247,6 @@ export function PrintTemplateEditorPage() {
       message.warning("Chọn một bản ghi để in thử")
       return
     }
-    const printWindow = window.open("", "_blank")
-    if (!printWindow) {
-      message.error("Trình duyệt đang chặn cửa sổ in")
-      return
-    }
     setPreviewLoading(true)
     try {
       const response = await api.post("/settings/print-templates/render-preview", {
@@ -259,11 +255,9 @@ export function PrintTemplateEditorPage() {
         htmlTemplate: form.getFieldValue("htmlTemplate"),
         pageWidth,
       }, { responseType: "text" })
-      printWindow.document.write(`<!doctype html><html><head><title>In thử mẫu</title></head><body><div class="print-sheet">${response.data}</div><script>window.print()</script></body></html>`)
-      printWindow.document.close()
+      printHtmlInPlace(response.data, "In thử mẫu")
       setPreviewOpen(false)
     } catch {
-      printWindow.close()
       message.error("Không thể tạo bản in thử")
     } finally {
       setPreviewLoading(false)

@@ -34,6 +34,7 @@ import {
   TeamOutlined,
 } from "@ant-design/icons"
 import { api } from "../api"
+import { printHtmlInPlace } from "../utils/printHtml"
 import { hasActionAccess, hasResourceAccess } from "../access"
 import { isModuleEnabled } from "../company-types"
 import { useAppUi } from "../app-ui"
@@ -1034,13 +1035,7 @@ async function printRecord(templateId: string, recordId: string) {
       responseType: "text",
     })
   ).data
-  const windowRef = window.open("", "_blank")
-  if (windowRef) {
-    windowRef.document.write(
-      `<div class="print-sheet">${html}</div><script>window.print()</script>`,
-    )
-    windowRef.document.close()
-  }
+  printHtmlInPlace(html, "Mẫu in")
 }
 
 function detailTitle(resource: string, record: Record<string, any> | null) {

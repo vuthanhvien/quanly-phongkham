@@ -40,6 +40,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState, type Key } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api"
+import { printHtmlInPlace } from "../utils/printHtml"
 import { hasActionAccess, hasResourceAccess } from "../access"
 import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordFormContent } from "../components/RecordFormContent"
@@ -440,13 +441,7 @@ export function RecordListPage() {
         { responseType: "text" },
       )
     ).data
-    const windowRef = window.open("", "_blank")
-    if (windowRef) {
-      windowRef.document.write(
-        `<div class="print-sheet">${html}</div><script>window.print()</script>`,
-      )
-      windowRef.document.close()
-    }
+    printHtmlInPlace(html, "Mẫu in")
   }
 
   function openPrintTemplatePicker(recordId: string) {

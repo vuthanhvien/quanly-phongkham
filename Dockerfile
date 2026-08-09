@@ -19,6 +19,7 @@ ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_BASE_PATH=$VITE_BASE_PATH
 ENV VITE_LANDING_URL=$VITE_LANDING_URL
 COPY cms/package*.json ./
+COPY cms/scripts ./scripts
 RUN npm install
 COPY cms ./
 RUN npm run build
@@ -51,6 +52,7 @@ CMD ["npm", "run", "start:dev"]
 FROM node:22-alpine AS cms-dev
 WORKDIR /app/cms
 COPY cms/package*.json ./
+COPY cms/scripts ./scripts
 RUN npm install
 COPY cms ./
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "9999"]
