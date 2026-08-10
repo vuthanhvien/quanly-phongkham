@@ -7,6 +7,8 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 
+const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '30d') as `${number}${'s' | 'm' | 'h' | 'd'}`;
+
 @Module({
   imports: [
     TenantOrmModule.forFeature([User, Staff, BranchRoleAssignment, DynamicRoleDefinition, ViewSetting]),
@@ -14,7 +16,7 @@ import { JwtStrategy } from './jwt.strategy';
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'development-only-secret',
-      signOptions: { expiresIn: '12h' },
+      signOptions: { expiresIn: JWT_EXPIRES_IN },
     }),
   ],
   controllers: [AuthController],

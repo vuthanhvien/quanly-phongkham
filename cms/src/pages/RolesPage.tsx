@@ -22,6 +22,7 @@ import {
 } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
+import { allAppModuleKeys, appModuleGroups, appModuleLabels } from "../company-types"
 import { ModalTitleBar } from "../components/ModalTitleBar"
 import { BranchRoleAssignment, DynamicRole, systemRoleSelectOptions } from "../models"
 import { getFirstOptionValue } from "../utils/branchDefaults"
@@ -58,6 +59,8 @@ export function RolesPage() {
   const [branchOptions, setBranchOptions] = useState<Array<{ value: string; label: string }>>([])
   const [loading, setLoading] = useState(false)
   const [selectedRoleKey, setSelectedRoleKey] = useState<string | null>(null)
+  const [selectedModules, setSelectedModules] = useState<string[]>([])
+  const [savingModules, setSavingModules] = useState(false)
 
   const [roleModal, setRoleModal] = useState(false)
   const [editingRole, setEditingRole] = useState<DynamicRole | null>(null)
@@ -226,6 +229,22 @@ export function RolesPage() {
 
   const selectedRole = roles.find((r) => r.key === selectedRoleKey) ?? null
 
+  useEffect(() => {
+    setSelectedModules(Array.isArray(selectedRole?.allowedModules) ? selectedRole.allowedModules : allAppModuleKeys)
+  }, [selectedRole])
+
+  async function saveRoleModules() {
+    if (!selectedRole) return
+    setSavingModules(true)
+    try {
+      await api.patch(`/settings/dynamic-roles/${selectedRole.id}`, { allowedModules: selectedModules })
+      setRoles((current) => current.map((role) => role.id === selectedRole.id ? { ...role, allowedModules: selectedModules } : role))
+      message.success("Đã lưu quyền truy cập module")
+    } finally {
+      setSavingModules(false)
+    }
+  }
+
   // Only users whose account.role matches the selected role's roleMain (ADMIN users can have any role)
   const compatibleUserOptions = useMemo(() => {
     if (!selectedRole) return userOptions
@@ -388,6 +407,44 @@ export function RolesPage() {
                   </Button>
                 </Flex>
               </div>
+
+              <Card
+                size="small"
+                title="Quyền truy cập module"
+                extra={<Button type="primary" size="small" loading={savingModules} onClick={() => void saveRoleModules()}>Lưu quyền module</Button>}
+              >
+                <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 10 }}>
+                  Chọn menu/module role này được sử dụng. Đây là cấu hình quyền module chính.
+                </Typography.Paragraph>
+                <div className="role-module-permission-grid">
+                  {appModuleGroups.map((group) => {
+                    const groupModules = group.modules.filter((module) => Boolean(appModuleLabels[module]))
+                    const checkedCount = groupModules.filter((module) => selectedModules.includes(module)).length
+                    return (
+                      <div className="role-module-permission-group" key={group.key}>
+                        <Checkbox
+                          checked={checkedCount === groupModules.length && groupModules.length > 0}
+                          indeterminate={checkedCount > 0 && checkedCount < groupModules.length}
+                          onChange={(event) => setSelectedModules((current) => event.target.checked
+                            ? Array.from(new Set([...current, ...groupModules]))
+                            : current.filter((module) => !groupModules.includes(module)),
+                          )}
+                        >
+                          <Typography.Text strong>{group.label}</Typography.Text>
+                        </Checkbox>
+                        <Checkbox.Group
+                          options={groupModules.map((module) => ({ label: appModuleLabels[module], value: module }))}
+                          value={selectedModules.filter((module) => groupModules.includes(module))}
+                          onChange={(values) => setSelectedModules((current) => [
+                            ...current.filter((module) => !groupModules.includes(module)),
+                            ...values.map(String),
+                          ])}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </Card>
 
               {/* Assignments grouped by branch */}
               <div style={{ flex: 1, overflowY: "auto" }}>

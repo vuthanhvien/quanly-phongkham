@@ -44,7 +44,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { api } from "../api"
-import { buildGroupedModuleOptions } from "../company-types"
+import { allAppModuleKeys, buildGroupedModuleOptions } from "../company-types"
 import { getInputPatternLabel, INPUT_PATTERN_OPTIONS } from "../input-patterns"
 import { getApiErrorMessage } from "../utils/apiError"
 import { baseFields, CustomField, DynamicRole, entityLabels, FieldSpec, getResourceActionOptions, normalizeSelectOption, permissionLabels, relationFields, type SelectOption } from "../models"
@@ -61,7 +61,6 @@ import {
   resolveAllowedActions,
   resolveActionSetting,
   resolveViewSetting,
-  resolveModuleEnabled,
   serializeViewConfig,
   ViewSettingRecord,
   ViewType,
@@ -637,7 +636,6 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   const [entityType, setEntityType] = useState(() => searchParams.get("module") || "customers")
   const [selectedRole, setSelectedRole] = useState(() => normalizeRole(searchParams.get("role") || getStoredUserRole()))
   const [expandedRoleKeys, setExpandedRoleKeys] = useState<string[]>([])
-  const [moduleEnabled, setModuleEnabled] = useState(true)
   const [fields, setFields] = useState<CustomField[]>([])
   const [views, setViews] = useState<ViewSettingRecord[]>([])
   const [tableConfig, setTableConfig] = useState<FieldLayoutConfig[]>([])
@@ -678,6 +676,14 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   const templatePresets = useMemo(
     () => TEMPLATE_PRESETS.filter((preset) => preset.entityType === entityType),
     [entityType],
+  )
+  const roleAllowedModules = useMemo(() => {
+    const role = dynamicRoles.find((item) => normalizeRole(item.key) === selectedRole)
+    return Array.isArray(role?.allowedModules) ? role.allowedModules : allAppModuleKeys
+  }, [dynamicRoles, selectedRole])
+  const roleModuleOptions = useMemo(
+    () => buildGroupedModuleOptions(permissionLabels, roleAllowedModules),
+    [roleAllowedModules],
   )
   const viewSources = useMemo(
     () =>
@@ -752,6 +758,11 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   }, [searchParams])
 
   useEffect(() => {
+    const allowed = roleAllowedModules.filter((module) => Boolean(permissionLabels[module]))
+    if (allowed.length > 0 && !allowed.includes(entityType)) setEntityType(allowed[0])
+  }, [entityType, roleAllowedModules])
+
+  useEffect(() => {
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set("module", entityType)
     nextParams.set("role", selectedRole)
@@ -767,7 +778,6 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   }, [entityType])
 
   useEffect(() => {
-    setModuleEnabled(resolveModuleEnabled(views, selectedRole, dynamicRoles))
     setAllowedActions(resolveAllowedActions(views, entityType, selectedRole, dynamicRoles))
     setTableConfig(
       buildFieldLayoutConfigs(
@@ -820,7 +830,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
         const config = viewType === "TABLE" ? tableConfig : viewType === "FORM" ? formConfig : detailConfig
         return api.put(`/settings/views/${entityType}/${viewType}`, {
           role: selectedRole,
-          config: serializeViewConfig(viewType, config, moduleEnabled, undefined, viewType === "TABLE"),
+          config: serializeViewConfig(viewType, config, true, undefined, viewType === "TABLE"),
         })
       }), reuseActionInherited
         ? api.delete(`/settings/views/${entityType}`, { params: { role: selectedRole, viewType: "ACTION" } })
@@ -964,14 +974,6 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
       <div className="page-header">
           <Typography.Title level={3}>{section === "roles" ? "Hiển thị theo role / module" : "Mẫu in"}</Typography.Title>
         <Space wrap>
-          <Select
-            showSearch
-            optionFilterProp="label"
-            value={entityType}
-            onChange={setEntityType}
-            style={{ width: 420 }}
-            options={buildGroupedModuleOptions(permissionLabels)}
-          />
           {section === "roles" && (
             <TreeSelect
               className="role-tree-select"
@@ -986,6 +988,27 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
               treeNodeFilterProp="searchTitle"
               showSearch
               onTreeExpand={(keys) => setExpandedRoleKeys(keys as string[])}
+            />
+          )}
+          {section === "roles" && (
+            <Select
+              showSearch
+              optionFilterProp="label"
+              value={entityType}
+              onChange={setEntityType}
+              placeholder="Chọn module"
+              style={{ width: 420 }}
+              options={roleModuleOptions}
+            />
+          )}
+          {section !== "roles" && (
+            <Select
+              showSearch
+              optionFilterProp="label"
+              value={entityType}
+              onChange={setEntityType}
+              style={{ width: 420 }}
+              options={buildGroupedModuleOptions(permissionLabels)}
             />
           )}
         </Space>
@@ -1009,11 +1032,6 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                     <Typography.Text>
                       Đang cấu hình <strong>{permissionLabels[entityType] || entityType}</strong> cho vai trò <strong>{selectedRole}</strong>. Chuỗi kế thừa: <strong>{inheritanceChain.join(" → ")}</strong>.
                     </Typography.Text>
-                    {!reuseInherited.TABLE && (
-                      <Checkbox checked={moduleEnabled} onChange={(event) => setModuleEnabled(event.target.checked)}>
-                        Cho phép role sử dụng module này
-                      </Checkbox>
-                    )}
                   </div>
                   <Tabs
                     className="settings-inner-tabs"

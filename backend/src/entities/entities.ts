@@ -97,6 +97,9 @@ export class DynamicRoleDefinition {
   @Column({ default: true })
   isActive: boolean;
 
+  @Column({ type: 'simple-json', nullable: true })
+  allowedModules?: string[];
+
   @Column({ default: false })
   isArchived: boolean;
 

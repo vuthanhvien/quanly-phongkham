@@ -70,6 +70,7 @@ export interface DynamicRole {
   name: string;
   roleMain: string;
   isActive: boolean;
+  allowedModules?: string[];
 }
 
 export type LandingBlockType = 'title' | 'text' | 'image' | 'video' | 'form' | 'slider' | 'gallery' | 'posts' | 'news';
