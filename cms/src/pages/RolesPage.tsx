@@ -20,7 +20,7 @@ import {
   Typography,
   message,
 } from "antd"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { api } from "../api"
 import { allAppModuleKeys, appModuleGroups, appModuleLabels } from "../company-types"
 import { ModalTitleBar } from "../components/ModalTitleBar"
@@ -60,7 +60,7 @@ export function RolesPage() {
   const [loading, setLoading] = useState(false)
   const [selectedRoleKey, setSelectedRoleKey] = useState<string | null>(null)
   const [selectedModules, setSelectedModules] = useState<string[]>([])
-  const [savingModules, setSavingModules] = useState(false)
+  const moduleSaveQueue = useRef(Promise.resolve())
 
   const [roleModal, setRoleModal] = useState(false)
   const [editingRole, setEditingRole] = useState<DynamicRole | null>(null)
@@ -233,16 +233,19 @@ export function RolesPage() {
     setSelectedModules(Array.isArray(selectedRole?.allowedModules) ? selectedRole.allowedModules : allAppModuleKeys)
   }, [selectedRole])
 
-  async function saveRoleModules() {
+  function updateRoleModules(nextModules: string[]) {
     if (!selectedRole) return
-    setSavingModules(true)
-    try {
-      await api.patch(`/settings/dynamic-roles/${selectedRole.id}`, { allowedModules: selectedModules })
-      setRoles((current) => current.map((role) => role.id === selectedRole.id ? { ...role, allowedModules: selectedModules } : role))
-      message.success("Đã lưu quyền truy cập module")
-    } finally {
-      setSavingModules(false)
-    }
+    const roleId = selectedRole.id
+    setSelectedModules(nextModules)
+    moduleSaveQueue.current = moduleSaveQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        await api.patch(`/settings/dynamic-roles/${roleId}`, { allowedModules: nextModules })
+        setRoles((current) => current.map((role) => role.id === roleId ? { ...role, allowedModules: nextModules } : role))
+      })
+      .catch(() => {
+        message.error("Không thể lưu quyền module")
+      })
   }
 
   // Only users whose account.role matches the selected role's roleMain (ADMIN users can have any role)
@@ -411,10 +414,9 @@ export function RolesPage() {
               <Card
                 size="small"
                 title="Quyền truy cập module"
-                extra={<Button type="primary" size="small" loading={savingModules} onClick={() => void saveRoleModules()}>Lưu quyền module</Button>}
               >
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 10 }}>
-                  Chọn menu/module role này được sử dụng. Đây là cấu hình quyền module chính.
+                <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
+                  Tick/bỏ tick để lưu ngay quyền menu/module của role này.
                 </Typography.Paragraph>
                 <div className="role-module-permission-grid">
                   {appModuleGroups.map((group) => {
@@ -425,9 +427,9 @@ export function RolesPage() {
                         <Checkbox
                           checked={checkedCount === groupModules.length && groupModules.length > 0}
                           indeterminate={checkedCount > 0 && checkedCount < groupModules.length}
-                          onChange={(event) => setSelectedModules((current) => event.target.checked
-                            ? Array.from(new Set([...current, ...groupModules]))
-                            : current.filter((module) => !groupModules.includes(module)),
+                          onChange={(event) => updateRoleModules(event.target.checked
+                            ? Array.from(new Set([...selectedModules, ...groupModules]))
+                            : selectedModules.filter((module) => !groupModules.includes(module)),
                           )}
                         >
                           <Typography.Text strong>{group.label}</Typography.Text>
@@ -435,8 +437,8 @@ export function RolesPage() {
                         <Checkbox.Group
                           options={groupModules.map((module) => ({ label: appModuleLabels[module], value: module }))}
                           value={selectedModules.filter((module) => groupModules.includes(module))}
-                          onChange={(values) => setSelectedModules((current) => [
-                            ...current.filter((module) => !groupModules.includes(module)),
+                          onChange={(values) => updateRoleModules([
+                            ...selectedModules.filter((module) => !groupModules.includes(module)),
                             ...values.map(String),
                           ])}
                         />
