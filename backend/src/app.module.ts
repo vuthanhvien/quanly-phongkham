@@ -13,6 +13,7 @@ import { LocationsModule } from './locations/locations.module';
 import { WorkflowModule } from './workflow/workflow.module';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { TenantModule } from './tenant/tenant-orm.module';
+import { CustomerPortalModule } from './customer-portal/customer-portal.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { TenantModule } from './tenant/tenant-orm.module';
     PayrollModule,
     LocationsModule,
     WorkflowModule,
+    CustomerPortalModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

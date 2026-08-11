@@ -334,6 +334,24 @@ export class Customer extends ConfigurableEntity {
   note?: string;
 }
 
+@Entity('customer_otps')
+export class CustomerOtp extends ConfigurableEntity {
+  @Column()
+  phone: string;
+
+  @Column()
+  codeHash: string;
+
+  @Column({ type: 'datetime' })
+  expiresAt: Date;
+
+  @Column({ type: 'int', default: 0 })
+  attempts: number;
+
+  @Column({ type: 'datetime', nullable: true })
+  consumedAt?: Date;
+}
+
 @Entity('leads')
 export class Lead extends ConfigurableEntity {
   @Column({ unique: true })
@@ -2914,6 +2932,7 @@ export const ENTITIES = [
   Staff,
   BranchRoleAssignment,
   Customer,
+  CustomerOtp,
   LocationCountry,
   LocationProvince,
   LocationWard,
