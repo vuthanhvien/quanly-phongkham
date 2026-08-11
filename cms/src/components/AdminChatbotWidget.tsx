@@ -268,7 +268,9 @@ export function AdminChatbotWidget() {
           <div className="admin-chatbot-messages">
             {messages.map((message, index) => (
               <div className={`admin-chatbot-message admin-chatbot-message--${message.role}`} key={`${message.role}-${index}`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                <div className="admin-chatbot-markdown">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                </div>
                 {message.actions?.map((action, actionIndex) => (
                   action.type === 'navigate' ? (
                     <Button block key={actionIndex} onClick={() => void execute(action)} size="small">{action.label}</Button>
