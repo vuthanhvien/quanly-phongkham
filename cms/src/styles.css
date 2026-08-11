@@ -4320,6 +4320,24 @@ textarea.ant-input {
   width: 32px;
 }
 
+.admin-chatbot-avatar img {
+  height: 30px;
+  object-fit: contain;
+  width: 30px;
+}
+
+.admin-chatbot-fab .anticon,
+.admin-chatbot-fab > img {
+  height: 29px;
+  width: 29px;
+}
+
+.admin-chatbot-fab > img {
+  display: block;
+  margin: auto;
+  object-fit: contain;
+}
+
 .admin-chatbot-context {
   background: rgba(15, 23, 42, .025);
   color: var(--app-muted, #6b7280);
@@ -4350,8 +4368,22 @@ textarea.ant-input {
   line-height: 1.45;
   max-width: 92%;
   padding: 9px 11px;
-  white-space: pre-wrap;
 }
+
+.admin-chatbot-message > p:first-child,
+.admin-chatbot-message > :first-child { margin-top: 0; }
+.admin-chatbot-message > p:last-child,
+.admin-chatbot-message > :last-child { margin-bottom: 0; }
+.admin-chatbot-message h1,
+.admin-chatbot-message h2,
+.admin-chatbot-message h3,
+.admin-chatbot-message h4 { font-size: 14px; margin: 10px 0 5px; }
+.admin-chatbot-message p { margin: 0 0 8px; }
+.admin-chatbot-message ul,
+.admin-chatbot-message ol { margin: 0 0 8px; padding-left: 20px; }
+.admin-chatbot-message li + li { margin-top: 3px; }
+.admin-chatbot-message code { background: rgba(15, 23, 42, .09); border-radius: 4px; font-size: .9em; padding: 1px 4px; }
+.admin-chatbot-message--user code { background: rgba(255, 255, 255, .2); }
 
 .admin-chatbot-message--user {
   align-self: flex-end;

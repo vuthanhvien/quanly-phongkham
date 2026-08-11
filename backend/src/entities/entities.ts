@@ -1979,6 +1979,45 @@ export class ChatbotSetting {
   updatedAt: Date;
 }
 
+@Entity('admin_chatbot_conversations')
+export class AdminChatbotConversation {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  userId: string;
+
+  @Column({ nullable: true })
+  title?: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
+@Entity('admin_chatbot_messages')
+export class AdminChatbotMessage {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  conversationId: string;
+
+  @Column()
+  role: string;
+
+  @Column({ type: 'text' })
+  content: string;
+
+  @Column({ type: 'text', nullable: true })
+  actionsJson?: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
+}
+
 @Entity('landing_theme_settings')
 export class LandingThemeSetting {
   @PrimaryGeneratedColumn('uuid')
@@ -2907,6 +2946,8 @@ export const ENTITIES = [
   AuditLog,
   RecordDraft,
   ChatbotSetting,
+  AdminChatbotConversation,
+  AdminChatbotMessage,
   LandingThemeSetting,
   ItemCategory,
   LandingGlobalSetting,

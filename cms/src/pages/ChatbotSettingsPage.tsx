@@ -256,16 +256,16 @@ export function ChatbotSettingsPage() {
 
           {activeTab === 'cms' && <>
           <Typography.Title level={5} style={{ marginBottom: 8 }}>
-            Trợ lý nội bộ CMS
+            Trợ lý nội bộ GISCAT
           </Typography.Title>
-          <Alert
+          {/* <Alert
             icon={<RobotOutlined />}
             showIcon
             type="info"
-            message="Bubble chat cho nhân viên và quản trị viên"
-            description="Trợ lý hiểu màn hình đang mở, có thể chỉ đường dẫn, tra cứu/check dữ liệu, hỗ trợ báo cáo và đề xuất thao tác. Thao tác ghi hoặc lưu trữ luôn cần người dùng xác nhận ở bubble chat."
+            message="GISCAT — Bubble chat cho nhân viên và quản trị viên"
+            description="Trợ lý hiểu màn hình đang mở, có thể chỉ đường dẫn, tra cứu/check dữ liệu, hỗ trợ báo cáo và đề xuất thao tác. Bác sĩ có thể bấm micro để nói tiếng Việt; hệ thống chuyển thành text trước khi gửi và lưu lịch sử theo tài khoản. Thao tác ghi hoặc lưu trữ luôn cần người dùng xác nhận ở bubble chat."
             style={{ marginBottom: 16 }}
-          />
+          /> */}
 
           <Card size="small" style={{ marginBottom: 16 }}>
             <Space style={{ justifyContent: 'space-between', width: '100%' }}>

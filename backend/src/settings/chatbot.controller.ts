@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Post, Request } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Request } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { AuthUser, Public } from '../common/auth';
 import { RecordsService } from '../records/records.service';
-import { Appointment, Customer, Staff, Treatment, User, WorkSchedule } from '../entities/entities';
+import { AdminChatbotConversation, AdminChatbotMessage, Appointment, Customer, Staff, Treatment, User, WorkSchedule } from '../entities/entities';
 import { SettingsService } from './settings.service';
 
 interface ChatMessage {
@@ -128,6 +128,8 @@ export class ChatbotController {
     @InjectRepository(Customer) private readonly customers: Repository<Customer>,
     @InjectRepository(Staff) private readonly staff: Repository<Staff>,
     @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(AdminChatbotConversation) private readonly adminConversations: Repository<AdminChatbotConversation>,
+    @InjectRepository(AdminChatbotMessage) private readonly adminMessages: Repository<AdminChatbotMessage>,
     private readonly records: RecordsService,
   ) {}
 
@@ -193,7 +195,7 @@ export class ChatbotController {
 
   @Post('admin/chatbot/chat')
   async adminChat(
-    @Body() body: { messages: ChatMessage[]; context?: Record<string, unknown> },
+    @Body() body: { messages: ChatMessage[]; context?: Record<string, unknown>; conversationId?: string },
     @Request() request?: { user?: AuthUser },
   ) {
     const user = request?.user;
@@ -212,9 +214,22 @@ export class ChatbotController {
       return true;
     });
     const actions: AdminChatAction[] = [];
+    const conversation = await this.resolveConversation(user.id, body.conversationId);
     const messages: ChatMessage[] = (body.messages || []).filter((msg) => msg.role === 'user' || msg.role === 'assistant');
+    const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user');
+    if (latestUserMessage?.content) {
+      await this.adminMessages.save(this.adminMessages.create({
+        conversationId: conversation.id,
+        role: 'user',
+        content: String(latestUserMessage.content).slice(0, 10000),
+      }));
+      if (!conversation.title) {
+        conversation.title = String(latestUserMessage.content).trim().slice(0, 120);
+        await this.adminConversations.save(conversation);
+      }
+    }
     const context = this.cleanAdminContext(body.context);
-    const defaultPrompt = `Bạn là trợ lý vận hành CMS. Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng.
+    const defaultPrompt = `Bạn là GISCAT, trợ lý vận hành CMS. Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng và dùng Markdown chuẩn (heading, danh sách, in đậm) khi nó làm câu trả lời dễ đọc hơn.
 Bạn hỗ trợ nhập liệu, kiểm tra dữ liệu, báo cáo và hướng dẫn sử dụng CMS. Ngữ cảnh màn hình hiện tại: ${JSON.stringify(context)}.
 Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển thị đường dẫn có thể bấm. Khi cần thay đổi dữ liệu, trước tiên phải hỏi đủ dữ liệu còn thiếu; sau đó gọi propose_record_change. Việc thay đổi chỉ có hiệu lực sau khi người dùng bấm Xác nhận trong CMS. Không tự bịa dữ liệu, không tiết lộ dữ liệu ngoài kết quả công cụ, và không đề xuất thao tác không có quyền.`;
     const systemPrompt = `${defaultPrompt}\n\n${config.adminSystemPrompt || ''}`.trim();
@@ -237,7 +252,33 @@ Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển t
     }
 
     const textBlock = response.content.find((block) => block.type === 'text');
-    return { data: { message: String(textBlock?.text || ''), actions } };
+    const answer = String(textBlock?.text || '');
+    await this.adminMessages.save(this.adminMessages.create({
+      conversationId: conversation.id,
+      role: 'assistant',
+      content: answer.slice(0, 10000),
+      actionsJson: actions.length ? JSON.stringify(actions) : undefined,
+    }));
+    return { data: { message: answer, actions, conversationId: conversation.id } };
+  }
+
+  @Get('admin/chatbot/conversations/:id')
+  async getAdminConversation(@Param('id') id: string, @Request() request?: { user?: AuthUser }) {
+    const user = request?.user;
+    if (!user) return { data: null };
+    const conversation = await this.adminConversations.findOne({ where: { id, userId: user.id } });
+    if (!conversation) return { data: null };
+    const messages = await this.adminMessages.find({ where: { conversationId: id }, order: { createdAt: 'ASC' }, take: 100 });
+    return {
+      data: {
+        id: conversation.id,
+        messages: messages.map((message) => ({
+          role: message.role,
+          content: message.content,
+          actions: message.actionsJson ? JSON.parse(message.actionsJson) : [],
+        })),
+      },
+    };
   }
 
   @Post('admin/chatbot/action')
@@ -267,6 +308,14 @@ Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển t
       recordId: String(context?.recordId || '').slice(0, 100),
       query: typeof context?.query === 'object' && context.query ? context.query : {},
     };
+  }
+
+  private async resolveConversation(userId: string, conversationId?: string) {
+    if (conversationId) {
+      const existing = await this.adminConversations.findOne({ where: { id: conversationId, userId } });
+      if (existing) return existing;
+    }
+    return this.adminConversations.save(this.adminConversations.create({ userId }));
   }
 
   private async executeAdminTool(
