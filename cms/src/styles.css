@@ -1865,13 +1865,17 @@ body {
   box-shadow: none;
   color: var(--app-primary);
   font-size: 22px;
-  height: 58px;
-  width: 58px;
+  height: 80px;
+  min-width: 0;
+  width: auto;
 }
 
 .login-brand-mark img {
   border-radius: 0;
+  height: 80px;
+  max-width: min(280px, calc(100vw - 48px));
   object-fit: contain;
+  width: auto;
 }
 
 .login-orb {
