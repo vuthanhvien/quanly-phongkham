@@ -9,6 +9,7 @@ import {
   Select,
   Space,
   Switch,
+  Tabs,
   Typography,
   message,
 } from 'antd'
@@ -23,6 +24,14 @@ interface ChatbotConfig {
   toolSearchServices: boolean
   toolCreateAppointment: boolean
   toolCheckDoctorSchedule: boolean
+  toolLookupAppointments: boolean
+  adminEnabled: boolean
+  adminApiKey?: string
+  adminSystemPrompt?: string
+  adminToolReadData: boolean
+  adminToolReports: boolean
+  adminToolMutations: boolean
+  adminToolImport: boolean
   updatedAt?: string
 }
 
@@ -39,11 +48,17 @@ const DEFAULT_SYSTEM_PROMPT = `Bạn là trợ lý tư vấn dịch vụ của p
 
 Hãy trả lời thân thiện, chuyên nghiệp và ngắn gọn bằng tiếng Việt. Khi khách hàng muốn đặt lịch, hãy hỏi đầy đủ thông tin: tên, số điện thoại, và thời gian mong muốn.`
 
+const DEFAULT_ADMIN_SYSTEM_PROMPT = `Bạn là trợ lý vận hành CMS.
+- Hỗ trợ người dùng nhập liệu, kiểm tra dữ liệu và xem báo cáo.
+- Luôn giải thích ngắn gọn, chỉ rõ màn hình/đường dẫn cần mở.
+- Chỉ đề xuất tạo, sửa hoặc lưu trữ khi người dùng đã xác nhận thông tin; CMS sẽ yêu cầu xác nhận lần cuối trước khi thực hiện.`
+
 export function ChatbotSettingsPage() {
   const [form] = Form.useForm<ChatbotConfig>()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [masked, setMasked] = useState(true)
+  const [activeTab, setActiveTab] = useState('landing')
 
   useEffect(() => {
     void load()
@@ -57,6 +72,7 @@ export function ChatbotSettingsPage() {
       form.setFieldsValue({
         ...data,
         apiKey: data.apiKey ? '••••••••••••••••••••••••••' : '',
+        adminApiKey: data.adminApiKey ? '••••••••••••••••••••••••••' : '',
       })
     } catch {
       message.error('Không thể tải cấu hình chatbot')
@@ -71,6 +87,9 @@ export function ChatbotSettingsPage() {
       const payload: Partial<ChatbotConfig> = { ...values }
       if (payload.apiKey?.startsWith('•')) {
         delete payload.apiKey
+      }
+      if (payload.adminApiKey?.startsWith('•')) {
+        delete payload.adminApiKey
       }
       await api.put('/settings/chatbot', payload)
       message.success('Đã lưu cấu hình chatbot')
@@ -101,8 +120,18 @@ export function ChatbotSettingsPage() {
         /> */}
 
         <Form form={form} layout="vertical" onFinish={save}>
+          <Tabs
+            activeKey={activeTab}
+            items={[
+              { key: 'landing', label: 'Chatbot Landing' },
+              { key: 'cms', label: 'Trợ lý CMS' },
+            ]}
+            onChange={setActiveTab}
+          />
+
+          {activeTab === 'landing' && <>
           <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 16 }}>
-            Kết nối API
+            Kết nối AI cho Landing
           </Typography.Title>
 
           <Form.Item
@@ -223,8 +252,89 @@ export function ChatbotSettingsPage() {
           >
             Lưu cấu hình
           </Button>
+          </>}
+
+          {activeTab === 'cms' && <>
+          <Typography.Title level={5} style={{ marginBottom: 8 }}>
+            Trợ lý nội bộ CMS
+          </Typography.Title>
+          <Alert
+            icon={<RobotOutlined />}
+            showIcon
+            type="info"
+            message="Bubble chat cho nhân viên và quản trị viên"
+            description="Trợ lý hiểu màn hình đang mở, có thể chỉ đường dẫn, tra cứu/check dữ liệu, hỗ trợ báo cáo và đề xuất thao tác. Thao tác ghi hoặc lưu trữ luôn cần người dùng xác nhận ở bubble chat."
+            style={{ marginBottom: 16 }}
+          />
+
+          <Card size="small" style={{ marginBottom: 16 }}>
+            <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+              <div>
+                <Typography.Text strong>Bật trợ lý CMS</Typography.Text>
+                <br />
+                <Typography.Text type="secondary">Dùng Anthropic API Key riêng cho trợ lý CMS.</Typography.Text>
+              </div>
+              <Form.Item name="adminEnabled" valuePropName="checked" style={{ margin: 0 }}>
+                <Switch />
+              </Form.Item>
+            </Space>
+          </Card>
+
+          <Form.Item
+            name="adminApiKey"
+            label="Anthropic API Key cho CMS"
+            extra="Key này tách biệt hoàn toàn với chatbot Landing và được mã hóa, không hiển thị lại."
+          >
+            <Input.Password
+              placeholder="sk-ant-..."
+              visibilityToggle={{ visible: !masked, onVisibleChange: (v) => setMasked(!v) }}
+              onFocus={() => {
+                const current = form.getFieldValue('adminApiKey') as string
+                if (current?.startsWith('•')) form.setFieldValue('adminApiKey', '')
+              }}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="adminSystemPrompt"
+            label="Hướng dẫn riêng cho trợ lý CMS"
+            extra="Bổ sung quy trình, thuật ngữ và quy ước nội bộ."
+          >
+            <Input.TextArea rows={6} placeholder={DEFAULT_ADMIN_SYSTEM_PROMPT} style={{ fontFamily: 'monospace', fontSize: 13 }} />
+          </Form.Item>
+
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <ToolToggle name="adminToolReadData" title="Tra cứu & kiểm tra dữ liệu" description="Cho phép đọc danh sách và chi tiết bản ghi theo đúng quyền của người đăng nhập." />
+            <ToolToggle name="adminToolReports" title="Báo cáo kế toán" description="Cho phép tổng hợp các báo cáo kế toán có sẵn trong CMS." />
+            <ToolToggle name="adminToolMutations" title="Thêm, sửa, lưu trữ dữ liệu" description="AI chỉ tạo đề xuất; người dùng phải xác nhận trước khi hệ thống ghi dữ liệu." />
+            <ToolToggle name="adminToolImport" title="Hướng dẫn import Excel" description="Hiển thị nút mở đúng trang import của từng phân hệ." />
+          </Space>
+
+          <Divider />
+
+          <Button className="primary-glow" htmlType="submit" loading={saving} type="primary" size="large">
+            Lưu cấu hình trợ lý
+          </Button>
+          </>}
         </Form>
       </Card>
     </>
+  )
+}
+
+function ToolToggle({ name, title, description }: { name: keyof ChatbotConfig; title: string; description: string }) {
+  return (
+    <Card size="small">
+      <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <Typography.Text strong>{title}</Typography.Text>
+          <br />
+          <Typography.Text type="secondary">{description}</Typography.Text>
+        </div>
+        <Form.Item name={name} valuePropName="checked" style={{ margin: 0 }}>
+          <Switch />
+        </Form.Item>
+      </Space>
+    </Card>
   )
 }

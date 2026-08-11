@@ -8,6 +8,7 @@ import { authProvider, dataProvider, api, getGlobalBranchFilterIds, onGlobalBran
 import { AppUiContext, cardPaddingBySize, controlHeightBySize, defaultAppUiSettings, layoutMetricsBySize, loadCachedAppUiSettings, normalizeAppUiSettings, persistAppUiSettings, syncDocumentBranding, tablePaddingBySize, useAppUi, type AppUiSettings } from './app-ui';
 import { isModuleEnabled } from './company-types';
 import { Shell } from './components/Shell';
+import { AdminChatbotWidget } from './components/AdminChatbotWidget';
 import { entityLabels } from './models';
 import { AuditPage } from './pages/AuditPage';
 import { AccountingReportsPage } from './pages/AccountingReportsPage';
@@ -66,7 +67,7 @@ function ProtectedLayout() {
 
   return (
     <Authenticated key="authenticated" fallback={<CatchAllNavigate to="/login" />}>
-      <Shell><Outlet key={branchScopeKey} /></Shell>
+      <Shell><Outlet key={branchScopeKey} /><AdminChatbotWidget /></Shell>
     </Authenticated>
   );
 }

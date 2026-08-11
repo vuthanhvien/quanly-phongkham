@@ -855,6 +855,13 @@ export class SettingsService {
       toolCreateAppointment: payload.toolCreateAppointment !== undefined ? Boolean(payload.toolCreateAppointment) : current.toolCreateAppointment,
       toolCheckDoctorSchedule: payload.toolCheckDoctorSchedule !== undefined ? Boolean(payload.toolCheckDoctorSchedule) : current.toolCheckDoctorSchedule,
       toolLookupAppointments: payload.toolLookupAppointments !== undefined ? Boolean(payload.toolLookupAppointments) : current.toolLookupAppointments,
+      adminEnabled: payload.adminEnabled !== undefined ? Boolean(payload.adminEnabled) : current.adminEnabled,
+      adminApiKey: payload.adminApiKey !== undefined ? String(payload.adminApiKey || '').trim() || undefined : current.adminApiKey,
+      adminSystemPrompt: payload.adminSystemPrompt !== undefined ? String(payload.adminSystemPrompt || '').trim() || undefined : current.adminSystemPrompt,
+      adminToolReadData: payload.adminToolReadData !== undefined ? Boolean(payload.adminToolReadData) : current.adminToolReadData,
+      adminToolReports: payload.adminToolReports !== undefined ? Boolean(payload.adminToolReports) : current.adminToolReports,
+      adminToolMutations: payload.adminToolMutations !== undefined ? Boolean(payload.adminToolMutations) : current.adminToolMutations,
+      adminToolImport: payload.adminToolImport !== undefined ? Boolean(payload.adminToolImport) : current.adminToolImport,
     });
     return this.chatbotSettings.save(next);
   }
@@ -884,6 +891,11 @@ export class SettingsService {
       toolCreateAppointment: true,
       toolCheckDoctorSchedule: true,
       toolLookupAppointments: true,
+      adminEnabled: false,
+      adminToolReadData: true,
+      adminToolReports: true,
+      adminToolMutations: true,
+      adminToolImport: true,
     }));
   }
 

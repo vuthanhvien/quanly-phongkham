@@ -1954,6 +1954,27 @@ export class ChatbotSetting {
   @Column({ default: true })
   toolLookupAppointments: boolean;
 
+  @Column({ default: false })
+  adminEnabled: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  adminApiKey?: string;
+
+  @Column({ type: 'text', nullable: true })
+  adminSystemPrompt?: string;
+
+  @Column({ default: true })
+  adminToolReadData: boolean;
+
+  @Column({ default: true })
+  adminToolReports: boolean;
+
+  @Column({ default: true })
+  adminToolMutations: boolean;
+
+  @Column({ default: true })
+  adminToolImport: boolean;
+
   @UpdateDateColumn()
   updatedAt: Date;
 }
