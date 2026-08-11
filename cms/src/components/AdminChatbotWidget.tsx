@@ -44,7 +44,7 @@ interface SpeechRecognitionInstance {
 
 const WELCOME: ChatMessage = {
   role: 'assistant',
-  content: 'Chào bạn, tôi là **GISCAT** — trợ lý CMS. Tôi có thể hướng dẫn theo màn hình hiện tại, tra cứu/check dữ liệu, hỗ trợ báo cáo và chuẩn bị thao tác nhập liệu.',
+  content: 'Chào bạn, tôi là **GIS AI** — trợ lý CMS. Tôi có thể hướng dẫn theo màn hình hiện tại, tra cứu/check dữ liệu, hỗ trợ báo cáo và chuẩn bị thao tác nhập liệu.',
 }
 
 export function AdminChatbotWidget() {
@@ -252,17 +252,17 @@ export function AdminChatbotWidget() {
           : undefined}
     >
       {open && (
-        <section className="admin-chatbot-panel" aria-label="GISCAT — trợ lý CMS" style={panelHeight ? { height: panelHeight } : undefined}>
+        <section className="admin-chatbot-panel" aria-label="GIS AI — trợ lý CMS" style={panelHeight ? { height: panelHeight } : undefined}>
           <header className="admin-chatbot-header">
-            <span className="admin-chatbot-avatar"><img alt="GISCAT" src={giscatIcon} /></span>
+            <span className="admin-chatbot-avatar"><img alt="GIS AI" src={giscatIcon} /></span>
             <div>
-              <Typography.Text strong>GISCAT</Typography.Text>
+              <Typography.Text strong>GIS AI</Typography.Text>
               <Typography.Text type="secondary">Dữ liệu, báo cáo & hướng dẫn</Typography.Text>
             </div>
             <Tooltip title="Cuộc trò chuyện mới">
               <Button aria-label="Tạo chat mới" icon={<PlusOutlined />} onClick={startNewConversation} size="small" type="text" />
             </Tooltip>
-            <Button aria-label="Đóng GISCAT" icon={<CloseOutlined />} onClick={() => setOpen(false)} size="small" type="text" />
+            <Button aria-label="Đóng GIS AI" icon={<CloseOutlined />} onClick={() => setOpen(false)} size="small" type="text" />
           </header>
           <div className="admin-chatbot-context">Đang xem: <code>{location.pathname || '/'}</code></div>
           <div className="admin-chatbot-messages">
@@ -276,6 +276,7 @@ export function AdminChatbotWidget() {
                     <Popconfirm
                       cancelText="Hủy"
                       description={action.summary || 'Thao tác này sẽ ghi thay đổi vào hệ thống.'}
+                      zIndex={1401}
                       key={actionIndex}
                       okButtonProps={{ danger: action.operation === 'archive' }}
                       okText={action.operation === 'archive' ? 'Lưu trữ' : 'Xác nhận'}
@@ -316,9 +317,9 @@ export function AdminChatbotWidget() {
           </div>
         </section>
       )}
-      <Tooltip title="GISCAT — Trợ lý CMS">
+      <Tooltip title="GIS AI — Trợ lý CMS">
         <Button
-          aria-label="Mở GISCAT"
+          aria-label="Mở GIS AI"
           className="admin-chatbot-fab"
           icon={open ? <CloseOutlined /> : <img alt="" src={giscatIcon} />}
           onClick={() => {

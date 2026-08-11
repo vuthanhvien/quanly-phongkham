@@ -550,7 +550,7 @@ function resolveBrowserPageTitle(pathname: string) {
     domains: 'Landing domains',
     configs: 'Landing configs',
     'chatbot-settings': 'Chatbot',
-    'chatbot-history': 'Lịch sử GISCAT',
+    'chatbot-history': 'Lịch sử GIS AI',
     'landing-theme': 'Giao diện landing',
     roles: 'Vai trò & Phân quyền',
     'ui-settings': 'Giao diện CMS',

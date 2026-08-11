@@ -182,8 +182,8 @@ erDiagram
 
 | Bảng | Entity | Liên kết đáng chú ý |
 | --- | --- | --- |
-| `chatbot_settings` | `ChatbotSetting` | Cấu hình chatbot landing và GISCAT |
-| `admin_chatbot_conversations` | `AdminChatbotConversation` | `userId`, phiên chat GISCAT |
+| `chatbot_settings` | `ChatbotSetting` | Cấu hình chatbot landing và GIS AI |
+| `admin_chatbot_conversations` | `AdminChatbotConversation` | `userId`, phiên chat GIS AI |
 | `admin_chatbot_messages` | `AdminChatbotMessage` | `conversationId`, lịch sử tin nhắn |
 | `audit_logs` | `AuditLog` | Nhật ký thao tác |
 | `record_drafts` | `RecordDraft` | Bản nháp record |
@@ -194,6 +194,6 @@ erDiagram
 
 Một dòng cấu hình cho mỗi `resource`. Mặc định hệ thống thêm tiền tố module và số tự tăng sáu ký tự, ví dụ `CUS-{NUMBER:6}` cho khách hàng (`CUS-000001`) và `LEAD-{NUMBER:6}` cho khách tiềm năng. Hệ thống cũng hỗ trợ `{NUMBER_DAY:3}` (đếm lại theo ngày) và `{YMD}`.
 
-### Lịch sử GISCAT
+### Lịch sử GIS AI
 
 `admin_chatbot_conversations` lưu phiên chat theo `userId`; `admin_chatbot_messages` lưu từng tin nhắn theo `conversationId`, gồm vai trò, nội dung và dữ liệu action nếu có. Khi cần tra cứu lịch sử một user, nối hai bảng qua `conversationId` và lọc `userId` ở bảng conversation.

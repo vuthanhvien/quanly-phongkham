@@ -31,7 +31,7 @@ export function ChatbotHistoryPage({ embedded = false }: { embedded?: boolean })
       const response = await api.get('/admin/chatbot/conversations')
       setItems(response.data?.data || [])
     } catch {
-      message.error('Không thể tải lịch sử GISCAT')
+      message.error('Không thể tải lịch sử GIS AI')
     } finally {
       setLoading(false)
     }
@@ -57,17 +57,17 @@ export function ChatbotHistoryPage({ embedded = false }: { embedded?: boolean })
     <>
       {!embedded && <div className="page-header">
         <div>
-          <Typography.Title level={3}>Lịch sử GISCAT</Typography.Title>
+          <Typography.Title level={3}>Lịch sử GIS AI</Typography.Title>
           <Typography.Text type="secondary">Hội thoại của nhân viên với trợ lý CMS.</Typography.Text>
         </div>
         <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>Tải lại</Button>
       </div>}
 
-      <Card className="glass-card" title={embedded ? 'Hội thoại của nhân viên với GISCAT' : undefined} extra={embedded ? <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>Tải lại</Button> : undefined}>
+      <Card className="glass-card" title={embedded ? 'Hội thoại của nhân viên với GIS AI' : undefined} extra={embedded ? <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>Tải lại</Button> : undefined}>
         <Table<ConversationSummary>
           columns={[
             { title: 'Người dùng', dataIndex: 'userName', key: 'userName', width: 220, render: (value) => <Typography.Text strong>{value}</Typography.Text> },
-            { title: 'Chủ đề', dataIndex: 'title', key: 'title', render: (value) => value || 'Hội thoại GISCAT' },
+            { title: 'Chủ đề', dataIndex: 'title', key: 'title', render: (value) => value || 'Hội thoại GIS AI' },
             { title: 'Tin nhắn gần nhất', dataIndex: 'latestMessage', key: 'latestMessage', ellipsis: true, render: (value) => <Typography.Text>{value}</Typography.Text> },
             { title: 'Cập nhật', dataIndex: 'updatedAt', key: 'updatedAt', width: 180, render: (value) => value ? new Date(value).toLocaleString('vi-VN') : '—' },
             { title: '', key: 'action', width: 110, render: (_, item) => <Button icon={<MessageOutlined />} onClick={() => void openConversation(item)} size="small">Xem chat</Button> },
@@ -79,11 +79,11 @@ export function ChatbotHistoryPage({ embedded = false }: { embedded?: boolean })
         />
       </Card>
 
-      <Drawer destroyOnClose onClose={() => setSelected(undefined)} open={Boolean(selected)} title={selected ? `GISCAT · ${selected.userName}` : 'GISCAT'} width={560}>
+      <Drawer destroyOnClose onClose={() => setSelected(undefined)} open={Boolean(selected)} title={selected ? `GIS AI · ${selected.userName}` : 'GIS AI'} width={560}>
         <div className="giscat-history-messages">
           {detailLoading ? <Typography.Text type="secondary">Đang tải hội thoại…</Typography.Text> : messages.map((item, index) => (
             <div className={`giscat-history-message giscat-history-message--${item.role}`} key={index}>
-              <Tag color={item.role === 'user' ? 'blue' : 'purple'}>{item.role === 'user' ? selected?.userName : 'GISCAT'}</Tag>
+              <Tag color={item.role === 'user' ? 'blue' : 'purple'}>{item.role === 'user' ? selected?.userName : 'GIS AI'}</Tag>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.content}</ReactMarkdown>
             </div>
           ))}

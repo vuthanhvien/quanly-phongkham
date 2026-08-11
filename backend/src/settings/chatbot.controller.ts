@@ -230,9 +230,10 @@ export class ChatbotController {
       }
     }
     const context = this.cleanAdminContext(body.context);
-    const defaultPrompt = `Bạn là GISCAT, trợ lý vận hành CMS. Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng và dùng Markdown chuẩn (heading, danh sách, in đậm) khi nó làm câu trả lời dễ đọc hơn.
+    const defaultPrompt = `Bạn là GIS AI, trợ lý vận hành CMS. Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng và dùng Markdown chuẩn (heading, danh sách, in đậm) khi nó làm câu trả lời dễ đọc hơn.
 Bạn hỗ trợ nhập liệu, kiểm tra dữ liệu, báo cáo và hướng dẫn sử dụng CMS. Ngữ cảnh màn hình hiện tại: ${JSON.stringify(context)}.
-Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà người dùng đang xem; các cách nói như “khách hàng này”, “ca này”, “bản ghi này” phải được hiểu là bản ghi đó. Không hỏi lại mã hoặc ID; khi cần kiểm tra dữ liệu, gọi inspect_record với resource và recordId trước. Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển thị đường dẫn có thể bấm. Khi yêu cầu tạo hoặc cập nhật đã rõ và đủ dữ liệu, BẮT BUỘC gọi propose_record_change ngay. Create/update được thực hiện ngay bởi công cụ, vì vậy sau khi gọi hãy chỉ thông báo “đã tạo/đã cập nhật”, tuyệt đối không nói “đề xuất”, không yêu cầu bấm xác nhận và không hỏi lại. Chỉ hỏi khi thiếu dữ liệu bắt buộc hoặc ý định thực sự mơ hồ. Lưu trữ/xóa luôn cần xác nhận trong CMS. Không tự bịa dữ liệu, không tiết lộ dữ liệu ngoài kết quả công cụ, và không đề xuất thao tác không có quyền.`;
+Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà người dùng đang xem; các cách nói như “khách hàng này”, “ca này”, “bản ghi này” phải được hiểu là bản ghi đó. Không hỏi lại mã hoặc ID; khi cần kiểm tra dữ liệu, gọi inspect_record với resource và recordId trước. Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển thị đường dẫn có thể bấm. Khi yêu cầu tạo hoặc cập nhật đã rõ và đủ dữ liệu, BẮT BUỘC gọi propose_record_change ngay. Create/update được thực hiện ngay bởi công cụ, vì vậy sau khi gọi hãy chỉ thông báo “đã tạo/đã cập nhật”, tuyệt đối không nói “đề xuất”, không yêu cầu bấm xác nhận và không hỏi lại. Chỉ hỏi khi thiếu dữ liệu bắt buộc hoặc ý định thực sự mơ hồ. Lưu trữ/xóa luôn cần xác nhận trong CMS. Không tự bịa dữ liệu, không tiết lộ dữ liệu ngoài kết quả công cụ, và không đề xuất thao tác không có quyền.
+QUY TẮC HIỂN THỊ DỮ LIỆU: Tuyệt đối không hiển thị UUID/ID kỹ thuật cho người dùng, kể cả trong Markdown, ví dụ hay ghi chú. Với bất kỳ dữ liệu liên kết nào, luôn gọi bằng tên hiển thị đã được trả về (khách hàng, bác sĩ, nhân viên, sản phẩm, chi nhánh…), không gọi bằng trường kết thúc bằng Id. Các mã tham chiếu nội bộ trong kết quả công cụ chỉ phục vụ cho việc gọi công cụ tiếp theo.`;
     const systemPrompt = `${defaultPrompt}\n\n${config.adminSystemPrompt || ''}`.trim();
     let response = await this.callClaude(config.adminApiKey, config.model, systemPrompt, messages, enabledTools as typeof TOOL_DEFINITIONS);
 
@@ -254,7 +255,7 @@ Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà ngư
     }
 
     const textBlock = response.content.find((block) => block.type === 'text');
-    const answer = String(textBlock?.text || '');
+    const answer = this.redactTechnicalIds(String(textBlock?.text || ''));
     await this.adminMessages.save(this.adminMessages.create({
       conversationId: conversation.id,
       role: 'assistant',
@@ -367,20 +368,21 @@ Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà ngư
     try {
       if (name === 'search_records') {
         const resource = String(input.resource || '');
-        const result = await this.records.list(resource, 1, 10, String(input.query || ''), {}, user);
-        return { resource, total: result.total, rows: result.data };
+        const result = await this.records.list(resource, 1, 10, String(input.query || ''), {}, user, undefined, '*');
+        return { resource, total: result.total, rows: result.data.map((row) => this.toChatbotReadableData(row, true)) };
       }
       if (name === 'inspect_record') {
-        return this.records.find(String(input.resource || ''), String(input.recordId || ''), user);
+        const result = await this.records.find(String(input.resource || ''), String(input.recordId || ''), user, undefined, '*');
+        return { data: this.toChatbotReadableData(result.data) };
       }
       if (name === 'get_accounting_report') {
         const params = Object.fromEntries(Object.entries((input.params || {}) as Record<string, unknown>).map(([key, value]) => [key, String(value)]));
         const report = String(input.report || '');
-        if (report === 'trial-balance') return this.records.accountingTrialBalance(params, user);
-        if (report === 'cash-flow') return this.records.accountingCashFlow(params, user);
-        if (report === 'receivables') return this.records.accountingReceivables(params, user);
-        if (report === 'payables') return this.records.accountingPayables(params, user);
-        if (report === 'general-ledger') return this.records.accountingGeneralLedger(params, user);
+        if (report === 'trial-balance') return this.toChatbotReadableData(await this.records.accountingTrialBalance(params, user));
+        if (report === 'cash-flow') return this.toChatbotReadableData(await this.records.accountingCashFlow(params, user));
+        if (report === 'receivables') return this.toChatbotReadableData(await this.records.accountingReceivables(params, user));
+        if (report === 'payables') return this.toChatbotReadableData(await this.records.accountingPayables(params, user));
+        if (report === 'general-ledger') return this.toChatbotReadableData(await this.records.accountingGeneralLedger(params, user));
         return { error: 'Loại báo cáo không hỗ trợ.' };
       }
       if (name === 'propose_record_change') {
@@ -394,14 +396,23 @@ Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà ngư
         if (operation === 'create') {
           const result = await this.records.create(resource, values, user);
           mutationState.changed = true;
-          return { executed: true, operation, resource, result };
+          return { executed: true, operation, resource, result: this.toChatbotReadableData(result) };
         }
         if (operation === 'update' && recordId) {
           const result = await this.records.update(resource, recordId, values, user);
           mutationState.changed = true;
-          return { executed: true, operation, resource, recordId, result };
+          return { executed: true, operation, resource, result: this.toChatbotReadableData(result) };
         }
-        const action: AdminChatAction = { type: 'mutation', operation: 'archive', resource, recordId, values, summary: String(input.summary || 'Xác nhận lưu trữ dữ liệu'), label: 'Xác nhận lưu trữ' };
+        const summary = String(input.summary || 'Xác nhận lưu trữ dữ liệu');
+        const action: AdminChatAction = {
+          type: 'mutation',
+          operation: 'archive',
+          resource,
+          recordId,
+          values,
+          summary,
+          label: await this.archiveActionLabel(resource, recordId!, user, summary),
+        };
         actions.push(action);
         return { proposed: true, summary: action.summary, confirmationRequired: true };
       }
@@ -454,6 +465,76 @@ Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà ngư
     return res.json() as Promise<AnthropicResponse>;
   }
 
+  /** Convert hydrated record relations to their human labels before sending them to the LLM. */
+  private toChatbotReadableData(value: unknown, keepRecordReference = false): unknown {
+    if (value === null || value === undefined) return value;
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'string') return this.isTechnicalId(value) ? undefined : value;
+    if (typeof value !== 'object') return value;
+    if (Array.isArray(value)) return value
+      .map((item) => this.toChatbotReadableData(item, keepRecordReference))
+      .filter((item) => item !== undefined);
+
+    const source = value as Record<string, unknown>;
+    const relationObjectKeys = new Set<string>();
+    const result: Record<string, unknown> = {};
+    for (const [key, related] of Object.entries(source)) {
+      if (!key.endsWith('Id') || !related) continue;
+      const relationKey = key.slice(0, -2);
+      const relatedObject = source[relationKey];
+      if (!relatedObject || typeof relatedObject !== 'object' || Array.isArray(relatedObject)) continue;
+      const label = this.recordDisplayName(relatedObject as Record<string, unknown>);
+      if (label) result[relationKey] = label;
+      relationObjectKeys.add(relationKey);
+    }
+
+    for (const [key, item] of Object.entries(source)) {
+      if (key === 'id') {
+        // The model may need this only to follow up on a search result; it is explicitly forbidden from displaying it.
+        if (keepRecordReference && typeof item === 'string') result.recordRef = item;
+        continue;
+      }
+      if (key.endsWith('Id') || relationObjectKeys.has(key)) continue;
+      const normalized = this.toChatbotReadableData(item);
+      if (normalized !== undefined) result[key] = normalized;
+    }
+    return result;
+  }
+
+  private recordDisplayName(record: Record<string, unknown>) {
+    return ['fullName', 'name', 'title', 'display_title', 'serviceName', 'accountNumber', 'code', 'email', 'username', 'slug']
+      .map((key) => record[key])
+      .find((value) => typeof value === 'string' && value.trim());
+  }
+
+  private isTechnicalId(value: string) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
+  }
+
+  private redactTechnicalIds(value: string) {
+    return value
+      .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi, '')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/\(\s*\)/g, '');
+  }
+
+  private async archiveActionLabel(resource: string, recordId: string, user: AuthUser, fallback: string) {
+    try {
+      const result = await this.records.find(resource, recordId, user, undefined, '*');
+      const record = result.data as unknown as Record<string, unknown>;
+      const linkedName = ['customer', 'staff', 'doctorStaff', 'supplier', 'product', 'project']
+        .map((key) => record[key])
+        .find((value): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value));
+      const name = this.recordDisplayName(record) || (linkedName ? this.recordDisplayName(linkedName) : undefined);
+      const timeValue = record.startTime || record.workDate || record.date;
+      const time = timeValue ? new Date(String(timeValue)).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '';
+      if (name || time) return `Lưu trữ: ${name || 'bản ghi'}${time ? ` · ${time}` : ''}`.slice(0, 96);
+    } catch {
+      // The action itself still has the validated resource and record ID.
+    }
+    return fallback.replace(/^xác nhận\s*/i, '').trim() || 'Xác nhận lưu trữ';
+  }
+
   private async executeTool(name: string, input: Record<string, string>) {
     if (name === 'search_services') {
       const query = input.query || '';
@@ -464,7 +545,6 @@ Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà ngư
       });
       if (!results.length) return { message: 'Không tìm thấy dịch vụ phù hợp.' };
       return results.map((t) => ({
-        id: t.id,
         name: t.name,
         totalSessions: t.totalSessions,
         status: t.status,
@@ -488,7 +568,6 @@ Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà ngư
       await this.appointments.save(appointment);
       return {
         success: true,
-        appointmentId: appointment.id,
         message: `Đã đặt lịch thành công vào ${startTime.toLocaleString('vi-VN')} cho ${input.customerName}.`,
       };
     }
@@ -511,18 +590,21 @@ Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà ngư
         const aptDate = apt.startTime?.toISOString().slice(0, 10);
         return aptDate === date;
       });
+      const staffNames = await this.staffNamesById([
+        ...schedules.map((item) => item.staffId),
+        ...dayAppointments.map((item) => item.doctorStaffId),
+      ]);
 
       return {
         date,
         schedules: schedules.map((s) => ({
-          staffId: s.staffId,
+          staff: staffNames.get(s.staffId) || 'Chưa xác định',
           shift: s.shiftLabel,
           start: s.startTime,
           end: s.endTime,
         })),
         appointments: dayAppointments.map((a) => ({
-          id: a.id,
-          doctor: a.doctorStaffId,
+          doctor: staffNames.get(a.doctorStaffId || '') || 'Chưa xác định',
           start: a.startTime,
           end: a.endTime,
           status: a.status,
@@ -564,16 +646,16 @@ Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà ngư
         if (!matchedChatbot.length) {
           return { found: false, message: 'Không tìm thấy khách hàng với thông tin đã cung cấp. Vui lòng kiểm tra lại tên và số điện thoại.' };
         }
+        const staffNames = await this.staffNamesById(matchedChatbot.map((item) => item.doctorStaffId));
         return {
           found: true,
           source: 'chatbot',
           appointments: matchedChatbot.map((a) => ({
-            id: a.id,
             startTime: a.startTime,
             endTime: a.endTime,
             status: a.status,
             type: a.type,
-            doctor: a.doctorStaffId,
+            doctor: staffNames.get(a.doctorStaffId || '') || 'Chưa xác định',
             note: a.note,
           })),
         };
@@ -586,18 +668,18 @@ Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà ngư
         order: { startTime: 'ASC' },
         take: 20,
       });
+      const staffNames = await this.staffNamesById(aptList.map((item) => item.doctorStaffId));
 
       return {
         found: true,
         source: 'crm',
         customer: { fullName: matched[0].fullName, phone: matched[0].phone, status: matched[0].status },
         appointments: aptList.map((a) => ({
-          id: a.id,
           startTime: a.startTime,
           endTime: a.endTime,
           status: a.status,
           type: a.type,
-          doctor: a.doctorStaffId,
+          doctor: staffNames.get(a.doctorStaffId || '') || 'Chưa xác định',
           note: a.note,
         })),
       };
@@ -621,5 +703,12 @@ Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà ngư
     const doctors = await this.staff.find({ where: staffIds.map((id) => ({ id })) });
     const match = doctors.find((item) => item.fullName.toLowerCase().includes(normalized.toLowerCase()));
     return match?.id;
+  }
+
+  private async staffNamesById(ids: Array<string | undefined>) {
+    const uniqueIds = [...new Set(ids.filter(Boolean) as string[])];
+    if (!uniqueIds.length) return new Map<string, string>();
+    const rows = await this.staff.find({ where: { id: In(uniqueIds) }, select: ['id', 'fullName'] });
+    return new Map(rows.map((item) => [item.id, item.fullName]));
   }
 }
