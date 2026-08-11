@@ -34,6 +34,7 @@ import { RolesPage } from './pages/RolesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PrintTemplateEditorPage } from './pages/PrintTemplateEditorPage';
 import { ChatbotSettingsPage } from './pages/ChatbotSettingsPage';
+import { ChatbotHistoryPage } from './pages/ChatbotHistoryPage';
 import { LandingThemePage } from './pages/LandingThemePage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { DepartmentsPage } from './pages/DepartmentsPage';
@@ -270,6 +271,7 @@ export function App() {
                 <Route path="/landing/configs" element={<Navigate to="/configs" replace />} />
                 <Route path="/landing-pages" element={<Navigate to="/pages" replace />} />
                 <Route path="/chatbot-settings" element={<ChatbotSettingsPage />} />
+                <Route path="/chatbot-history" element={<ChatbotHistoryPage />} />
                 <Route path="/landing-theme" element={<LandingThemePage />} />
                 <Route path="/roles" element={<RolesPage />} />
                 <Route path="/branch-role-assignments" element={<Navigate to="/roles" replace />} />

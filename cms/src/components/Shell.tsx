@@ -321,6 +321,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
               label: <Link to="/chatbot-settings">Trợ lý chat</Link>,
             }
           : null,
+        isAdmin && hasScreenAccess("settings")
+          ? {
+              key: "/chatbot-history",
+              icon: <MessageOutlined />,
+              label: <Link to="/chatbot-history">Lịch sử GISCAT</Link>,
+            }
+          : null,
         hasScreenAccess("settings")
           ? {
               key: "/custom-fields",
@@ -383,6 +390,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     location.pathname.startsWith("/landing-pages") ||
     location.pathname.startsWith("/landing-theme") ||
     location.pathname.startsWith("/chatbot-settings") ||
+    location.pathname.startsWith("/chatbot-history") ||
     location.pathname.startsWith("/custom-fields") ||
     location.pathname.startsWith("/custom-tables") ||
     location.pathname.startsWith("/print-templates") ||
@@ -549,6 +557,7 @@ function resolveBrowserPageTitle(pathname: string) {
     domains: 'Landing domains',
     configs: 'Landing configs',
     'chatbot-settings': 'Chatbot',
+    'chatbot-history': 'Lịch sử GISCAT',
     'landing-theme': 'Giao diện landing',
     roles: 'Vai trò & Phân quyền',
     'ui-settings': 'Giao diện CMS',

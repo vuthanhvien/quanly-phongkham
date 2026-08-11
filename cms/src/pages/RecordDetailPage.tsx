@@ -29,6 +29,7 @@ import {
   IdcardOutlined,
   PhoneOutlined,
   PrinterOutlined,
+  ReloadOutlined,
   SwapOutlined,
   TagOutlined,
   TeamOutlined,
@@ -82,6 +83,7 @@ interface RecordDetailPageProps {
   id?: string
   embedded?: boolean
   onClose?: () => void
+  refreshKey?: number
 }
 
 export function RecordDetailPage(props: RecordDetailPageProps = {}) {
@@ -89,6 +91,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   const resource = props.resource ?? params.resource ?? "customers"
   const id = props.id ?? params.id ?? ""
   const embedded = Boolean(props.embedded)
+  const refreshKey = props.refreshKey || 0
   const navigate = useNavigate()
   const { settings } = useAppUi()
   const [toast, toastContextHolder] = message.useMessage()
@@ -158,7 +161,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
     return () => {
       mounted = false
     }
-  }, [resource, id, canShowRelatedResource])
+  }, [resource, id, canShowRelatedResource, refreshKey])
 
   if (!record && !loading) {
     return <Empty description="Không tìm thấy bản ghi" />
@@ -228,6 +231,15 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
             <Link to={`/${resource}`}>
               <Button icon={<ArrowLeftOutlined />}>Quay lại</Button>
             </Link>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => {
+                void reloadCurrentRecord()
+                void reloadRelatedBlocks()
+              }}
+            >
+              Làm mới dữ liệu
+            </Button>
             {resource === "leads" && !record?.convertedCustomerId && hasActionAccess(resource, "convert-to-customer") && (
               <Tooltip title="Chuyển khách tiềm năng thành khách hàng">
                 <Button

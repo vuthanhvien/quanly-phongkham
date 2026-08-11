@@ -4273,27 +4273,42 @@ textarea.ant-input {
   bottom: 26px;
   position: fixed;
   right: 28px;
-  z-index: 1100;
+  z-index: 1300;
 }
 
 .admin-chatbot-fab {
   box-shadow: 0 12px 26px color-mix(in srgb, var(--app-primary) 35%, transparent);
   height: 52px !important;
   width: 52px !important;
+  position: relative;
+  z-index: 2;
 }
 
 .admin-chatbot-panel {
   background: var(--app-surface, #fff);
   border: 1px solid var(--app-line, #dbe1ea);
   border-radius: 16px;
-  bottom: 66px;
+  bottom: 52px;
   box-shadow: 0 20px 52px rgba(15, 23, 42, .2);
   display: flex;
   flex-direction: column;
+  height: min(440px, calc(100vh - 104px));
+  max-height: calc(100vh - 24px);
   overflow: hidden;
   position: absolute;
   right: 0;
   width: min(390px, calc(100vw - 32px));
+  z-index: 1;
+}
+
+.admin-chatbot--left .admin-chatbot-panel {
+  left: 0;
+  right: auto;
+}
+
+.admin-chatbot--panel-below .admin-chatbot-panel {
+  bottom: auto;
+  top: 52px;
 }
 
 .admin-chatbot-header {
@@ -4327,12 +4342,12 @@ textarea.ant-input {
 }
 
 .admin-chatbot-fab .anticon,
-.admin-chatbot-fab > img {
+.admin-chatbot-fab .ant-btn-icon img {
   height: 29px;
   width: 29px;
 }
 
-.admin-chatbot-fab > img {
+.admin-chatbot-fab .ant-btn-icon img {
   display: block;
   margin: auto;
   object-fit: contain;
@@ -4352,8 +4367,8 @@ textarea.ant-input {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: min(440px, 56vh);
-  min-height: 270px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 14px;
 }
@@ -4401,6 +4416,25 @@ textarea.ant-input {
 }
 
 .admin-chatbot-compose .ant-input { font-size: 13px; }
+
+.giscat-history-messages {
+  display: grid;
+  gap: 12px;
+}
+
+.giscat-history-message {
+  background: rgba(15, 23, 42, .045);
+  border-radius: 10px;
+  padding: 11px 13px;
+}
+
+.giscat-history-message--user {
+  background: color-mix(in srgb, var(--app-primary) 10%, white);
+}
+
+.giscat-history-message .ant-tag { margin-bottom: 7px; }
+.giscat-history-message p:first-of-type { margin-top: 0; }
+.giscat-history-message p:last-child { margin-bottom: 0; }
 
 @media (max-width: 640px) {
   .admin-chatbot { bottom: 18px; right: 16px; }

@@ -1,4 +1,4 @@
-import { AudioOutlined, CloseOutlined, SendOutlined } from '@ant-design/icons'
+import { AudioOutlined, CloseOutlined, PlusOutlined, SendOutlined } from '@ant-design/icons'
 import { Button, Input, Popconfirm, Spin, Tooltip, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -27,16 +27,18 @@ interface ChatAction {
 }
 
 interface SpeechRecognitionResultEvent extends Event {
-  results: { [index: number]: { [index: number]: { transcript: string } } }
+  results: { length: number; [index: number]: { [index: number]: { transcript: string } } }
 }
 
 interface SpeechRecognitionInstance {
   lang: string
   interimResults: boolean
+  continuous: boolean
   onerror: (() => void) | null
   onresult: ((event: SpeechRecognitionResultEvent) => void) | null
   onend: (() => void) | null
   start: () => void
+  stop: () => void
 }
 
 const WELCOME: ChatMessage = {
@@ -54,8 +56,24 @@ export function AdminChatbotWidget() {
   const [listening, setListening] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME])
   const [conversationId, setConversationId] = useState(() => readConversationId())
+  const [bubblePosition, setBubblePosition] = useState<{ side: 'left' | 'right'; topPercent: number }>()
+  const [dragPosition, setDragPosition] = useState<{ x: number; y: number }>()
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<any>(null)
+  const dragRef = useRef<{ pointerId: number; originX: number; originY: number; startX: number; startY: number; width: number; height: number; moved: boolean; x: number; y: number } | undefined>(undefined)
+  const justDraggedRef = useRef(false)
+  const voiceRecognitionRef = useRef<SpeechRecognitionInstance | undefined>(undefined)
+  const voiceActiveRef = useRef(false)
+  const voiceStopTimerRef = useRef<number | undefined>(undefined)
+  const dockedLeft = bubblePosition?.side === 'left'
+  const panelBelow = Boolean(bubblePosition && bubblePosition.topPercent < 45)
+  const panelHeight = bubblePosition
+    ? Math.max(150, Math.floor(
+      panelBelow
+        ? window.innerHeight * (1 - bubblePosition.topPercent / 100) - 78
+        : window.innerHeight * (bubblePosition.topPercent / 100) - 78,
+    ))
+    : undefined
 
   useEffect(() => {
     api.get('/admin/chatbot/config')
@@ -100,6 +118,7 @@ export function AdminChatbotWidget() {
         content: String(data.message || 'Tôi chưa nhận được phản hồi. Vui lòng thử lại.'),
         actions: Array.isArray(data.actions) ? data.actions : [],
       }])
+      if (data.reload) schedulePageReload()
     } catch {
       setMessages((current) => [...current, { role: 'assistant', content: 'Không thể kết nối trợ lý lúc này. Vui lòng thử lại.' }])
     } finally {
@@ -108,6 +127,10 @@ export function AdminChatbotWidget() {
   }
 
   function transcribeVoice() {
+    if (listening) {
+      stopVoiceListening()
+      return
+    }
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!Recognition) {
       setMessages((current) => [...current, { role: 'assistant', content: 'Trình duyệt này chưa hỗ trợ nhập giọng nói. Hãy dùng Chrome hoặc Edge và cho phép quyền micro.' }])
@@ -116,14 +139,38 @@ export function AdminChatbotWidget() {
     const recognition: SpeechRecognitionInstance = new Recognition()
     recognition.lang = 'vi-VN'
     recognition.interimResults = false
+    recognition.continuous = true
     recognition.onresult = (event) => {
-      const transcript = event.results[0]?.[0]?.transcript?.trim()
+      const transcript = event.results[event.results.length - 1]?.[0]?.transcript?.trim()
       if (transcript) setInput((current) => current ? `${current} ${transcript}` : transcript)
+      scheduleVoiceStop()
     }
-    recognition.onerror = () => setListening(false)
-    recognition.onend = () => setListening(false)
+    recognition.onerror = () => stopVoiceListening()
+    recognition.onend = () => {
+      if (!voiceActiveRef.current) return
+      window.setTimeout(() => {
+        if (!voiceActiveRef.current) return
+        try { recognition.start() } catch { /* recognition is already restarting */ }
+      }, 250)
+    }
+    voiceRecognitionRef.current = recognition
+    voiceActiveRef.current = true
     setListening(true)
     recognition.start()
+    scheduleVoiceStop()
+  }
+
+  function scheduleVoiceStop() {
+    if (voiceStopTimerRef.current) window.clearTimeout(voiceStopTimerRef.current)
+    voiceStopTimerRef.current = window.setTimeout(stopVoiceListening, 5000)
+  }
+
+  function stopVoiceListening() {
+    voiceActiveRef.current = false
+    if (voiceStopTimerRef.current) window.clearTimeout(voiceStopTimerRef.current)
+    voiceStopTimerRef.current = undefined
+    try { voiceRecognitionRef.current?.stop() } catch { /* it may already be stopped */ }
+    setListening(false)
   }
 
   async function execute(action: ChatAction) {
@@ -135,23 +182,80 @@ export function AdminChatbotWidget() {
     try {
       await api.post('/admin/chatbot/action', action)
       setMessages((current) => [...current, { role: 'assistant', content: `Đã thực hiện: ${action.summary || action.label}.` }])
+      schedulePageReload()
     } catch {
       setMessages((current) => [...current, { role: 'assistant', content: 'Không thể thực hiện thao tác. Hãy kiểm tra quyền hoặc dữ liệu và thử lại.' }])
     }
   }
 
+  function startNewConversation() {
+    setConversationId('')
+    clearConversationId()
+    setMessages([WELCOME])
+    setInput('')
+  }
+
+  function startBubbleDrag(event: React.PointerEvent<HTMLButtonElement>) {
+    const rect = event.currentTarget.getBoundingClientRect()
+    dragRef.current = {
+      pointerId: event.pointerId,
+      originX: event.clientX - rect.left,
+      originY: event.clientY - rect.top,
+      startX: rect.left,
+      startY: rect.top,
+      width: rect.width,
+      height: rect.height,
+      moved: false,
+      x: rect.left,
+      y: rect.top,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function moveBubble(event: React.PointerEvent<HTMLButtonElement>) {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const x = clamp(event.clientX - drag.originX, 12, window.innerWidth - drag.width - 12)
+    const y = clamp(event.clientY - drag.originY, 12, window.innerHeight - drag.height - 12)
+    drag.x = x
+    drag.y = y
+    drag.moved ||= Math.abs(x - drag.startX) > 3 || Math.abs(y - drag.startY) > 3
+    setDragPosition({ x, y })
+  }
+
+  function endBubbleDrag(event: React.PointerEvent<HTMLButtonElement>) {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const side = drag.x + drag.width / 2 < window.innerWidth / 2 ? 'left' : 'right'
+    const y = clamp(drag.y, 12, window.innerHeight - drag.height - 12)
+    setDragPosition(undefined)
+    setBubblePosition({ side, topPercent: (y / window.innerHeight) * 100 })
+    justDraggedRef.current = drag.moved
+    dragRef.current = undefined
+  }
+
   if (!enabled) return null
 
   return (
-    <div className="admin-chatbot">
+    <div
+      className={`admin-chatbot${dockedLeft ? ' admin-chatbot--left' : ''}${panelBelow ? ' admin-chatbot--panel-below' : ''}`}
+      style={dragPosition
+        ? { left: dragPosition.x, top: dragPosition.y, right: 'auto', bottom: 'auto' }
+        : bubblePosition
+          ? { [bubblePosition.side]: 12, top: `clamp(12px, ${bubblePosition.topPercent}%, calc(100vh - 64px))`, right: bubblePosition.side === 'left' ? 'auto' : 12, bottom: 'auto' }
+          : undefined}
+    >
       {open && (
-        <section className="admin-chatbot-panel" aria-label="GISCAT — trợ lý CMS">
+        <section className="admin-chatbot-panel" aria-label="GISCAT — trợ lý CMS" style={panelHeight ? { height: panelHeight } : undefined}>
           <header className="admin-chatbot-header">
             <span className="admin-chatbot-avatar"><img alt="GISCAT" src={giscatIcon} /></span>
             <div>
               <Typography.Text strong>GISCAT</Typography.Text>
               <Typography.Text type="secondary">Dữ liệu, báo cáo & hướng dẫn</Typography.Text>
             </div>
+            <Tooltip title="Cuộc trò chuyện mới">
+              <Button aria-label="Tạo chat mới" icon={<PlusOutlined />} onClick={startNewConversation} size="small" type="text" />
+            </Tooltip>
             <Button aria-label="Đóng GISCAT" icon={<CloseOutlined />} onClick={() => setOpen(false)} size="small" type="text" />
           </header>
           <div className="admin-chatbot-context">Đang xem: <code>{location.pathname || '/'}</code></div>
@@ -205,7 +309,23 @@ export function AdminChatbotWidget() {
         </section>
       )}
       <Tooltip title="GISCAT — Trợ lý CMS">
-        <Button aria-label="Mở GISCAT" className="admin-chatbot-fab" icon={open ? <CloseOutlined /> : <img alt="" src={giscatIcon} />} onClick={() => setOpen((value) => !value)} shape="circle" type="primary" />
+        <Button
+          aria-label="Mở GISCAT"
+          className="admin-chatbot-fab"
+          icon={open ? <CloseOutlined /> : <img alt="" src={giscatIcon} />}
+          onClick={() => {
+            if (justDraggedRef.current) {
+              justDraggedRef.current = false
+              return
+            }
+            setOpen((value) => !value)
+          }}
+          onPointerDown={startBubbleDrag}
+          onPointerMove={moveBubble}
+          onPointerUp={endBubbleDrag}
+          shape="circle"
+          type="primary"
+        />
       </Tooltip>
     </div>
   )
@@ -214,8 +334,11 @@ export function AdminChatbotWidget() {
 function getPageContext(path: string, search: string) {
   const segments = path.split('/').filter(Boolean)
   const resource = segments[0] || ''
-  const recordId = segments.length > 1 && !['import', 'new'].includes(segments[1]) ? segments[1] : ''
-  return { path, resource, recordId, query: Object.fromEntries(new URLSearchParams(search)) }
+  const query = Object.fromEntries(new URLSearchParams(search))
+  const recordId = segments.length > 1 && !['import', 'new'].includes(segments[1])
+    ? segments[1]
+    : String(query.detail || query.recordId || query.id || '')
+  return { path, resource, recordId, query }
 }
 
 function conversationStorageKey() {
@@ -241,6 +364,22 @@ function saveConversationId(value: string) {
   } catch {
     // Storage is optional; the server still keeps the conversation.
   }
+}
+
+function clearConversationId() {
+  try {
+    localStorage.removeItem(conversationStorageKey())
+  } catch {
+    // Storage is optional; a new conversation will be created on the next message.
+  }
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), Math.max(min, max))
+}
+
+function schedulePageReload() {
+  window.setTimeout(() => window.location.reload(), 450)
 }
 
 declare global {

@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Param, Post, Request } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, Request } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { ILike, In, Repository } from 'typeorm';
 import { AuthUser, Public } from '../common/auth';
 import { RecordsService } from '../records/records.service';
 import { AdminChatbotConversation, AdminChatbotMessage, Appointment, Customer, Staff, Treatment, User, WorkSchedule } from '../entities/entities';
@@ -50,7 +50,7 @@ const ADMIN_TOOL_DEFINITIONS = [
   },
   {
     name: 'propose_record_change',
-    description: 'Đề xuất tạo, cập nhật hoặc lưu trữ một bản ghi. KHÔNG tự khẳng định đã thực hiện: CMS sẽ hiển thị nút xác nhận riêng cho người dùng.',
+    description: 'THỰC HIỆN tạo, cập nhật hoặc lưu trữ một bản ghi. Với create/update, công cụ ghi dữ liệu ngay lập tức: chỉ gọi khi ý định và dữ liệu đã rõ, sau đó thông báo kết quả đã thực hiện; không đề xuất hay yêu cầu xác nhận. Chỉ archive mới trả về nút xác nhận riêng trong CMS.',
     input_schema: { type: 'object', properties: { operation: { type: 'string', enum: ['create', 'update', 'archive'] }, resource: { type: 'string' }, recordId: { type: 'string', description: 'Bắt buộc khi update hoặc archive' }, values: { type: 'object', description: 'Các trường cần tạo/cập nhật; chỉ gửi các trường đã được người dùng cung cấp hoặc xác nhận' }, summary: { type: 'string', description: 'Mô tả ngắn, chính xác nội dung thay đổi để người dùng xác nhận' } }, required: ['operation', 'resource', 'summary'] },
   },
   {
@@ -214,6 +214,7 @@ export class ChatbotController {
       return true;
     });
     const actions: AdminChatAction[] = [];
+    const mutationState = { changed: false };
     const conversation = await this.resolveConversation(user.id, body.conversationId);
     const messages: ChatMessage[] = (body.messages || []).filter((msg) => msg.role === 'user' || msg.role === 'assistant');
     const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user');
@@ -231,7 +232,7 @@ export class ChatbotController {
     const context = this.cleanAdminContext(body.context);
     const defaultPrompt = `Bạn là GISCAT, trợ lý vận hành CMS. Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng và dùng Markdown chuẩn (heading, danh sách, in đậm) khi nó làm câu trả lời dễ đọc hơn.
 Bạn hỗ trợ nhập liệu, kiểm tra dữ liệu, báo cáo và hướng dẫn sử dụng CMS. Ngữ cảnh màn hình hiện tại: ${JSON.stringify(context)}.
-Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển thị đường dẫn có thể bấm. Khi cần thay đổi dữ liệu, trước tiên phải hỏi đủ dữ liệu còn thiếu; sau đó gọi propose_record_change. Việc thay đổi chỉ có hiệu lực sau khi người dùng bấm Xác nhận trong CMS. Không tự bịa dữ liệu, không tiết lộ dữ liệu ngoài kết quả công cụ, và không đề xuất thao tác không có quyền.`;
+Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà người dùng đang xem; các cách nói như “khách hàng này”, “ca này”, “bản ghi này” phải được hiểu là bản ghi đó. Không hỏi lại mã hoặc ID; khi cần kiểm tra dữ liệu, gọi inspect_record với resource và recordId trước. Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển thị đường dẫn có thể bấm. Khi yêu cầu tạo hoặc cập nhật đã rõ và đủ dữ liệu, BẮT BUỘC gọi propose_record_change ngay. Create/update được thực hiện ngay bởi công cụ, vì vậy sau khi gọi hãy chỉ thông báo “đã tạo/đã cập nhật”, tuyệt đối không nói “đề xuất”, không yêu cầu bấm xác nhận và không hỏi lại. Chỉ hỏi khi thiếu dữ liệu bắt buộc hoặc ý định thực sự mơ hồ. Lưu trữ/xóa luôn cần xác nhận trong CMS. Không tự bịa dữ liệu, không tiết lộ dữ liệu ngoài kết quả công cụ, và không đề xuất thao tác không có quyền.`;
     const systemPrompt = `${defaultPrompt}\n\n${config.adminSystemPrompt || ''}`.trim();
     let response = await this.callClaude(config.adminApiKey, config.model, systemPrompt, messages, enabledTools as typeof TOOL_DEFINITIONS);
 
@@ -243,6 +244,7 @@ Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển t
           (toolUse.input || {}) as Record<string, unknown>,
           user,
           actions,
+          mutationState,
         );
         toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(result) });
       }
@@ -259,14 +261,15 @@ Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển t
       content: answer.slice(0, 10000),
       actionsJson: actions.length ? JSON.stringify(actions) : undefined,
     }));
-    return { data: { message: answer, actions, conversationId: conversation.id } };
+    return { data: { message: answer, actions, conversationId: conversation.id, reload: mutationState.changed } };
   }
 
   @Get('admin/chatbot/conversations/:id')
   async getAdminConversation(@Param('id') id: string, @Request() request?: { user?: AuthUser }) {
     const user = request?.user;
     if (!user) return { data: null };
-    const conversation = await this.adminConversations.findOne({ where: { id, userId: user.id } });
+    const isAdmin = (user.roleMain || user.role) === 'ADMIN';
+    const conversation = await this.adminConversations.findOne({ where: isAdmin ? { id } : { id, userId: user.id } });
     if (!conversation) return { data: null };
     const messages = await this.adminMessages.find({ where: { conversationId: id }, order: { createdAt: 'ASC' }, take: 100 });
     return {
@@ -278,6 +281,39 @@ Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển t
           actions: message.actionsJson ? JSON.parse(message.actionsJson) : [],
         })),
       },
+    };
+  }
+
+  @Get('admin/chatbot/conversations')
+  async listAdminConversations(@Request() request?: { user?: AuthUser }) {
+    const user = request?.user;
+    if (!user || (user.roleMain || user.role) !== 'ADMIN') {
+      throw new ForbiddenException('Chỉ quản trị viên được xem lịch sử GISCAT');
+    }
+    const conversations = await this.adminConversations.find({ order: { updatedAt: 'DESC' }, take: 100 });
+    const userIds = [...new Set(conversations.map((conversation) => conversation.userId))];
+    const users = userIds.length ? await this.users.find({ where: { id: In(userIds) }, select: ['id', 'fullName', 'email', 'username'] }) : [];
+    const userById = new Map(users.map((item) => [item.id, item]));
+    const messages = conversations.length
+      ? await this.adminMessages.find({ where: { conversationId: In(conversations.map((conversation) => conversation.id)) }, order: { createdAt: 'DESC' } })
+      : [];
+    const latestMessageByConversation = new Map<string, AdminChatbotMessage>();
+    for (const message of messages) {
+      if (!latestMessageByConversation.has(message.conversationId)) latestMessageByConversation.set(message.conversationId, message);
+    }
+    return {
+      data: conversations.map((conversation) => {
+        const owner = userById.get(conversation.userId);
+        const latest = latestMessageByConversation.get(conversation.id);
+        return {
+          id: conversation.id,
+          title: conversation.title,
+          userId: conversation.userId,
+          userName: owner?.fullName || owner?.username || owner?.email || conversation.userId,
+          updatedAt: conversation.updatedAt,
+          latestMessage: latest?.content || '',
+        };
+      }),
     };
   }
 
@@ -323,6 +359,7 @@ Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển t
     input: Record<string, unknown>,
     user: AuthUser,
     actions: AdminChatAction[],
+    mutationState: { changed: boolean },
   ) {
     try {
       if (name === 'search_records') {
@@ -350,7 +387,18 @@ Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển t
         if (!['create', 'update', 'archive'].includes(operation) || !resource || ((operation === 'update' || operation === 'archive') && !recordId)) {
           return { error: 'Đề xuất thay đổi thiếu operation, resource hoặc recordId.' };
         }
-        const action: AdminChatAction = { type: 'mutation', operation: operation as NonNullable<AdminChatAction['operation']>, resource, recordId, values: (input.values || {}) as Record<string, unknown>, summary: String(input.summary || 'Xác nhận thay đổi dữ liệu'), label: operation === 'archive' ? 'Xác nhận lưu trữ' : 'Xác nhận thực hiện' };
+        const values = (input.values || {}) as Record<string, unknown>;
+        if (operation === 'create') {
+          const result = await this.records.create(resource, values, user);
+          mutationState.changed = true;
+          return { executed: true, operation, resource, result };
+        }
+        if (operation === 'update' && recordId) {
+          const result = await this.records.update(resource, recordId, values, user);
+          mutationState.changed = true;
+          return { executed: true, operation, resource, recordId, result };
+        }
+        const action: AdminChatAction = { type: 'mutation', operation: 'archive', resource, recordId, values, summary: String(input.summary || 'Xác nhận lưu trữ dữ liệu'), label: 'Xác nhận lưu trữ' };
         actions.push(action);
         return { proposed: true, summary: action.summary, confirmationRequired: true };
       }

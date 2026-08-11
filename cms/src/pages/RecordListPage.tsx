@@ -15,6 +15,7 @@ import {
   PrinterOutlined,
   SwapOutlined,
   PlusOutlined,
+  ReloadOutlined,
   UserAddOutlined,
 } from "@ant-design/icons"
 import {
@@ -70,6 +71,7 @@ export function RecordListPage() {
   const [advancedSearch, setAdvancedSearch] = useState(false)
   const [advancedFilters, setAdvancedFilters] = useState<Record<string, { operator: string; value?: string | number }>>({})
   const [recordStatus, setRecordStatus] = useState<"active" | "archived">("active")
+  const [detailRefreshKey, setDetailRefreshKey] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
   const [displayFields, setDisplayFields] = useState<FieldLayoutConfig[]>([])
@@ -822,6 +824,12 @@ export function RecordListPage() {
                 <Tooltip title="Xem đầy đủ">
                   <Button ghost icon={<FullscreenOutlined />} onClick={() => navigate(`/${resource}/${detailId}/full`)} />
                 </Tooltip>
+                <Tooltip title="Làm mới dữ liệu">
+                  <Button icon={<ReloadOutlined />} onClick={() => {
+                    refresh()
+                    setDetailRefreshKey((value) => value + 1)
+                  }} />
+                </Tooltip>
                 {hasActionAccess(resource, "update") && (
                   <Button
                     className="primary-glow"
@@ -847,6 +855,7 @@ export function RecordListPage() {
           <RecordDetailPage
             embedded
             id={detailId}
+            refreshKey={detailRefreshKey}
             resource={resource}
             onClose={closeDetail}
           />
