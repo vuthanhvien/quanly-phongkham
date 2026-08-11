@@ -321,13 +321,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
               label: <Link to="/chatbot-settings">Trợ lý chat</Link>,
             }
           : null,
-        isAdmin && hasScreenAccess("settings")
-          ? {
-              key: "/chatbot-history",
-              icon: <MessageOutlined />,
-              label: <Link to="/chatbot-history">Lịch sử GISCAT</Link>,
-            }
-          : null,
         hasScreenAccess("settings")
           ? {
               key: "/custom-fields",

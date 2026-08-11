@@ -287,10 +287,13 @@ Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà ngư
   @Get('admin/chatbot/conversations')
   async listAdminConversations(@Request() request?: { user?: AuthUser }) {
     const user = request?.user;
-    if (!user || (user.roleMain || user.role) !== 'ADMIN') {
-      throw new ForbiddenException('Chỉ quản trị viên được xem lịch sử GISCAT');
-    }
-    const conversations = await this.adminConversations.find({ order: { updatedAt: 'DESC' }, take: 100 });
+    if (!user) throw new ForbiddenException('Phiên đăng nhập đã hết hạn');
+    const isAdmin = (user.roleMain || user.role) === 'ADMIN';
+    const conversations = await this.adminConversations.find({
+      where: isAdmin ? {} : { userId: user.id },
+      order: { updatedAt: 'DESC' },
+      take: 100,
+    });
     const userIds = [...new Set(conversations.map((conversation) => conversation.userId))];
     const users = userIds.length ? await this.users.find({ where: { id: In(userIds) }, select: ['id', 'fullName', 'email', 'username'] }) : [];
     const userById = new Map(users.map((item) => [item.id, item]));

@@ -6,13 +6,15 @@ import Handlebars from 'handlebars';
 import { basename, join } from 'path';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, GoogleDriveConnection, ItemCategory, LandingDomain, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, Product, Unit, User, ViewSetting } from '../entities/entities';
+import { defaultCodeFormula } from '../common/code-generation';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CodeGenerationSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, GoogleDriveConnection, ItemCategory, LandingDomain, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, Product, Unit, User, ViewSetting } from '../entities/entities';
 import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
 import { renderDocxTemplate } from './docx-template';
 import { assertPdfHasReadableText, renderPdfTemplate as renderPdfTemplateFile } from './pdf-template';
 
 const DEFAULT_ROLE_SCOPE = 'ALL';
+const LEGACY_DEFAULT_CODE_FORMULA = '{NUMBER:6}';
 const SYSTEM_ROLES = ['ADMIN', 'STAFF', 'DOCTOR'];
 const LANDING_BLOCK_TYPES = ['title', 'text', 'image', 'video', 'form', 'slider'];
 const UI_THEME_OPTIONS = ['dark', 'light'];
@@ -163,6 +165,12 @@ function slugify(input?: string) {
     .replace(/(^-|-$)/g, '');
 }
 
+function isValidCodeFormula(formula: string) {
+  const tokenPattern = /\{(?:NUMBER|NUMBER_DAY):\d+\}|\{YMD\}/g;
+  const stripped = formula.replace(tokenPattern, '');
+  return !/[{}]/.test(stripped) && /\{(?:NUMBER|NUMBER_DAY):\d+\}|\{YMD\}/.test(formula);
+}
+
 function normalizeLandingPath(path?: string, fallbackSlug?: string) {
   const raw = String(path || fallbackSlug || '').trim();
   if (!raw) return '/';
@@ -181,6 +189,7 @@ export class SettingsService {
 
   constructor(
     @InjectRepository(CustomFieldDefinition) private readonly fields: Repository<CustomFieldDefinition>,
+    @InjectRepository(CodeGenerationSetting) private readonly codeGenerationSettings: Repository<CodeGenerationSetting>,
     @InjectRepository(CustomTable) private readonly customTables: Repository<CustomTable>,
     @InjectRepository(CustomTableColumn) private readonly customTableColumns: Repository<CustomTableColumn>,
     @InjectRepository(CustomTableRow) private readonly customTableRows: Repository<CustomTableRow>,
@@ -480,6 +489,33 @@ export class SettingsService {
   listFields(entityType?: string, user?: AuthUser) {
     this.assertResourceReadable(user, entityType);
     return this.fields.find({ where: entityType ? { entityType, isArchived: false } : { isArchived: false }, order: { entityType: 'ASC', sortOrder: 'ASC' } });
+  }
+
+  async getCodeGenerationSetting(resource: string, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const current = await this.codeGenerationSettings.findOne({ where: { resource } });
+    // Upgrade the old system default only. Custom formulas are always preserved.
+    if (current?.formula?.trim() === LEGACY_DEFAULT_CODE_FORMULA) {
+      return this.codeGenerationSettings.save(this.codeGenerationSettings.merge(current, { formula: defaultCodeFormula(resource) }));
+    }
+    return current || this.codeGenerationSettings.save(this.codeGenerationSettings.create({
+      resource,
+      formula: defaultCodeFormula(resource),
+      isActive: true,
+    }));
+  }
+
+  async updateCodeGenerationSetting(resource: string, payload: Partial<CodeGenerationSetting>, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const formula = String(payload.formula || '').trim();
+    if (formula && !isValidCodeFormula(formula)) {
+      throw new BadRequestException('Công thức mã chỉ hỗ trợ text thường và các token {NUMBER:n}, {NUMBER_DAY:n}, {YMD}');
+    }
+    const current = await this.codeGenerationSettings.findOne({ where: { resource } });
+    return this.codeGenerationSettings.save(this.codeGenerationSettings.merge(
+      current || this.codeGenerationSettings.create({ resource }),
+      { formula: formula || defaultCodeFormula(resource), isActive: payload.isActive !== false },
+    ));
   }
 
   async createField(payload: Partial<CustomFieldDefinition>, user?: AuthUser) {

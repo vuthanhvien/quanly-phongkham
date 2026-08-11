@@ -15,6 +15,7 @@ import {
 } from 'antd'
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import { ChatbotHistoryPage } from './ChatbotHistoryPage'
 
 interface ChatbotConfig {
   id?: string
@@ -125,6 +126,7 @@ export function ChatbotSettingsPage() {
             items={[
               { key: 'landing', label: 'Chatbot Landing' },
               { key: 'cms', label: 'Trợ lý CMS' },
+              { key: 'history', label: 'Lịch sử GISCAT' },
             ]}
             onChange={setActiveTab}
           />
@@ -316,6 +318,8 @@ export function ChatbotSettingsPage() {
             Lưu cấu hình trợ lý
           </Button>
           </>}
+
+          {activeTab === 'history' && <ChatbotHistoryPage embedded />}
         </Form>
       </Card>
     </>

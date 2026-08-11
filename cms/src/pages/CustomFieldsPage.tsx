@@ -20,6 +20,8 @@ import {
   Select,
   Space,
   Table,
+  Tabs,
+  Tree,
   Tooltip,
   Typography,
   Upload,
@@ -30,7 +32,7 @@ import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState, type Key } from "react"
 import * as XLSX from "xlsx"
 import { api } from "../api"
-import { buildGroupedModuleOptions } from "../company-types"
+import { appModuleGroups } from "../company-types"
 import { ModalTitleBar } from "../components/ModalTitleBar"
 import { CustomField, entityLabels } from "../models"
 
@@ -52,10 +54,12 @@ const RELATIVE_RESOURCE_OPTIONS = Object.entries(entityLabels).map(
   ([value, label]) => ({ value, label }),
 )
 
-const CUSTOM_FIELD_ENTITY_OPTIONS = buildGroupedModuleOptions(entityLabels)
-
 export function CustomFieldsPage() {
   const [entityType, setEntityType] = useState("customers")
+  const [activeTab, setActiveTab] = useState("fields")
+  const [codeFormula, setCodeFormula] = useState("")
+  const [codeEnabled, setCodeEnabled] = useState(true)
+  const [savingCode, setSavingCode] = useState(false)
   const [fields, setFields] = useState<CustomField[]>([])
   const [customTables, setCustomTables] = useState<Array<{ id: string; name: string; key: string }>>([])
   const [fieldModal, setFieldModal] = useState(false)
@@ -83,12 +87,39 @@ export function CustomFieldsPage() {
   }, [])
 
   async function load() {
-    const response = await api.get("/settings/custom-fields", {
-      params: { entityType },
-    })
-    setFields(response.data.data)
+    const [fieldResponse, codeResponse] = await Promise.all([
+      api.get("/settings/custom-fields", { params: { entityType } }),
+      api.get(`/settings/code-generation/${entityType}`),
+    ])
+    setFields(fieldResponse.data.data)
+    setCodeFormula(codeResponse.data?.data?.formula || "")
+    setCodeEnabled(codeResponse.data?.data?.isActive !== false)
     setSelectedFieldIds([])
   }
+
+  async function saveCodeSetting() {
+    setSavingCode(true)
+    try {
+      await api.put(`/settings/code-generation/${entityType}`, { formula: codeFormula, isActive: codeEnabled })
+      message.success("Đã lưu công thức sinh mã")
+    } finally {
+      setSavingCode(false)
+    }
+  }
+
+  const moduleTree = useMemo(() => {
+    const grouped = new Set<string>()
+    const groups = appModuleGroups.map((group) => {
+      const children = group.modules.filter((key) => entityLabels[key]).map((key) => {
+        grouped.add(key)
+        return { key, title: entityLabels[key] }
+      })
+      return children.length ? { key: `group-${group.key}`, title: group.label, selectable: false, children } : null
+    }).filter(Boolean) as Array<{ key: string; title: string; selectable: false; children: Array<{ key: string; title: string }> }>
+    const remaining = Object.keys(entityLabels).filter((key) => !grouped.has(key)).map((key) => ({ key, title: entityLabels[key] }))
+    if (remaining.length) groups.push({ key: "group-other", title: "Khác", selectable: false, children: remaining })
+    return groups
+  }, [])
 
   async function saveField(values: Record<string, unknown>) {
     const payload = normalizeFieldPayload(values, entityType)
@@ -308,14 +339,6 @@ export function CustomFieldsPage() {
       <div className="page-header">
         <Typography.Title level={3}>Trường tuỳ biến</Typography.Title>
         <Space wrap>
-          <Select
-            showSearch
-            value={entityType}
-            onChange={setEntityType}
-            optionFilterProp="label"
-            style={{ width: 280 }}
-            options={CUSTOM_FIELD_ENTITY_OPTIONS}
-          />
           {selectedFieldIds.length > 0 ? (
             <Button danger icon={<DeleteOutlined />} onClick={archiveSelectedFields}>
               Lưu trữ đã chọn ({selectedFieldIds.length})
@@ -347,7 +370,28 @@ export function CustomFieldsPage() {
           </Dropdown>
         </Space>
       </div>
-      <Card className="glass-card settings-card">
+      <div className="custom-fields-workspace">
+        <Card className="glass-card custom-fields-module-tree" title="Module">
+          <Tree
+            defaultExpandAll
+            selectedKeys={[entityType]}
+            treeData={moduleTree}
+            onSelect={(keys) => {
+              const selected = String(keys[0] || "")
+              if (selected && !selected.startsWith("group-")) setEntityType(selected)
+            }}
+          />
+        </Card>
+        <div className="custom-fields-content">
+          <Tabs
+            activeKey={activeTab}
+            items={[
+              { key: "fields", label: "Trường tuỳ biến" },
+              { key: "settings", label: "Cài đặt mã" },
+            ]}
+            onChange={setActiveTab}
+          />
+          {activeTab === "fields" && <Card className="glass-card settings-card">
         <Typography.Paragraph type="secondary">
           Custom field dùng chung cho tất cả role. Phần hiển thị và bắt buộc
           nhập sẽ được cấu hình riêng theo role trong màn Cấu hình động.
@@ -395,7 +439,30 @@ export function CustomFieldsPage() {
             },
           ]}
         />
-      </Card>
+          </Card>}
+          {activeTab === "settings" && (
+            <Card className="glass-card settings-card" title={`Sinh mã tự động · ${entityLabels[entityType] || entityType}`}>
+              <Typography.Paragraph type="secondary">
+                Khi tạo mới và không nhập mã, hệ thống sẽ sinh mã theo công thức này. Mã nhập thủ công vẫn được giữ nguyên.
+              </Typography.Paragraph>
+              <Form layout="vertical" onFinish={() => void saveCodeSetting()}>
+                <Form.Item label="Công thức mã" extra="Ví dụ: OR-{NUMBER:4}, HD-{YMD}-{NUMBER_DAY:3}">
+                  <Input value={codeFormula} onChange={(event) => setCodeFormula(event.target.value)} placeholder={defaultCodeFormula(entityType)} />
+                </Form.Item>
+                <Form.Item label="Bật tự động sinh mã" valuePropName="checked">
+                  <Checkbox checked={codeEnabled} onChange={(event) => setCodeEnabled(event.target.checked)}>Tự động sinh mã khi để trống</Checkbox>
+                </Form.Item>
+                <Typography.Paragraph type="secondary">
+                  <code>{previewCodeFormula(codeFormula, entityType)}</code>
+                  <br />
+                  <strong>{'{NUMBER:4}'}</strong>: số tăng toàn bộ, 4 ký tự. <strong>{'{NUMBER_DAY:3}'}</strong>: số tăng lại mỗi ngày, 3 ký tự. <strong>{'{YMD}'}</strong>: ngày hiện tại dạng YYYYMMDD.
+                </Typography.Paragraph>
+                <Button className="primary-glow" htmlType="submit" loading={savingCode} type="primary">Lưu cài đặt mã</Button>
+              </Form>
+            </Card>
+          )}
+        </div>
+      </div>
       <Modal
         className={`quick-drawer${fullscreenPopup === "field" ? " quick-drawer-fullscreen" : ""}`}
         title={
@@ -653,6 +720,27 @@ function normalizeBatchRow(row: BatchFieldRow): ParsedFieldInput {
 
 function sanitizeFieldKey(key: string) {
   return key.trim().replace(/[^a-zA-Z0-9_]/g, "_")
+}
+
+function defaultCodeFormula(resource: string) {
+  const prefixes: Record<string, string> = {
+    appointments: "APT", branches: "BRA", customers: "CUS", departments: "DEP", expenses: "EXP",
+    invoices: "INV", leads: "LEAD", medical_episodes: "MED", "medical-episodes": "MED", products: "PROD",
+    projects: "PROJ", rooms: "ROOM", service_orders: "SO", "service-orders": "SO", staff: "STF",
+    suppliers: "SUP", tasks: "TASK", treatments: "TRT", users: "USR",
+  }
+  const normalized = String(resource || "").trim().toLowerCase()
+  const prefix = prefixes[normalized] || normalized.split(/[-_]/).filter(Boolean).map((part) => part.slice(0, 2)).join("").slice(0, 4).toUpperCase() || "REC"
+  return `${prefix}-{NUMBER:6}`
+}
+
+function previewCodeFormula(formula: string, resource = "") {
+  const now = new Date()
+  const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`
+  return (formula || defaultCodeFormula(resource))
+    .replace(/\{YMD\}/g, ymd)
+    .replace(/\{NUMBER(?::\d+)?\}/g, "0001")
+    .replace(/\{NUMBER_DAY(?::\d+)?\}/g, "001")
 }
 
 function normalizeFieldPayload(

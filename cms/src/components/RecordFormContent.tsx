@@ -412,10 +412,10 @@ export function RecordFormContent({
                 <span>{field.label}</span>
                 <Typography.Text type="secondary">{field.description}</Typography.Text>
               </Space>
-            ) : field.label}
+            ) : field.key === "code" && !editing ? `${field.label} (tự sinh nếu để trống)` : field.label}
             name={field.key}
             rules={[
-              { required: Boolean(field.required && !field.disabled), message: `Nhập ${field.label}` },
+              { required: Boolean(field.required && !field.disabled && !(field.key === "code" && !editing)), message: `Nhập ${field.label}` },
               ...(field.inputPattern ? [{
                 validator: (_rule: unknown, value: unknown) => isInputPatternComplete(field.inputPattern, value)
                   ? Promise.resolve()

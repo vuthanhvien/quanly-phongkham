@@ -1,4 +1,4 @@
-import { AudioOutlined, CloseOutlined, PlusOutlined, SendOutlined } from '@ant-design/icons'
+import { AudioOutlined, CloseOutlined, PlusOutlined, SendOutlined, StopOutlined } from '@ant-design/icons'
 import { Button, Input, Popconfirm, Spin, Tooltip, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -64,7 +64,8 @@ export function AdminChatbotWidget() {
   const justDraggedRef = useRef(false)
   const voiceRecognitionRef = useRef<SpeechRecognitionInstance | undefined>(undefined)
   const voiceActiveRef = useRef(false)
-  const voiceStopTimerRef = useRef<number | undefined>(undefined)
+  const voiceTranscriptRef = useRef('')
+  const voicePrefixRef = useRef('')
   const dockedLeft = bubblePosition?.side === 'left'
   const panelBelow = Boolean(bubblePosition && bubblePosition.topPercent < 45)
   const panelHeight = bubblePosition
@@ -94,12 +95,14 @@ export function AdminChatbotWidget() {
     window.setTimeout(() => inputRef.current?.focus?.(), 100)
   }, [messages, open])
 
-  async function send() {
-    const content = input.trim()
+  async function send(textOverride?: string) {
+    const content = (textOverride ?? input).trim()
     if (!content || loading) return
     const nextMessages = [...messages, { role: 'user' as const, content }]
     setMessages(nextMessages)
     setInput('')
+    voiceTranscriptRef.current = ''
+    voicePrefixRef.current = ''
     setLoading(true)
     try {
       const response = await api.post('/admin/chatbot/chat', {
@@ -128,7 +131,7 @@ export function AdminChatbotWidget() {
 
   function transcribeVoice() {
     if (listening) {
-      stopVoiceListening()
+      stopVoiceListening(true)
       return
     }
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -138,14 +141,18 @@ export function AdminChatbotWidget() {
     }
     const recognition: SpeechRecognitionInstance = new Recognition()
     recognition.lang = 'vi-VN'
-    recognition.interimResults = false
+    recognition.interimResults = true
     recognition.continuous = true
     recognition.onresult = (event) => {
-      const transcript = event.results[event.results.length - 1]?.[0]?.transcript?.trim()
-      if (transcript) setInput((current) => current ? `${current} ${transcript}` : transcript)
-      scheduleVoiceStop()
+      if (!voiceActiveRef.current) return
+      const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index]?.[0]?.transcript?.trim())
+        .filter(Boolean)
+        .join(' ')
+      const nextText = `${voicePrefixRef.current}${transcript}`.trim()
+      voiceTranscriptRef.current = nextText
+      setInput(nextText)
     }
-    recognition.onerror = () => stopVoiceListening()
+    recognition.onerror = () => stopVoiceListening(false)
     recognition.onend = () => {
       if (!voiceActiveRef.current) return
       window.setTimeout(() => {
@@ -155,22 +162,20 @@ export function AdminChatbotWidget() {
     }
     voiceRecognitionRef.current = recognition
     voiceActiveRef.current = true
+    voicePrefixRef.current = input.trim() ? `${input.trim()} ` : ''
+    voiceTranscriptRef.current = input.trim()
     setListening(true)
     recognition.start()
-    scheduleVoiceStop()
   }
 
-  function scheduleVoiceStop() {
-    if (voiceStopTimerRef.current) window.clearTimeout(voiceStopTimerRef.current)
-    voiceStopTimerRef.current = window.setTimeout(stopVoiceListening, 5000)
-  }
-
-  function stopVoiceListening() {
+  function stopVoiceListening(sendAfterStop: boolean) {
     voiceActiveRef.current = false
-    if (voiceStopTimerRef.current) window.clearTimeout(voiceStopTimerRef.current)
-    voiceStopTimerRef.current = undefined
     try { voiceRecognitionRef.current?.stop() } catch { /* it may already be stopped */ }
     setListening(false)
+    const capturedText = voiceTranscriptRef.current.trim()
+    if (sendAfterStop && capturedText) {
+      window.setTimeout(() => void send(capturedText), 0)
+    }
   }
 
   async function execute(action: ChatAction) {
@@ -287,7 +292,7 @@ export function AdminChatbotWidget() {
           </div>
           <div className="admin-chatbot-compose">
             <Input.TextArea
-              autoSize={{ minRows: 1, maxRows: 4 }}
+              autoSize={{ minRows: 2, maxRows: 5 }}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -299,8 +304,10 @@ export function AdminChatbotWidget() {
               ref={inputRef}
               value={input}
             />
-            <Tooltip title={listening ? 'Đang nghe…' : 'Nhập bằng giọng nói'}>
-              <Button icon={<AudioOutlined />} loading={listening} onClick={transcribeVoice} />
+            <Tooltip title={listening ? 'Dừng nghe và gửi' : 'Bắt đầu nhập bằng giọng nói'}>
+              <Button danger={listening} icon={listening ? <StopOutlined /> : <AudioOutlined />} onClick={transcribeVoice}>
+                {listening ? 'Dừng & gửi' : undefined}
+              </Button>
             </Tooltip>
             <Tooltip title="Gửi">
               <Button disabled={!input.trim() || loading} icon={<SendOutlined />} onClick={() => void send()} type="primary" />

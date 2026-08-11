@@ -18,7 +18,7 @@ interface StoredMessage {
   content: string
 }
 
-export function ChatbotHistoryPage() {
+export function ChatbotHistoryPage({ embedded = false }: { embedded?: boolean }) {
   const [items, setItems] = useState<ConversationSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<ConversationSummary>()
@@ -55,15 +55,15 @@ export function ChatbotHistoryPage() {
 
   return (
     <>
-      <div className="page-header">
+      {!embedded && <div className="page-header">
         <div>
           <Typography.Title level={3}>Lịch sử GISCAT</Typography.Title>
           <Typography.Text type="secondary">Hội thoại của nhân viên với trợ lý CMS.</Typography.Text>
         </div>
         <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>Tải lại</Button>
-      </div>
+      </div>}
 
-      <Card className="glass-card">
+      <Card className="glass-card" title={embedded ? 'Hội thoại của nhân viên với GISCAT' : undefined} extra={embedded ? <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>Tải lại</Button> : undefined}>
         <Table<ConversationSummary>
           columns={[
             { title: 'Người dùng', dataIndex: 'userName', key: 'userName', width: 220, render: (value) => <Typography.Text strong>{value}</Typography.Text> },

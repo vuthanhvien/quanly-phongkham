@@ -4436,6 +4436,56 @@ textarea.ant-input {
 .giscat-history-message p:first-of-type { margin-top: 0; }
 .giscat-history-message p:last-child { margin-bottom: 0; }
 
+.custom-fields-workspace {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+}
+
+.custom-fields-module-tree {
+  position: sticky;
+  top: 82px;
+}
+
+.custom-fields-module-tree .ant-card-body {
+  max-height: calc(100vh - 185px);
+  overflow: auto;
+  padding: 8px 10px !important;
+}
+
+.custom-fields-module-tree .ant-tree {
+  font-size: 13px;
+}
+
+.custom-fields-module-tree .ant-tree-treenode {
+  align-items: center;
+  min-height: 26px;
+  padding: 0 !important;
+}
+
+.custom-fields-module-tree .ant-tree-node-content-wrapper,
+.custom-fields-module-tree .ant-tree-switcher {
+  line-height: 26px !important;
+  min-height: 26px;
+}
+
+.custom-fields-module-tree .ant-tree-node-content-wrapper {
+  padding: 0 4px !important;
+}
+
+.custom-fields-module-tree .ant-tree-indent-unit {
+  width: 14px;
+}
+
+.custom-fields-content { min-width: 0; }
+
+@media (max-width: 900px) {
+  .custom-fields-workspace { grid-template-columns: 1fr; }
+  .custom-fields-module-tree { position: static; }
+  .custom-fields-module-tree .ant-card-body { max-height: 260px; }
+}
+
 @media (max-width: 640px) {
   .admin-chatbot { bottom: 18px; right: 16px; }
   .admin-chatbot-panel { bottom: 62px; }

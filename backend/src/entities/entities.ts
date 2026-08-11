@@ -1480,6 +1480,24 @@ export class CustomFieldDefinition {
   createdAt: Date;
 }
 
+@Entity('code_generation_settings')
+export class CodeGenerationSetting {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  resource: string;
+
+  @Column({ type: 'text', nullable: true })
+  formula?: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
 @Entity('custom_tables')
 export class CustomTable {
   @PrimaryGeneratedColumn('uuid')
@@ -2929,6 +2947,7 @@ export const ENTITIES = [
   Treatment,
   Commission,
   CustomFieldDefinition,
+  CodeGenerationSetting,
   CustomTable,
   CustomTableColumn,
   CustomTableRow,

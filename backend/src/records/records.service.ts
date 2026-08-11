@@ -6,6 +6,7 @@ import { promises as fs } from 'fs';
 import { extname, join } from 'path';
 import { Between, FindOptionsWhere, ILike, In, IsNull, LessThan, LessThanOrEqual, MoreThan, MoreThanOrEqual, Not, QueryFailedError, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
+import { defaultCodeFormula } from '../common/code-generation';
 import {
   Appointment,
   AccountingCashFlowMapping,
@@ -25,6 +26,7 @@ import {
   ConfigurableEntity,
   ContentNews,
   ContentPost,
+  CodeGenerationSetting,
   CustomFieldDefinition,
   CustomFieldValue,
   CustomTableRow,
@@ -110,6 +112,10 @@ function buildRoleChain (role?: string, mainRole?: string) {
 }
 
 type ResourceRepository = Repository<any>;
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 type RequestContext = {
   protocol?: string;
   headers?: Record<string, string | string[] | undefined>;
@@ -471,6 +477,7 @@ export class RecordsService {
     @InjectRepository(ContentPost) private readonly posts: Repository<ContentPost>,
     @InjectRepository(ContentNews) private readonly news: Repository<ContentNews>,
     @InjectRepository(CustomFieldDefinition) private readonly fieldDefinitions: Repository<CustomFieldDefinition>,
+    @InjectRepository(CodeGenerationSetting) private readonly codeGenerationSettings: Repository<CodeGenerationSetting>,
     @InjectRepository(CustomFieldValue) private readonly customFieldValues: Repository<CustomFieldValue>,
     @InjectRepository(CustomTableRow) private readonly customTableRows: Repository<CustomTableRow>,
     @InjectRepository(ViewSetting) private readonly viewSettings: Repository<ViewSetting>,
@@ -1070,13 +1077,17 @@ export class RecordsService {
     if (resource === 'products' && Boolean(payload.hasVariants) && productVariants.length === 0) {
       throw new BadRequestException('Sản phẩm có biến thể cần ít nhất một SKU');
     }
-    const normalized = await this.normalizeInput(resource, payload, true);
+    const repository = this.repository(resource);
+    const payloadWithAutoCode = { ...payload };
+    if (!String(payloadWithAutoCode.code || '').trim() && repository.metadata.findColumnWithPropertyName('code')) {
+      payloadWithAutoCode.code = await this.generateCode(resource, repository);
+    }
+    const normalized = await this.normalizeInput(resource, payloadWithAutoCode, true);
     delete normalized.variants;
     if (resource === 'leave-requests') await this.prepareLeaveRequest(normalized);
     if (resource === 'work-schedules') return this.saveWorkScheduleSchema(normalized, payload, user);
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
-    const repository = this.repository(resource);
     const record = await this.saveRecord(resource, repository.create(normalized), repository);
     if (resource === 'projects' && Array.isArray(payload.memberStaffIds)) await this.syncProjectMembers(record.id, payload.memberStaffIds);
     if (resource === 'products') await this.syncProductVariants(record.id, productVariants);
@@ -3357,6 +3368,29 @@ export class RecordsService {
     if (Array.isArray(raw)) return raw[0]?.split(',')[0].trim();
     if (typeof raw === 'string') return raw.split(',')[0].trim();
     return '';
+  }
+
+  private async generateCode(resource: string, repository: ResourceRepository) {
+    const setting = await this.codeGenerationSettings.findOne({ where: { resource, isActive: true } });
+    const formula = setting?.formula?.trim() || defaultCodeFormula(resource);
+    const now = new Date();
+    const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const numberToken = /\{(NUMBER|NUMBER_DAY):(\d+)\}/.exec(formula);
+    if (!numberToken) return formula.replace(/\{YMD\}/g, ymd);
+
+    const [, numberKind, digitsText] = numberToken;
+    const digits = Math.min(Math.max(Number(digitsText), 1), 12);
+    const before = formula.slice(0, numberToken.index).replace(/\{YMD\}/g, ymd);
+    const after = formula.slice((numberToken.index || 0) + numberToken[0].length).replace(/\{YMD\}/g, ymd);
+    const matcher = new RegExp(`^${escapeRegExp(before)}(\\d{${digits}})${escapeRegExp(after)}$`);
+    const rows = await repository.find({ select: ['code', 'createdAt'] as any });
+    const today = now.toDateString();
+    const currentMax = rows.reduce((max, row) => {
+      if (numberKind === 'NUMBER_DAY' && row.createdAt && new Date(row.createdAt).toDateString() !== today) return max;
+      const match = matcher.exec(String(row.code || ''));
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+    return `${before}${String(currentMax + 1).padStart(digits, '0')}${after}`;
   }
 
   private async normalize (resource: string, payload: Record<string, unknown>, creating = false) {

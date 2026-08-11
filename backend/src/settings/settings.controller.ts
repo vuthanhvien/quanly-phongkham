@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, 
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { AuthUser, Public } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, DynamicRoleDefinition, LandingForm, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CodeGenerationSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, DynamicRoleDefinition, LandingForm, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
 import { SettingsService } from './settings.service';
 
 function escapeHtml(value: string) {
@@ -31,6 +31,16 @@ export class SettingsController {
   @Delete('custom-fields/:id')
   async removeField(@Param('id') id: string, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.deleteField(id, request?.user) };
+  }
+
+  @Get('code-generation/:resource')
+  async getCodeGeneration(@Param('resource') resource: string, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.getCodeGenerationSetting(resource, request?.user) };
+  }
+
+  @Put('code-generation/:resource')
+  async updateCodeGeneration(@Param('resource') resource: string, @Body() payload: Partial<CodeGenerationSetting>, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.updateCodeGenerationSetting(resource, payload, request?.user) };
   }
 
   @Get('custom-tables')
