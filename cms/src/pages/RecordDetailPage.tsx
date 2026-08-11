@@ -35,6 +35,7 @@ import {
   TeamOutlined,
 } from "@ant-design/icons"
 import { api } from "../api"
+import { CMS_DATA_REFRESH_EVENT, type CmsDataRefreshDetail } from "../utils/dataRefresh"
 import { printHtmlInPlace } from "../utils/printHtml"
 import { hasActionAccess, hasResourceAccess } from "../access"
 import { isModuleEnabled } from "../company-types"
@@ -92,6 +93,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   const id = props.id ?? params.id ?? ""
   const embedded = Boolean(props.embedded)
   const refreshKey = props.refreshKey || 0
+  const [chatbotRefreshKey, setChatbotRefreshKey] = useState(0)
   const navigate = useNavigate()
   const { settings } = useAppUi()
   const [toast, toastContextHolder] = message.useMessage()
@@ -115,6 +117,16 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
       settings.hasCustomModuleSelection,
     ) && hasResourceAccess(relatedResource),
   [settings.companyType, settings.enabledModules, settings.hasCustomModuleSelection])
+
+  useEffect(() => {
+    const onDataRefresh = (event: Event) => {
+      const targetResource = (event as CustomEvent<CmsDataRefreshDetail>).detail?.resource
+      if (targetResource && targetResource !== resource) return
+      setChatbotRefreshKey((value) => value + 1)
+    }
+    window.addEventListener(CMS_DATA_REFRESH_EVENT, onDataRefresh)
+    return () => window.removeEventListener(CMS_DATA_REFRESH_EVENT, onDataRefresh)
+  }, [resource])
 
   useEffect(() => {
     let mounted = true
@@ -161,7 +173,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
     return () => {
       mounted = false
     }
-  }, [resource, id, canShowRelatedResource, refreshKey])
+  }, [resource, id, canShowRelatedResource, refreshKey, chatbotRefreshKey])
 
   if (!record && !loading) {
     return <Empty description="Không tìm thấy bản ghi" />

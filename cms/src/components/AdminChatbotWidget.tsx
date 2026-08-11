@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import remarkGfm from 'remark-gfm'
 import { api } from '../api'
 import giscatIcon from '../assets/giscat-catbot.png'
+import { requestCmsDataRefresh } from '../utils/dataRefresh'
 
 type ChatRole = 'user' | 'assistant'
 
@@ -121,7 +122,7 @@ export function AdminChatbotWidget() {
         content: String(data.message || 'Tôi chưa nhận được phản hồi. Vui lòng thử lại.'),
         actions: Array.isArray(data.actions) ? data.actions : [],
       }])
-      if (data.reload) schedulePageReload()
+      if (data.reload) requestCmsDataRefresh(getPageContext(location.pathname, location.search).resource)
     } catch {
       setMessages((current) => [...current, { role: 'assistant', content: 'Không thể kết nối trợ lý lúc này. Vui lòng thử lại.' }])
     } finally {
@@ -187,7 +188,7 @@ export function AdminChatbotWidget() {
     try {
       await api.post('/admin/chatbot/action', action)
       setMessages((current) => [...current, { role: 'assistant', content: `Đã thực hiện: ${action.summary || action.label}.` }])
-      schedulePageReload()
+      requestCmsDataRefresh(getPageContext(location.pathname, location.search).resource)
     } catch {
       setMessages((current) => [...current, { role: 'assistant', content: 'Không thể thực hiện thao tác. Hãy kiểm tra quyền hoặc dữ liệu và thử lại.' }])
     }
@@ -383,10 +384,6 @@ function clearConversationId() {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), Math.max(min, max))
-}
-
-function schedulePageReload() {
-  window.setTimeout(() => window.location.reload(), 450)
 }
 
 declare global {

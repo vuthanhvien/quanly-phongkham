@@ -53,6 +53,7 @@ import { CustomField, entityLabels, normalizeSelectOption } from "../models"
 import { RecordDetailPage } from "./RecordDetailPage"
 import { displayValue, FileLookupMap, getRelationSpec, hasFileField, loadFileLookupMap, LookupMap, resolveRecordFieldValue } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
+import { CMS_DATA_REFRESH_EVENT, type CmsDataRefreshDetail } from "../utils/dataRefresh"
 import * as XLSX from "xlsx"
 import {
   FieldLayoutConfig,
@@ -117,6 +118,20 @@ export function RecordListPage() {
   const detailId = searchParams.get("detail")
   const { mutate: deleteRecord } = useDelete()
   const refresh = () => query.query?.refetch?.() || query.refetch?.()
+  const refreshData = () => {
+    void refresh()
+    if (detailId) setDetailRefreshKey((value) => value + 1)
+  }
+
+  useEffect(() => {
+    const onDataRefresh = (event: Event) => {
+      const targetResource = (event as CustomEvent<CmsDataRefreshDetail>).detail?.resource
+      if (targetResource && targetResource !== resource) return
+      refreshData()
+    }
+    window.addEventListener(CMS_DATA_REFRESH_EVENT, onDataRefresh)
+    return () => window.removeEventListener(CMS_DATA_REFRESH_EVENT, onDataRefresh)
+  }, [resource, detailId, query])
   const tableRows = useMemo(
     () => resource === "units" ? buildUnitTree(rows as Record<string, any>[]) : rows,
     [resource, rows],
@@ -620,6 +635,9 @@ export function RecordListPage() {
           </Typography.Title>
         </div>
         <Space wrap className="page-header-actions record-list-actions">
+          <Button icon={<ReloadOutlined />} onClick={refreshData}>
+            Làm mới dữ liệu
+          </Button>
           <Input.Search
             allowClear
             className="page-search"
@@ -826,8 +844,7 @@ export function RecordListPage() {
                 </Tooltip>
                 <Tooltip title="Làm mới dữ liệu">
                   <Button icon={<ReloadOutlined />} onClick={() => {
-                    refresh()
-                    setDetailRefreshKey((value) => value + 1)
+                    refreshData()
                   }} />
                 </Tooltip>
                 {hasActionAccess(resource, "update") && (

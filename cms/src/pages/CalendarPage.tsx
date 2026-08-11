@@ -390,7 +390,6 @@ export function CalendarPage() {
                 <DayPlannerTimeline
                   events={selectedEvents.filter((item) => item.type !== "schedule")}
                   selectedDate={selectedDate}
-                  onOpen={(item) => navigate(`/${item.resource}/${item.id}`)}
                   onOpenQuickDetail={(item) => void openQuickDetail(item)}
                 />
                 <div className="calendar-day-work-schedule-panels">
@@ -654,12 +653,10 @@ export function CalendarPage() {
 function DayPlannerTimeline({
   events,
   selectedDate,
-  onOpen,
   onOpenQuickDetail,
 }: {
   events: PlannerEvent[]
   selectedDate: Dayjs
-  onOpen: (item: PlannerEvent) => void
   onOpenQuickDetail: (item: PlannerEvent) => void
 }) {
   const hourSlots = Array.from({ length: DAY_VIEW_HOUR_COUNT + 1 }, (_, index) => DAY_VIEW_START_HOUR + index)
@@ -671,7 +668,7 @@ function DayPlannerTimeline({
     <div className="calendar-day-timeline">
       <div className="calendar-day-timeline__grid">
         {hourSlots.map((hour) => (
-          <div className="calendar-day-timeline__slot" key={hour}>
+          <div className={`calendar-day-timeline__slot${hour === DAY_VIEW_END_HOUR ? " calendar-day-timeline__slot--end" : ""}`} key={hour}>
             <div className="calendar-day-timeline__label">{`${String(hour).padStart(2, "0")}:00`}</div>
             <div className="calendar-day-timeline__line" />
           </div>
@@ -679,7 +676,7 @@ function DayPlannerTimeline({
         <div className="calendar-day-timeline__events">
           {timelineEvents.map((event) => (
             <button
-              className={`calendar-day-event tone-${event.type}`}
+              className={`calendar-day-event tone-${event.type}${event.isCompact ? " is-compact" : ""}`}
               key={event.id}
               style={{
                 top: `${event.topPercent}%`,
@@ -688,10 +685,17 @@ function DayPlannerTimeline({
                 width: `calc(${event.widthPercent}% - 12px)`,
               }}
               type="button"
+              title={`${formatEventTime(event.start, event.end)} · ${event.customerName || event.title}`}
               onClick={() => onOpenQuickDetail(event)}
             >
-              <div className="calendar-day-event__time">{formatEventTime(event.start, event.end)}</div>
-              {event.type === "appointment" ? (
+              {event.isCompact ? (
+                <>
+                  <span className="calendar-day-event__time">{formatEventTime(event.start, event.end)}</span>
+                  <strong className="calendar-day-event__compact-title">{event.customerName || event.title}</strong>
+                </>
+              ) : event.type === "appointment" ? (
+                <>
+                  <div className="calendar-day-event__time">{formatEventTime(event.start, event.end)}</div>
                 <div className="calendar-day-event__appointment">
                   <div className="calendar-day-event__appointment-head">
                     <Avatar
@@ -707,16 +711,15 @@ function DayPlannerTimeline({
                   </div>
                   {event.roomName ? <small>{event.roomName}</small> : null}
                 </div>
+                </>
               ) : (
                 <>
+                  <div className="calendar-day-event__time">{formatEventTime(event.start, event.end)}</div>
                   <strong>{event.title}</strong>
                   <span>{event.statusLabel}</span>
                   {event.summary ? <small>{event.summary}</small> : null}
                 </>
               )}
-              <span className="calendar-day-event__link" onClick={(clickEvent) => { clickEvent.stopPropagation(); onOpen(event) }}>
-                Mở chi tiết
-              </span>
             </button>
           ))}
         </div>
@@ -772,6 +775,7 @@ function projectTimelineEvent(event: PlannerEvent, selectedDate: Dayjs) {
     endMinutes: Math.min(DAY_VIEW_MINUTES, startMinutes + durationMinutes),
     topPercent: (startMinutes / DAY_VIEW_MINUTES) * 100,
     heightPercent: (Math.min(durationMinutes, DAY_VIEW_MINUTES - startMinutes) / DAY_VIEW_MINUTES) * 100,
+    isCompact: durationMinutes <= DAY_VIEW_MIN_BLOCK_MINUTES,
   }
 }
 
