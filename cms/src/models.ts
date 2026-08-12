@@ -5,6 +5,9 @@ const RESOURCE_HIDDEN_FIELD_KEYS: Record<string, string[]> = {
   leads: ['branchId'],
   staff: ['defaultBranchId'],
   departments: ['branchId'],
+  // Kept for backwards compatibility with existing image records. New uploads
+  // are stored in `files` instead.
+  'customer-images': ['imageUrl'],
 }
 
 export function normalizeSelectOption (opt: SelectOption): { value: string; label: string } {
@@ -939,7 +942,8 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
     { key: 'mediaType', label: 'Loại', type: 'select', options: [{ value: 'BEFORE', label: 'Trước điều trị' }, { value: 'AFTER', label: 'Sau điều trị' }, { value: 'PROGRESS', label: 'Tiến trình' }, { value: 'DIAGNOSIS', label: 'Chẩn đoán' }], width: '33', tableWidth: 150 },
     { key: 'title', label: 'Tiêu đề', width: '66', tableWidth: 220 },
-    { key: 'imageUrl', label: 'Link hình ảnh', required: true, width: '100', tableWidth: 320 },
+    { key: 'imageUrl', label: 'Link hình ảnh', width: '100', tableWidth: 320 },
+    { key: 'files', label: 'Tệp đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'capturedAt', label: 'Thời gian chụp', type: 'datetime', width: '50', tableWidth: 190 },
     { key: 'diagnosisNote', label: 'Ghi chú / chẩn đoán', type: 'textarea', width: '100', tableWidth: 320 },
   ],

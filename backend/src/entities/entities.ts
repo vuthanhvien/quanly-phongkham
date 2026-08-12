@@ -954,8 +954,11 @@ export class CustomerImage extends ConfigurableEntity {
   @Column({ nullable: true })
   title?: string;
 
-  @Column()
-  imageUrl: string;
+  @Column({ nullable: true })
+  imageUrl?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 
   @Column({ type: 'timestamp', nullable: true })
   capturedAt?: Date;

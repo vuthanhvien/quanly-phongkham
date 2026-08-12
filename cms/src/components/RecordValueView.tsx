@@ -7,7 +7,7 @@ import {
   FileTextOutlined,
   LinkOutlined,
 } from "@ant-design/icons"
-import { Avatar, Button, Image } from "antd"
+import { Avatar, Button, Image, Tooltip } from "antd"
 import { resolveFileUrl } from "../api"
 import { displayValue, FileLookupMap, getRelationMeta, getRelationSpec, LookupMap, RelationLookupRecord } from "../relations"
 import { FieldSpec } from "../models"
@@ -186,6 +186,31 @@ function renderFileValue(value: unknown, lookups: LookupMap, fileLookups: FileLo
   if (items.length === 0) return <span>-</span>
   const resolved = items.map((item) => fileLookups[item] || buildFallbackFileLookup(item))
   if (resolved.length === 0) return <>{displayValue({ key: "", label: "", type: "file" }, value, lookups)}</>
+
+  if (compact) {
+    return (
+      <div className="record-media-stack compact">
+        {resolved.map((file) => {
+          const tooltip = file.originalName && file.originalName !== file.title
+            ? `${file.title}\n${file.originalName}`
+            : file.title
+          return (
+            <Tooltip key={file.id} title={tooltip}>
+              <a
+                aria-label={`Mở ${file.title}`}
+                className="record-media-card record-media-card--icon"
+                href={resolveFileUrl(file.publicUrl)}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {renderFileIcon(file, true)}
+              </a>
+            </Tooltip>
+          )
+        })}
+      </div>
+    )
+  }
 
   return (
     <Image.PreviewGroup>

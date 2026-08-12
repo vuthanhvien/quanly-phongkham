@@ -1008,6 +1008,7 @@ interface FileLibraryOption {
   title: string
   previewUrl: string
   fileId: string
+  source?: "local" | "google"
   folderId?: string
   folderLabel?: string
   isImage: boolean
@@ -1032,13 +1033,19 @@ function FileSelectInput({
   const [openPicker, setOpenPicker] = useState(false)
   const [openUpload, setOpenUpload] = useState(false)
   const [options, setOptions] = useState<FileLibraryOption[]>([])
+  const [googleOptions, setGoogleOptions] = useState<FileLibraryOption[]>([])
   const [treeData, setTreeData] = useState<FolderTreeNode[]>([])
+  const [googleTreeData, setGoogleTreeData] = useState<FolderTreeNode[]>([])
   const [search, setSearch] = useState("")
+  const [source, setSource] = useState<"local" | "google">("local")
   const [manualLink, setManualLink] = useState("")
   const [selectedFolderId, setSelectedFolderId] = useState<string>()
+  const [selectedGoogleFolderId, setSelectedGoogleFolderId] = useState("root")
   const [draftValues, setDraftValues] = useState<string[]>([])
   const [folderChildrenMap, setFolderChildrenMap] = useState<Record<string, string[]>>({})
   const [folderPathMap, setFolderPathMap] = useState<Record<string, string>>({})
+  const [googleFolderPathMap, setGoogleFolderPathMap] = useState<Record<string, string>>({ root: "Google Drive" })
+  const [googleDriveConnected, setGoogleDriveConnected] = useState(false)
 
   useEffect(() => {
     void loadOptions()
@@ -1073,6 +1080,67 @@ function FileSelectInput({
         extension: String(row.extension || ""),
       })),
     )
+    try {
+      const statusResponse = await api.get("/settings/google-drive")
+      setGoogleDriveConnected(Boolean(statusResponse.data?.data?.connected))
+    } catch {
+      setGoogleDriveConnected(false)
+    }
+  }
+
+  async function loadGoogleDriveFiles(parentId = selectedGoogleFolderId) {
+    try {
+      const [filesResponse, foldersResponse] = await Promise.all([
+        api.get("/settings/google-drive/files", { params: { q: search.trim() || undefined, parentId } }),
+        api.get("/settings/google-drive/folders"),
+      ])
+      const googleFolders = [
+        { id: "root", name: "Google Drive", parentId: null },
+        ...((foldersResponse.data?.data?.folders || []) as Array<Record<string, unknown>>).map((folder) => ({
+          id: String(folder.id || ""), name: String(folder.name || folder.id || ""), parentId: folder.parentId ? String(folder.parentId) : "root",
+        })).filter((folder) => folder.id),
+      ]
+      const paths = buildFolderPathMap(googleFolders)
+      setGoogleTreeData(buildFolderTree(googleFolders))
+      setGoogleFolderPathMap({ root: "Google Drive", ...paths })
+      setGoogleOptions(((filesResponse.data?.data?.files || []) as Array<Record<string, unknown>>).map((row) => {
+        const publicUrl = String(row.publicUrl || "")
+        const mimeType = String(row.mimeType || "")
+        const title = String(row.title || row.originalName || row.id)
+        return {
+          value: publicUrl,
+          title,
+          previewUrl: String(row.thumbnailUrl || publicUrl),
+          fileId: `google-${String(row.id || title)}`,
+          source: "google" as const,
+          folderId: parentId,
+          folderLabel: parentId === "root" ? "Google Drive" : (paths[parentId] || "Google Drive"),
+          isImage: mimeType.startsWith("image/"),
+          mimeType,
+          extension: title.includes(".") ? title.split(".").pop() || "" : "",
+        }
+      }).filter((option) => option.value))
+    } catch (error) {
+      setGoogleOptions([])
+      toastError(getApiErrorMessage(error, "Không thể đọc Google Drive"))
+    }
+  }
+
+  async function connectGoogleDrive() {
+    try {
+      const response = await api.post("/settings/google-drive/connect")
+      const authorizationUrl = String(response.data?.data?.authorizationUrl || "")
+      if (!authorizationUrl) throw new Error("Không lấy được đường dẫn xác thực Google")
+      const popup = window.open(authorizationUrl, "company-google-drive", "popup=yes,width=620,height=720")
+      if (!popup) throw new Error("Trình duyệt đang chặn popup")
+      const timer = window.setInterval(() => {
+        if (!popup.closed) return
+        window.clearInterval(timer)
+        void loadOptions()
+      }, 800)
+    } catch (error) {
+      toastError(getApiErrorMessage(error, "Không thể kết nối Google Drive"))
+    }
   }
 
   const optionByValue = new Map(options.map((option) => [option.value, option]))
@@ -1088,14 +1156,15 @@ function FileSelectInput({
   const selectedValues = normalizeStringArray(value)
   const selectedItems = selectedValues.map(toFileOption)
   const selectedDraftItems = draftValues.map(toFileOption)
-  const visibleOptions = options.filter((option) => {
+  const activeOptions = source === "google" ? googleOptions : options
+  const visibleOptions = activeOptions.filter((option) => {
     const keyword = search.trim().toLowerCase()
     const matchesSearch = !keyword
       || option.title.toLowerCase().includes(keyword)
       || String(option.folderLabel || "").toLowerCase().includes(keyword)
       || option.extension.toLowerCase().includes(keyword)
     if (!matchesSearch) return false
-    if (!selectedFolderId) return true
+    if (source === "google" || !selectedFolderId) return true
     const allowedFolders = new Set([selectedFolderId, ...(folderChildrenMap[selectedFolderId] || [])])
     return option.folderId ? allowedFolders.has(option.folderId) : false
   })
