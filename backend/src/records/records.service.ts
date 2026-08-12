@@ -18,6 +18,7 @@ import {
   Attendance,
   AttendanceAdjustmentRequest,
   AuditLog,
+  SystemErrorLog,
   BranchRoleAssignment,
   Branch,
   BusinessTripRequest,
@@ -483,6 +484,7 @@ export class RecordsService {
     @InjectRepository(CustomTableRow) private readonly customTableRows: Repository<CustomTableRow>,
     @InjectRepository(ViewSetting) private readonly viewSettings: Repository<ViewSetting>,
     @InjectRepository(AuditLog) private readonly auditLogs: Repository<AuditLog>,
+    @InjectRepository(SystemErrorLog) private readonly systemErrorLogs: Repository<SystemErrorLog>,
     @InjectRepository(WorkContract) private readonly workContracts: Repository<WorkContract>,
     @InjectRepository(StaffInsurance) private readonly staffInsurances: Repository<StaffInsurance>,
     @InjectRepository(Attendance) private readonly attendances: Repository<Attendance>,
@@ -3249,13 +3251,26 @@ export class RecordsService {
     return record;
   }
 
-  async audits (page = 1, pageSize = 30, user?: AuthUser) {
+  async audits (page = 1, pageSize = 30, search = '', sort = 'createdAt', order = 'desc', user?: AuthUser) {
     this.assertScreenAccess(user, 'audit-logs');
-    const [data, total] = await this.auditLogs.findAndCount({
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-    });
+    const sortableColumns = new Set(['createdAt', 'userName', 'action', 'module', 'targetId']);
+    const sortColumn = sortableColumns.has(sort) ? sort : 'createdAt';
+    const sortOrder = order?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    const query = this.auditLogs.createQueryBuilder('audit');
+    const keyword = search.trim().toLowerCase();
+    if (keyword) {
+      query.where(`(
+        LOWER(COALESCE(audit.userName, '')) LIKE :keyword OR
+        LOWER(audit.action) LIKE :keyword OR
+        LOWER(audit.module) LIKE :keyword OR
+        LOWER(COALESCE(audit.targetId, '')) LIKE :keyword
+      )`, { keyword: `%${keyword}%` });
+    }
+    const [data, total] = await query
+      .orderBy(`audit.${sortColumn}`, sortOrder)
+      .skip((Math.max(page, 1) - 1) * Math.max(pageSize, 1))
+      .take(Math.min(Math.max(pageSize, 1), 200))
+      .getManyAndCount();
     return { data, total };
   }
 

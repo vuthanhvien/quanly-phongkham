@@ -2896,6 +2896,48 @@ export class AuditLog {
   createdAt: Date;
 }
 
+@Entity('system_error_logs')
+export class SystemErrorLog {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'int' })
+  status: number;
+
+  @Column()
+  method: string;
+
+  @Column({ type: 'text' })
+  path: string;
+
+  @Column({ nullable: true })
+  userId?: string;
+
+  @Column({ nullable: true })
+  userEmail?: string;
+
+  @Column({ nullable: true })
+  requestId?: string;
+
+  @Column({ nullable: true })
+  errorName?: string;
+
+  @Column({ type: 'text' })
+  message: string;
+
+  @Column({ type: 'text', nullable: true })
+  stack?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  query?: Record<string, unknown>;
+
+  @Column({ type: 'simple-json', nullable: true })
+  body?: Record<string, unknown>;
+
+  @CreateDateColumn()
+  createdAt: Date;
+}
+
 /** A user's unfinished create form. Drafts never participate in business records. */
 @Entity('record_drafts')
 export class RecordDraft {
@@ -2982,6 +3024,7 @@ export const ENTITIES = [
   GoogleDriveConnection,
   LandingFormSubmission,
   AuditLog,
+  SystemErrorLog,
   RecordDraft,
   ChatbotSetting,
   AdminChatbotConversation,

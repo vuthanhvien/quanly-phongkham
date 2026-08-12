@@ -6,6 +6,7 @@ import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { ErrorLogExceptionFilter } from './common/error-log.exception-filter';
+import { TenantContextService } from './tenant/tenant-context.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
@@ -16,7 +17,7 @@ async function bootstrap() {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: false }));
-  app.useGlobalFilters(new ErrorLogExceptionFilter());
+  app.useGlobalFilters(new ErrorLogExceptionFilter(app.get(TenantContextService)));
   app.use('/uploads', express.static(uploadsRoot));
 
   const swaggerConfig = new DocumentBuilder()

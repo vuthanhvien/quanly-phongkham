@@ -172,6 +172,7 @@ export function AdminChatbotWidget() {
   function stopVoiceListening(sendAfterStop: boolean) {
     voiceActiveRef.current = false
     try { voiceRecognitionRef.current?.stop() } catch { /* it may already be stopped */ }
+    voiceRecognitionRef.current = undefined
     setListening(false)
     const capturedText = voiceTranscriptRef.current.trim()
     if (sendAfterStop && capturedText) {
@@ -179,10 +180,22 @@ export function AdminChatbotWidget() {
     }
   }
 
+  function clearVoiceDraft() {
+    // A recognition event can still arrive briefly after `stop()`. Mark it inactive
+    // before clearing so that no stale transcript can be put back into the input.
+    voiceActiveRef.current = false
+    try { voiceRecognitionRef.current?.stop() } catch { /* it may already be stopped */ }
+    voiceRecognitionRef.current = undefined
+    voiceTranscriptRef.current = ''
+    voicePrefixRef.current = ''
+    setListening(false)
+    setInput('')
+    window.setTimeout(() => inputRef.current?.focus?.(), 0)
+  }
+
   async function execute(action: ChatAction) {
     if (action.type === 'navigate' && action.path) {
       navigate(action.path)
-      setOpen(false)
       return
     }
     try {
@@ -259,7 +272,7 @@ export function AdminChatbotWidget() {
               <Typography.Text strong>GIS AI</Typography.Text>
               <Typography.Text type="secondary">Dữ liệu, báo cáo & hướng dẫn</Typography.Text>
             </div>
-            <Tooltip title="Cuộc trò chuyện mới">
+            <Tooltip title="Cuộc trò chuyện mới" zIndex={1501}>
               <Button aria-label="Tạo chat mới" icon={<PlusOutlined />} onClick={startNewConversation} size="small" type="text" />
             </Tooltip>
             <Button aria-label="Đóng GIS AI" icon={<CloseOutlined />} onClick={() => setOpen(false)} size="small" type="text" />
@@ -309,16 +322,16 @@ export function AdminChatbotWidget() {
               value={input}
             />
             {listening ? <>
-              <Button disabled={!input} onClick={() => { setInput(''); inputRef.current?.focus() }}>Xóa</Button>
-              <Tooltip title="Dừng nghe và gửi"><Button danger icon={<StopOutlined />} onClick={transcribeVoice}>Dừng & gửi</Button></Tooltip>
+              <Button disabled={!input} onClick={clearVoiceDraft}>Xóa</Button>
+              <Tooltip title="Dừng nghe và gửi" zIndex={1501}><Button danger icon={<StopOutlined />} onClick={transcribeVoice}>Dừng & gửi</Button></Tooltip>
             </> : <>
-              <Tooltip title="Bắt đầu nhập bằng giọng nói"><Button icon={<AudioOutlined />} onClick={transcribeVoice} /></Tooltip>
-              <Tooltip title="Gửi"><Button disabled={!input.trim() || loading} onClick={() => void send()} type="primary">Gửi</Button></Tooltip>
+              <Tooltip title="Bắt đầu nhập bằng giọng nói" zIndex={1501}><Button icon={<AudioOutlined />} onClick={transcribeVoice} /></Tooltip>
+              <Tooltip title="Gửi" zIndex={1501}><Button disabled={!input.trim() || loading} onClick={() => void send()} type="primary">Gửi</Button></Tooltip>
             </>}
           </div>
         </section>
       )}
-      <Tooltip title="GIS AI — Trợ lý CMS">
+      <Tooltip title="GIS AI — Trợ lý CMS" zIndex={1501}>
         <Button
           aria-label="Mở GIS AI"
           className="admin-chatbot-fab"

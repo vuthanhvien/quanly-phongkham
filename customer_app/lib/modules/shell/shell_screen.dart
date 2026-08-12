@@ -27,12 +27,12 @@ class ShellScreen extends StatelessWidget {
       final index = controller.tabIndex.value;
       return Scaffold(
         body: IndexedStack(index: index, children: _pages),
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: SizedBox(
-            // BottomNavigationBar needs room for its internal item layout;
-            // SafeArea then adds only the device's bottom inset (home indicator).
-            height: 64,
+        bottomNavigationBar: Container(
+          color: AppColors.surface,
+          child: SafeArea(
+            top: false,
+            // The white surface extends into the home-indicator area while
+            // navigation content itself stays safely above it.
             child: BottomNavigationBar(
               currentIndex: index,
               onTap: (selected) {

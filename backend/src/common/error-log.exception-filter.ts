@@ -2,6 +2,8 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from
 import { appendFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { Request, Response } from 'express';
+import { SystemErrorLog } from '../entities/entities';
+import { TenantContextService } from '../tenant/tenant-context.service';
 
 const SENSITIVE_KEYS = new Set([
   'authorization',
@@ -29,6 +31,8 @@ function redact(value: unknown): unknown {
 
 @Catch()
 export class ErrorLogExceptionFilter implements ExceptionFilter {
+  constructor(private readonly tenantContext?: TenantContextService) {}
+
   catch(exception: unknown, host: ArgumentsHost) {
     const http = host.switchToHttp();
     const request = http.getRequest<Request & { user?: { id?: string; email?: string } }>();
@@ -93,5 +97,24 @@ export class ErrorLogExceptionFilter implements ExceptionFilter {
 
     await mkdir(logDirectory, { recursive: true });
     await appendFile(join(logDirectory, `error-${date}.jsonl`), `${JSON.stringify(entry)}\n`, 'utf8');
+
+    // Persist in the tenant database as well, so administrators can inspect
+    // production errors in CMS without terminal or container-log access.
+    const dataSource = this.tenantContext?.get()?.dataSource;
+    if (dataSource?.isInitialized) {
+      await dataSource.getRepository(SystemErrorLog).save(dataSource.getRepository(SystemErrorLog).create({
+        status,
+        method: request.method,
+        path: request.originalUrl || request.url,
+        userId: request.user?.id,
+        userEmail: request.user?.email,
+        requestId: typeof request.headers['x-request-id'] === 'string' ? request.headers['x-request-id'] : undefined,
+        errorName: entry.error.name,
+        message: entry.error.message,
+        stack: entry.error.stack,
+        query: entry.query as Record<string, unknown>,
+        body: entry.body as Record<string, unknown>,
+      }));
+    }
   }
 }

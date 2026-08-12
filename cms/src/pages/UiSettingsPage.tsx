@@ -1,4 +1,4 @@
-import { BgColorsOutlined, BorderOutlined, FontSizeOutlined, UndoOutlined } from '@ant-design/icons'
+import { BgColorsOutlined, BorderOutlined, DownOutlined, FontSizeOutlined, UndoOutlined } from '@ant-design/icons'
 import { Button, Card, Checkbox, Col, Flex, Form, Input, InputNumber, Radio, Row, Select, Space, Typography, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { buildShadowValue, companyTypeOptions, defaultAppUiSettings, fontFamilyOptions, syncDocumentBranding, useAppUi, type AppUiSettings } from '../app-ui'
@@ -6,6 +6,30 @@ import { appModuleGroups, appModuleLabels, companyTypeModulePresets, resolveMenu
 import { ImagePickerInput } from '../components/ImagePickerInput'
 
 type UiSettingsFormValues = AppUiSettings
+
+function SettingsBlock({ children, extra, title }: { children: React.ReactNode; extra?: React.ReactNode; title: React.ReactNode }) {
+  const [collapsed, setCollapsed] = useState(false)
+
+  return (
+    <Card
+      className={`glass-card settings-card collapsible-settings-block${collapsed ? ' is-collapsed' : ''}`}
+      extra={extra}
+      title={(
+        <button
+          aria-expanded={!collapsed}
+          className="collapsible-settings-block-trigger"
+          onClick={() => setCollapsed((value) => !value)}
+          type="button"
+        >
+          <DownOutlined />
+          <span>{title}</span>
+        </button>
+      )}
+    >
+      {!collapsed && children}
+    </Card>
+  )
+}
 
 const sizeOptions = [
   { value: 'small', label: 'Nhỏ' },
@@ -201,9 +225,6 @@ export function UiSettingsPage() {
           <Button icon={<UndoOutlined />} onClick={handleResetDefaults}>
             Khôi phục preset mặc định
           </Button>
-          <Button loading={saving || loading} type="primary" icon={<BgColorsOutlined />} onClick={() => form.submit()}>
-            Lưu UI settings
-          </Button>
         </Space>
       </Flex>
 
@@ -211,7 +232,7 @@ export function UiSettingsPage() {
         <Row gutter={[16, 16]}>
           <Col lg={15} xs={24}>
             <Space direction="vertical" size={16} style={{ width: '100%' }}>
-              <Card className="glass-card settings-card" title="Nhận diện ứng dụng">
+              <SettingsBlock title="Nhận diện ứng dụng">
                 <Row gutter={[16, 0]}>
                   <Col md={12} xs={24}>
                     <Form.Item label="Loại hình công ty" name="companyType" rules={[{ required: true, message: 'Chọn loại hình' }]}>
@@ -237,10 +258,9 @@ export function UiSettingsPage() {
                     </Form.Item>
                   </Col>
                 </Row>
-              </Card>
+              </SettingsBlock>
 
-              <Card
-                className="glass-card settings-card"
+              <SettingsBlock
                 extra={
                   <Space size={8}>
                     <Button size="small" type="default" onClick={() => { setSelectedModules([]); setHasCustomModuleSelection(true) }}>Bỏ chọn hết</Button>
@@ -286,9 +306,9 @@ export function UiSettingsPage() {
                     })}
                   </Space>
                 </Space>
-              </Card>
+              </SettingsBlock>
 
-              <Card className="glass-card settings-card" title="Màu sắc giao diện">
+              <SettingsBlock title="Màu sắc giao diện">
                 <Space direction="vertical" size={16} style={{ width: '100%' }}>
                   {colorSections.map((section) => (
                     <div key={section.title}>
@@ -305,9 +325,9 @@ export function UiSettingsPage() {
                     </div>
                   ))}
                 </Space>
-              </Card>
+              </SettingsBlock>
 
-              <Card className="glass-card settings-card" title="Hiển thị & hiệu ứng">
+              <SettingsBlock title="Hiển thị & hiệu ứng">
                 <Row gutter={[16, 0]}>
                   <Col lg={8} md={12} xs={24}>
                     <Form.Item label="Kích thước giao diện" name="size" rules={[{ required: true }]}>
@@ -351,7 +371,7 @@ export function UiSettingsPage() {
                     </Form.Item>
                   </Col>
                 </Row>
-              </Card>
+              </SettingsBlock>
             </Space>
           </Col>
 
@@ -361,7 +381,10 @@ export function UiSettingsPage() {
                 const preview = { ...defaultAppUiSettings, ...settings, ...form.getFieldsValue(true) }
                 const previewShadow = buildShadowValue(preview, 1)
                 return <div className="ui-settings-preview-sticky">
-            <Card className="glass-card settings-card" title="Xem trước nhanh">
+            <div className="ui-settings-preview-content">
+              <Button block className="ui-settings-save-button ui-settings-save-button--top" icon={<BgColorsOutlined />} loading={saving || loading} onClick={() => form.submit()} type="primary">
+                Lưu UI settings
+              </Button>
               <div
                 style={{
                   background: preview.pageBgColor,
@@ -495,14 +518,14 @@ export function UiSettingsPage() {
                 </div>
               </div>
 
-              <Space direction="vertical" size={8} style={{ width: '100%', marginTop: 16 }}>
+              <Space className="ui-settings-preview-summary" direction="vertical" size={8} style={{ width: '100%', marginTop: 16 }}>
                 <Typography.Text strong>Thiết lập hiện tại</Typography.Text>
                 <Typography.Text type="secondary">Font: {fontFamilyOptions.find((font) => font.value === preview.fontFamily)?.label || preview.fontFamily}</Typography.Text>
                 <Typography.Text type="secondary">Size: {preview.size}</Typography.Text>
                 <Typography.Text type="secondary">Radius: {preview.borderRadius}px</Typography.Text>
                 <Typography.Text type="secondary">Shadow: {preview.shadowOpacity}% / {preview.shadowBlur}px / y {preview.shadowOffsetY}px</Typography.Text>
               </Space>
-            </Card>
+            </div>
                 </div>
               }}
             </Form.Item>

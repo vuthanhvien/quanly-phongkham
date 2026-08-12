@@ -232,7 +232,7 @@ export class ChatbotController {
     const context = this.cleanAdminContext(body.context);
     const defaultPrompt = `Bạn là GIS AI, trợ lý vận hành CMS. Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng và dùng Markdown chuẩn (heading, danh sách, in đậm) khi nó làm câu trả lời dễ đọc hơn.
 Bạn hỗ trợ nhập liệu, kiểm tra dữ liệu, báo cáo và hướng dẫn sử dụng CMS. Ngữ cảnh màn hình hiện tại: ${JSON.stringify(context)}.
-Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà người dùng đang xem; các cách nói như “khách hàng này”, “ca này”, “bản ghi này” phải được hiểu là bản ghi đó. Không hỏi lại mã hoặc ID; khi cần kiểm tra dữ liệu, gọi inspect_record với resource và recordId trước. Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển thị đường dẫn có thể bấm. Khi yêu cầu tạo hoặc cập nhật đã rõ và đủ dữ liệu, BẮT BUỘC gọi propose_record_change ngay. Create/update được thực hiện ngay bởi công cụ, vì vậy sau khi gọi hãy chỉ thông báo “đã tạo/đã cập nhật”, tuyệt đối không nói “đề xuất”, không yêu cầu bấm xác nhận và không hỏi lại. Chỉ hỏi khi thiếu dữ liệu bắt buộc hoặc ý định thực sự mơ hồ. Lưu trữ/xóa luôn cần xác nhận trong CMS. Không tự bịa dữ liệu, không tiết lộ dữ liệu ngoài kết quả công cụ, và không đề xuất thao tác không có quyền.
+Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà người dùng đang xem; các cách nói như “khách hàng này”, “ca này”, “bản ghi này” phải được hiểu là bản ghi đó. Không hỏi lại mã hoặc ID; khi cần kiểm tra dữ liệu, gọi inspect_record với resource và recordId trước. Các tool tra cứu, xem chi tiết, tạo và cập nhật sẽ tự sinh nút link CMS; không cần tự viết URL hoặc UUID trong câu trả lời. Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển thị đường dẫn có thể bấm. Khi yêu cầu tạo hoặc cập nhật đã rõ và đủ dữ liệu, BẮT BUỘC gọi propose_record_change ngay. Create/update được thực hiện ngay bởi công cụ, vì vậy sau khi gọi hãy chỉ thông báo “đã tạo/đã cập nhật”, tuyệt đối không nói “đề xuất”, không yêu cầu bấm xác nhận và không hỏi lại. Chỉ hỏi khi thiếu dữ liệu bắt buộc hoặc ý định thực sự mơ hồ. Lưu trữ/xóa luôn cần xác nhận trong CMS. Không tự bịa dữ liệu, không tiết lộ dữ liệu ngoài kết quả công cụ, và không đề xuất thao tác không có quyền.
 QUY TẮC HIỂN THỊ DỮ LIỆU: Tuyệt đối không hiển thị UUID/ID kỹ thuật cho người dùng, kể cả trong Markdown, ví dụ hay ghi chú. Với bất kỳ dữ liệu liên kết nào, luôn gọi bằng tên hiển thị đã được trả về (khách hàng, bác sĩ, nhân viên, sản phẩm, chi nhánh…), không gọi bằng trường kết thúc bằng Id. Các mã tham chiếu nội bộ trong kết quả công cụ chỉ phục vụ cho việc gọi công cụ tiếp theo. Khi trình bày danh sách bằng bảng Markdown, chỉ chọn tối đa 4 cột thực sự hữu ích cho câu hỏi; ưu tiên tên, thời gian, trạng thái và thông tin cần quyết định. Không đưa cột #, ID, chi nhánh hay trường kỹ thuật trừ khi người dùng yêu cầu rõ.`;
     const systemPrompt = `${defaultPrompt}\n\n${config.adminSystemPrompt || ''}`.trim();
     let response = await this.callClaude(config.adminApiKey, config.model, systemPrompt, messages, enabledTools as typeof TOOL_DEFINITIONS);
@@ -369,10 +369,20 @@ QUY TẮC HIỂN THỊ DỮ LIỆU: Tuyệt đối không hiển thị UUID/ID k
       if (name === 'search_records') {
         const resource = String(input.resource || '');
         const result = await this.records.list(resource, 1, 10, String(input.query || ''), {}, user, undefined, '*');
+        actions.push({ type: 'navigate', path: `/${resource}`, label: 'Mở danh sách' });
+        result.data.slice(0, 5).forEach((row) => {
+          const record = row as unknown as Record<string, unknown>;
+          const recordId = String(record.id || '');
+          const label = this.recordDisplayName(record);
+          if (recordId && label) actions.push({ type: 'navigate', path: `/${resource}/${recordId}/full`, label: `Xem: ${label}` });
+        });
         return { resource, total: result.total, rows: result.data.map((row) => this.toChatbotReadableData(row, true)) };
       }
       if (name === 'inspect_record') {
-        const result = await this.records.find(String(input.resource || ''), String(input.recordId || ''), user, undefined, '*');
+        const resource = String(input.resource || '');
+        const recordId = String(input.recordId || '');
+        const result = await this.records.find(resource, recordId, user, undefined, '*');
+        actions.push({ type: 'navigate', path: `/${resource}/${recordId}/full`, label: 'Mở chi tiết' });
         return { data: this.toChatbotReadableData(result.data) };
       }
       if (name === 'get_accounting_report') {
@@ -396,11 +406,14 @@ QUY TẮC HIỂN THỊ DỮ LIỆU: Tuyệt đối không hiển thị UUID/ID k
         if (operation === 'create') {
           const result = await this.records.create(resource, values, user);
           mutationState.changed = true;
+          const createdId = String(((result as Record<string, unknown>)?.data as Record<string, unknown> | undefined)?.id || '');
+          if (createdId) actions.push({ type: 'navigate', path: `/${resource}/${createdId}/full`, label: 'Xem bản ghi vừa tạo' });
           return { executed: true, operation, resource, result: this.toChatbotReadableData(result) };
         }
         if (operation === 'update' && recordId) {
           const result = await this.records.update(resource, recordId, values, user);
           mutationState.changed = true;
+          actions.push({ type: 'navigate', path: `/${resource}/${recordId}/full`, label: 'Xem bản ghi đã cập nhật' });
           return { executed: true, operation, resource, result: this.toChatbotReadableData(result) };
         }
         const summary = String(input.summary || 'Xác nhận lưu trữ dữ liệu');
