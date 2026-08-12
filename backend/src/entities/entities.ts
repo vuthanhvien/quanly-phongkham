@@ -414,6 +414,31 @@ export class LocationProvince { @PrimaryGeneratedColumn('uuid') id: string; @Col
 @Index(['provinceCode', 'code'], { unique: true })
 export class LocationWard { @PrimaryGeneratedColumn('uuid') id: string; @Column() code: string; @Column() provinceCode: string; @Column() name: string; @Column({ nullable: true }) divisionType?: string; }
 
+@Entity('master_data')
+@Index(['group', 'value'], { unique: true })
+export class MasterData extends ConfigurableEntity {
+  @Column()
+  group: string;
+
+  @Column()
+  name: string;
+
+  @Column()
+  value: string;
+
+  @Column({ nullable: true })
+  parentValue?: string;
+
+  @Column({ type: 'int', default: 0 })
+  sortOrder: number;
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @Column({ type: 'simple-json', nullable: true })
+  metadata?: Record<string, unknown>;
+}
+
 @Entity('lead_activities')
 export class LeadActivity extends ConfigurableEntity {
   @Column()
@@ -3116,6 +3141,7 @@ export const ENTITIES = [
   LocationCountry,
   LocationProvince,
   LocationWard,
+  MasterData,
   Lead,
   LeadActivity,
   ZaloAccount,

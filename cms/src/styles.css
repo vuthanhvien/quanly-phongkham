@@ -1813,6 +1813,13 @@ body {
   width: 100%;
 }
 
+.master-data-layout { background: transparent; gap: 16px; }
+.master-data-nav { background: var(--app-surface) !important; border: 1px solid var(--app-line); border-radius: var(--app-radius); padding: 16px 10px; }
+.master-data-nav .eyebrow { display: block; margin: 0 8px 10px; }
+.master-data-nav .ant-btn { margin-bottom: 4px; text-align: left; }
+.master-data-nav .ant-btn.active { background: color-mix(in srgb, var(--app-primary) 14%, transparent); color: var(--app-primary); font-weight: 700; }
+.master-data-content { min-width: 0; }
+
 .record-form .ant-form-item {
   margin-bottom: 12px;
 }

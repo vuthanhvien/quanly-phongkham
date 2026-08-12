@@ -436,7 +436,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           ? {
               key: "/locations",
               icon: <AppstoreOutlined />,
-              label: <Link to="/locations">Master Data Địa chỉ</Link>,
+              label: <Link to="/locations">Master Data</Link>,
             }
           : null,
         canAccessScreen("audit-logs")
