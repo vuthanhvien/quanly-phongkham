@@ -189,8 +189,9 @@ export function UiSettingsPage() {
     <Space direction="vertical" size={20} style={{ width: '100%' }}>
       <Flex align="start" justify="space-between" gap={16} wrap>
         <div>
-          <Typography.Title level={3} style={{ marginBottom: 4 }}>
-            Giao diện CMS
+          <Typography.Title className="page-title-with-icon" level={3} style={{ marginBottom: 4 }}>
+            <BgColorsOutlined />
+            <span>Giao diện CMS</span>
           </Typography.Title>
           <Typography.Paragraph style={{ margin: 0 }}>
             Tuỳ biến sâu màu sắc và phong cách CMS cho nền, đầu trang, menu, chữ và nút bấm.

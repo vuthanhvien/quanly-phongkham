@@ -40,6 +40,7 @@ dependencies:
   get_storage: ^2.1.1
   intl: ^0.20.1
   google_fonts: ^6.2.1
+  picons: ^3.0.1
 
 dev_dependencies:
   flutter_test:

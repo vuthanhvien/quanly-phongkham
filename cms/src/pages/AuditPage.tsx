@@ -1,3 +1,4 @@
+import { AuditOutlined } from "@ant-design/icons"
 import { Card, Table, Typography } from "antd"
 import { useEffect, useState } from "react"
 import { api } from "../api"
@@ -10,7 +11,7 @@ export function AuditPage() {
   return (
     <>
       <div className="page-header">
-          <Typography.Title level={3}>Nhật ký hệ thống</Typography.Title>
+          <Typography.Title className="page-title-with-icon" level={3}><AuditOutlined /><span>Nhật ký hệ thống</span></Typography.Title>
       </div>
       <Card className="table-card">
         <Table

@@ -398,7 +398,13 @@ export function RecordFormContent({
 
     if (usesTabs && tab) setActiveTab(tab.key)
 
-    const errorMessage = firstError?.errors?.[0] || "Vui lòng kiểm tra các trường bắt buộc"
+    const errorMessage = Array.from(
+      new Set(
+        (errorInfo.errorFields || [])
+          .flatMap((item) => item.errors)
+          .filter(Boolean),
+      ),
+    ).join(" · ") || "Vui lòng kiểm tra các trường bắt buộc"
     setSubmitError(usesTabs && tab ? `Tab “${tab.tab || "Thông tin chung"}”: ${errorMessage}` : errorMessage)
   }
 

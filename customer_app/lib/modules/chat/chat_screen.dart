@@ -96,7 +96,7 @@ class _SupportCard extends StatelessWidget {
             ],
           ),
         ),
-        Icon(Icons.arrow_forward_rounded, color: Colors.white),
+        Icon(AppIcons.arrowRight, color: Colors.white),
       ],
     ),
   );

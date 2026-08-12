@@ -288,11 +288,7 @@ class _DoctorCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(13),
               ),
               alignment: Alignment.center,
-              child: const Icon(
-                Icons.person_rounded,
-                color: Colors.white,
-                size: 42,
-              ),
+              child: const Icon(AppIcons.person, color: Colors.white, size: 42),
             ),
             const SizedBox(height: 10),
             Text(
@@ -339,10 +335,7 @@ class _PostCard extends StatelessWidget {
               color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.auto_awesome_rounded,
-              color: AppColors.primaryDark,
-            ),
+            child: const Icon(AppIcons.sparkle, color: AppColors.primaryDark),
           ),
           const SizedBox(width: 13),
           Expanded(

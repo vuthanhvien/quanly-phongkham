@@ -1,4 +1,4 @@
-import { AudioOutlined, CloseOutlined, PlusOutlined, SendOutlined, StopOutlined } from '@ant-design/icons'
+import { AudioOutlined, CloseOutlined, PlusOutlined, StopOutlined } from '@ant-design/icons'
 import { Button, Input, Popconfirm, Spin, Tooltip, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -308,14 +308,13 @@ export function AdminChatbotWidget() {
               ref={inputRef}
               value={input}
             />
-            <Tooltip title={listening ? 'Dừng nghe và gửi' : 'Bắt đầu nhập bằng giọng nói'}>
-              <Button danger={listening} icon={listening ? <StopOutlined /> : <AudioOutlined />} onClick={transcribeVoice}>
-                {listening ? 'Dừng & gửi' : undefined}
-              </Button>
-            </Tooltip>
-            <Tooltip title="Gửi">
-              <Button disabled={!input.trim() || loading} icon={<SendOutlined />} onClick={() => void send()} type="primary" />
-            </Tooltip>
+            {listening ? <>
+              <Button disabled={!input} onClick={() => { setInput(''); inputRef.current?.focus() }}>Xóa</Button>
+              <Tooltip title="Dừng nghe và gửi"><Button danger icon={<StopOutlined />} onClick={transcribeVoice}>Dừng & gửi</Button></Tooltip>
+            </> : <>
+              <Tooltip title="Bắt đầu nhập bằng giọng nói"><Button icon={<AudioOutlined />} onClick={transcribeVoice} /></Tooltip>
+              <Tooltip title="Gửi"><Button disabled={!input.trim() || loading} onClick={() => void send()} type="primary">Gửi</Button></Tooltip>
+            </>}
           </div>
         </section>
       )}

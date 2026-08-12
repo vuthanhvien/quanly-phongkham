@@ -747,10 +747,15 @@ export class RecordsService {
     request?: RequestContext,
     include?: string,
     advanced?: string,
+    sort?: string,
+    sortOrder?: string,
   ) {
     await this.assertPermission(user, resource, 'view');
     if (resource === 'leave-types') await this.ensureDefaultLeaveTypes();
     const repository = this.repository(resource);
+    const sortableFields = new Set(repository.metadata.columns.map((column) => column.propertyName));
+    const sortField = sort && sortableFields.has(sort) ? sort : 'createdAt';
+    const orderDirection = String(sortOrder).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
     const isArchived = String(filters.isArchived || '').toLowerCase() === 'true';
     const includeArchived = String(filters.includeArchived || '').toLowerCase() === 'true';
     // The branch directory is global reference data. It must stay available
@@ -758,7 +763,7 @@ export class RecordsService {
     if (resource === 'branches') {
       const [rows, total] = await repository.findAndCount({
         where: includeArchived ? {} : { isArchived },
-        order: { createdAt: 'DESC' },
+        order: { [sortField]: orderDirection },
       });
       return { data: rows.map((row) => this.protect(resource, row, request)), total };
     }
@@ -822,7 +827,7 @@ export class RecordsService {
     if (resource === 'work-schedules') {
       // Existing installations can contain old expanded occurrences.  Expose
       // only the most recently updated roster profile for each employee.
-      const allRows = await repository.find({ where, order: { updatedAt: 'DESC' } });
+      const allRows = await repository.find({ where, order: { [sortField]: orderDirection } });
       const onePerStaff = Array.from(new Map(allRows.map((item) => [String((item as WorkSchedule).staffId), item])).values());
       total = onePerStaff.length;
       rows = onePerStaff.slice((page - 1) * pageSize, page * pageSize);
@@ -831,7 +836,7 @@ export class RecordsService {
         where,
         skip: (page - 1) * pageSize,
         take: pageSize,
-        order: { createdAt: 'DESC' },
+        order: { [sortField]: orderDirection },
       });
       rows = result[0];
       total = result[1];
@@ -3811,8 +3816,28 @@ export class RecordsService {
       }
 
       if (!columnNames.has(filter.field)) continue;
+      if (filter.operator === 'is_empty' || filter.operator === 'is_present') {
+        const emptyCondition = filter.operator === 'is_empty' ? IsNull() : Not(IsNull());
+        where = this.mergeWhere(where, { [filter.field]: emptyCondition } as FindOptionsWhere<ConfigurableEntity>);
+        continue;
+      }
       const relationResource = FIELD_RELATION_RESOURCES[filter.field];
       if (relationResource) {
+        const relationValue = String(filter.value).trim();
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(relationValue);
+        if (isUuid && (filter.operator === 'eq' || filter.operator === 'ne')) {
+          where = this.mergeWhere(where, {
+            [filter.field]: filter.operator === 'eq' ? relationValue : Not(relationValue),
+          } as FindOptionsWhere<ConfigurableEntity>);
+          continue;
+        }
+        if (filter.operator === 'in' || filter.operator === 'not_in') {
+          const ids = String(filter.value).split(',').map((item) => item.trim()).filter(Boolean);
+          where = this.mergeWhere(where, {
+            [filter.field]: filter.operator === 'in' ? In(ids.length ? ids : ['__no_advanced_relation_match__']) : Not(In(ids)),
+          } as FindOptionsWhere<ConfigurableEntity>);
+          continue;
+        }
         const relationIds = await this.findRelationIdsByKeyword(relationResource, String(filter.value));
         where = this.mergeWhere(where, {
           [filter.field]: In(relationIds.size > 0 ? Array.from(relationIds) : ['__no_advanced_relation_match__']),
@@ -3855,16 +3880,16 @@ export class RecordsService {
     try {
       const parsed = JSON.parse(rawFilters);
       if (!Array.isArray(parsed)) return [];
-      const operators = new Set(['contains', 'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'number']);
+      const operators = new Set(['contains', 'eq', 'ne', 'in', 'not_in', 'is_empty', 'is_present', 'gt', 'gte', 'lt', 'lte', 'number']);
       return parsed
         .slice(0, 20)
         .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
         .map((item) => ({
           field: String(item.field || '').trim(),
           operator: String(item.operator || 'contains').trim().toLowerCase(),
-          value: typeof item.value === 'number' ? item.value : String(item.value || '').trim(),
+          value: Array.isArray(item.value) ? item.value.map(String).join(',') : typeof item.value === 'number' ? item.value : String(item.value || '').trim(),
         }))
-        .filter((item) => /^[a-zA-Z0-9_-]+$/.test(item.field) && operators.has(item.operator) && String(item.value).trim() !== '');
+        .filter((item) => /^[a-zA-Z0-9_-]+$/.test(item.field) && operators.has(item.operator) && (['is_empty', 'is_present'].includes(item.operator) || String(item.value).trim() !== ''));
     } catch {
       return [];
     }
@@ -3937,6 +3962,8 @@ export class RecordsService {
   private advancedFilterCondition (operator: string, value: string | number) {
     if (operator === 'contains') return ILike(`%${String(value)}%`);
     if (operator === 'ne') return typeof value === 'string' ? Not(ILike(String(value))) : Not(value);
+    if (operator === 'in') return In(String(value).split(',').map((item) => item.trim()).filter(Boolean));
+    if (operator === 'not_in') return Not(In(String(value).split(',').map((item) => item.trim()).filter(Boolean)));
     if (operator === 'gt') return MoreThan(value);
     if (operator === 'gte') return MoreThanOrEqual(value);
     if (operator === 'lt') return LessThan(value);
@@ -3951,6 +3978,12 @@ export class RecordsService {
       return !Number.isNaN(actualDate.getTime()) && actualDate >= dynamicDateRange.start && actualDate <= dynamicDateRange.end;
     }
     const expected = filter.value;
+    if (filter.operator === 'is_empty') return actual === null || actual === undefined || String(actual).trim() === '';
+    if (filter.operator === 'is_present') return actual !== null && actual !== undefined && String(actual).trim() !== '';
+    if (filter.operator === 'in' || filter.operator === 'not_in') {
+      const included = String(expected).split(',').map((item) => item.trim()).includes(String(actual ?? ''));
+      return filter.operator === 'in' ? included : !included;
+    }
     if (typeof actual === 'number' || typeof expected === 'number') {
       const left = Number(actual);
       const right = Number(expected);

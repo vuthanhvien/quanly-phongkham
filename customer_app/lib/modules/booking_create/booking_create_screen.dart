@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_icons.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/repositories/appointment_repository.dart';
 import '../../data/repositories/lookup_repository.dart';
@@ -291,7 +292,7 @@ class _DateTimeStep extends StatelessWidget {
       const SizedBox(height: 9),
       OutlinedButton.icon(
         onPressed: pickDate,
-        icon: const Icon(Icons.calendar_month_outlined),
+        icon: const Icon(AppIcons.calendarPicker),
         label: Align(
           alignment: Alignment.centerLeft,
           child: Text(
@@ -306,7 +307,7 @@ class _DateTimeStep extends StatelessWidget {
       const SizedBox(height: 9),
       OutlinedButton.icon(
         onPressed: pickTime,
-        icon: const Icon(Icons.schedule_outlined),
+        icon: const Icon(AppIcons.timePicker),
         label: Align(
           alignment: Alignment.centerLeft,
           child: Text(
@@ -325,7 +326,7 @@ class _DateTimeStep extends StatelessWidget {
         ),
         child: const Row(
           children: [
-            Icon(Icons.info_outline, color: AppColors.primaryDark),
+            Icon(AppIcons.info, color: AppColors.primaryDark),
             SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -453,7 +454,7 @@ class _SelectTile extends StatelessWidget {
             const CircleAvatar(
               radius: 19,
               backgroundColor: AppColors.primarySofter,
-              child: Icon(Icons.person_outline, color: AppColors.primaryDark),
+              child: Icon(AppIcons.person, color: AppColors.primaryDark),
             ),
             const SizedBox(width: 11),
           ],
@@ -477,9 +478,7 @@ class _SelectTile extends StatelessWidget {
             ),
           ),
           Icon(
-            selected
-                ? Icons.check_circle_rounded
-                : Icons.radio_button_unchecked_rounded,
+            selected ? AppIcons.check : AppIcons.radio,
             color: selected ? AppColors.primaryDark : AppColors.border,
           ),
         ],

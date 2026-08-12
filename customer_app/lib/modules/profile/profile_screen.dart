@@ -231,13 +231,13 @@ class _HealthJourney extends StatelessWidget {
   Widget build(BuildContext context) => ListView(
     children: const [
       _JourneyCard(
-        icon: Icons.auto_graph_rounded,
+        icon: AppIcons.chart,
         title: 'Liệu trình của tôi',
         subtitle: 'Chăm sóc da phục hồi · 2/6 buổi',
         accent: AppColors.primaryDark,
       ),
       _JourneyCard(
-        icon: Icons.health_and_safety_outlined,
+        icon: AppIcons.healthRecord,
         title: 'Chẩn đoán & hồ sơ khám',
         subtitle: 'Kết quả khám gần nhất: 05/08/2026',
         accent: Color(0xFF0F7A72),
@@ -311,13 +311,13 @@ class _AccountActions extends StatelessWidget {
             ),
             const Divider(height: 1),
             const ListTile(
-              leading: Icon(Icons.workspace_premium_outlined),
+              leading: Icon(AppIcons.membership),
               title: Text('Quyền lợi thành viên'),
               trailing: Icon(AppIcons.chevronRight),
             ),
             const Divider(height: 1),
             const ListTile(
-              leading: Icon(Icons.privacy_tip_outlined),
+              leading: Icon(AppIcons.privacy),
               title: Text('Quyền riêng tư & bảo mật'),
               trailing: Icon(AppIcons.chevronRight),
             ),

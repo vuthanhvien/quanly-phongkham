@@ -19,9 +19,9 @@ export class RecordsController {
     @Request() request?: ExpressRequest & { user?: AuthUser },
   ) {
     const filters = Object.fromEntries(
-      Object.entries(query || {}).filter(([key]) => !['page', 'pageSize', 'search', 'advanced', 'include'].includes(key)),
+      Object.entries(query || {}).filter(([key]) => !['page', 'pageSize', 'search', 'advanced', 'include', 'sort', 'order'].includes(key)),
     );
-    return this.records.list(resource, page, pageSize, search, filters, request?.user, request, query?.include, advanced);
+    return this.records.list(resource, page, pageSize, search, filters, request?.user, request, query?.include, advanced, query?.sort, query?.order);
   }
 
   @Post('records/customers/:id/reveal-phone')

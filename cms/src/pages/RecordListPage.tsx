@@ -41,7 +41,7 @@ import {
   message,
 } from "antd"
 import type { ColumnsType } from "antd/es/table"
-import { useEffect, useMemo, useState, type Key } from "react"
+import { useEffect, useMemo, useRef, useState, type Key } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { printHtmlInPlace } from "../utils/printHtml"
@@ -55,7 +55,7 @@ import { ProductForm } from "../components/ProductForm"
 import { StockBatchForm } from "../components/StockBatchForm"
 import { CustomField, entityLabels, normalizeSelectOption } from "../models"
 import { RecordDetailPage } from "./RecordDetailPage"
-import { displayValue, FileLookupMap, getRelationSpec, hasFileField, loadFileLookupMap, LookupMap, resolveRecordFieldValue } from "../relations"
+import { displayValue, FileLookupMap, getRelationSpec, hasFileField, loadFileLookupMap, loadRelationOptions, LookupMap, resolveRecordFieldValue } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
 import { CMS_DATA_REFRESH_EVENT, type CmsDataRefreshDetail } from "../utils/dataRefresh"
 import * as XLSX from "xlsx"
@@ -70,7 +70,7 @@ import {
 type SavedTableTab = {
   key: string
   label: string
-  filters: Array<{ field: string; operator: string; value: string | number }>
+  filters: Array<{ field: string; operator: string; value: string | number | string[] }>
 }
 
 function isSavedTableTab(value: unknown): value is SavedTableTab {
@@ -90,13 +90,19 @@ export function RecordListPage() {
   const [advancedFilters, setAdvancedFilters] = useState<Record<string, { operator: string; value?: string | number }>>({})
   const [recordStatus, setRecordStatus] = useState<"active" | "archived">("active")
   const [tableTabs, setTableTabs] = useState<SavedTableTab[]>([])
-  const [tableTabKey, setTableTabKey] = useState("active")
+  const [tableTabCounts, setTableTabCounts] = useState<Record<string, number>>({})
+  const [tableTabsLoaded, setTableTabsLoaded] = useState(false)
+  const initializedTableTabResource = useRef<string | undefined>(undefined)
+  const [tableTabKey, setTableTabKey] = useState(() => searchParams.get("tab") || "active")
   const [tableTabModalOpen, setTableTabModalOpen] = useState(false)
   const [editingTableTab, setEditingTableTab] = useState<SavedTableTab | null>(null)
   const [tableTabForm] = Form.useForm<SavedTableTab>()
+  const tableTabFilters = Form.useWatch("filters", tableTabForm) || []
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
+  const [sortField, setSortField] = useState(() => searchParams.get("sort") || "")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => searchParams.get("order") === "asc" ? "asc" : "desc")
   const [displayFields, setDisplayFields] = useState<FieldLayoutConfig[]>([])
   const [templates, setTemplates] = useState<
     Array<{ id: string; name: string; templateType?: string; isActive?: boolean }>
@@ -108,6 +114,7 @@ export function RecordListPage() {
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [lookups, setLookups] = useState<LookupMap>({})
   const [fileLookups, setFileLookups] = useState<FileLookupMap>({})
+  const [productCategoryNames, setProductCategoryNames] = useState<Record<string, string>>({})
   const [relatedQuickView, setRelatedQuickView] = useState<{ resource: string; id: string } | null>(null)
   const [doctorFilter, setDoctorFilter] = useState<string | undefined>(undefined)
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
@@ -134,6 +141,7 @@ export function RecordListPage() {
       { field: "search", operator: "contains" as const, value: search },
       ...((advancedSearch || selectedTableTab) && advancedFilterPayload ? [{ field: "advanced", operator: "eq" as const, value: advancedFilterPayload }] : []),
       { field: "isArchived", operator: "eq" as const, value: recordStatus === "archived" },
+      ...(sortField ? [{ field: "sort", operator: "eq" as const, value: sortField }, { field: "order", operator: "eq" as const, value: sortOrder }] : []),
       ...(resource === "appointments" && doctorFilter ? [{ field: "doctorStaffId", operator: "eq" as const, value: doctorFilter }] : []),
     ],
   }) as any
@@ -179,6 +187,39 @@ export function RecordListPage() {
       nextParams.delete("detail")
       setSearchParams(nextParams, { replace: true })
     }
+  }, [resource])
+
+  useEffect(() => {
+    let active = true
+    const countRequests = [
+      { key: "active", filters: [] as SavedTableTab["filters"] },
+      ...tableTabs,
+    ]
+    Promise.all(countRequests.map(async (tab) => {
+      const response = await api.get(`/records/${resource}`, {
+        params: {
+          page: 1,
+          pageSize: 1,
+          include: "*",
+          isArchived: false,
+          advanced: tab.filters.length ? JSON.stringify(tab.filters) : undefined,
+        },
+      }).catch(() => ({ data: { total: 0 } }))
+      return [tab.key, Number(response.data?.total || 0)] as const
+    })).then((entries) => {
+      if (active) setTableTabCounts(Object.fromEntries(entries))
+    })
+    return () => { active = false }
+  }, [resource, tableTabs])
+
+  useEffect(() => {
+    if (resource !== "products") {
+      setProductCategoryNames({})
+      return
+    }
+    api.get("/product-categories")
+      .then((response) => setProductCategoryNames(Object.fromEntries((response.data?.data || []).map((row: Record<string, unknown>) => [String(row.id), String(row.name || row.code || row.id)]))))
+      .catch(() => setProductCategoryNames({}))
   }, [resource])
 
   function updateAdvancedFilter(field: FieldLayoutConfig, next: Partial<{ operator: string; value?: string | number }>) {
@@ -247,6 +288,8 @@ export function RecordListPage() {
   }
 
   useEffect(() => {
+    setTableTabsLoaded(false)
+    initializedTableTabResource.current = undefined
     Promise.all([
       api.get("/settings/custom-fields", { params: { entityType: resource } }),
       api.get("/settings/views", { params: { entityType: resource } }),
@@ -268,22 +311,61 @@ export function RecordListPage() {
         setDisplayFields(tableFields)
         const savedTabConfig = (views.data.data as ViewSettingRecord[]).find((view) => view.viewType === "TABLE_TABS" && view.role === "ALL")?.config?.tabs
         setTableTabs(Array.isArray(savedTabConfig) ? savedTabConfig.filter(isSavedTableTab) : [])
+        setTableTabsLoaded(true)
         setTemplates(
           (prints.data.data || []).filter(
             (template: { isActive?: boolean }) => template.isActive !== false,
           ),
         )
-        return hasFileField(tableFields) ? loadFileLookupMap() : Promise.resolve({})
+        return Promise.all([
+          hasFileField(tableFields) ? loadFileLookupMap() : Promise.resolve({}),
+          loadRelationOptions(tableFields),
+        ])
       })
-      .then((nextFileLookups) => {
-        setLookups({})
+      .then(([nextFileLookups, nextLookups]) => {
+        setLookups(nextLookups)
         setFileLookups(nextFileLookups)
       })
   }, [resource])
 
   useEffect(() => {
-    if (tableTabKey !== "active" && !tableTabs.some((tab) => tab.key === tableTabKey)) setTableTabKey("active")
-  }, [tableTabKey, tableTabs])
+    if (tableTabsLoaded && tableTabKey !== "active" && !tableTabs.some((tab) => tab.key === tableTabKey)) setTableTabKey("active")
+  }, [tableTabKey, tableTabs, tableTabsLoaded])
+
+  useEffect(() => {
+    if (!tableTabsLoaded || initializedTableTabResource.current === resource) return
+    initializedTableTabResource.current = resource
+    const tabFromUrl = searchParams.get("tab") || "active"
+    if (tabFromUrl !== "active" && tableTabs.some((tab) => tab.key === tabFromUrl)) setTableTabKey(tabFromUrl)
+  }, [resource, searchParams, tableTabs, tableTabsLoaded])
+
+  function selectTableTab(key: string) {
+    setTableTabKey(key)
+    setRecordStatus("active")
+    setCurrentPage(1)
+    setSelectedRowKeys([])
+    const nextParams = new URLSearchParams(searchParams)
+    if (key === "active") nextParams.delete("tab")
+    else nextParams.set("tab", key)
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  function updateTableSort(field?: string, order?: "ascend" | "descend" | null) {
+    const nextField = field && order ? field : ""
+    const nextOrder: "asc" | "desc" = order === "ascend" ? "asc" : "desc"
+    setSortField(nextField)
+    setSortOrder(nextOrder)
+    setCurrentPage(1)
+    const nextParams = new URLSearchParams(searchParams)
+    if (!nextField) {
+      nextParams.delete("sort")
+      nextParams.delete("order")
+    } else {
+      nextParams.set("sort", nextField)
+      nextParams.set("order", nextOrder)
+    }
+    setSearchParams(nextParams, { replace: true })
+  }
 
   async function saveTableTab(values: SavedTableTab) {
     const key = String(values.key || "").trim().replace(/[^a-zA-Z0-9_-]/g, "_")
@@ -300,8 +382,7 @@ export function RecordListPage() {
       : [...tableTabs, nextTab]
     await api.put(`/settings/views/${resource}/TABLE_TABS`, { role: "ALL", config: { tabs: nextTabs } })
     setTableTabs(nextTabs)
-    setTableTabKey(key)
-    setRecordStatus("active")
+    selectTableTab(key)
     setTableTabModalOpen(false)
     setEditingTableTab(null)
     tableTabForm.resetFields()
@@ -320,9 +401,13 @@ export function RecordListPage() {
         dataIndex: field.key,
         key: field.key,
         width: field.tableWidth,
+        sorter: true,
+        sortOrder: (sortField === field.key ? (sortOrder === "asc" ? "ascend" : "descend") : undefined) as "ascend" | "descend" | undefined,
         render: (_: unknown, row: Record<string, any>) => (
           <Space size={4} wrap>
-            <RecordValueView
+            {resource === "products" && field.key === "category"
+              ? (productCategoryNames[String(resolveRecordFieldValue(row, field) || "")] || "—")
+              : <RecordValueView
               compact
               field={field}
               fileLookups={fileLookups}
@@ -332,7 +417,7 @@ export function RecordListPage() {
                 setRelatedQuickView({ resource: targetResource, id })
               }}
               value={resolveRecordFieldValue(row, field)}
-            />
+            />}
           </Space>
         ),
       })),
@@ -474,7 +559,7 @@ export function RecordListPage() {
         },
       },
     ],
-    [advancedFilters, advancedSearch, displayFields, resource, recordStatus, templates, lookups, fileLookups, screens.md],
+    [advancedFilters, advancedSearch, displayFields, resource, recordStatus, templates, lookups, fileLookups, productCategoryNames, screens.md],
   )
 
   const doctorOptions = useMemo(
@@ -777,16 +862,16 @@ export function RecordListPage() {
         activeKey={tableTabKey}
         className="record-status-tabs"
         items={[
-          { key: "active", label: "Tất cả" },
+          { key: "active", label: <span>Tất cả{tableTabCounts.active > 0 ? ` (${tableTabCounts.active})` : ""}</span> },
           ...tableTabs.map((tab) => ({
             key: tab.key,
-            label: canManageTableTabs ? <span className="custom-table-tab-label"><span>{tab.label}</span><Tooltip title="Sửa tab"><button aria-label={`Sửa tab ${tab.label}`} className="edit-table-tab-button" onClick={(event) => {
+            label: canManageTableTabs ? <span className="custom-table-tab-label"><span>{tab.label}{tableTabCounts[tab.key] > 0 ? ` (${tableTabCounts[tab.key]})` : ""}</span><Tooltip title="Sửa tab"><button aria-label={`Sửa tab ${tab.label}`} className="edit-table-tab-button" onClick={(event) => {
               event.preventDefault()
               event.stopPropagation()
               setEditingTableTab(tab)
               tableTabForm.setFieldsValue(tab)
               setTableTabModalOpen(true)
-            }}><EditOutlined /></button></Tooltip></span> : tab.label,
+            }}><EditOutlined /></button></Tooltip></span> : <span>{tab.label}{tableTabCounts[tab.key] > 0 ? ` (${tableTabCounts[tab.key]})` : ""}</span>,
           })),
           ...(canManageTableTabs ? [{ key: "__add_tab", label: <button className="add-table-tab-button" onClick={(event) => {
             event.preventDefault()
@@ -805,10 +890,7 @@ export function RecordListPage() {
         }}
         onChange={(key) => {
           if (key === "__add_tab") return
-          setTableTabKey(key)
-          setRecordStatus("active")
-          setCurrentPage(1)
-          setSelectedRowKeys([])
+          selectTableTab(key)
         }}
       />
       <Card className="table-card">
@@ -829,7 +911,12 @@ export function RecordListPage() {
               setPageSize(nextPageSize)
             },
           }}
+          onChange={(_pagination, _filters, sorter) => {
+            const currentSorter = Array.isArray(sorter) ? sorter[0] : sorter
+            updateTableSort(String(currentSorter?.field || "") || undefined, currentSorter?.order)
+          }}
           rowKey="id"
+          tableLayout="fixed"
           expandable={resource === "units" ? { defaultExpandAllRows: true } : undefined}
           indentSize={28}
           rowSelection={recordStatus === "active" && hasActionAccess(resource, "delete") ? {
@@ -848,6 +935,7 @@ export function RecordListPage() {
         okText="Lưu tab"
         open={tableTabModalOpen}
         title={editingTableTab ? "Chỉnh sửa tab lọc" : "Tạo tab lọc cho bảng"}
+        width={860}
         onCancel={() => { setTableTabModalOpen(false); setEditingTableTab(null); tableTabForm.resetFields() }}
         onOk={() => void tableTabForm.submit()}
       >
@@ -861,14 +949,25 @@ export function RecordListPage() {
           <Typography.Text strong>Bộ lọc</Typography.Text>
           <Form.List name="filters">
             {(fields, { add, remove }) => <div className="table-tab-filter-list">
-              {fields.map((field) => <div className="table-tab-filter-row" key={field.key}>
+              {fields.map((field) => {
+                const filter = tableTabFilters[field.name] || {}
+                const selectedField = displayFields.find((item) => item.key === filter.field)
+                const relation = selectedField ? getRelationSpec(selectedField) : undefined
+                const isOptionField = Boolean(selectedField && (selectedField.type === "select" || selectedField.type === "multi-select") && selectedField.options?.length)
+                const isListValue = isOptionField || Boolean(relation)
+                const valueOptions = isOptionField
+                  ? (selectedField?.options || []).map(normalizeSelectOption)
+                  : relation ? Object.entries(lookups[relation.lookupKey || relation.resource] || {}).map(([value, label]) => ({ value, label })) : []
+                const noValueNeeded = ["is_empty", "is_present"].includes(String(filter.operator || ""))
+                return <div className="table-tab-filter-row" key={field.key}>
                 <Form.Item name={[field.name, "field"]} rules={[{ required: true, message: "Chọn trường" }]}>
                   <Select options={displayFields.map((item) => ({ value: item.key, label: item.label }))} placeholder="Trường" />
                 </Form.Item>
                 <Form.Item name={[field.name, "operator"]} rules={[{ required: true }]}>
-                  <Select options={[{ value: "eq", label: "Bằng" }, { value: "ne", label: "Khác" }, { value: "contains", label: "Chứa" }, { value: "gt", label: ">" }, { value: "gte", label: "≥" }, { value: "lt", label: "<" }, { value: "lte", label: "≤" }]} />
+                  <Select options={[{ value: "eq", label: "Bằng" }, { value: "ne", label: "Khác" }, { value: "contains", label: "Chứa" }, { value: "in", label: "Trong" }, { value: "not_in", label: "Không trong" }, { value: "is_empty", label: "Rỗng" }, { value: "is_present", label: "Có giá trị" }, { value: "gt", label: ">" }, { value: "gte", label: "≥" }, { value: "lt", label: "<" }, { value: "lte", label: "≤" }]} />
                 </Form.Item>
-                <Form.Item name={[field.name, "value"]} rules={[{ required: true, message: "Nhập giá trị" }]}>
+                <Form.Item hidden={noValueNeeded} name={[field.name, "value"]} rules={noValueNeeded ? [] : [{ required: true, message: "Nhập giá trị" }]}>
+                  {isListValue ? <Select mode={["in", "not_in"].includes(String(filter.operator)) ? "multiple" : undefined} options={valueOptions} optionFilterProp="label" placeholder="Chọn giá trị" showSearch /> :
                   <AutoComplete
                     options={[
                       { value: "__YESTERDAY__", label: "Hôm qua" },
@@ -879,10 +978,10 @@ export function RecordListPage() {
                       { value: "__THIS_YEAR__", label: "Năm nay" },
                     ]}
                     placeholder="Giá trị hoặc chọn ngày động"
-                  />
+                  />}
                 </Form.Item>
                 <Button aria-label="Xóa bộ lọc" danger icon={<MinusCircleOutlined />} type="text" onClick={() => remove(field.name)} />
-              </div>)}
+              </div>})}
               <Button icon={<PlusOutlined />} type="dashed" onClick={() => add({ operator: "eq" })}>Thêm điều kiện lọc</Button>
             </div>}
           </Form.List>

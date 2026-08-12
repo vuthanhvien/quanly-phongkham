@@ -985,7 +985,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     <>
       {toastContextHolder}
       <div className="page-header">
-          <Typography.Title level={3}>{section === "roles" ? "Hiển thị theo role / module" : "Mẫu in"}</Typography.Title>
+          <Typography.Title className="page-title-with-icon" level={3}>{section === "roles" ? <><SettingOutlined /><span>Hiển thị theo role / module</span></> : <><FileTextOutlined /><span>Mẫu in</span></>}</Typography.Title>
         <Space wrap>
           {section === "roles" && (
             <TreeSelect
