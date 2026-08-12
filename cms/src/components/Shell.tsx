@@ -34,7 +34,7 @@ import {
   UserOutlined,
 } from "@ant-design/icons"
 import { useGetIdentity, useLogout } from "@refinedev/core"
-import { Avatar, Button, Dropdown, Grid, Layout, Menu, Modal, Select, Space, Typography } from "antd"
+import { Avatar, Button, Checkbox, Dropdown, Grid, Layout, Menu, Modal, Select, Typography } from "antd"
 import type { MenuProps } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
@@ -50,10 +50,10 @@ import {
 } from "../company-types"
 import { entityLabels } from "../models"
 
-const { Header, Content, Sider } = Layout
+const { Content, Sider } = Layout
 const SIDER_COLLAPSE_KEY = "clinic-sider-collapsed"
 
-const menuIcons: Record<string, React.ReactNode> = {
+export const menuIcons: Record<string, React.ReactNode> = {
   "custom-fields": <AppstoreOutlined />,
   branches: <BankOutlined />,
   roles: <SettingOutlined />,
@@ -169,6 +169,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [branchOptions, setBranchOptions] = useState<Array<{ value: string; label: string }>>([])
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>(() => getGlobalBranchFilterIds())
+  const [branchPickerOpen, setBranchPickerOpen] = useState(false)
+  const [pendingBranchIds, setPendingBranchIds] = useState<string[]>([])
 
   useEffect(() => {
     const appName = String(settings.appName || 'CMS').trim() || 'CMS'
@@ -241,6 +243,64 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const profileDisplayName = useMemo(
     () => staffDisplayName || identity?.fullName || identity?.username || identity?.email || "",
     [identity?.email, identity?.fullName, identity?.username, staffDisplayName],
+  )
+  const selectedBranchLabel = useMemo(() => {
+    const names = branchOptions.filter((option) => selectedBranchIds.includes(option.value)).map((option) => option.label)
+    if (names.length === 0) return "Chọn chi nhánh"
+    return names.length === 1 ? names[0] : `${names.length} chi nhánh`
+  }, [branchOptions, selectedBranchIds])
+  const selectedBranchNames = useMemo(
+    () => branchOptions.filter((option) => selectedBranchIds.includes(option.value)).map((option) => option.label),
+    [branchOptions, selectedBranchIds],
+  )
+  const openBranchPicker = () => {
+    setPendingBranchIds(selectedBranchIds)
+    setBranchPickerOpen(true)
+  }
+  const applyBranchFilter = () => {
+    const nextValues = pendingBranchIds.length > 0 ? pendingBranchIds : (branchOptions[0] ? [branchOptions[0].value] : [])
+    setSelectedBranchIds(nextValues)
+    setGlobalBranchFilterIds(nextValues)
+    setBranchPickerOpen(false)
+  }
+  const toggleBranchFilter = (branchId: string, checked: boolean) => {
+    const nextValues = checked
+      ? Array.from(new Set([...selectedBranchIds, branchId]))
+      : selectedBranchIds.filter((id) => id !== branchId)
+    if (nextValues.length === 0) return
+    setSelectedBranchIds(nextValues)
+    setGlobalBranchFilterIds(nextValues)
+  }
+  const profileMenu: MenuProps["items"] = [
+    {
+      key: "profile",
+      icon: <UserOutlined />,
+      label: "Hồ sơ cá nhân",
+      onClick: () => navigate("/profile"),
+    },
+    { type: "divider" },
+    {
+      key: "logout",
+      icon: <LogoutOutlined />,
+      label: "Đăng xuất",
+      danger: true,
+      onClick: () => logout(),
+    },
+  ]
+  const profileDropdown = (
+    <div className="profile-dropdown-panel">
+      <div className="profile-branch-picker">
+        <div className="profile-branch-picker-title"><BankOutlined /> Chi nhánh hiển thị</div>
+        <div className="profile-branch-options">
+          {branchOptions.map((branch) => (
+            <Checkbox key={branch.value} checked={selectedBranchIds.includes(branch.value)} onChange={(event) => toggleBranchFilter(branch.value, event.target.checked)}>
+              {branch.label}
+            </Checkbox>
+          ))}
+        </div>
+      </div>
+      <Menu items={profileMenu} selectable={false} />
+    </div>
   )
 
   const currentResource = location.pathname.split("/")[1]
@@ -438,79 +498,54 @@ export function Shell({ children }: { children: React.ReactNode }) {
           if (broken) setCollapsed(true)
         }}
       >
-        <div className="brand-card">
-          <div className="brand-mark">
-            {settings.appIconUrl ? <img alt={settings.appName} src={settings.appIconUrl} /> : (settings.appName || 'CMS').slice(0, 2).toUpperCase()}
+        <div className="sidebar-brand-row">
+          <div className="brand-card">
+            <div className={`brand-mark${settings.appIconUrl ? " has-image" : ""}`}>
+              {settings.appIconUrl ? <img alt={settings.appName} src={settings.appIconUrl} /> : (settings.appName || 'CMS').slice(0, 2).toUpperCase()}
+            </div>
+            <div className="brand-copy">
+              <Typography.Title level={4}>{settings.appName || 'CMS'}</Typography.Title>
+            </div>
           </div>
-          <div className="brand-copy">
-            <Typography.Title level={4}>{settings.appName || 'CMS'}</Typography.Title>
-          </div>
+          <Button aria-label={collapsed ? "Mở menu" : "Thu gọn menu"} className="sider-toggle sidebar-top-toggle" icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={toggleCollapsed} />
         </div>
         <div className="side-menu-scroll">
           {menuNode}
         </div>
-      </Sider>
-      <Layout>
-        <Header className="app-header">
-          <Space size={12}>
-            <Button
-              aria-label={collapsed ? "Mở menu" : "Thu gọn menu"}
-              className="sider-toggle"
-              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-              onClick={toggleCollapsed}
-            />
-            <Select
-              className="global-branch-filter"
-              mode="multiple"
-              maxTagCount="responsive"
-              options={branchOptions}
-              placeholder="Chọn chi nhánh"
-              showSearch
-              loading={branchOptions.length === 0}
-              value={branchOptions.length > 0 ? selectedBranchIds : undefined}
-              onChange={(values) => {
-                const nextValues = values.length > 0 ? values : (branchOptions[0] ? [branchOptions[0].value] : [])
-                setSelectedBranchIds(nextValues)
-                setGlobalBranchFilterIds(nextValues)
-              }}
-            />
-          </Space>
-          <Dropdown
-            menu={{
-              items: [
-                {
-                  key: "profile",
-                  icon: <UserOutlined />,
-                  label: "Hồ sơ cá nhân",
-                  onClick: () => navigate("/profile"),
-                },
-                { type: "divider" },
-                {
-                  key: "logout",
-                  icon: <LogoutOutlined />,
-                  label: "Đăng xuất",
-                  danger: true,
-                  onClick: () => logout(),
-                },
-              ],
-            }}
-            placement="bottomRight"
-            trigger={["click"]}
-          >
-            <button className="profile-trigger">
-              <Avatar
-                icon={<UserOutlined />}
-                size={32}
-                style={{ background: "var(--app-primary)", color: "#180c12", cursor: "pointer", flexShrink: 0 }}
-              />
-              {profileDisplayName && (
-                <Typography.Text className="profile-name">{profileDisplayName}</Typography.Text>
-              )}
+        <div className="sider-footer">
+          <Dropdown dropdownRender={() => profileDropdown} placement="topRight" trigger={["click"]}>
+            <button className="profile-trigger sidebar-profile-card" title={profileDisplayName || "Tài khoản"}>
+              <Avatar icon={<UserOutlined />} size={32} style={{ background: "var(--app-primary)", color: "#180c12", cursor: "pointer", flexShrink: 0 }} />
+              {!collapsed && <span className="sidebar-profile-copy"><Typography.Text className="profile-name">{profileDisplayName || "Tài khoản"}</Typography.Text><span className="sidebar-branch-names">{selectedBranchNames.length > 0 ? selectedBranchNames.slice(0, 2).join(" · ") : "Chưa chọn chi nhánh"}</span></span>}
             </button>
           </Dropdown>
-        </Header>
+        </div>
+      </Sider>
+      <Layout>
         <Content className="app-content">{children}</Content>
       </Layout>
+      <Button className="mobile-navigation-trigger" aria-label="Mở menu" icon={<MenuUnfoldOutlined />} onClick={() => setMobileMenuOpen(true)} />
+      <Modal
+        open={branchPickerOpen}
+        title="Chọn chi nhánh hiển thị"
+        okText="Áp dụng"
+        cancelText="Hủy"
+        onCancel={() => setBranchPickerOpen(false)}
+        onOk={applyBranchFilter}
+      >
+        <Typography.Paragraph type="secondary">Dữ liệu trên CMS sẽ được lọc theo các chi nhánh đã chọn.</Typography.Paragraph>
+        <Select
+          mode="multiple"
+          maxTagCount="responsive"
+          options={branchOptions}
+          placeholder="Tìm và chọn chi nhánh"
+          showSearch
+          optionFilterProp="label"
+          style={{ width: "100%" }}
+          value={pendingBranchIds}
+          onChange={setPendingBranchIds}
+        />
+      </Modal>
       <Modal
         className="mobile-menu-drawer"
         open={mobileMenuOpen}
@@ -520,7 +555,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         onCancel={() => setMobileMenuOpen(false)}
       >
         <div className="brand-card mobile-menu-brand">
-          <div className="brand-mark">
+            <div className={`brand-mark${settings.appIconUrl ? " has-image" : ""}`}>
             {settings.appIconUrl ? <img alt={settings.appName} src={settings.appIconUrl} /> : (settings.appName || 'CMS').slice(0, 2).toUpperCase()}
           </div>
           <div className="brand-copy">
@@ -528,6 +563,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <div className="mobile-menu-scroll">{menuNode}</div>
+        <div className="mobile-menu-footer">
+          <Button block icon={<BankOutlined />} onClick={openBranchPicker}>{selectedBranchLabel}</Button>
+          <Dropdown dropdownRender={() => profileDropdown} placement="topRight" trigger={["click"]}>
+            <button className="profile-trigger sidebar-profile-trigger">
+              <Avatar icon={<UserOutlined />} size={32} style={{ background: "var(--app-primary)", color: "#180c12", flexShrink: 0 }} />
+              {profileDisplayName && <Typography.Text className="profile-name">{profileDisplayName}</Typography.Text>}
+            </button>
+          </Dropdown>
+        </div>
       </Modal>
     </Layout>
   )

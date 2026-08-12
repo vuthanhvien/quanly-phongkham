@@ -16,7 +16,7 @@ export interface ViewSettingRecord {
 }
 
 export function getRoleInheritanceChain(role?: string, dynamicRoles: DynamicRole[] = []) {
-  const normalizedRole = normalizeRole(role)
+  const normalizedRole = normalizeRenderableRole(role)
   if (normalizedRole === DEFAULT_ROLE_SCOPE) return [DEFAULT_ROLE_SCOPE]
 
   const user = readStoredUser()
@@ -90,7 +90,7 @@ export interface FieldLayoutConfig extends FieldSpec {
   description?: string
   placeholder?: string
   defaultValue?: unknown
-  width?: '25' | '33' | '50' | '66' | '100'
+  width?: '25' | '33' | '50' | '66' | '75' | '100'
   tableWidth?: number
 }
 
@@ -202,17 +202,24 @@ function readStoredUser() {
 
 export function getStoredUserRole() {
   const user = readStoredUser()
-  return normalizeRole(user?.activeRole || user?.role)
+  return normalizeRenderableRole(user?.activeRole || user?.role)
 }
 
 export function normalizeRole(role?: string) {
   return role?.trim().toUpperCase() || DEFAULT_ROLE_SCOPE
 }
 
+// "VIEW" is an old malformed view-setting role, not a user role.
+function normalizeRenderableRole(role?: string) {
+  const normalized = normalizeRole(role)
+  return normalized === 'VIEW' ? DEFAULT_ROLE_SCOPE : normalized
+}
+
 export function getRoleOptions(views: ViewSettingRecord[], extraRoles: string[] = []) {
+  void views
   return Array.from(
     new Set(
-      [...DEFAULT_ROLE_GROUPS, ...views.map((view) => normalizeRole(view.role)), ...extraRoles]
+      [...DEFAULT_ROLE_GROUPS, ...extraRoles]
         .filter(Boolean)
         .map((role) => normalizeRole(role)),
     ),
@@ -393,7 +400,7 @@ export function buildFieldLayoutConfigs(
           ? String(entry.displayFormat) as FieldLayoutConfig['displayFormat']
           : base.displayFormat,
       width:
-        ['25', '33', '50', '66', '100'].includes(String(entry.width))
+        ['25', '33', '50', '66', '75', '100'].includes(String(entry.width))
           ? String(entry.width) as FieldLayoutConfig['width']
           : base.width,
       tableWidth:

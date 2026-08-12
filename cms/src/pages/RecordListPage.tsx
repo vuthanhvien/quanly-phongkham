@@ -10,6 +10,8 @@ import {
   EyeOutlined,
   FullscreenOutlined,
   ImportOutlined,
+  InboxOutlined,
+  MinusCircleOutlined,
   MoreOutlined,
   PhoneOutlined,
   PrinterOutlined,
@@ -19,6 +21,7 @@ import {
   UserAddOutlined,
 } from "@ant-design/icons"
 import {
+  AutoComplete,
   Button,
   Card,
   Checkbox,
@@ -42,11 +45,12 @@ import { useEffect, useMemo, useState, type Key } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { printHtmlInPlace } from "../utils/printHtml"
-import { hasActionAccess, hasResourceAccess } from "../access"
+import { hasActionAccess, hasResourceAccess, isCurrentUserAdmin } from "../access"
 import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
+import { menuIcons } from "../components/Shell"
 import { ProductForm } from "../components/ProductForm"
 import { StockBatchForm } from "../components/StockBatchForm"
 import { CustomField, entityLabels, normalizeSelectOption } from "../models"
@@ -63,15 +67,33 @@ import {
   ViewSettingRecord,
 } from "../view-settings"
 
+type SavedTableTab = {
+  key: string
+  label: string
+  filters: Array<{ field: string; operator: string; value: string | number }>
+}
+
+function isSavedTableTab(value: unknown): value is SavedTableTab {
+  if (!value || typeof value !== "object") return false
+  const tab = value as Partial<SavedTableTab>
+  return typeof tab.key === "string" && typeof tab.label === "string" && Array.isArray(tab.filters)
+}
+
 export function RecordListPage() {
   const screens = Grid.useBreakpoint()
   const { resource = "customers" } = useParams()
+  const canManageTableTabs = isCurrentUserAdmin()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState("")
   const [advancedSearch, setAdvancedSearch] = useState(false)
   const [advancedFilters, setAdvancedFilters] = useState<Record<string, { operator: string; value?: string | number }>>({})
   const [recordStatus, setRecordStatus] = useState<"active" | "archived">("active")
+  const [tableTabs, setTableTabs] = useState<SavedTableTab[]>([])
+  const [tableTabKey, setTableTabKey] = useState("active")
+  const [tableTabModalOpen, setTableTabModalOpen] = useState(false)
+  const [editingTableTab, setEditingTableTab] = useState<SavedTableTab | null>(null)
+  const [tableTabForm] = Form.useForm<SavedTableTab>()
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
@@ -95,18 +117,22 @@ export function RecordListPage() {
   const [staffAccountStaff, setStaffAccountStaff] = useState<Record<string, any> | null>(null)
   const [staffAccountSubmitting, setStaffAccountSubmitting] = useState(false)
   const [staffAccountForm] = Form.useForm()
+  const selectedTableTab = useMemo(() => tableTabs.find((tab) => tab.key === tableTabKey), [tableTabKey, tableTabs])
   const advancedFilterPayload = useMemo(() => {
-    const filters = Object.entries(advancedFilters)
+    const filters = [
+      ...(selectedTableTab?.filters || []),
+      ...Object.entries(advancedFilters)
       .filter(([, filter]) => filter.value !== undefined && filter.value !== null && String(filter.value).trim() !== "")
-      .map(([field, filter]) => ({ field, operator: filter.operator, value: filter.value }))
+      .map(([field, filter]) => ({ field, operator: filter.operator, value: filter.value })),
+    ]
     return filters.length > 0 ? JSON.stringify(filters) : ""
-  }, [advancedFilters])
+  }, [advancedFilters, selectedTableTab])
   const query = useList({
     resource,
     pagination: { currentPage, pageSize },
     filters: [
       { field: "search", operator: "contains" as const, value: search },
-      ...(advancedSearch && advancedFilterPayload ? [{ field: "advanced", operator: "eq" as const, value: advancedFilterPayload }] : []),
+      ...((advancedSearch || selectedTableTab) && advancedFilterPayload ? [{ field: "advanced", operator: "eq" as const, value: advancedFilterPayload }] : []),
       { field: "isArchived", operator: "eq" as const, value: recordStatus === "archived" },
       ...(resource === "appointments" && doctorFilter ? [{ field: "doctorStaffId", operator: "eq" as const, value: doctorFilter }] : []),
     ],
@@ -240,6 +266,8 @@ export function RecordListPage() {
           getStoredUserRole(),
         )
         setDisplayFields(tableFields)
+        const savedTabConfig = (views.data.data as ViewSettingRecord[]).find((view) => view.viewType === "TABLE_TABS" && view.role === "ALL")?.config?.tabs
+        setTableTabs(Array.isArray(savedTabConfig) ? savedTabConfig.filter(isSavedTableTab) : [])
         setTemplates(
           (prints.data.data || []).filter(
             (template: { isActive?: boolean }) => template.isActive !== false,
@@ -252,6 +280,33 @@ export function RecordListPage() {
         setFileLookups(nextFileLookups)
       })
   }, [resource])
+
+  useEffect(() => {
+    if (tableTabKey !== "active" && !tableTabs.some((tab) => tab.key === tableTabKey)) setTableTabKey("active")
+  }, [tableTabKey, tableTabs])
+
+  async function saveTableTab(values: SavedTableTab) {
+    const key = String(values.key || "").trim().replace(/[^a-zA-Z0-9_-]/g, "_")
+    const label = String(values.label || "").trim()
+    if (!key || !label) return
+    if (key === "active" || key === "archived" || tableTabs.some((tab) => tab.key === key && tab.key !== editingTableTab?.key)) {
+      message.error("Key tab đã tồn tại hoặc là key hệ thống")
+      return
+    }
+    const filters = (values.filters || []).filter((filter) => filter.field && filter.operator && filter.value !== undefined && String(filter.value).trim() !== "")
+    const nextTab = { key, label, filters }
+    const nextTabs = editingTableTab
+      ? tableTabs.map((tab) => tab.key === editingTableTab.key ? nextTab : tab)
+      : [...tableTabs, nextTab]
+    await api.put(`/settings/views/${resource}/TABLE_TABS`, { role: "ALL", config: { tabs: nextTabs } })
+    setTableTabs(nextTabs)
+    setTableTabKey(key)
+    setRecordStatus("active")
+    setTableTabModalOpen(false)
+    setEditingTableTab(null)
+    tableTabForm.resetFields()
+    message.success(editingTableTab ? "Đã cập nhật tab lọc" : "Đã tạo tab lọc")
+  }
 
   const columns: ColumnsType<Record<string, any>> = useMemo(
     () => [
@@ -630,14 +685,22 @@ export function RecordListPage() {
     <>
       <div className="page-header record-list-page-header">
         <div>
-          <Typography.Title level={3}>
-            {entityLabels[resource] || resource}
-          </Typography.Title>
+          <div className="record-list-title-row">
+            <Typography.Title className="record-list-title" level={3}>
+              {menuIcons[resource] || <AppstoreOutlined />}
+              <span>{entityLabels[resource] || resource}</span>
+            </Typography.Title>
+            <div className="record-list-title-actions">
+              <Tooltip title="Làm mới dữ liệu"><Button aria-label="Làm mới dữ liệu" className="title-icon-action" icon={<ReloadOutlined />} size="small" type="text" onClick={refreshData} /></Tooltip>
+            </div>
+          </div>
         </div>
         <Space wrap className="page-header-actions record-list-actions">
-          <Button icon={<ReloadOutlined />} onClick={refreshData}>
-            Làm mới dữ liệu
-          </Button>
+          <Tooltip title="Tìm kiếm nâng cao"><Checkbox aria-label="Tìm kiếm nâng cao" checked={advancedSearch} className="title-advanced-toggle" onChange={(event) => {
+            setAdvancedSearch(event.target.checked)
+            if (!event.target.checked) setAdvancedFilters({})
+            setCurrentPage(1)
+          }} /></Tooltip>
           <Input.Search
             allowClear
             className="page-search"
@@ -647,16 +710,6 @@ export function RecordListPage() {
               setSearch(value)
             }}
           />
-          <Checkbox
-            checked={advancedSearch}
-            onChange={(event) => {
-              setAdvancedSearch(event.target.checked)
-              if (!event.target.checked) setAdvancedFilters({})
-              setCurrentPage(1)
-            }}
-          >
-            Tìm kiếm nâng cao
-          </Checkbox>
           {resource === "appointments" ? (
             <Select
               allowClear
@@ -721,14 +774,39 @@ export function RecordListPage() {
         </Space>
       </div>
       <Tabs
-        activeKey={recordStatus}
+        activeKey={tableTabKey}
         className="record-status-tabs"
         items={[
-          { key: "active", label: "Đang hoạt động" },
-          { key: "archived", label: "Lưu trữ" },
+          { key: "active", label: "Tất cả" },
+          ...tableTabs.map((tab) => ({
+            key: tab.key,
+            label: canManageTableTabs ? <span className="custom-table-tab-label"><span>{tab.label}</span><Tooltip title="Sửa tab"><button aria-label={`Sửa tab ${tab.label}`} className="edit-table-tab-button" onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              setEditingTableTab(tab)
+              tableTabForm.setFieldsValue(tab)
+              setTableTabModalOpen(true)
+            }}><EditOutlined /></button></Tooltip></span> : tab.label,
+          })),
+          ...(canManageTableTabs ? [{ key: "__add_tab", label: <button className="add-table-tab-button" onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            setEditingTableTab(null)
+            tableTabForm.setFieldsValue({ filters: [{ operator: "eq" }] })
+            setTableTabModalOpen(true)
+          }}><PlusOutlined />Thêm tab</button> }] : []),
         ]}
+        tabBarExtraContent={{
+          right: <button className={`archived-tab-button${recordStatus === "archived" ? " is-active" : ""}`} onClick={() => {
+            setRecordStatus("archived")
+            setCurrentPage(1)
+            setSelectedRowKeys([])
+          }}><InboxOutlined />Lưu trữ</button>,
+        }}
         onChange={(key) => {
-          setRecordStatus(key as "active" | "archived")
+          if (key === "__add_tab") return
+          setTableTabKey(key)
+          setRecordStatus("active")
           setCurrentPage(1)
           setSelectedRowKeys([])
         }}
@@ -759,9 +837,57 @@ export function RecordListPage() {
             onChange: setSelectedRowKeys,
             preserveSelectedRowKeys: true,
           } : undefined}
-          scroll={{ x: "max-content" }}
+          scroll={{
+            x: "max-content",
+            y: screens.md ? (advancedSearch ? "calc(100vh - 308px)" : "calc(100vh - 260px)") : undefined,
+          }}
         />
       </Card>
+      <Modal
+        destroyOnHidden
+        okText="Lưu tab"
+        open={tableTabModalOpen}
+        title={editingTableTab ? "Chỉnh sửa tab lọc" : "Tạo tab lọc cho bảng"}
+        onCancel={() => { setTableTabModalOpen(false); setEditingTableTab(null); tableTabForm.resetFields() }}
+        onOk={() => void tableTabForm.submit()}
+      >
+        <Form form={tableTabForm} layout="vertical" onFinish={(values) => void saveTableTab(values)}>
+          <Form.Item label="Tên tab" name="label" rules={[{ required: true, message: "Nhập tên tab" }]}>
+            <Input placeholder="Ví dụ: Khách hàng tiềm năng" />
+          </Form.Item>
+          <Form.Item extra="Chỉ dùng chữ, số, dấu gạch ngang hoặc gạch dưới." label="Key tab" name="key" rules={[{ required: true, message: "Nhập key tab" }]}>
+            <Input placeholder="leads" />
+          </Form.Item>
+          <Typography.Text strong>Bộ lọc</Typography.Text>
+          <Form.List name="filters">
+            {(fields, { add, remove }) => <div className="table-tab-filter-list">
+              {fields.map((field) => <div className="table-tab-filter-row" key={field.key}>
+                <Form.Item name={[field.name, "field"]} rules={[{ required: true, message: "Chọn trường" }]}>
+                  <Select options={displayFields.map((item) => ({ value: item.key, label: item.label }))} placeholder="Trường" />
+                </Form.Item>
+                <Form.Item name={[field.name, "operator"]} rules={[{ required: true }]}>
+                  <Select options={[{ value: "eq", label: "Bằng" }, { value: "ne", label: "Khác" }, { value: "contains", label: "Chứa" }, { value: "gt", label: ">" }, { value: "gte", label: "≥" }, { value: "lt", label: "<" }, { value: "lte", label: "≤" }]} />
+                </Form.Item>
+                <Form.Item name={[field.name, "value"]} rules={[{ required: true, message: "Nhập giá trị" }]}>
+                  <AutoComplete
+                    options={[
+                      { value: "__YESTERDAY__", label: "Hôm qua" },
+                      { value: "__TODAY__", label: "Hôm nay" },
+                      { value: "__TOMORROW__", label: "Ngày mai" },
+                      { value: "__THIS_WEEK__", label: "Tuần này" },
+                      { value: "__THIS_MONTH__", label: "Tháng này" },
+                      { value: "__THIS_YEAR__", label: "Năm nay" },
+                    ]}
+                    placeholder="Giá trị hoặc chọn ngày động"
+                  />
+                </Form.Item>
+                <Button aria-label="Xóa bộ lọc" danger icon={<MinusCircleOutlined />} type="text" onClick={() => remove(field.name)} />
+              </div>)}
+              <Button icon={<PlusOutlined />} type="dashed" onClick={() => add({ operator: "eq" })}>Thêm điều kiện lọc</Button>
+            </div>}
+          </Form.List>
+        </Form>
+      </Modal>
       <Modal
         destroyOnHidden
         okButtonProps={{ className: "primary-glow", type: "primary" }}

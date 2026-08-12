@@ -33,7 +33,7 @@ export interface FieldSpec {
   required?: boolean;
   options?: SelectOption[];
   defaultValue?: unknown;
-  width?: '25' | '33' | '50' | '66' | '100';
+  width?: '25' | '33' | '50' | '66' | '75' | '100';
   tableWidth?: number;
   disabled?: boolean;
   description?: string;

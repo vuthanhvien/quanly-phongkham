@@ -3820,6 +3820,13 @@ export class RecordsService {
         continue;
       }
       const column = repository.metadata.columns.find((item) => item.propertyName === filter.field);
+      const dynamicDateRange = this.dynamicDateFilterRange(filter.value);
+      if (dynamicDateRange && this.isDateColumnType(String(column?.type || ''))) {
+        where = this.mergeWhere(where, {
+          [filter.field]: Between(dynamicDateRange.start, dynamicDateRange.end),
+        } as FindOptionsWhere<ConfigurableEntity>);
+        continue;
+      }
       const value = this.advancedFilterValue(filter.value, String(column?.type || ''));
       const operator = filter.operator === 'number' ? this.advancedNumericOperator(filter.value) : filter.operator;
       const condition = this.advancedFilterCondition(operator, value);
@@ -3872,6 +3879,52 @@ export class RecordsService {
     return String(value);
   }
 
+  private isDateColumnType(columnType: string) {
+    const type = columnType.toLowerCase();
+    return type.includes('date') || type.includes('time');
+  }
+
+  private dynamicDateFilterRange(value: string | number) {
+    const preset = String(value).trim().toUpperCase();
+    const now = new Date();
+    const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const endOfDay = (date: Date) => {
+      const end = startOfDay(date);
+      end.setDate(end.getDate() + 1);
+      end.setMilliseconds(end.getMilliseconds() - 1);
+      return end;
+    };
+    const range = (start: Date, end: Date) => ({ start, end });
+
+    if (preset === '__TODAY__') return range(startOfDay(now), endOfDay(now));
+    if (preset === '__YESTERDAY__') {
+      const date = startOfDay(now);
+      date.setDate(date.getDate() - 1);
+      return range(date, endOfDay(date));
+    }
+    if (preset === '__TOMORROW__') {
+      const date = startOfDay(now);
+      date.setDate(date.getDate() + 1);
+      return range(date, endOfDay(date));
+    }
+    if (preset === '__THIS_WEEK__') {
+      const start = startOfDay(now);
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      return range(start, endOfDay(end));
+    }
+    if (preset === '__THIS_MONTH__') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return range(start, endOfDay(new Date(now.getFullYear(), now.getMonth() + 1, 0)));
+    }
+    if (preset === '__THIS_YEAR__') {
+      const start = new Date(now.getFullYear(), 0, 1);
+      return range(start, endOfDay(new Date(now.getFullYear(), 11, 31)));
+    }
+    return undefined;
+  }
+
   private advancedNumericOperator (value: string | number) {
     const matched = String(value).trim().match(/^(>=|<=|>|<)/);
     if (matched?.[1] === '>') return 'gt';
@@ -3892,6 +3945,11 @@ export class RecordsService {
   }
 
   private advancedFilterMatches (actual: unknown, filter: { operator: string; value: string | number }) {
+    const dynamicDateRange = this.dynamicDateFilterRange(filter.value);
+    if (dynamicDateRange) {
+      const actualDate = new Date(String(actual || ''));
+      return !Number.isNaN(actualDate.getTime()) && actualDate >= dynamicDateRange.start && actualDate <= dynamicDateRange.end;
+    }
     const expected = filter.value;
     if (typeof actual === 'number' || typeof expected === 'number') {
       const left = Number(actual);

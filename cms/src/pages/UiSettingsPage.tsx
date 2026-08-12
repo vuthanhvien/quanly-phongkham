@@ -1,6 +1,5 @@
-import { BgColorsOutlined, BorderOutlined, DatabaseOutlined, FontSizeOutlined, UndoOutlined } from '@ant-design/icons'
-import { Button, Card, Checkbox, Col, Flex, Form, Input, InputNumber, Popconfirm, Radio, Row, Select, Space, Typography, message } from 'antd'
-import { api } from '../api'
+import { BgColorsOutlined, BorderOutlined, FontSizeOutlined, UndoOutlined } from '@ant-design/icons'
+import { Button, Card, Checkbox, Col, Flex, Form, Input, InputNumber, Radio, Row, Select, Space, Typography, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { buildShadowValue, companyTypeOptions, defaultAppUiSettings, fontFamilyOptions, syncDocumentBranding, useAppUi, type AppUiSettings } from '../app-ui'
 import { appModuleGroups, appModuleLabels, companyTypeModulePresets, resolveMenuGroupLabel, type CompanyType } from '../company-types'
@@ -114,7 +113,6 @@ export function UiSettingsPage() {
   const { settings, save, loading } = useAppUi()
   const [form] = Form.useForm<UiSettingsFormValues>()
   const [saving, setSaving] = useState(false)
-  const [initializing, setInitializing] = useState(false)
   const draftAppName = Form.useWatch('appName', form)
   const selectedCompanyType = (Form.useWatch('companyType', form) || settings.companyType || defaultAppUiSettings.companyType) as CompanyType
   const [selectedModules, setSelectedModules] = useState<string[]>([])
@@ -187,17 +185,6 @@ export function UiSettingsPage() {
     setHasCustomModuleSelection(true)
   }
 
-  async function handleInitializeIndustryData() {
-    setInitializing(true)
-    try {
-      const response = await api.post('/settings/app-ui/initialize-industry-data', { companyType: selectedCompanyType })
-      const created = response.data.data?.created || {}
-      message.success(`Đã khởi tạo: ${created.units || 0} đơn vị, ${created.categories || 0} nhóm hàng, ${created.products || 0} hàng mẫu`)
-    } finally {
-      setInitializing(false)
-    }
-  }
-
   return (
     <Space direction="vertical" size={20} style={{ width: '100%' }}>
       <Flex align="start" justify="space-between" gap={16} wrap>
@@ -249,24 +236,6 @@ export function UiSettingsPage() {
                     </Form.Item>
                   </Col>
                 </Row>
-              </Card>
-
-              <Card
-                className="glass-card settings-card"
-                extra={
-                  <Popconfirm
-                    title="Khởi tạo dữ liệu theo ngành hàng?"
-                    description="Chỉ bổ sung dữ liệu mẫu còn thiếu, không xóa dữ liệu hiện có."
-                    okText="Khởi tạo"
-                    cancelText="Hủy"
-                    onConfirm={() => void handleInitializeIndustryData()}
-                  >
-                    <Button type="primary" icon={<DatabaseOutlined />} loading={initializing}>Khởi tạo dữ liệu</Button>
-                  </Popconfirm>
-                }
-                title="Dữ liệu theo ngành hàng"
-              >
-                <Typography.Text>{companyTypeOptions.find((item) => item.value === selectedCompanyType)?.label}</Typography.Text>
               </Card>
 
               <Card

@@ -45,7 +45,13 @@ export class CustomerAuthService {
     if (!customer) return response;
 
     const recent = await this.otps.findOne({ where: { phone }, order: { createdAt: 'DESC' } });
-    if (recent && Date.now() - recent.createdAt.getTime() < OTP_RESEND_COOLDOWN_MS) {
+    // During development the OTP is returned as devCode, so allow immediate
+    // regeneration while testing the login flow. Production keeps the rate limit.
+    if (
+      !this.smsService.isDevMode &&
+      recent &&
+      Date.now() - recent.createdAt.getTime() < OTP_RESEND_COOLDOWN_MS
+    ) {
       throw new BadRequestException('Vui lòng đợi ít phút trước khi yêu cầu mã mới');
     }
 

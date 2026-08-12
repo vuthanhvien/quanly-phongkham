@@ -658,8 +658,8 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     [entityType, fields],
   )
   const selectableRoles = useMemo(
-    () => getRoleOptions(views, [selectedRole, ...dynamicRoles.map((role) => role.key)]),
-    [dynamicRoles, selectedRole, views],
+    () => getRoleOptions(views, dynamicRoles.map((role) => role.key)),
+    [dynamicRoles, views],
   )
   const inheritanceChain = useMemo(
     () => getRoleInheritanceChain(selectedRole, dynamicRoles),
@@ -736,6 +736,10 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     const allNode = buildNode(DEFAULT_ROLE_SCOPE)
     return [{ ...allNode, children: [...(allNode.children || []), ...rootChildren] }]
   }, [dynamicRoles, selectableRoles, views])
+
+  useEffect(() => {
+    if (!selectableRoles.includes(selectedRole)) setSelectedRole(DEFAULT_ROLE_SCOPE)
+  }, [selectableRoles, selectedRole])
 
   useEffect(() => {
     const keys: string[] = []
@@ -1288,6 +1292,7 @@ function ViewConfigTable({
       title: "",
       key: "sort",
       width: 56,
+      fixed: "left",
       render: (_, row) =>
         onReorder ? (
           <span className="drag-handle" title="Kéo để đổi thứ tự">
@@ -1300,6 +1305,7 @@ function ViewConfigTable({
       title: "Hiển thị",
       dataIndex: "visible",
       width: 100,
+      fixed: "left",
       render: (value, row) => <Checkbox checked={value} onChange={(event) => onChange(viewType, row.key, { visible: event.target.checked })} aria-label={`Hiển thị ${row.label}`} />,
     },
     {
@@ -1490,7 +1496,7 @@ function FieldConfigEditor({
         </Form.Item>
         <Form.Item label="Độ rộng">
           <Select value={field.width || "100"} onChange={(value) => update({ width: value as FieldLayoutConfig["width"] })} options={[
-            { value: "25", label: "1/4" }, { value: "33", label: "1/3" }, { value: "50", label: "1/2" }, { value: "66", label: "2/3" }, { value: "100", label: "Toàn bộ" },
+            { value: "25", label: "1/4" }, { value: "33", label: "1/3" }, { value: "50", label: "1/2 (2/4)" }, { value: "66", label: "2/3" }, { value: "75", label: "3/4" }, { value: "100", label: "Toàn bộ" },
           ]} />
         </Form.Item>
         <Form.Item label="Mô tả / hướng dẫn">

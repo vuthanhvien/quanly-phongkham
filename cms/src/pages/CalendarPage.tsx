@@ -971,6 +971,8 @@ function detailWidthToSpan(width?: FieldLayoutConfig["width"]) {
       return 12
     case "66":
       return 16
+    case "75":
+      return 18
     case "100":
     default:
       return 24
