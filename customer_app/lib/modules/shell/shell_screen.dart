@@ -27,67 +27,126 @@ class ShellScreen extends StatelessWidget {
       final index = controller.tabIndex.value;
       return Scaffold(
         body: IndexedStack(index: index, children: _pages),
-        bottomNavigationBar: Container(
-          color: AppColors.surface,
-          child: SafeArea(
-            top: false,
-            // The white surface extends into the home-indicator area while
-            // navigation content itself stays safely above it.
-            child: BottomNavigationBar(
-              currentIndex: index,
-              onTap: (selected) {
-                if (selected == 2) {
-                  Get.toNamed(AppRoutes.bookingCreate);
-                  return;
-                }
-                controller.changeTab(selected);
-              },
-              items: [
-                BottomNavigationBarItem(
-                  icon: const Icon(AppIcons.home),
-                  activeIcon: const Icon(AppIcons.homeFill),
-                  label: 'Trang chủ',
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(AppIcons.calendar),
-                  activeIcon: const Icon(AppIcons.calendarFill),
-                  label: 'Lịch hẹn',
-                ),
-                BottomNavigationBarItem(
-                  icon: Container(
-                    transform: Matrix4.translationValues(0, -6, 0),
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x448D365B),
-                          blurRadius: 12,
-                          offset: Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(AppIcons.plus, color: Colors.white),
-                  ),
-                  label: 'Đặt lịch',
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(AppIcons.chat),
-                  activeIcon: const Icon(AppIcons.chatFill),
-                  label: 'Tin nhắn',
-                ),
-                BottomNavigationBarItem(
-                  icon: const Icon(AppIcons.profile),
-                  activeIcon: const Icon(AppIcons.profileFill),
-                  label: 'Hồ sơ',
-                ),
-              ],
-            ),
-          ),
+        bottomNavigationBar: _ClinicBottomBar(
+          selectedIndex: index,
+          onChanged: controller.changeTab,
+          onBook: () => Get.toNamed(AppRoutes.bookingCreate),
         ),
       );
     });
+  }
+}
+
+class _ClinicBottomBar extends StatelessWidget {
+  const _ClinicBottomBar({
+    required this.selectedIndex,
+    required this.onChanged,
+    required this.onBook,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+  final VoidCallback onBook;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    color: AppColors.surface,
+    child: SafeArea(
+      top: false,
+      child: SizedBox(
+        height: 52,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.topCenter,
+          children: [
+            Row(
+              children: [
+                _NavIcon(
+                  index: 0,
+                  selectedIndex: selectedIndex,
+                  icon: AppIcons.home,
+                  activeIcon: AppIcons.homeFill,
+                  onTap: onChanged,
+                ),
+                _NavIcon(
+                  index: 1,
+                  selectedIndex: selectedIndex,
+                  icon: AppIcons.calendar,
+                  activeIcon: AppIcons.calendarFill,
+                  onTap: onChanged,
+                ),
+                const Spacer(),
+                _NavIcon(
+                  index: 3,
+                  selectedIndex: selectedIndex,
+                  icon: AppIcons.chat,
+                  activeIcon: AppIcons.chatFill,
+                  onTap: onChanged,
+                ),
+                _NavIcon(
+                  index: 4,
+                  selectedIndex: selectedIndex,
+                  icon: AppIcons.profile,
+                  activeIcon: AppIcons.profileFill,
+                  onTap: onChanged,
+                ),
+              ],
+            ),
+            Positioned(
+              top: -18,
+              child: InkResponse(
+                onTap: onBook,
+                radius: 33,
+                child: Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.shadowPink.withValues(alpha: 0.38),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    AppIcons.plus,
+                    color: Colors.white,
+                    size: 25,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _NavIcon extends StatelessWidget {
+  const _NavIcon({
+    required this.index,
+    required this.selectedIndex,
+    required this.icon,
+    required this.activeIcon,
+    required this.onTap,
+  });
+  final int index, selectedIndex;
+  final IconData icon, activeIcon;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = index == selectedIndex;
+    return Expanded(
+      child: IconButton(
+        onPressed: () => onTap(index),
+        icon: Icon(selected ? activeIcon : icon, size: 23),
+        color: selected ? AppColors.primaryDark : AppColors.textMuted,
+      ),
+    );
   }
 }

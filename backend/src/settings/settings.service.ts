@@ -31,6 +31,17 @@ const UI_FONT_FAMILIES = [
   '"Public Sans", Inter, Arial, sans-serif',
   '"Work Sans", Inter, Arial, sans-serif',
   '"Barlow", Inter, Arial, sans-serif',
+  'Inter, Arial, sans-serif',
+  'Roboto, Arial, sans-serif',
+  '"Noto Sans", Arial, sans-serif',
+  '"Open Sans", Arial, sans-serif',
+  'Lato, Arial, sans-serif',
+  'Montserrat, Arial, sans-serif',
+  'Mulish, Arial, sans-serif',
+  'Lexend, Arial, sans-serif',
+  'Quicksand, Arial, sans-serif',
+  'Arsenal, Arial, sans-serif',
+  'Signika, Arial, sans-serif',
 ];
 const DEFAULT_APP_UI_COLORS = {
   primaryColor: '#e889ae',
@@ -49,16 +60,34 @@ const DEFAULT_APP_UI_COLORS = {
   textColor: '#1f2430',
   textMutedColor: '#6b7280',
   titleColor: '#111827',
+  buttonPrimaryBgColor: '#e889ae',
   buttonPrimaryTextColor: '#ffffff',
+  buttonPrimaryBorderColor: '#e889ae',
   buttonDefaultBgColor: '#ffffff',
   buttonDefaultTextColor: '#1f2430',
   buttonDefaultBorderColor: '#dbe1ea',
+  buttonSecondaryBgColor: '#f3f4f6',
+  buttonSecondaryTextColor: '#374151',
+  buttonSecondaryBorderColor: '#d1d5db',
+  buttonSuccessBgColor: '#16a34a',
+  buttonSuccessTextColor: '#ffffff',
+  buttonSuccessBorderColor: '#16a34a',
+  buttonInfoBgColor: '#0ea5e9',
+  buttonInfoTextColor: '#ffffff',
+  buttonInfoBorderColor: '#0ea5e9',
+  buttonWarningBgColor: '#f59e0b',
+  buttonWarningTextColor: '#111827',
+  buttonWarningBorderColor: '#f59e0b',
+  buttonErrorBgColor: '#ef4444',
+  buttonErrorTextColor: '#ffffff',
+  buttonErrorBorderColor: '#ef4444',
   shadowColor: '#0f172a',
   shadowOpacity: 8,
   shadowBlur: 18,
   shadowOffsetY: 1,
 } as const;
 const APP_MODULE_KEYS = [
+  'dashboard',
   'calendar',
   'landing-pages',
   'landing-forms',
@@ -458,29 +487,52 @@ export class SettingsService {
     return { id };
   }
 
-  async getLandingGlobalSettings() {
-    const existing = await this.landingGlobalSettings.findOne({ where: { settingKey: 'default' } });
+  private normalizeLandingSettingsKey(domain?: string) {
+    const value = String(domain || '').trim();
+    if (!value) return 'default';
+    return this.normalizeLandingDomain(value);
+  }
+
+  async getLandingGlobalSettings(domain?: string) {
+    const settingKey = this.normalizeLandingSettingsKey(domain);
+    const existing = await this.landingGlobalSettings.findOne({ where: { settingKey } });
     if (existing) return { data: existing };
-    const fresh = this.landingGlobalSettings.create({ settingKey: 'default', menuItems: [], footerColumns: [], footerSocialLinks: [] });
+    if (settingKey !== 'default') {
+      const fallback = await this.landingGlobalSettings.findOne({ where: { settingKey: 'default' } });
+      const fresh = this.landingGlobalSettings.create({
+        ...fallback,
+        id: undefined,
+        settingKey,
+        menuItems: fallback?.menuItems ?? [],
+        footerColumns: fallback?.footerColumns ?? [],
+        footerSocialLinks: fallback?.footerSocialLinks ?? [],
+      });
+      const saved = await this.landingGlobalSettings.save(fresh);
+      return { data: saved };
+    }
+    const fresh = this.landingGlobalSettings.create({ settingKey, menuItems: [], footerColumns: [], footerSocialLinks: [] });
     const saved = await this.landingGlobalSettings.save(fresh);
     return { data: saved };
   }
 
-  async updateLandingGlobalSettings(payload: Partial<LandingGlobalSetting>) {
-    const { data: current } = await this.getLandingGlobalSettings();
-    const merged = this.landingGlobalSettings.merge(current, payload);
+  async updateLandingGlobalSettings(payload: Partial<LandingGlobalSetting>, domain?: string) {
+    const settingKey = this.normalizeLandingSettingsKey(domain || String((payload as Record<string, unknown>)?.settingKey || ''));
+    const { settingKey: _ignoredSettingKey, id: _ignoredId, ...safePayload } = payload as Partial<LandingGlobalSetting>;
+    const { data: current } = await this.getLandingGlobalSettings(settingKey);
+    current.settingKey = settingKey;
+    const merged = this.landingGlobalSettings.merge(current, safePayload);
     const saved = await this.landingGlobalSettings.save(merged);
     await this.revalidateLandingCache();
     return { data: saved };
   }
 
-  async getLandingMenuSettings() {
-    const { data } = await this.getLandingGlobalSettings();
+  async getLandingMenuSettings(domain?: string) {
+    const { data } = await this.getLandingGlobalSettings(domain);
     return { data: data.menuItems ?? [] };
   }
 
-  async updateLandingMenuSettings(menuItems: Record<string, unknown>[]) {
-    const { data: current } = await this.getLandingGlobalSettings();
+  async updateLandingMenuSettings(menuItems: Record<string, unknown>[], domain?: string) {
+    const { data: current } = await this.getLandingGlobalSettings(domain);
     current.menuItems = Array.isArray(menuItems) ? menuItems : [];
     const saved = await this.landingGlobalSettings.save(current);
     await this.revalidateLandingCache();
@@ -1822,10 +1874,27 @@ export class SettingsService {
     const textColor = this.normalizeHexColor(payload.textColor ?? fallback?.textColor ?? DEFAULT_APP_UI_COLORS.textColor, 'textColor');
     const textMutedColor = this.normalizeHexColor(payload.textMutedColor ?? fallback?.textMutedColor ?? DEFAULT_APP_UI_COLORS.textMutedColor, 'textMutedColor');
     const titleColor = this.normalizeHexColor(payload.titleColor ?? fallback?.titleColor ?? DEFAULT_APP_UI_COLORS.titleColor, 'titleColor');
+    const buttonPrimaryBgColor = this.normalizeHexColor(payload.buttonPrimaryBgColor ?? fallback?.buttonPrimaryBgColor ?? DEFAULT_APP_UI_COLORS.buttonPrimaryBgColor, 'buttonPrimaryBgColor');
     const buttonPrimaryTextColor = this.normalizeHexColor(payload.buttonPrimaryTextColor ?? fallback?.buttonPrimaryTextColor ?? DEFAULT_APP_UI_COLORS.buttonPrimaryTextColor, 'buttonPrimaryTextColor');
+    const buttonPrimaryBorderColor = this.normalizeHexColor(payload.buttonPrimaryBorderColor ?? fallback?.buttonPrimaryBorderColor ?? DEFAULT_APP_UI_COLORS.buttonPrimaryBorderColor, 'buttonPrimaryBorderColor');
     const buttonDefaultBgColor = this.normalizeHexColor(payload.buttonDefaultBgColor ?? fallback?.buttonDefaultBgColor ?? DEFAULT_APP_UI_COLORS.buttonDefaultBgColor, 'buttonDefaultBgColor');
     const buttonDefaultTextColor = this.normalizeHexColor(payload.buttonDefaultTextColor ?? fallback?.buttonDefaultTextColor ?? DEFAULT_APP_UI_COLORS.buttonDefaultTextColor, 'buttonDefaultTextColor');
     const buttonDefaultBorderColor = this.normalizeHexColor(payload.buttonDefaultBorderColor ?? fallback?.buttonDefaultBorderColor ?? DEFAULT_APP_UI_COLORS.buttonDefaultBorderColor, 'buttonDefaultBorderColor');
+    const buttonSecondaryBgColor = this.normalizeHexColor(payload.buttonSecondaryBgColor ?? fallback?.buttonSecondaryBgColor ?? DEFAULT_APP_UI_COLORS.buttonSecondaryBgColor, 'buttonSecondaryBgColor');
+    const buttonSecondaryTextColor = this.normalizeHexColor(payload.buttonSecondaryTextColor ?? fallback?.buttonSecondaryTextColor ?? DEFAULT_APP_UI_COLORS.buttonSecondaryTextColor, 'buttonSecondaryTextColor');
+    const buttonSecondaryBorderColor = this.normalizeHexColor(payload.buttonSecondaryBorderColor ?? fallback?.buttonSecondaryBorderColor ?? DEFAULT_APP_UI_COLORS.buttonSecondaryBorderColor, 'buttonSecondaryBorderColor');
+    const buttonSuccessBgColor = this.normalizeHexColor(payload.buttonSuccessBgColor ?? fallback?.buttonSuccessBgColor ?? DEFAULT_APP_UI_COLORS.buttonSuccessBgColor, 'buttonSuccessBgColor');
+    const buttonSuccessTextColor = this.normalizeHexColor(payload.buttonSuccessTextColor ?? fallback?.buttonSuccessTextColor ?? DEFAULT_APP_UI_COLORS.buttonSuccessTextColor, 'buttonSuccessTextColor');
+    const buttonSuccessBorderColor = this.normalizeHexColor(payload.buttonSuccessBorderColor ?? fallback?.buttonSuccessBorderColor ?? DEFAULT_APP_UI_COLORS.buttonSuccessBorderColor, 'buttonSuccessBorderColor');
+    const buttonInfoBgColor = this.normalizeHexColor(payload.buttonInfoBgColor ?? fallback?.buttonInfoBgColor ?? DEFAULT_APP_UI_COLORS.buttonInfoBgColor, 'buttonInfoBgColor');
+    const buttonInfoTextColor = this.normalizeHexColor(payload.buttonInfoTextColor ?? fallback?.buttonInfoTextColor ?? DEFAULT_APP_UI_COLORS.buttonInfoTextColor, 'buttonInfoTextColor');
+    const buttonInfoBorderColor = this.normalizeHexColor(payload.buttonInfoBorderColor ?? fallback?.buttonInfoBorderColor ?? DEFAULT_APP_UI_COLORS.buttonInfoBorderColor, 'buttonInfoBorderColor');
+    const buttonWarningBgColor = this.normalizeHexColor(payload.buttonWarningBgColor ?? fallback?.buttonWarningBgColor ?? DEFAULT_APP_UI_COLORS.buttonWarningBgColor, 'buttonWarningBgColor');
+    const buttonWarningTextColor = this.normalizeHexColor(payload.buttonWarningTextColor ?? fallback?.buttonWarningTextColor ?? DEFAULT_APP_UI_COLORS.buttonWarningTextColor, 'buttonWarningTextColor');
+    const buttonWarningBorderColor = this.normalizeHexColor(payload.buttonWarningBorderColor ?? fallback?.buttonWarningBorderColor ?? DEFAULT_APP_UI_COLORS.buttonWarningBorderColor, 'buttonWarningBorderColor');
+    const buttonErrorBgColor = this.normalizeHexColor(payload.buttonErrorBgColor ?? fallback?.buttonErrorBgColor ?? DEFAULT_APP_UI_COLORS.buttonErrorBgColor, 'buttonErrorBgColor');
+    const buttonErrorTextColor = this.normalizeHexColor(payload.buttonErrorTextColor ?? fallback?.buttonErrorTextColor ?? DEFAULT_APP_UI_COLORS.buttonErrorTextColor, 'buttonErrorTextColor');
+    const buttonErrorBorderColor = this.normalizeHexColor(payload.buttonErrorBorderColor ?? fallback?.buttonErrorBorderColor ?? DEFAULT_APP_UI_COLORS.buttonErrorBorderColor, 'buttonErrorBorderColor');
     const shadowColor = this.normalizeHexColor(payload.shadowColor ?? fallback?.shadowColor ?? DEFAULT_APP_UI_COLORS.shadowColor, 'shadowColor');
     const shadowOpacity = this.normalizeOpacity(payload.shadowOpacity ?? fallback?.shadowOpacity ?? DEFAULT_APP_UI_COLORS.shadowOpacity);
     const shadowBlur = this.normalizeShadowBlur(payload.shadowBlur ?? fallback?.shadowBlur ?? DEFAULT_APP_UI_COLORS.shadowBlur);
@@ -1859,10 +1928,27 @@ export class SettingsService {
       textColor,
       textMutedColor,
       titleColor,
+      buttonPrimaryBgColor,
       buttonPrimaryTextColor,
+      buttonPrimaryBorderColor,
       buttonDefaultBgColor,
       buttonDefaultTextColor,
       buttonDefaultBorderColor,
+      buttonSecondaryBgColor,
+      buttonSecondaryTextColor,
+      buttonSecondaryBorderColor,
+      buttonSuccessBgColor,
+      buttonSuccessTextColor,
+      buttonSuccessBorderColor,
+      buttonInfoBgColor,
+      buttonInfoTextColor,
+      buttonInfoBorderColor,
+      buttonWarningBgColor,
+      buttonWarningTextColor,
+      buttonWarningBorderColor,
+      buttonErrorBgColor,
+      buttonErrorTextColor,
+      buttonErrorBorderColor,
       shadowColor,
       shadowOpacity,
       shadowBlur,
@@ -1979,10 +2065,27 @@ export class SettingsService {
       current.textColor !== next.textColor ||
       current.textMutedColor !== next.textMutedColor ||
       current.titleColor !== next.titleColor ||
+      current.buttonPrimaryBgColor !== next.buttonPrimaryBgColor ||
       current.buttonPrimaryTextColor !== next.buttonPrimaryTextColor ||
+      current.buttonPrimaryBorderColor !== next.buttonPrimaryBorderColor ||
       current.buttonDefaultBgColor !== next.buttonDefaultBgColor ||
       current.buttonDefaultTextColor !== next.buttonDefaultTextColor ||
       current.buttonDefaultBorderColor !== next.buttonDefaultBorderColor ||
+      current.buttonSecondaryBgColor !== next.buttonSecondaryBgColor ||
+      current.buttonSecondaryTextColor !== next.buttonSecondaryTextColor ||
+      current.buttonSecondaryBorderColor !== next.buttonSecondaryBorderColor ||
+      current.buttonSuccessBgColor !== next.buttonSuccessBgColor ||
+      current.buttonSuccessTextColor !== next.buttonSuccessTextColor ||
+      current.buttonSuccessBorderColor !== next.buttonSuccessBorderColor ||
+      current.buttonInfoBgColor !== next.buttonInfoBgColor ||
+      current.buttonInfoTextColor !== next.buttonInfoTextColor ||
+      current.buttonInfoBorderColor !== next.buttonInfoBorderColor ||
+      current.buttonWarningBgColor !== next.buttonWarningBgColor ||
+      current.buttonWarningTextColor !== next.buttonWarningTextColor ||
+      current.buttonWarningBorderColor !== next.buttonWarningBorderColor ||
+      current.buttonErrorBgColor !== next.buttonErrorBgColor ||
+      current.buttonErrorTextColor !== next.buttonErrorTextColor ||
+      current.buttonErrorBorderColor !== next.buttonErrorBorderColor ||
       current.shadowColor !== next.shadowColor ||
       current.shadowOpacity !== next.shadowOpacity ||
       current.shadowBlur !== next.shadowBlur ||

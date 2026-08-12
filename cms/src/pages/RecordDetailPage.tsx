@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Col,
+  Dropdown,
   Empty,
   Modal,
   Popconfirm,
@@ -16,6 +17,7 @@ import {
   Typography,
 } from "antd"
 import { ReactNode, useCallback, useEffect, useState } from "react"
+import dayjs from "dayjs"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import {
   ArrowLeftOutlined,
@@ -26,8 +28,10 @@ import {
   EditOutlined,
   EyeOutlined,
   FileTextOutlined,
+  HistoryOutlined,
   IdcardOutlined,
   PhoneOutlined,
+  PlusOutlined,
   PrinterOutlined,
   ReloadOutlined,
   SwapOutlined,
@@ -35,6 +39,7 @@ import {
   TeamOutlined,
 } from "@ant-design/icons"
 import { api } from "../api"
+import { resolveFileUrl } from "../api"
 import { CMS_DATA_REFRESH_EVENT, type CmsDataRefreshDetail } from "../utils/dataRefresh"
 import { printHtmlInPlace } from "../utils/printHtml"
 import { hasActionAccess, hasResourceAccess } from "../access"
@@ -77,6 +82,33 @@ interface RelatedRecordEditState {
 interface MainRecordEditState {
   resource: string
   recordId: string
+}
+
+interface CustomerHistoryItem {
+  key: string
+  block: RelatedBlock
+  record: Record<string, any>
+  occurredAt: dayjs.Dayjs
+  dateLabel: string
+  timeLabel: string
+  title: string
+  description?: string
+  status?: string
+  amount?: string
+  imageValue?: unknown
+}
+
+interface CustomerHistoryGroup {
+  key: string
+  label: string
+  items: CustomerHistoryItem[]
+  days: CustomerHistoryDayGroup[]
+}
+
+interface CustomerHistoryDayGroup {
+  key: string
+  label: string
+  items: CustomerHistoryItem[]
 }
 
 interface RecordDetailPageProps {
@@ -233,25 +265,55 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
     <>
       {toastContextHolder}
       {!embedded && (
-        <div className="page-header">
-          <div>
+        <div className="page-header detail-page-header">
+          <div className="detail-page-title-wrap">
+            <Link to={`/${resource}`}>
+              <Tooltip title="Quay lại">
+                <Button
+                  aria-label="Quay lại"
+                  className="detail-header-ghost-button"
+                  icon={<ArrowLeftOutlined />}
+                  type="text"
+                />
+              </Tooltip>
+            </Link>
             <Typography.Title level={3}>
               {detailTitle(resource, record)}
             </Typography.Title>
           </div>
           <Space>
-            <Link to={`/${resource}`}>
-              <Button icon={<ArrowLeftOutlined />}>Quay lại</Button>
-            </Link>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() => {
-                void reloadCurrentRecord()
-                void reloadRelatedBlocks()
-              }}
-            >
-              Làm mới dữ liệu
-            </Button>
+            <Tooltip title="Làm mới dữ liệu">
+              <Button
+                aria-label="Làm mới dữ liệu"
+                className="detail-header-ghost-button"
+                icon={<ReloadOutlined />}
+                type="text"
+                onClick={() => {
+                  void reloadCurrentRecord()
+                  void reloadRelatedBlocks()
+                }}
+              />
+            </Tooltip>
+            {resource === "customers" && related.some((block) => hasActionAccess(block.resource, "create")) && (
+              <Dropdown
+                menu={{
+                  items: related
+                    .filter((block) => hasActionAccess(block.resource, "create"))
+                    .map((block) => ({
+                      key: block.resource,
+                      icon: getCustomerHistoryIcon(block.resource),
+                      label: entityLabels[block.resource] || block.title,
+                      onClick: () => setQuickCreateBlock(block),
+                    })),
+                }}
+                placement="bottomRight"
+                trigger={["click"]}
+              >
+                <Button className="primary-glow" icon={<PlusOutlined />} type="primary">
+                  Thêm nhanh
+                </Button>
+              </Dropdown>
+            )}
             {resource === "leads" && !record?.convertedCustomerId && hasActionAccess(resource, "convert-to-customer") && (
               <Tooltip title="Chuyển khách tiềm năng thành khách hàng">
                 <Button
@@ -540,7 +602,27 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
               ),
             }))
 
-            const allTabs = [...infoTabs, ...accountingVoucherLinesTab, ...relatedTabs, ...serviceOrderItemsTab]
+            const customerHistoryGroups = resource === "customers" ? buildCustomerHistoryGroups(related) : []
+            const customerHistoryCount = customerHistoryGroups.reduce((total, group) => total + group.items.length, 0)
+            const customerHistoryTab = resource === "customers"
+              ? [{
+                  key: "__customer-history",
+                  label: (
+                    <span>
+                      <HistoryOutlined /> Lịch sử
+                      {customerHistoryCount > 0 && <span className="tab-count">{customerHistoryCount}</span>}
+                    </span>
+                  ),
+                  children: (
+                    <CustomerHistoryTimeline
+                      groups={customerHistoryGroups}
+                      onOpen={(block, recordId) => void openRelatedDetail(block, recordId)}
+                    />
+                  ),
+                }]
+              : []
+
+            const allTabs = [...infoTabs, ...customerHistoryTab, ...accountingVoucherLinesTab, ...relatedTabs, ...serviceOrderItemsTab]
             if (allTabs.length === 0) {
               return <Card className="glass-card detail-card" loading={loading}><Empty description="Không có dữ liệu liên kết" /></Card>
             }
@@ -992,7 +1074,13 @@ async function loadBlocks(
 
       const [recordResponse, fieldResponse, viewResponse, printResponse] = await Promise.all([
         api
-          .get(`/records/${spec.resource}`, { params: { pageSize: 100, include: '*' } })
+          .get(`/records/${spec.resource}`, {
+            params: {
+              pageSize: 500,
+              include: '*',
+              advanced: JSON.stringify([{ field: spec.field, operator: "eq", value: id }]),
+            },
+          })
           .catch(() => ({ data: { data: [] } })),
         api
           .get("/settings/custom-fields", { params: { entityType: spec.resource } })
@@ -1037,6 +1125,78 @@ async function loadBlocks(
     detailFields: response.detailFields,
     printTemplateId: response.printTemplateId,
   }] : [])
+}
+
+function CustomerHistoryTimeline({
+  groups,
+  onOpen,
+}: {
+  groups: CustomerHistoryGroup[]
+  onOpen: (block: RelatedBlock, recordId: string) => void
+}) {
+  if (!groups.length) {
+    return (
+      <Empty
+        className="customer-history-empty"
+        description="Chưa có lịch sử liên quan"
+      />
+    )
+  }
+
+  return (
+    <div className="customer-history-timeline">
+      {groups.map((group) => (
+        <section className="customer-history-month" key={group.key}>
+          <div className="customer-history-month-title">{group.label}</div>
+          <div className="customer-history-day-list">
+            {group.days.map((day) => (
+              <section className="customer-history-day" key={day.key}>
+                <div className="customer-history-day-marker">
+                  <span>{day.label}</span>
+                </div>
+                <div className="customer-history-card-grid">
+                  {day.items.map((item) => (
+                    <article className={`customer-history-item${item.imageValue ? " has-image" : ""}`} key={item.key}>
+                      <button
+                        className="customer-history-card"
+                        type="button"
+                        onClick={() => onOpen(item.block, String(item.record.id))}
+                      >
+                        {item.imageValue ? (
+                          <div className="customer-history-image">
+                            {renderCustomerHistoryImage(item.imageValue, item.title)}
+                          </div>
+                        ) : (
+                          <div className="customer-history-card-icon">
+                            {getCustomerHistoryIcon(item.block.resource)}
+                          </div>
+                        )}
+                        <div className="customer-history-card-body">
+                          <div className="customer-history-card-head">
+                            <span className="customer-history-resource">{item.block.title}</span>
+                            {item.timeLabel ? <span className="customer-history-date">{item.timeLabel}</span> : null}
+                          </div>
+                          <div className="customer-history-title">{item.title}</div>
+                          {item.description ? (
+                            <div className="customer-history-description">{item.description}</div>
+                          ) : null}
+                          <div className="customer-history-meta">
+                            {item.status ? <Tag className="soft-tag">{item.status}</Tag> : null}
+                            {item.amount ? <Tag color="green">{item.amount}</Tag> : null}
+                            {item.record.code ? <Tag>{String(item.record.code)}</Tag> : null}
+                          </div>
+                        </div>
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  )
 }
 
 async function convertLead(id: string) {
@@ -1212,4 +1372,144 @@ function formatCurrencyValue(value: unknown) {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) return formatValue(value)
   return `${new Intl.NumberFormat("vi-VN").format(numeric)} đ`
+}
+
+const CUSTOMER_HISTORY_DATE_FIELDS: Record<string, string[]> = {
+  appointments: ["startTime", "endTime", "createdAt"],
+  "medical-episodes": ["operationDate", "createdAt", "updatedAt"],
+  treatments: ["updatedAt", "createdAt"],
+  consultations: ["consultedAt", "createdAt"],
+  "service-orders": ["orderDate", "createdAt"],
+  "customer-images": ["capturedAt", "createdAt"],
+  invoices: ["createdAt", "updatedAt"],
+}
+
+function buildCustomerHistoryGroups(relatedBlocks: RelatedBlock[]): CustomerHistoryGroup[] {
+  const items = relatedBlocks
+    .flatMap((block) => block.rows.map((row) => buildCustomerHistoryItem(block, row)))
+    .filter((item): item is CustomerHistoryItem => Boolean(item))
+    .sort((a, b) => b.occurredAt.valueOf() - a.occurredAt.valueOf())
+
+  const groups = new Map<string, CustomerHistoryGroup>()
+  items.forEach((item) => {
+    const key = item.occurredAt.format("YYYY-MM")
+    const group = groups.get(key) || {
+      key,
+      label: formatHistoryMonth(item.occurredAt),
+      items: [],
+      days: [],
+    }
+    group.items.push(item)
+    groups.set(key, group)
+  })
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    days: buildCustomerHistoryDayGroups(group.items),
+  }))
+}
+
+function buildCustomerHistoryDayGroups(items: CustomerHistoryItem[]): CustomerHistoryDayGroup[] {
+  const groups = new Map<string, CustomerHistoryDayGroup>()
+  items.forEach((item) => {
+    const key = item.occurredAt.format("YYYY-MM-DD")
+    const group = groups.get(key) || {
+      key,
+      label: formatHistoryDay(item.occurredAt),
+      items: [],
+    }
+    group.items.push(item)
+    groups.set(key, group)
+  })
+  return Array.from(groups.values())
+}
+
+function buildCustomerHistoryItem(block: RelatedBlock, row: Record<string, any>): CustomerHistoryItem | null {
+  const occurredAt = getCustomerHistoryDate(block.resource, row)
+  if (!occurredAt) return null
+
+  return {
+    key: `${block.resource}-${row.id || occurredAt.valueOf()}`,
+    block,
+    record: row,
+    occurredAt,
+    dateLabel: occurredAt.format("DD/MM/YYYY"),
+    timeLabel: occurredAt.format("HH:mm") === "00:00" ? "" : occurredAt.format("HH:mm"),
+    title: getCustomerHistoryTitle(block.resource, row),
+    description: getCustomerHistoryDescription(block.resource, row),
+    status: row.status ? getFieldLabel(block.resource, "status", String(row.status)) : undefined,
+    amount: getCustomerHistoryAmount(block.resource, row),
+    imageValue: block.resource === "customer-images" ? row.imageUrl : undefined,
+  }
+}
+
+function getCustomerHistoryDate(resource: string, row: Record<string, any>) {
+  const candidateFields = CUSTOMER_HISTORY_DATE_FIELDS[resource] || ["createdAt", "updatedAt"]
+  for (const field of candidateFields) {
+    const value = row[field]
+    if (!value) continue
+    const date = dayjs(value)
+    if (date.isValid()) return date
+  }
+  return null
+}
+
+function getCustomerHistoryTitle(resource: string, row: Record<string, any>) {
+  if (resource === "appointments") {
+    return `Lịch hẹn ${getFieldLabel(resource, "type", String(row.type || "CONSULTATION")).toLowerCase()}`
+  }
+  if (resource === "medical-episodes") return String(row.serviceName || row.diagnosis || "Hồ sơ bệnh án")
+  if (resource === "treatments") return String(row.name || "Liệu trình")
+  if (resource === "consultations") return String(row.summary || row.diagnosis || "Thăm khám")
+  if (resource === "service-orders") return String(row.serviceName || row.code || "Đơn hàng / dịch vụ")
+  if (resource === "customer-images") return String(row.title || getFieldLabel(resource, "mediaType", String(row.mediaType || "BEFORE")))
+  if (resource === "invoices") return String(row.code || row.invoiceNumber || "Phiếu thu / hóa đơn")
+  return String(row.title || row.name || row.code || entityLabels[resource] || resource)
+}
+
+function getCustomerHistoryDescription(resource: string, row: Record<string, any>) {
+  const fieldsByResource: Record<string, string[]> = {
+    appointments: ["note"],
+    "medical-episodes": ["chiefComplaint", "diagnosis", "allergyWarning"],
+    treatments: ["note"],
+    consultations: ["diagnosis", "nextAction", "summary"],
+    "service-orders": ["note"],
+    "customer-images": ["diagnosisNote"],
+    invoices: ["method"],
+  }
+  for (const field of fieldsByResource[resource] || ["note", "description"]) {
+    const value = row[field]
+    if (value === null || value === undefined || value === "") continue
+    const text = String(value)
+    return text.length > 72 ? `${text.slice(0, 72)}...` : text
+  }
+  return undefined
+}
+
+function getCustomerHistoryAmount(resource: string, row: Record<string, any>) {
+  if (!["service-orders", "invoices"].includes(resource)) return undefined
+  const value = row.totalAmount || row.paidAmount
+  if (value === null || value === undefined || value === "") return undefined
+  return formatCurrencyValue(value)
+}
+
+function formatHistoryMonth(date: dayjs.Dayjs) {
+  return `Tháng ${date.format("M")} ${date.format("YYYY")}`
+}
+
+function formatHistoryDay(date: dayjs.Dayjs) {
+  return date.format("DD/MM")
+}
+
+function renderCustomerHistoryImage(value: unknown, alt: string) {
+  const source = Array.isArray(value) ? value[0] : value
+  if (!source) return null
+  return <img alt={alt} src={resolveFileUrl(String(source))} />
+}
+
+function getCustomerHistoryIcon(resource: string) {
+  if (resource === "appointments") return <CalendarOutlined />
+  if (resource === "consultations" || resource === "medical-episodes") return <AuditOutlined />
+  if (resource === "service-orders" || resource === "invoices") return <BankOutlined />
+  if (resource === "customer-images") return <FileTextOutlined />
+  return <HistoryOutlined />
 }

@@ -27,10 +27,27 @@ export interface AppUiSettings {
   textColor: string
   textMutedColor: string
   titleColor: string
+  buttonPrimaryBgColor: string
   buttonPrimaryTextColor: string
+  buttonPrimaryBorderColor: string
   buttonDefaultBgColor: string
   buttonDefaultTextColor: string
   buttonDefaultBorderColor: string
+  buttonSecondaryBgColor: string
+  buttonSecondaryTextColor: string
+  buttonSecondaryBorderColor: string
+  buttonSuccessBgColor: string
+  buttonSuccessTextColor: string
+  buttonSuccessBorderColor: string
+  buttonInfoBgColor: string
+  buttonInfoTextColor: string
+  buttonInfoBorderColor: string
+  buttonWarningBgColor: string
+  buttonWarningTextColor: string
+  buttonWarningBorderColor: string
+  buttonErrorBgColor: string
+  buttonErrorTextColor: string
+  buttonErrorBorderColor: string
   shadowColor: string
   shadowOpacity: number
   shadowBlur: number
@@ -60,6 +77,17 @@ export const fontFamilyOptions = [
   { value: '"Public Sans", Inter, Arial, sans-serif', label: 'Public Sans' },
   { value: '"Work Sans", Inter, Arial, sans-serif', label: 'Work Sans' },
   { value: '"Barlow", Inter, Arial, sans-serif', label: 'Barlow' },
+  { value: 'Inter, Arial, sans-serif', label: 'Inter' },
+  { value: 'Roboto, Arial, sans-serif', label: 'Roboto' },
+  { value: '"Noto Sans", Arial, sans-serif', label: 'Noto Sans' },
+  { value: '"Open Sans", Arial, sans-serif', label: 'Open Sans' },
+  { value: 'Lato, Arial, sans-serif', label: 'Lato' },
+  { value: 'Montserrat, Arial, sans-serif', label: 'Montserrat' },
+  { value: 'Mulish, Arial, sans-serif', label: 'Mulish' },
+  { value: 'Lexend, Arial, sans-serif', label: 'Lexend' },
+  { value: 'Quicksand, Arial, sans-serif', label: 'Quicksand' },
+  { value: 'Arsenal, Arial, sans-serif', label: 'Arsenal' },
+  { value: 'Signika, Arial, sans-serif', label: 'Signika' },
 ] as const
 
 export const defaultAppUiSettings: AppUiSettings = {
@@ -84,10 +112,27 @@ export const defaultAppUiSettings: AppUiSettings = {
   textColor: '#1f2430',
   textMutedColor: '#6b7280',
   titleColor: '#111827',
+  buttonPrimaryBgColor: '#e889ae',
   buttonPrimaryTextColor: '#ffffff',
+  buttonPrimaryBorderColor: '#e889ae',
   buttonDefaultBgColor: '#ffffff',
   buttonDefaultTextColor: '#1f2430',
   buttonDefaultBorderColor: '#dbe1ea',
+  buttonSecondaryBgColor: '#f3f4f6',
+  buttonSecondaryTextColor: '#374151',
+  buttonSecondaryBorderColor: '#d1d5db',
+  buttonSuccessBgColor: '#16a34a',
+  buttonSuccessTextColor: '#ffffff',
+  buttonSuccessBorderColor: '#16a34a',
+  buttonInfoBgColor: '#0ea5e9',
+  buttonInfoTextColor: '#ffffff',
+  buttonInfoBorderColor: '#0ea5e9',
+  buttonWarningBgColor: '#f59e0b',
+  buttonWarningTextColor: '#111827',
+  buttonWarningBorderColor: '#f59e0b',
+  buttonErrorBgColor: '#ef4444',
+  buttonErrorTextColor: '#ffffff',
+  buttonErrorBorderColor: '#ef4444',
   shadowColor: '#0f172a',
   shadowOpacity: 8,
   shadowBlur: 18,
@@ -194,10 +239,27 @@ export function syncDocumentBranding(settings: AppUiSettings) {
   document.documentElement.style.setProperty('--app-text', settings.textColor)
   document.documentElement.style.setProperty('--app-text-soft', settings.textMutedColor)
   document.documentElement.style.setProperty('--app-title', settings.titleColor)
+  document.documentElement.style.setProperty('--app-button-primary-bg', settings.buttonPrimaryBgColor)
   document.documentElement.style.setProperty('--app-button-primary-text', settings.buttonPrimaryTextColor)
+  document.documentElement.style.setProperty('--app-button-primary-border', settings.buttonPrimaryBorderColor)
   document.documentElement.style.setProperty('--app-button-default-bg', settings.buttonDefaultBgColor)
   document.documentElement.style.setProperty('--app-button-default-text', settings.buttonDefaultTextColor)
   document.documentElement.style.setProperty('--app-button-default-border', settings.buttonDefaultBorderColor)
+  document.documentElement.style.setProperty('--app-button-secondary-bg', settings.buttonSecondaryBgColor)
+  document.documentElement.style.setProperty('--app-button-secondary-text', settings.buttonSecondaryTextColor)
+  document.documentElement.style.setProperty('--app-button-secondary-border', settings.buttonSecondaryBorderColor)
+  document.documentElement.style.setProperty('--app-button-success-bg', settings.buttonSuccessBgColor)
+  document.documentElement.style.setProperty('--app-button-success-text', settings.buttonSuccessTextColor)
+  document.documentElement.style.setProperty('--app-button-success-border', settings.buttonSuccessBorderColor)
+  document.documentElement.style.setProperty('--app-button-info-bg', settings.buttonInfoBgColor)
+  document.documentElement.style.setProperty('--app-button-info-text', settings.buttonInfoTextColor)
+  document.documentElement.style.setProperty('--app-button-info-border', settings.buttonInfoBorderColor)
+  document.documentElement.style.setProperty('--app-button-warning-bg', settings.buttonWarningBgColor)
+  document.documentElement.style.setProperty('--app-button-warning-text', settings.buttonWarningTextColor)
+  document.documentElement.style.setProperty('--app-button-warning-border', settings.buttonWarningBorderColor)
+  document.documentElement.style.setProperty('--app-button-error-bg', settings.buttonErrorBgColor)
+  document.documentElement.style.setProperty('--app-button-error-text', settings.buttonErrorTextColor)
+  document.documentElement.style.setProperty('--app-button-error-border', settings.buttonErrorBorderColor)
   document.documentElement.style.setProperty('--app-shadow-soft', buildShadowValue(settings, 1))
   document.documentElement.style.setProperty('--app-shadow-strong', buildShadowValue(settings, 1.8))
   document.documentElement.style.setProperty('--app-space-xs', `${metrics.spaceXS}px`)

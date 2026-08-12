@@ -17,6 +17,10 @@ const SENSITIVE_KEYS = new Set([
   'secret',
 ]);
 
+const MAX_LOG_STRING_LENGTH = 2000;
+const MAX_LOG_ARRAY_ITEMS = 30;
+const MAX_LOG_OBJECT_KEYS = 80;
+
 function redact(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redact);
   if (!value || typeof value !== 'object') return value;
@@ -27,6 +31,37 @@ function redact(value: unknown): unknown {
       SENSITIVE_KEYS.has(key.toLowerCase()) ? '[REDACTED]' : redact(child),
     ]),
   );
+}
+
+function compactForLog(value: unknown): unknown {
+  const redacted = redact(value);
+  if (typeof redacted === 'string') {
+    return redacted.length > MAX_LOG_STRING_LENGTH
+      ? `${redacted.slice(0, MAX_LOG_STRING_LENGTH)}... [truncated]`
+      : redacted;
+  }
+  if (Array.isArray(redacted)) return redacted.slice(0, MAX_LOG_ARRAY_ITEMS).map(compactForLog);
+  if (!redacted || typeof redacted !== 'object') return redacted;
+  return Object.fromEntries(
+    Object.entries(redacted as Record<string, unknown>)
+      .slice(0, MAX_LOG_OBJECT_KEYS)
+      .map(([key, child]) => [key, compactForLog(child)]),
+  );
+}
+
+function uploadedFilesInfo(request: Request) {
+  const files = (request as Request & { files?: unknown; file?: unknown }).files;
+  const file = (request as Request & { files?: unknown; file?: unknown }).file;
+  const items = Array.isArray(files) ? files : file ? [file] : [];
+  return items.map((item) => {
+    const upload = item as { originalname?: string; mimetype?: string; size?: number; fieldname?: string };
+    return {
+      fieldname: upload.fieldname,
+      originalname: upload.originalname,
+      mimetype: upload.mimetype,
+      size: upload.size,
+    };
+  });
 }
 
 @Catch()
@@ -86,8 +121,16 @@ export class ErrorLogExceptionFilter implements ExceptionFilter {
       path: request.originalUrl || request.url,
       requestId: request.headers['x-request-id'],
       user: request.user ? { id: request.user.id, email: request.user.email } : undefined,
-      query: redact(request.query),
-      body: redact(request.body),
+      params: compactForLog(request.params),
+      query: compactForLog(request.query),
+      body: compactForLog(request.body),
+      headers: compactForLog({
+        origin: request.headers.origin,
+        referer: request.headers.referer,
+        userAgent: request.headers['user-agent'],
+        contentType: request.headers['content-type'],
+      }),
+      files: uploadedFilesInfo(request),
       error: {
         name: error?.name || 'UnknownException',
         message: error?.message || String(exception),
@@ -95,14 +138,16 @@ export class ErrorLogExceptionFilter implements ExceptionFilter {
       },
     };
 
-    await mkdir(logDirectory, { recursive: true });
-    await appendFile(join(logDirectory, `error-${date}.jsonl`), `${JSON.stringify(entry)}\n`, 'utf8');
-
     // Persist in the tenant database as well, so administrators can inspect
     // production errors in CMS without terminal or container-log access.
     const dataSource = this.tenantContext?.get()?.dataSource;
+    const tasks: Promise<unknown>[] = [
+      mkdir(logDirectory, { recursive: true })
+        .then(() => appendFile(join(logDirectory, `error-${date}.jsonl`), `${JSON.stringify(entry)}\n`, 'utf8')),
+    ];
     if (dataSource?.isInitialized) {
-      await dataSource.getRepository(SystemErrorLog).save(dataSource.getRepository(SystemErrorLog).create({
+      const repository = dataSource.getRepository(SystemErrorLog);
+      tasks.push(repository.save(repository.create({
         status,
         method: request.method,
         path: request.originalUrl || request.url,
@@ -112,9 +157,13 @@ export class ErrorLogExceptionFilter implements ExceptionFilter {
         errorName: entry.error.name,
         message: entry.error.message,
         stack: entry.error.stack,
+        params: entry.params as Record<string, unknown>,
         query: entry.query as Record<string, unknown>,
         body: entry.body as Record<string, unknown>,
-      }));
+        headers: entry.headers as Record<string, unknown>,
+        files: entry.files as Record<string, unknown>[],
+      })));
     }
+    await Promise.allSettled(tasks);
   }
 }

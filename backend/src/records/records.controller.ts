@@ -257,4 +257,16 @@ export class RecordsController {
   ) {
     return this.records.audits(page, pageSize, search, sort, order, request?.user);
   }
+
+  @Get('system-error-logs')
+  systemErrors(
+    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
+    @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize = 30,
+    @Query('search') search?: string,
+    @Query('sort') sort?: string,
+    @Query('order') order?: string,
+    @Request() request?: { user: AuthUser },
+  ) {
+    return this.records.systemErrors(page, pageSize, search, sort, order, request?.user);
+  }
 }

@@ -1781,8 +1781,14 @@ export class AppUiSetting {
   @Column({ default: '#111827' })
   titleColor: string;
 
+  @Column({ default: '#e889ae' })
+  buttonPrimaryBgColor: string;
+
   @Column({ default: '#ffffff' })
   buttonPrimaryTextColor: string;
+
+  @Column({ default: '#e889ae' })
+  buttonPrimaryBorderColor: string;
 
   @Column({ default: '#ffffff' })
   buttonDefaultBgColor: string;
@@ -1792,6 +1798,51 @@ export class AppUiSetting {
 
   @Column({ default: '#dbe1ea' })
   buttonDefaultBorderColor: string;
+
+  @Column({ default: '#f3f4f6' })
+  buttonSecondaryBgColor: string;
+
+  @Column({ default: '#374151' })
+  buttonSecondaryTextColor: string;
+
+  @Column({ default: '#d1d5db' })
+  buttonSecondaryBorderColor: string;
+
+  @Column({ default: '#16a34a' })
+  buttonSuccessBgColor: string;
+
+  @Column({ default: '#ffffff' })
+  buttonSuccessTextColor: string;
+
+  @Column({ default: '#16a34a' })
+  buttonSuccessBorderColor: string;
+
+  @Column({ default: '#0ea5e9' })
+  buttonInfoBgColor: string;
+
+  @Column({ default: '#ffffff' })
+  buttonInfoTextColor: string;
+
+  @Column({ default: '#0ea5e9' })
+  buttonInfoBorderColor: string;
+
+  @Column({ default: '#f59e0b' })
+  buttonWarningBgColor: string;
+
+  @Column({ default: '#111827' })
+  buttonWarningTextColor: string;
+
+  @Column({ default: '#f59e0b' })
+  buttonWarningBorderColor: string;
+
+  @Column({ default: '#ef4444' })
+  buttonErrorBgColor: string;
+
+  @Column({ default: '#ffffff' })
+  buttonErrorTextColor: string;
+
+  @Column({ default: '#ef4444' })
+  buttonErrorBorderColor: string;
 
   @Column({ default: '#0f172a' })
   shadowColor: string;
@@ -2929,10 +2980,19 @@ export class SystemErrorLog {
   stack?: string;
 
   @Column({ type: 'simple-json', nullable: true })
+  params?: Record<string, unknown>;
+
+  @Column({ type: 'simple-json', nullable: true })
   query?: Record<string, unknown>;
 
   @Column({ type: 'simple-json', nullable: true })
   body?: Record<string, unknown>;
+
+  @Column({ type: 'simple-json', nullable: true })
+  headers?: Record<string, unknown>;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 
   @CreateDateColumn()
   createdAt: Date;

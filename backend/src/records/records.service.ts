@@ -1106,7 +1106,7 @@ export class RecordsService {
     await this.replaceCustomFieldValues(resource, record.id, (payload.customFields || {}) as Record<string, unknown>);
     await this.syncAccountingForSourceResource(resource, record.id, user);
     await this.workflowService.startForRecord(resource, record, user);
-    await this.audit(user, 'CREATE', resource, record.id, normalized);
+    await this.audit(user, 'CREATE', resource, record.id, { submitted: payload, saved: normalized });
     const hydrated = await this.findRaw(resource, record.id);
     return { data: this.protect(resource, hydrated) };
   }
@@ -1131,7 +1131,7 @@ export class RecordsService {
     const account = await this.users.save(this.users.create(normalized as Partial<User>));
     staff.userId = account.id;
     await this.staff.save(staff);
-    await this.audit(user, 'CREATE_ACCOUNT', 'staff', staff.id, { userId: account.id });
+    await this.audit(user, 'CREATE_ACCOUNT', 'staff', staff.id, { submitted: payload, userId: account.id });
     return { data: this.protect('user-accounts', account as unknown as ConfigurableEntity) };
   }
 
@@ -1206,7 +1206,7 @@ export class RecordsService {
     await this.replaceCustomFieldValues(resource, id, mergedCustomFields);
     await this.syncAccountingForSourceResource(resource, id, user);
     await this.workflowService.startForRecord(resource, record, user);
-    await this.audit(user, 'UPDATE', resource, id, { before: previous, changes: normalized });
+    await this.audit(user, 'UPDATE', resource, id, { before: previous, submitted: payload, changes: normalized });
     const hydrated = await this.findRaw(resource, record.id);
     return { data: this.protect(resource, hydrated) };
   }
@@ -1217,7 +1217,7 @@ export class RecordsService {
     await this.assertProtectedAdminAssignment(resource, record);
     await this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
     await this.repository(resource).save({ ...record, isArchived: true });
-    await this.audit(user, 'ARCHIVE', resource, id);
+    await this.audit(user, 'ARCHIVE', resource, id, { before: record });
     return { data: { id } };
   }
 
@@ -3274,6 +3274,29 @@ export class RecordsService {
     return { data, total };
   }
 
+  async systemErrors (page = 1, pageSize = 30, search = '', sort = 'createdAt', order = 'desc', user?: AuthUser) {
+    this.assertScreenAccess(user, 'audit-logs');
+    const sortableColumns = new Set(['createdAt', 'status', 'method', 'path', 'userEmail', 'message']);
+    const sortColumn = sortableColumns.has(sort) ? sort : 'createdAt';
+    const sortOrder = order?.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    const query = this.systemErrorLogs.createQueryBuilder('errorLog');
+    const keyword = search.trim().toLowerCase();
+    if (keyword) {
+      query.where(`(
+        LOWER(errorLog.method) LIKE :keyword OR
+        LOWER(errorLog.path) LIKE :keyword OR
+        LOWER(COALESCE(errorLog.userEmail, '')) LIKE :keyword OR
+        LOWER(errorLog.message) LIKE :keyword
+      )`, { keyword: `%${keyword}%` });
+    }
+    const [data, total] = await query
+      .orderBy(`errorLog.${sortColumn}`, sortOrder)
+      .skip((Math.max(page, 1) - 1) * Math.max(pageSize, 1))
+      .take(Math.min(Math.max(pageSize, 1), 200))
+      .getManyAndCount();
+    return { data, total };
+  }
+
   private protect (resource: string, record: ConfigurableEntity, request?: RequestContext) {
     if (resource === 'user-accounts') {
       const user = { ...(record as unknown as Record<string, unknown>) };
@@ -4831,7 +4854,19 @@ export class RecordsService {
     payload?: Record<string, unknown>,
   ) {
     await this.auditLogs.save(
-      this.auditLogs.create({ userId: user.id, userName: user.fullName, action, module, targetId, payload }),
+      this.auditLogs.create({ userId: user.id, userName: user.fullName, action, module, targetId, payload: this.redactAuditPayload(payload) as Record<string, unknown> | undefined }),
+    );
+  }
+
+  private redactAuditPayload (value: unknown): unknown {
+    const sensitiveKeys = new Set(['password', 'passwordhash', 'token', 'access_token', 'refresh_token', 'jwt', 'secret']);
+    if (Array.isArray(value)) return value.map((item) => this.redactAuditPayload(item));
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, child]) => [
+        key,
+        sensitiveKeys.has(key.toLowerCase()) ? '[REDACTED]' : this.redactAuditPayload(child),
+      ]),
     );
   }
 }

@@ -11,6 +11,8 @@ export type AppModuleGroup = {
   modules: AppModuleKey[]
 }
 
+export const appStandaloneModules: AppModuleKey[] = ["dashboard", "calendar"]
+
 export const companyTypeLabels = Object.fromEntries(
   companyTypeOptions.map((item) => [item.value, item.label]),
 ) as Record<CompanyType, string>
@@ -94,13 +96,14 @@ export const appModuleGroups: AppModuleGroup[] = [
   {
     key: "admin",
     label: "Quản trị",
-    modules: ["calendar", "user-accounts", "branches"],
+    modules: ["user-accounts", "branches"],
   },
 ]
 
 export const appModuleLabels: Record<AppModuleKey, string> = {
   ...entityLabels,
   ...screenLabels,
+  dashboard: "Tổng quan",
   calendar: "Lịch tổng",
   "landing-pages": "Pages",
   "landing-forms": "Forms",
@@ -109,7 +112,7 @@ export const appModuleLabels: Record<AppModuleKey, string> = {
 }
 
 export const allAppModuleKeys = Array.from(
-  new Set(appModuleGroups.flatMap((group) => group.modules)),
+  new Set([...appStandaloneModules, ...appModuleGroups.flatMap((group) => group.modules)]),
 )
 
 export function buildGroupedModuleOptions(labels: Record<string, string>, keys = Object.keys(labels)) {
@@ -195,6 +198,7 @@ export const menuGroupLabelsByCompanyType: Partial<
 
 export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
   clinic: [
+    "dashboard",
     "calendar",
     "landing-pages",
     "landing-forms",
@@ -259,6 +263,7 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
     "workflow-actions",
   ],
   retail: [
+    "dashboard",
     "calendar",
     "landing-pages",
     "landing-forms",
@@ -314,6 +319,7 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
     "workflow-actions",
   ],
   cafe: [
+    "dashboard",
     "calendar",
     "landing-pages",
     "landing-forms",
@@ -370,6 +376,7 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
     "workflow-actions",
   ],
   agriculture: [
+    "dashboard",
     "calendar",
     "landing-pages",
     "landing-forms",
@@ -422,6 +429,7 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
     "workflow-actions",
   ],
   general: [
+    "dashboard",
     "calendar",
     "landing-pages",
     "landing-forms",

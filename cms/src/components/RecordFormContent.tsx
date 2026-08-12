@@ -997,6 +997,7 @@ interface LibraryImageOption {
   title: string
   previewUrl: string
   fileId: string
+  source?: "local" | "google"
   folderId?: string
   folderLabel?: string
 }
@@ -1325,12 +1326,18 @@ function ImageLibrarySelectInput({
   const [openPicker, setOpenPicker] = useState(false)
   const [openUpload, setOpenUpload] = useState(false)
   const [options, setOptions] = useState<LibraryImageOption[]>([])
+  const [googleOptions, setGoogleOptions] = useState<LibraryImageOption[]>([])
   const [treeData, setTreeData] = useState<FolderTreeNode[]>([])
+  const [googleTreeData, setGoogleTreeData] = useState<FolderTreeNode[]>([])
   const [search, setSearch] = useState("")
+  const [source, setSource] = useState<"local" | "google">("local")
   const [selectedFolderId, setSelectedFolderId] = useState<string>()
+  const [selectedGoogleFolderId, setSelectedGoogleFolderId] = useState<string>("root")
   const [draftValues, setDraftValues] = useState<string[]>([])
   const [folderChildrenMap, setFolderChildrenMap] = useState<Record<string, string[]>>({})
+  const [googleFolderChildrenMap, setGoogleFolderChildrenMap] = useState<Record<string, string[]>>({})
   const [folderPathMap, setFolderPathMap] = useState<Record<string, string>>({})
+  const [googleFolderPathMap, setGoogleFolderPathMap] = useState<Record<string, string>>({ root: "Google Drive" })
 
   useEffect(() => {
     void loadOptions()
@@ -1368,19 +1375,66 @@ function ImageLibrarySelectInput({
         }
       })
     setOptions(nextOptions)
+    await loadGoogleDriveImages()
+  }
+
+  async function loadGoogleDriveImages(parentId = selectedGoogleFolderId) {
+    try {
+      const [filesResponse, foldersResponse] = await Promise.all([
+        api.get("/settings/google-drive/files", { params: { q: search.trim() || undefined, parentId } }),
+        api.get("/settings/google-drive/folders"),
+      ])
+      const googleFolders = [
+        { id: "root", name: "Google Drive", parentId: null },
+        ...((foldersResponse.data?.data?.folders || []) as Array<Record<string, unknown>>).map((folder) => ({
+          id: String(folder.id || ""),
+          name: String(folder.name || folder.id || ""),
+          parentId: folder.parentId ? String(folder.parentId) : "root",
+        })).filter((folder) => folder.id),
+      ]
+      const googleFolderPaths = buildFolderPathMap(googleFolders)
+      setGoogleTreeData(buildFolderTree(googleFolders))
+      setGoogleFolderChildrenMap(buildFolderChildrenMap(googleFolders))
+      setGoogleFolderPathMap({ root: "Google Drive", ...googleFolderPaths })
+      setGoogleOptions(((filesResponse.data?.data?.files || []) as Array<Record<string, unknown>>)
+        .filter((row) => isImageFile(row))
+        .map((row) => {
+          const title = String(row.title || row.originalName || row.id)
+          const folderLabel = parentId === "root" ? "Google Drive" : (googleFolderPaths[parentId] || "Google Drive")
+          const thumbnailUrl = String(row.thumbnailUrl || "")
+          const publicUrl = String(row.publicUrl || "")
+          const previewUrl = thumbnailUrl || publicUrl
+          return {
+            value: previewUrl || publicUrl,
+            title: `${title}${folderLabel ? ` ${folderLabel}` : ""}`,
+            previewUrl,
+            fileId: `google-${String(row.id || title)}`,
+            source: "google" as const,
+            folderId: parentId,
+            folderLabel,
+          }
+        }).filter((option) => option.value && option.previewUrl))
+    } catch {
+      setGoogleOptions([])
+      setGoogleTreeData([{ key: "root", value: "root", title: "Google Drive" } as FolderTreeNode])
+    }
   }
 
   const selectedValues = Array.isArray(value) ? value.map(String) : typeof value === "string" && value ? [value] : []
-  const selectedOptions = options.filter((option) => selectedValues.includes(option.value))
-  const selectedDraft = options.find((option) => draftValues.includes(option.value))
-  const visibleOptions = options.filter((option) => {
+  const allOptions = [...options, ...googleOptions]
+  const activeOptions = source === "google" ? googleOptions : options
+  const selectedOptions = allOptions.filter((option) => selectedValues.includes(option.value))
+  const selectedDraft = allOptions.find((option) => draftValues.includes(option.value))
+  const visibleOptions = activeOptions.filter((option) => {
     const keyword = search.trim().toLowerCase()
     const matchesSearch = !keyword
       || option.title.toLowerCase().includes(keyword)
       || String(option.folderLabel || "").toLowerCase().includes(keyword)
     if (!matchesSearch) return false
-    if (!selectedFolderId) return true
-    const allowedFolders = new Set([selectedFolderId, ...(folderChildrenMap[selectedFolderId] || [])])
+    if (source === "google") return true
+    const currentFolderId = selectedFolderId
+    if (!currentFolderId) return true
+    const allowedFolders = new Set([currentFolderId, ...(folderChildrenMap[currentFolderId] || [])])
     return option.folderId ? allowedFolders.has(option.folderId) : false
   })
 
@@ -1444,14 +1498,35 @@ function ImageLibrarySelectInput({
             <Button block onClick={() => setSelectedFolderId(undefined)}>
               Tất cả folder
             </Button>
+            <Tabs
+              activeKey={source}
+              items={[
+                { key: "local", label: "Thư viện" },
+                { key: "google", label: "Google Drive" },
+              ]}
+              onChange={(key) => {
+                const nextSource = key === "google" ? "google" : "local"
+                setSource(nextSource)
+                if (nextSource === "google") void loadGoogleDriveImages(selectedGoogleFolderId)
+              }}
+            />
             <Tree
               blockNode
               className="image-library-tree"
               defaultExpandAll
               filterTreeNode={(node) => String(node.title || "").toLowerCase().includes(search.trim().toLowerCase())}
-              selectedKeys={selectedFolderId ? [selectedFolderId] : []}
-              treeData={treeData}
-              onSelect={(keys) => setSelectedFolderId(keys[0] ? String(keys[0]) : undefined)}
+              selectedKeys={source === "google" ? [selectedGoogleFolderId] : (selectedFolderId ? [selectedFolderId] : [])}
+              treeData={source === "google" ? googleTreeData : treeData}
+              onSelect={(keys) => {
+                const nextFolderId = keys[0] ? String(keys[0]) : undefined
+                if (source === "google") {
+                  const googleFolderId = nextFolderId || "root"
+                  setSelectedGoogleFolderId(googleFolderId)
+                  void loadGoogleDriveImages(googleFolderId)
+                  return
+                }
+                setSelectedFolderId(nextFolderId)
+              }}
             />
           </div>
           <div className="image-library-browser">
@@ -1461,14 +1536,15 @@ function ImageLibrarySelectInput({
                 placeholder="Tìm theo tên ảnh hoặc thư mục"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
+                onSearch={() => { if (source === "google") void loadGoogleDriveImages(selectedGoogleFolderId) }}
               />
-              <Button onClick={() => setOpenUpload(true)}>Upload ảnh mới</Button>
+              <Button disabled={source === "google"} onClick={() => setOpenUpload(true)}>Upload ảnh mới</Button>
             </div>
             <div className="image-library-current-folder">
               <Typography.Text type="secondary">
-                {selectedFolderId
-                  ? folderPathMap[selectedFolderId] || "Thư mục đã chọn"
-                  : "Đang xem tất cả thư mục"}
+                {source === "google"
+                  ? (googleFolderPathMap[selectedGoogleFolderId] || "Google Drive")
+                  : (selectedFolderId ? folderPathMap[selectedFolderId] || "Thư mục đã chọn" : "Đang xem tất cả thư mục")}
               </Typography.Text>
             </div>
             <div className="image-library-content">

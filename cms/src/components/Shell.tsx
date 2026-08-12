@@ -44,6 +44,7 @@ import { useAppUi } from "../app-ui"
 import {
   appModuleGroups,
   appModuleLabels,
+  appStandaloneModules,
   isModuleEnabled,
   resolveMenuGroupLabel,
   type AppModuleGroup,
@@ -78,6 +79,7 @@ export const menuIcons: Record<string, React.ReactNode> = {
   "medical-episodes": <MedicineBoxOutlined />,
   appointments: <CalendarOutlined />,
   calendar: <CalendarOutlined />,
+  dashboard: <DashboardOutlined />,
   "work-schedules": <CalendarOutlined />,
   consultations: <MedicineBoxOutlined />,
   "service-orders": <FileDoneOutlined />,
@@ -131,6 +133,8 @@ const menuGroupIcons: Record<AppModuleGroup["key"], React.ReactNode> = {
 }
 
 const moduleNavigation: Record<string, { path: string; label: string; screen?: string }> = {
+  dashboard: { path: "/", label: "Tổng quan" },
+  calendar: { path: "/calendar", label: "Lịch tổng" },
   "landing-pages": { path: "/pages", label: "Trang đích", screen: "settings" },
   "landing-forms": { path: "/forms", label: "Biểu mẫu", screen: "settings" },
   "landing-domains": { path: "/domains", label: "Tên miền", screen: "settings" },
@@ -307,55 +311,83 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const activeCompanyType = settings.companyType || "clinic"
   const isAdmin = isCurrentUserAdmin()
   const canAccessScreen = (screen: string) => isAdmin || hasScreenAccess(screen)
+  const isGloballyEnabled = (moduleKey: string) =>
+    isModuleEnabled(moduleKey, settings.enabledModules, activeCompanyType, settings.hasCustomModuleSelection)
+  const moduleOrderMap = new Map((settings.enabledModules || []).map((resource, index) => [resource, index]))
+  const getModuleOrder = (resource: string, fallbackIndex = Number.MAX_SAFE_INTEGER) =>
+    moduleOrderMap.has(resource) ? moduleOrderMap.get(resource) as number : fallbackIndex
+  const sortModulesBySettingsOrder = (modules: string[]) =>
+    modules
+      .map((resource, index) => ({ resource, index }))
+      .sort((left, right) => {
+        const leftOrder = getModuleOrder(left.resource)
+        const rightOrder = getModuleOrder(right.resource)
+        return leftOrder === rightOrder ? left.index - right.index : leftOrder - rightOrder
+      })
+      .map((item) => item.resource)
+  const canShowMenuModule = (resource: string) => {
+    if (!entityLabels[resource] && !moduleNavigation[resource]) return false
+    if (!isGloballyEnabled(resource)) return false
+    if (moduleNavigation[resource]?.screen && !canAccessScreen(moduleNavigation[resource].screen!)) return false
+    return hasResourceAccess(resource)
+  }
   const visibleGroups = appModuleGroups
-    .map((group) => ({
+    .map((group, groupIndex) => ({
       ...group,
+      groupIndex,
       label: resolveMenuGroupLabel(group.key, group.label, activeCompanyType),
-      resources: group.modules.filter((resource) => {
-        if (!entityLabels[resource] && !moduleNavigation[resource]) return false
-        if (moduleNavigation[resource]?.screen && !canAccessScreen(moduleNavigation[resource].screen!)) return false
-        if (!isAdmin && !isModuleEnabled(resource, settings.enabledModules, activeCompanyType, settings.hasCustomModuleSelection)) return false
-        return hasResourceAccess(resource)
-      }),
+      resources: sortModulesBySettingsOrder(group.modules.filter(canShowMenuModule)),
     }))
     .filter((group) => group.resources.length > 0)
-  const items: MenuProps["items"] = [
-    {
-      key: "/",
-      icon: <DashboardOutlined />,
-      label: <Link to="/">Tổng quan</Link>,
-    },
-    {
-      key: "/calendar",
-      icon: menuIcons.calendar,
-      label: <Link to="/calendar">Lịch tổng</Link>,
-    },
-    ...visibleGroups.map((group) => ({
-      key: group.key,
-      icon: menuGroupIcons[group.key] || <SolutionOutlined />,
-      label: group.label,
-      children: [
-        ...group.resources.map((key) => ({
+  const getGroupOrder = (resources: string[]) =>
+    resources.reduce((best, resource) => Math.min(best, getModuleOrder(resource)), Number.MAX_SAFE_INTEGER)
+  const menuSections = [
+    ...appStandaloneModules
+      .filter(canShowMenuModule)
+      .map((key, index) => ({
+        key: `single:${key}`,
+        order: getModuleOrder(key, index),
+        index,
+        item: {
           key: moduleNavigation[key]?.path || `/${key}`,
           icon: menuIcons[key] || <SolutionOutlined />,
-          label: <Link to={moduleNavigation[key]?.path || `/${key}`}>{moduleNavigation[key]?.label || entityLabels[key] || appModuleLabels[key] || key}</Link>,
-        })),
-        ...(group.key === "admin" && canAccessScreen("settings")
-          ? [
-              {
-                key: "/role-module-settings",
-                icon: <SettingOutlined />,
-                label: <Link to="/role-module-settings">Hiển thị theo role/module</Link>,
-              },
-              {
-                key: "/roles",
-                icon: menuIcons.roles,
-                label: <Link to="/roles">Vai trò & Phân quyền</Link>,
-              },
-            ]
-          : []),
-      ],
+          label: <Link to={moduleNavigation[key]?.path || `/${key}`}>{moduleNavigation[key]?.label || appModuleLabels[key] || key}</Link>,
+        },
+      })),
+    ...visibleGroups.map((group) => ({
+      key: group.key,
+      order: getGroupOrder(group.resources),
+      index: appStandaloneModules.length + group.groupIndex,
+      item: {
+        key: group.key,
+        icon: menuGroupIcons[group.key] || <SolutionOutlined />,
+        label: group.label,
+        children: [
+          ...group.resources.map((key) => ({
+            key: moduleNavigation[key]?.path || `/${key}`,
+            icon: menuIcons[key] || <SolutionOutlined />,
+            label: <Link to={moduleNavigation[key]?.path || `/${key}`}>{moduleNavigation[key]?.label || entityLabels[key] || appModuleLabels[key] || key}</Link>,
+          })),
+          ...(group.key === "admin" && canAccessScreen("settings")
+            ? [
+                {
+                  key: "/role-module-settings",
+                  icon: <SettingOutlined />,
+                  label: <Link to="/role-module-settings">Hiển thị theo role/module</Link>,
+                },
+                {
+                  key: "/roles",
+                  icon: menuIcons.roles,
+                  label: <Link to="/roles">Vai trò & Phân quyền</Link>,
+                },
+              ]
+            : []),
+        ],
+      },
     })),
+  ].sort((left, right) => left.order === right.order ? left.index - right.index : left.order - right.order)
+  const items: MenuProps["items"] = [
+    ...menuSections.map((section) => section.item),
     {
       key: "system-tools",
       icon: <GoldOutlined />,
@@ -413,8 +445,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ].filter(Boolean),
     },
   ]
-    .filter((item) => item.key !== "/calendar" || isAdmin || isModuleEnabled("calendar", settings.enabledModules, activeCompanyType, settings.hasCustomModuleSelection))
-    .filter((item) => item && (item.key !== "system-tools" || ((item.children as []) || []).length > 0))
+    .filter((item) => item && (item.key !== "system-tools" || ((("children" in item ? item.children : []) as []) || []).length > 0))
   const selected =
     location.pathname === "/"
       ? "/"

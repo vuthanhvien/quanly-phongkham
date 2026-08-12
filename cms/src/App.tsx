@@ -3,7 +3,7 @@ import routerProvider, { CatchAllNavigate } from '@refinedev/react-router';
 import { App as AntdApp, ConfigProvider, theme } from 'antd';
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
-import { hasResourceAccess, hasScreenAccess, isCurrentUserAdmin } from './access';
+import { hasResourceAccess, hasScreenAccess } from './access';
 import { authProvider, dataProvider, api, getGlobalBranchFilterIds, onGlobalBranchFilterChange } from './api';
 import { AppUiContext, cardPaddingBySize, controlHeightBySize, defaultAppUiSettings, layoutMetricsBySize, loadCachedAppUiSettings, normalizeAppUiSettings, persistAppUiSettings, syncDocumentBranding, tablePaddingBySize, useAppUi, type AppUiSettings } from './app-ui';
 import { isModuleEnabled } from './company-types';
@@ -79,20 +79,20 @@ function ScreenGuard({ screen }: { screen: string }) {
 
 function ModuleGuard({ moduleKey }: { moduleKey: string }) {
   const { settings } = useAppUi();
-  return isCurrentUserAdmin() || isModuleEnabled(moduleKey, settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection) ? <Outlet /> : <Navigate to="/" replace />;
+  return isModuleEnabled(moduleKey, settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection) ? <Outlet /> : <Navigate to="/" replace />;
 }
 
 function ResourceGuard() {
   const { resource = '' } = useParams();
   const { settings } = useAppUi();
-  return hasResourceAccess(resource) && (isCurrentUserAdmin() || isModuleEnabled(resource, settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection))
+  return isModuleEnabled(resource, settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection) && hasResourceAccess(resource)
     ? <Outlet />
     : <Navigate to="/" replace />;
 }
 
 function StaticResourceGuard({ resource }: { resource: string }) {
   const { settings } = useAppUi();
-  return hasResourceAccess(resource) && (isCurrentUserAdmin() || isModuleEnabled(resource, settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection))
+  return isModuleEnabled(resource, settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection) && hasResourceAccess(resource)
     ? <Outlet />
     : <Navigate to="/" replace />;
 }
@@ -162,8 +162,11 @@ export function App() {
         theme={{
           algorithm: theme.defaultAlgorithm,
           token: {
-            colorPrimary: appUiSettings.primaryColor,
-            colorInfo: appUiSettings.primaryColor,
+            colorPrimary: appUiSettings.buttonPrimaryBgColor || appUiSettings.primaryColor,
+            colorInfo: appUiSettings.buttonInfoBgColor,
+            colorSuccess: appUiSettings.buttonSuccessBgColor,
+            colorWarning: appUiSettings.buttonWarningBgColor,
+            colorError: appUiSettings.buttonErrorBgColor,
             colorBgBase: appUiSettings.pageBgColor,
             colorBgContainer: appUiSettings.surfaceColor,
             colorBgElevated: appUiSettings.surfaceColor,
@@ -197,10 +200,19 @@ export function App() {
               controlHeight,
               borderRadius: appUiSettings.borderRadius,
               fontWeight: 700,
+              primaryShadow: 'none',
               primaryColor: appUiSettings.buttonPrimaryTextColor,
+              colorPrimary: appUiSettings.buttonPrimaryBgColor || appUiSettings.primaryColor,
+              colorPrimaryHover: appUiSettings.buttonPrimaryBgColor || appUiSettings.primaryColor,
+              colorPrimaryActive: appUiSettings.buttonPrimaryBgColor || appUiSettings.primaryColor,
               defaultBg: appUiSettings.buttonDefaultBgColor,
               defaultColor: appUiSettings.buttonDefaultTextColor,
               defaultBorderColor: appUiSettings.buttonDefaultBorderColor,
+              dangerColor: appUiSettings.buttonErrorTextColor,
+              dangerShadow: 'none',
+              colorError: appUiSettings.buttonErrorBgColor,
+              colorErrorHover: appUiSettings.buttonErrorBgColor,
+              colorErrorActive: appUiSettings.buttonErrorBgColor,
             },
             Card: {
               borderRadius: appUiSettings.borderRadius,
@@ -260,16 +272,24 @@ export function App() {
                 <Route path="/print-templates" element={<SettingsPage section="print" />} />
                 <Route path="/settings" element={<Navigate to="/role-module-settings" replace />} />
                 <Route path="/settings/print-templates/:id" element={<PrintTemplateEditorPage />} />
-                <Route path="/pages" element={<LandingPageListPage />} />
-                <Route path="/pages/:id" element={<LandingPagesPage />} />
-                <Route path="/forms" element={<LandingFormsPage />} />
-                <Route path="/domains" element={<LandingDomainsPage />} />
-                <Route path="/configs" element={<LandingSiteSettingsPage />} />
-                <Route path="/landing/pages/*" element={<Navigate to="/pages" replace />} />
-                <Route path="/landing/forms" element={<Navigate to="/forms" replace />} />
-                <Route path="/landing/domains" element={<Navigate to="/domains" replace />} />
-                <Route path="/landing/configs" element={<Navigate to="/configs" replace />} />
-                <Route path="/landing-pages" element={<Navigate to="/pages" replace />} />
+                <Route element={<ModuleGuard moduleKey="landing-pages" />}>
+                  <Route path="/pages" element={<LandingPageListPage />} />
+                  <Route path="/pages/:id" element={<LandingPagesPage />} />
+                  <Route path="/landing/pages/*" element={<Navigate to="/pages" replace />} />
+                  <Route path="/landing-pages" element={<Navigate to="/pages" replace />} />
+                </Route>
+                <Route element={<ModuleGuard moduleKey="landing-forms" />}>
+                  <Route path="/forms" element={<LandingFormsPage />} />
+                  <Route path="/landing/forms" element={<Navigate to="/forms" replace />} />
+                </Route>
+                <Route element={<ModuleGuard moduleKey="landing-domains" />}>
+                  <Route path="/domains" element={<LandingDomainsPage />} />
+                  <Route path="/landing/domains" element={<Navigate to="/domains" replace />} />
+                </Route>
+                <Route element={<ModuleGuard moduleKey="landing-config" />}>
+                  <Route path="/configs" element={<LandingSiteSettingsPage />} />
+                  <Route path="/landing/configs" element={<Navigate to="/configs" replace />} />
+                </Route>
                 <Route path="/chatbot-settings" element={<ChatbotSettingsPage />} />
                 <Route path="/chatbot-history" element={<ChatbotHistoryPage />} />
                 <Route path="/landing-theme" element={<LandingThemePage />} />

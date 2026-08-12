@@ -20,6 +20,22 @@ import {
   UnorderedListOutlined,
 } from "@ant-design/icons"
 import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  type DragEndEvent,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import {
   Button,
   Card,
   Checkbox,
@@ -41,10 +57,11 @@ import {
   message,
 } from "antd"
 import type { ColumnsType } from "antd/es/table"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { api } from "../api"
-import { allAppModuleKeys, buildGroupedModuleOptions } from "../company-types"
+import { buildGroupedModuleOptions, resolveEnabledModules } from "../company-types"
+import { useAppUi } from "../app-ui"
 import { getInputPatternLabel, INPUT_PATTERN_OPTIONS } from "../input-patterns"
 import { getApiErrorMessage } from "../utils/apiError"
 import { baseFields, CustomField, DynamicRole, entityLabels, FieldSpec, getResourceActionOptions, normalizeSelectOption, permissionLabels, relationFields, type SelectOption } from "../models"
@@ -631,6 +648,7 @@ export function PrintHtmlEditor({
 }
 
 export function SettingsPage({ section = "roles" }: { section?: "roles" | "print" }) {
+  const { settings } = useAppUi()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [entityType, setEntityType] = useState(() => searchParams.get("module") || "customers")
@@ -678,9 +696,11 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     [entityType],
   )
   const roleAllowedModules = useMemo(() => {
+    const globallyEnabledModules = resolveEnabledModules(settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection)
     const role = dynamicRoles.find((item) => normalizeRole(item.key) === selectedRole)
-    return Array.isArray(role?.allowedModules) ? role.allowedModules : allAppModuleKeys
-  }, [dynamicRoles, selectedRole])
+    const roleModules = Array.isArray(role?.allowedModules) ? role.allowedModules : globallyEnabledModules
+    return roleModules.filter((module) => globallyEnabledModules.includes(module))
+  }, [dynamicRoles, selectedRole, settings.companyType, settings.enabledModules, settings.hasCustomModuleSelection])
   const roleModuleOptions = useMemo(
     () => buildGroupedModuleOptions(permissionLabels, roleAllowedModules),
     [roleAllowedModules],
@@ -1021,7 +1041,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
               value={entityType}
               onChange={setEntityType}
               style={{ width: 420 }}
-              options={buildGroupedModuleOptions(permissionLabels)}
+              options={buildGroupedModuleOptions(permissionLabels, resolveEnabledModules(settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection))}
             />
           )}
         </Space>
@@ -1231,6 +1251,48 @@ function formatRoleLabel(role: string) {
   return ({ ALL: "Tất cả", ADMIN: "Quản trị viên", STAFF: "Nhân viên", DOCTOR: "Bác sĩ" } as Record<string, string>)[role] || role
 }
 
+type RowDragHandleContextValue = Pick<ReturnType<typeof useSortable>, "attributes" | "listeners" | "setActivatorNodeRef">
+const RowDragHandleContext = createContext<RowDragHandleContextValue | null>(null)
+
+function SortableFieldTableRow(props: React.HTMLAttributes<HTMLTableRowElement>) {
+  const rowKey = String((props as React.HTMLAttributes<HTMLTableRowElement> & { "data-row-key"?: string })["data-row-key"] || "")
+  const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ id: rowKey, disabled: !rowKey })
+  return (
+    <RowDragHandleContext.Provider value={{ attributes, listeners, setActivatorNodeRef }}>
+      <tr
+        {...props}
+        className={`${props.className || ""} ${isDragging ? "drag-row-active" : ""}`.trim()}
+        ref={setNodeRef}
+        style={{
+          ...props.style,
+          position: isDragging ? "relative" : props.style?.position,
+          transform: CSS.Transform.toString(transform),
+          transition,
+          zIndex: isDragging ? 10 : props.style?.zIndex,
+        }}
+      />
+    </RowDragHandleContext.Provider>
+  )
+}
+
+function SortableFieldDragHandle({ order }: { order: number }) {
+  const dragHandle = useContext(RowDragHandleContext)
+  return (
+    <span
+      className="drag-handle"
+      ref={dragHandle?.setActivatorNodeRef}
+      role="button"
+      tabIndex={0}
+      title="Kéo để đổi thứ tự"
+      {...dragHandle?.attributes}
+      {...dragHandle?.listeners}
+    >
+      <HolderOutlined />
+      <span className="drag-order">#{order}</span>
+    </span>
+  )
+}
+
 function ViewConfigTable({
   dataSource,
   viewType,
@@ -1246,46 +1308,26 @@ function ViewConfigTable({
   ) => void
   onReorder?: (viewType: ViewType, fromKey: string, toKey: string) => void
 }) {
-  const [draggingKey, setDraggingKey] = useState<string | null>(null)
   const [editingField, setEditingField] = useState<FieldLayoutConfig | null>(null)
   const [optionEdit, setOptionEdit] = useState<{ fieldKey: string; index: number; value: string; label: string } | null>(null)
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (!onReorder) return
+    const fromKey = String(event.active.id)
+    const toKey = event.over?.id ? String(event.over.id) : ""
+    if (!fromKey || !toKey || fromKey === toKey) return
+    onReorder(viewType, fromKey, toKey)
+  }
   const tableComponents = useMemo(
     () => ({
       body: {
-        row: (props: React.HTMLAttributes<HTMLTableRowElement>) => {
-          const rowKey = String((props as React.HTMLAttributes<HTMLTableRowElement> & { "data-row-key"?: string })["data-row-key"] || "")
-          const draggable = Boolean(onReorder)
-          return (
-            <tr
-              {...props}
-              className={`${props.className || ""} ${draggingKey === rowKey ? "drag-row-active" : ""}`.trim()}
-              draggable={draggable}
-              onDragStart={(event) => {
-                if (!draggable || !rowKey) return
-                setDraggingKey(rowKey)
-                event.dataTransfer.effectAllowed = "move"
-                event.dataTransfer.setData("text/plain", rowKey)
-              }}
-              onDragOver={(event) => {
-                if (!draggable || !rowKey) return
-                event.preventDefault()
-                event.dataTransfer.dropEffect = "move"
-              }}
-              onDrop={(event) => {
-                if (!draggable || !rowKey || !onReorder) return
-                event.preventDefault()
-                const fromKey = event.dataTransfer.getData("text/plain")
-                if (!fromKey || fromKey === rowKey) return
-                onReorder(viewType, fromKey, rowKey)
-                setDraggingKey(null)
-              }}
-              onDragEnd={() => setDraggingKey(null)}
-            />
-          )
-        },
+        row: SortableFieldTableRow,
       },
     }),
-    [draggingKey, onReorder, viewType],
+    [],
   )
   const columns: ColumnsType<FieldLayoutConfig> = [
     {
@@ -1295,10 +1337,7 @@ function ViewConfigTable({
       fixed: "left",
       render: (_, row) =>
         onReorder ? (
-          <span className="drag-handle" title="Kéo để đổi thứ tự">
-            <HolderOutlined />
-            <span className="drag-order">#{dataSource.findIndex((item) => item.key === row.key) + 1}</span>
-          </span>
+          <SortableFieldDragHandle order={dataSource.findIndex((item) => item.key === row.key) + 1} />
         ) : null,
     },
     {
@@ -1393,7 +1432,11 @@ function ViewConfigTable({
 
   return (
     <>
-      <Table columns={columns} components={tableComponents} dataSource={dataSource} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" />
+      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={dndSensors}>
+        <SortableContext items={dataSource.map((item) => item.key)} strategy={verticalListSortingStrategy}>
+          <Table columns={columns} components={tableComponents} dataSource={dataSource} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" />
+        </SortableContext>
+      </DndContext>
       <Modal
         open={Boolean(editingField)}
         title={`Chỉnh sửa field${editingField ? `: ${editingField.label}` : ""}`}

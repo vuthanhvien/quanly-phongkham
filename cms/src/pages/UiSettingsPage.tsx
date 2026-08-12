@@ -1,11 +1,29 @@
-import { BgColorsOutlined, BorderOutlined, DownOutlined, FontSizeOutlined, UndoOutlined } from '@ant-design/icons'
+import { BgColorsOutlined, BorderOutlined, DownOutlined, FontSizeOutlined, HolderOutlined, UndoOutlined } from '@ant-design/icons'
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  type DragEndEvent,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Button, Card, Checkbox, Col, Flex, Form, Input, InputNumber, Radio, Row, Select, Space, Typography, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { buildShadowValue, companyTypeOptions, defaultAppUiSettings, fontFamilyOptions, syncDocumentBranding, useAppUi, type AppUiSettings } from '../app-ui'
-import { appModuleGroups, appModuleLabels, companyTypeModulePresets, resolveMenuGroupLabel, type CompanyType } from '../company-types'
+import { appModuleGroups, appModuleLabels, appStandaloneModules, companyTypeModulePresets, resolveMenuGroupLabel, type AppModuleGroup, type CompanyType } from '../company-types'
 import { ImagePickerInput } from '../components/ImagePickerInput'
 
 type UiSettingsFormValues = AppUiSettings
+type ModuleDndSection = AppModuleGroup & { standalone?: boolean }
 
 function SettingsBlock({ children, extra, title }: { children: React.ReactNode; extra?: React.ReactNode; title: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
@@ -28,6 +46,114 @@ function SettingsBlock({ children, extra, title }: { children: React.ReactNode; 
     >
       {!collapsed && children}
     </Card>
+  )
+}
+
+function SortableModuleRow({
+  checked,
+  label,
+  moduleKey,
+  onCheckedChange,
+}: {
+  checked: boolean
+  label: string
+  moduleKey: string
+  onCheckedChange: (checked: boolean) => void
+}) {
+  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: moduleKey })
+  return (
+    <div
+      className={`module-dnd-module${checked ? ' is-enabled' : ''}${isDragging ? ' is-dragging' : ''}`}
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+    >
+      <span
+        aria-label={`Kéo module ${label}`}
+        className="module-dnd-handle module-dnd-handle--module"
+        {...attributes}
+        {...listeners}
+      >
+        <HolderOutlined />
+      </span>
+      <Checkbox checked={checked} onChange={(event) => onCheckedChange(event.target.checked)}>
+        {label}
+      </Checkbox>
+    </div>
+  )
+}
+
+function SortableModuleSection({
+  group,
+  onGroupCheckedChange,
+  onModuleCheckedChange,
+  onModuleDragEnd,
+  selectedCompanyType,
+  selectedModules,
+}: {
+  group: ModuleDndSection
+  onGroupCheckedChange: (moduleKeys: string[], checked: boolean) => void
+  onModuleCheckedChange: (moduleKey: string, checked: boolean) => void
+  onModuleDragEnd: (groupKey: string, event: DragEndEvent) => void
+  selectedCompanyType: CompanyType
+  selectedModules: string[]
+}) {
+  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: group.key })
+  const childSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const selectedCount = group.modules.filter((moduleKey) => selectedModules.includes(moduleKey)).length
+  const isStandalone = Boolean(group.standalone)
+  const title = isStandalone
+    ? appModuleLabels[group.modules[0]] || group.label
+    : resolveMenuGroupLabel(group.key, group.label, selectedCompanyType)
+
+  return (
+    <div
+      className={`module-dnd-group${isStandalone ? ' module-dnd-group--single' : ''}${isDragging ? ' is-dragging' : ''}`}
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+    >
+      <div className="module-dnd-group-head">
+        <span
+          aria-label={`Kéo ${isStandalone ? 'mục' : 'nhóm'} ${title}`}
+          className="module-dnd-handle"
+          {...attributes}
+          {...listeners}
+        >
+          <HolderOutlined />
+        </span>
+        <Checkbox
+          checked={selectedCount === group.modules.length}
+          indeterminate={!isStandalone && selectedCount > 0 && selectedCount < group.modules.length}
+          onChange={(event) => onGroupCheckedChange(group.modules, event.target.checked)}
+        >
+          <Typography.Text strong>{title}</Typography.Text>
+        </Checkbox>
+        {!isStandalone && <span className="module-dnd-count">{selectedCount}/{group.modules.length}</span>}
+      </div>
+      {!isStandalone && (
+        <DndContext
+          collisionDetection={closestCenter}
+          onDragEnd={(event) => onModuleDragEnd(group.key, event)}
+          sensors={childSensors}
+        >
+          <SortableContext items={group.modules} strategy={verticalListSortingStrategy}>
+            <div className="module-dnd-module-list">
+              {group.modules.map((moduleKey) => (
+                <SortableModuleRow
+                  checked={selectedModules.includes(moduleKey)}
+                  key={moduleKey}
+                  label={appModuleLabels[moduleKey] || moduleKey}
+                  moduleKey={moduleKey}
+                  onCheckedChange={(checked) => onModuleCheckedChange(moduleKey, checked)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+    </div>
   )
 }
 
@@ -85,10 +211,27 @@ const colorSections: Array<{
   {
     title: 'Nút bấm',
     fields: [
+      { name: 'buttonPrimaryBgColor', label: 'Nền nút chính' },
       { name: 'buttonPrimaryTextColor', label: 'Chữ nút chính' },
+      { name: 'buttonPrimaryBorderColor', label: 'Viền nút chính' },
       { name: 'buttonDefaultBgColor', label: 'Nền nút thường' },
       { name: 'buttonDefaultTextColor', label: 'Chữ nút thường' },
       { name: 'buttonDefaultBorderColor', label: 'Viền nút thường' },
+      { name: 'buttonSecondaryBgColor', label: 'Nền nút secondary' },
+      { name: 'buttonSecondaryTextColor', label: 'Chữ nút secondary' },
+      { name: 'buttonSecondaryBorderColor', label: 'Viền nút secondary' },
+      { name: 'buttonSuccessBgColor', label: 'Nền nút success' },
+      { name: 'buttonSuccessTextColor', label: 'Chữ nút success' },
+      { name: 'buttonSuccessBorderColor', label: 'Viền nút success' },
+      { name: 'buttonInfoBgColor', label: 'Nền nút info' },
+      { name: 'buttonInfoTextColor', label: 'Chữ nút info' },
+      { name: 'buttonInfoBorderColor', label: 'Viền nút info' },
+      { name: 'buttonWarningBgColor', label: 'Nền nút warning' },
+      { name: 'buttonWarningTextColor', label: 'Chữ nút warning' },
+      { name: 'buttonWarningBorderColor', label: 'Viền nút warning' },
+      { name: 'buttonErrorBgColor', label: 'Nền nút error' },
+      { name: 'buttonErrorTextColor', label: 'Chữ nút error' },
+      { name: 'buttonErrorBorderColor', label: 'Viền nút error' },
     ],
   },
 ]
@@ -140,7 +283,12 @@ export function UiSettingsPage() {
   const draftAppName = Form.useWatch('appName', form)
   const selectedCompanyType = (Form.useWatch('companyType', form) || settings.companyType || defaultAppUiSettings.companyType) as CompanyType
   const [selectedModules, setSelectedModules] = useState<string[]>([])
+  const [moduleGroups, setModuleGroups] = useState<ModuleDndSection[]>(() => buildOrderedModuleGroups([]))
   const [hasCustomModuleSelection, setHasCustomModuleSelection] = useState(false)
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   useEffect(() => {
     const usesPreset = !settings.hasCustomModuleSelection
@@ -151,6 +299,7 @@ export function UiSettingsPage() {
       enabledModules,
     })
     setSelectedModules(enabledModules.map(String))
+    setModuleGroups(buildOrderedModuleGroups(enabledModules.map(String)))
     setHasCustomModuleSelection(!usesPreset)
   }, [form, settings])
 
@@ -179,22 +328,17 @@ export function UiSettingsPage() {
 
   function handleResetDefaults() {
     form.setFieldsValue(defaultAppUiSettings)
-    setSelectedModules(companyTypeModulePresets[defaultAppUiSettings.companyType])
+    const presetModules = companyTypeModulePresets[defaultAppUiSettings.companyType].map(String)
+    setSelectedModules(presetModules)
+    setModuleGroups(buildOrderedModuleGroups(presetModules))
     setHasCustomModuleSelection(false)
-  }
-
-  function handleApplyCompanyPreset() {
-    const companyType = (form.getFieldValue('companyType') || defaultAppUiSettings.companyType) as CompanyType
-    setSelectedModules((companyTypeModulePresets[companyType] || []).map(String))
-    setHasCustomModuleSelection(true)
-    message.success('Đã áp preset module theo loại hình công ty')
   }
 
   function setGroupModules(moduleKeys: string[], checked: boolean) {
     setSelectedModules((current) => {
       const selected = new Set(current)
       moduleKeys.forEach((moduleKey) => checked ? selected.add(moduleKey) : selected.delete(moduleKey))
-      return Array.from(selected)
+      return serializeSelectedModules(moduleGroups, selected)
     })
     setHasCustomModuleSelection(true)
   }
@@ -204,7 +348,40 @@ export function UiSettingsPage() {
       const selected = new Set(current)
       if (checked) selected.add(moduleKey)
       else selected.delete(moduleKey)
-      return Array.from(selected)
+      return serializeSelectedModules(moduleGroups, selected)
+    })
+    setHasCustomModuleSelection(true)
+  }
+
+  function reorderModuleGroup(event: DragEndEvent) {
+    const fromKey = String(event.active.id)
+    const toKey = event.over?.id ? String(event.over.id) : ""
+    if (!toKey || fromKey === toKey) return
+    setModuleGroups((current) => {
+      const fromIndex = current.findIndex((group) => group.key === fromKey)
+      const toIndex = current.findIndex((group) => group.key === toKey)
+      if (fromIndex < 0 || toIndex < 0) return current
+      const next = arrayMove(current, fromIndex, toIndex)
+      setSelectedModules(serializeSelectedModules(next, new Set(selectedModules)))
+      return next
+    })
+    setHasCustomModuleSelection(true)
+  }
+
+  function reorderModuleInGroup(targetGroupKey: string, event: DragEndEvent) {
+    const fromKey = String(event.active.id)
+    const toKey = event.over?.id ? String(event.over.id) : ""
+    if (!toKey || fromKey === toKey) return
+    setModuleGroups((current) => {
+      const next = current.map((group) => ({ ...group, modules: [...group.modules] }))
+      const group = next.find((item) => item.key === targetGroupKey)
+      if (!group) return current
+      const fromIndex = group.modules.indexOf(fromKey)
+      const toIndex = group.modules.indexOf(toKey)
+      if (fromIndex < 0 || toIndex < 0) return current
+      group.modules = arrayMove(group.modules, fromIndex, toIndex)
+      setSelectedModules(serializeSelectedModules(next, new Set(selectedModules)))
+      return next
     })
     setHasCustomModuleSelection(true)
   }
@@ -261,50 +438,32 @@ export function UiSettingsPage() {
               </SettingsBlock>
 
               <SettingsBlock
-                extra={
-                  <Space size={8}>
-                    <Button size="small" type="default" onClick={() => { setSelectedModules([]); setHasCustomModuleSelection(true) }}>Bỏ chọn hết</Button>
-                    <Button size="small" type="default" onClick={handleApplyCompanyPreset}>Áp preset theo loại hình</Button>
-                  </Space>
-                }
                 title="Bật / tắt module sử dụng"
               >
                 <Space direction="vertical" size={16} style={{ width: '100%' }}>
-                  <Typography.Paragraph style={{ margin: 0 }}>
-                    Loại cty chỉ là quick action để gợi ý bộ module. Module nào hiển thị thực tế sẽ phụ thuộc vào danh sách bật/tắt bên dưới.
-                  </Typography.Paragraph>
-                  <Space direction="vertical" size={14} style={{ width: '100%' }}>
-                    {appModuleGroups.map((group) => {
-                      const selectedCount = group.modules.filter((moduleKey) => selectedModules.includes(moduleKey)).length
-                      const groupValues = group.modules.filter((moduleKey) => selectedModules.includes(moduleKey))
-                      return (
-                        <div key={group.key}>
-                          <Checkbox
-                            checked={selectedCount === group.modules.length}
-                            indeterminate={selectedCount > 0 && selectedCount < group.modules.length}
-                            onChange={(event) => setGroupModules(group.modules, event.target.checked)}
-                            style={{ marginBottom: 10 }}
-                          >
-                            <Typography.Text strong>{resolveMenuGroupLabel(group.key, group.label, selectedCompanyType)}</Typography.Text>
-                          </Checkbox>
-                          <div style={{ paddingLeft: 28 }}>
-                            <Row gutter={[12, 12]}>
-                              {group.modules.map((moduleKey) => (
-                                <Col key={moduleKey} md={12} xs={24}>
-                                  <Checkbox
-                                    checked={groupValues.includes(moduleKey)}
-                                    onChange={(event) => setModuleChecked(moduleKey, event.target.checked)}
-                                  >
-                                    {appModuleLabels[moduleKey] || moduleKey}
-                                  </Checkbox>
-                                </Col>
-                              ))}
-                            </Row>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </Space>
+                  <Flex align="center" justify="space-between" gap={12} wrap>
+                    <Typography.Paragraph style={{ margin: 0 }}>
+                      Kéo mục hoặc nhóm để đổi thứ tự menu cha, kéo module con để đổi thứ tự trong nhóm. Checkbox quyết định module nào được bật.
+                    </Typography.Paragraph>
+                    <Typography.Text type="secondary">{selectedModules.length} module đang bật</Typography.Text>
+                  </Flex>
+                  <DndContext collisionDetection={closestCenter} onDragEnd={reorderModuleGroup} sensors={dndSensors}>
+                    <SortableContext items={moduleGroups.map((group) => group.key)} strategy={verticalListSortingStrategy}>
+                      <div className="module-dnd-board">
+                        {moduleGroups.map((group) => (
+                          <SortableModuleSection
+                            group={group}
+                            key={group.key}
+                            onGroupCheckedChange={setGroupModules}
+                            onModuleCheckedChange={setModuleChecked}
+                            onModuleDragEnd={reorderModuleInGroup}
+                            selectedCompanyType={selectedCompanyType}
+                            selectedModules={selectedModules}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
                 </Space>
               </SettingsBlock>
 
@@ -497,7 +656,8 @@ export function UiSettingsPage() {
                         <Button
                           type="primary"
                           style={{
-                            background: preview.primaryColor,
+                            background: preview.buttonPrimaryBgColor,
+                            borderColor: preview.buttonPrimaryBorderColor,
                             color: preview.buttonPrimaryTextColor,
                           }}
                         >
@@ -512,6 +672,20 @@ export function UiSettingsPage() {
                         >
                           Default
                         </Button>
+                        {[
+                          ['Secondary', preview.buttonSecondaryBgColor, preview.buttonSecondaryTextColor, preview.buttonSecondaryBorderColor],
+                          ['Success', preview.buttonSuccessBgColor, preview.buttonSuccessTextColor, preview.buttonSuccessBorderColor],
+                          ['Info', preview.buttonInfoBgColor, preview.buttonInfoTextColor, preview.buttonInfoBorderColor],
+                          ['Warning', preview.buttonWarningBgColor, preview.buttonWarningTextColor, preview.buttonWarningBorderColor],
+                          ['Error', preview.buttonErrorBgColor, preview.buttonErrorTextColor, preview.buttonErrorBorderColor],
+                        ].map(([label, background, color, borderColor]) => (
+                          <Button
+                            key={label}
+                            style={{ background, color, borderColor }}
+                          >
+                            {label}
+                          </Button>
+                        ))}
                       </Flex>
                     </div>
                   </div>
@@ -535,4 +709,45 @@ export function UiSettingsPage() {
       </Form>
     </Space>
   )
+}
+
+function buildOrderedModuleGroups(enabledModules: string[]) {
+  const order = new Map(enabledModules.map((moduleKey, index) => [moduleKey, index]))
+  const sections: ModuleDndSection[] = [
+    ...appStandaloneModules.map((moduleKey) => ({
+      key: `single:${moduleKey}`,
+      label: appModuleLabels[moduleKey] || moduleKey,
+      modules: [moduleKey],
+      standalone: true,
+    })),
+    ...appModuleGroups,
+  ]
+  return sections
+    .map((group, groupIndex) => ({
+      ...group,
+      modules: [...group.modules].sort((left, right) => {
+        const leftOrder = order.get(left)
+        const rightOrder = order.get(right)
+        if (leftOrder !== undefined && rightOrder !== undefined) return leftOrder - rightOrder
+        if (leftOrder !== undefined) return -1
+        if (rightOrder !== undefined) return 1
+        return group.modules.indexOf(left) - group.modules.indexOf(right)
+      }),
+      __order: Math.min(
+        ...group.modules
+          .map((moduleKey) => order.get(moduleKey))
+          .filter((index): index is number => index !== undefined),
+        Number.MAX_SAFE_INTEGER,
+      ),
+      __groupIndex: groupIndex,
+    }))
+    .sort((left, right) => {
+      if (left.__order !== right.__order) return left.__order - right.__order
+      return left.__groupIndex - right.__groupIndex
+    })
+    .map(({ __order, __groupIndex, ...group }) => group)
+}
+
+function serializeSelectedModules(groups: AppModuleGroup[], selected: Set<string>) {
+  return groups.flatMap((group) => group.modules.filter((moduleKey) => selected.has(moduleKey)))
 }

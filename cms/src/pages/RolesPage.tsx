@@ -22,7 +22,8 @@ import {
 } from "antd"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { api } from "../api"
-import { allAppModuleKeys, appModuleGroups, appModuleLabels } from "../company-types"
+import { appModuleGroups, appModuleLabels, resolveEnabledModules } from "../company-types"
+import { useAppUi } from "../app-ui"
 import { ModalTitleBar } from "../components/ModalTitleBar"
 import { BranchRoleAssignment, DynamicRole, systemRoleSelectOptions } from "../models"
 import { getFirstOptionValue } from "../utils/branchDefaults"
@@ -53,6 +54,7 @@ const ROLE_MAIN_LABEL: Record<string, string> = {
 }
 
 export function RolesPage() {
+  const { settings } = useAppUi()
   const [roles, setRoles] = useState<DynamicRole[]>([])
   const [assignments, setAssignments] = useState<BranchRoleAssignment[]>([])
   const [userOptions, setUserOptions] = useState<Array<{ value: string; label: string; email?: string; role?: string }>>([])
@@ -228,10 +230,15 @@ export function RolesPage() {
   )
 
   const selectedRole = roles.find((r) => r.key === selectedRoleKey) ?? null
+  const globallyEnabledModules = useMemo(
+    () => resolveEnabledModules(settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection),
+    [settings.companyType, settings.enabledModules, settings.hasCustomModuleSelection],
+  )
 
   useEffect(() => {
-    setSelectedModules(Array.isArray(selectedRole?.allowedModules) ? selectedRole.allowedModules : allAppModuleKeys)
-  }, [selectedRole])
+    const roleModules = Array.isArray(selectedRole?.allowedModules) ? selectedRole.allowedModules : globallyEnabledModules
+    setSelectedModules(roleModules.filter((module) => globallyEnabledModules.includes(module)))
+  }, [globallyEnabledModules, selectedRole])
 
   function updateRoleModules(nextModules: string[]) {
     if (!selectedRole) return
@@ -420,7 +427,8 @@ export function RolesPage() {
                 </Typography.Paragraph>
                 <div className="role-module-permission-grid">
                   {appModuleGroups.map((group) => {
-                    const groupModules = group.modules.filter((module) => Boolean(appModuleLabels[module]))
+                    const groupModules = group.modules.filter((module) => Boolean(appModuleLabels[module]) && globallyEnabledModules.includes(module))
+                    if (!groupModules.length) return null
                     const checkedCount = groupModules.filter((module) => selectedModules.includes(module)).length
                     return (
                       <div className="role-module-permission-group" key={group.key}>
