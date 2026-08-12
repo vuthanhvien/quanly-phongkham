@@ -21,6 +21,8 @@ export type SocialLink = {
 }
 
 export interface LandingGlobalSetting {
+  settingKey?: string
+  useParentConfig?: boolean
   logoUrl?: string
   logoAlt?: string
   logoWidth?: number

@@ -2127,7 +2127,7 @@ export class RecordsService {
     return String((record as Record<string, unknown>).id);
   }
 
-  async uploadFiles (files: any[], payload: { folderId?: string; title?: string; note?: string }, user: AuthUser, request?: RequestContext) {
+  async uploadFiles (files: any[], payload: { folderId?: string; title?: string; note?: string; staffId?: string }, user: AuthUser, request?: RequestContext) {
     await this.assertPermission(user, 'files', 'create');
     if (!payload.folderId) {
       throw new BadRequestException('Phải chọn folder trước khi upload file');
@@ -3211,7 +3211,7 @@ export class RecordsService {
   private async storeUploadedFile (
     file: any,
     folder: FileFolder,
-    payload: { title?: string; note?: string },
+    payload: { title?: string; note?: string; staffId?: string },
     user: AuthUser,
     useCustomTitle: boolean,
   ) {
@@ -3239,6 +3239,7 @@ export class RecordsService {
         storagePath,
         publicUrl: `/uploads/${folder.id}/${storedName}`,
         uploadedBy: user.id,
+        staffId: payload.staffId || undefined,
         note: payload.note,
         isActive: true,
       }),

@@ -17,6 +17,7 @@ interface FileUploadPanelProps {
   defaultFolderId?: string
   accept?: string
   multiple?: boolean
+  extraPayload?: Record<string, string | undefined>
   onCancel?: () => void
   onSuccess?: (files: UploadedFileRecord[]) => void
 }
@@ -25,6 +26,7 @@ export function FileUploadPanel({
   defaultFolderId,
   accept = "*",
   multiple = true,
+  extraPayload,
   onCancel,
   onSuccess,
 }: FileUploadPanelProps) {
@@ -84,6 +86,9 @@ export function FileUploadPanel({
       formData.append("folderId", values.folderId)
       if (values.title && selectedFiles.length === 1) formData.append("title", values.title)
       if (values.note) formData.append("note", values.note)
+      Object.entries(extraPayload || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== "") formData.append(key, value)
+      })
       selectedFiles.forEach((file) => {
         formData.append("files", file)
       })

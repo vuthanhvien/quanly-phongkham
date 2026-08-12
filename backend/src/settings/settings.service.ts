@@ -496,21 +496,20 @@ export class SettingsService {
   async getLandingGlobalSettings(domain?: string) {
     const settingKey = this.normalizeLandingSettingsKey(domain);
     const existing = await this.landingGlobalSettings.findOne({ where: { settingKey } });
-    if (existing) return { data: existing };
+    if (existing) {
+      if (settingKey !== 'default' && existing.useParentConfig) {
+        const fallback = await this.landingGlobalSettings.findOne({ where: { settingKey: 'default' } });
+        return { data: { ...(fallback || {}), settingKey, useParentConfig: true } };
+      }
+      return { data: existing };
+    }
     if (settingKey !== 'default') {
       const fallback = await this.landingGlobalSettings.findOne({ where: { settingKey: 'default' } });
-      const fresh = this.landingGlobalSettings.create({
-        ...fallback,
-        id: undefined,
-        settingKey,
-        menuItems: fallback?.menuItems ?? [],
-        footerColumns: fallback?.footerColumns ?? [],
-        footerSocialLinks: fallback?.footerSocialLinks ?? [],
-      });
+      const fresh = this.landingGlobalSettings.create({ settingKey, useParentConfig: true });
       const saved = await this.landingGlobalSettings.save(fresh);
-      return { data: saved };
+      return { data: { ...(fallback || {}), ...saved, menuItems: fallback?.menuItems ?? [], footerColumns: fallback?.footerColumns ?? [], footerSocialLinks: fallback?.footerSocialLinks ?? [] } };
     }
-    const fresh = this.landingGlobalSettings.create({ settingKey, menuItems: [], footerColumns: [], footerSocialLinks: [] });
+    const fresh = this.landingGlobalSettings.create({ settingKey, useParentConfig: false, menuItems: [], footerColumns: [], footerSocialLinks: [] });
     const saved = await this.landingGlobalSettings.save(fresh);
     return { data: saved };
   }
@@ -518,7 +517,8 @@ export class SettingsService {
   async updateLandingGlobalSettings(payload: Partial<LandingGlobalSetting>, domain?: string) {
     const settingKey = this.normalizeLandingSettingsKey(domain || String((payload as Record<string, unknown>)?.settingKey || ''));
     const { settingKey: _ignoredSettingKey, id: _ignoredId, ...safePayload } = payload as Partial<LandingGlobalSetting>;
-    const { data: current } = await this.getLandingGlobalSettings(settingKey);
+    const current = await this.landingGlobalSettings.findOne({ where: { settingKey } })
+      || this.landingGlobalSettings.create({ settingKey, menuItems: [], footerColumns: [], footerSocialLinks: [] });
     current.settingKey = settingKey;
     const merged = this.landingGlobalSettings.merge(current, safePayload);
     const saved = await this.landingGlobalSettings.save(merged);
@@ -527,6 +527,12 @@ export class SettingsService {
   }
 
   async getLandingMenuSettings(domain?: string) {
+    const settingKey = this.normalizeLandingSettingsKey(domain);
+    const existing = await this.landingGlobalSettings.findOne({ where: { settingKey } });
+    if (settingKey !== 'default' && existing?.useParentConfig) {
+      const fallback = await this.landingGlobalSettings.findOne({ where: { settingKey: 'default' } });
+      return { data: fallback?.menuItems ?? [] };
+    }
     const { data } = await this.getLandingGlobalSettings(domain);
     return { data: data.menuItems ?? [] };
   }

@@ -262,6 +262,9 @@ export class Staff extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('branch_permissions')
@@ -332,6 +335,9 @@ export class Customer extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('customer_otps')
@@ -395,6 +401,9 @@ export class Lead extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('location_countries')
@@ -469,6 +478,9 @@ export class ZaloAccount extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('zalo_conversations')
@@ -585,6 +597,9 @@ export class Supplier extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('products')
@@ -747,6 +762,9 @@ export class Appointment extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('work_schedules')
@@ -797,6 +815,9 @@ export class WorkSchedule extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('consultations')
@@ -992,6 +1013,9 @@ export class ManagedFile extends ConfigurableEntity {
 
   @Column({ nullable: true })
   uploadedBy?: string;
+
+  @Column({ nullable: true })
+  staffId?: string;
 
   @Column({ type: 'text', nullable: true })
   note?: string;
@@ -1454,6 +1478,9 @@ export class Commission extends ConfigurableEntity {
 
   @Column({ default: 'PENDING' })
   status: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('custom_field_definitions')
@@ -2196,6 +2223,9 @@ export class StaffReward extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('staff_trainings')
@@ -2229,6 +2259,9 @@ export class StaffTraining extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('performance_reviews')
@@ -2265,6 +2298,9 @@ export class PerformanceReview extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('position_histories')
@@ -2295,6 +2331,9 @@ export class PositionHistory extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('work_contracts')
@@ -2331,6 +2370,9 @@ export class WorkContract extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('staff_insurances')
@@ -2368,6 +2410,9 @@ export class StaffInsurance extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('attendances')
@@ -2392,6 +2437,9 @@ export class Attendance extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('leave_requests')
@@ -2422,6 +2470,9 @@ export class LeaveRequest extends ConfigurableEntity {
 
   @Column({ nullable: true })
   branchId?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('leave_types')
@@ -2469,6 +2520,9 @@ export class LeaveAllocation extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('projects')
@@ -2493,6 +2547,9 @@ export class Project extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   description?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 
   @Column({ type: 'simple-json', nullable: true })
   kanbanColumns?: Array<{ key: string; name: string; color?: string; allowedToKeys?: string[] }>;
@@ -2523,6 +2580,9 @@ export class Task extends ConfigurableEntity {
 
   @Column({ type: 'text', nullable: true })
   description?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('project_members')
@@ -2566,6 +2626,9 @@ export class AttendanceAdjustmentRequest extends ConfigurableEntity {
 
   @Column({ nullable: true })
   branchId?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('business_trip_requests')
@@ -2596,6 +2659,9 @@ export class BusinessTripRequest extends ConfigurableEntity {
 
   @Column({ nullable: true })
   approvedById?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('payment_requests')
@@ -2632,6 +2698,9 @@ export class PaymentRequest extends ConfigurableEntity {
 
   @Column({ nullable: true })
   approvedById?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('workflow_definitions')
@@ -2863,6 +2932,9 @@ export class Payroll extends ConfigurableEntity {
 
   @Column({ nullable: true })
   expenseAccountNumber?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  files?: Array<Record<string, unknown>>;
 }
 
 @Entity('landing_global_settings')
@@ -2872,6 +2944,9 @@ export class LandingGlobalSetting {
 
   @Column({ default: 'default' })
   settingKey: string;
+
+  @Column({ default: false })
+  useParentConfig: boolean;
 
   // Logo
   @Column({ nullable: true })

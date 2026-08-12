@@ -302,23 +302,23 @@ export class SettingsController {
   }
 
   @Get('landing-global')
-  getLandingGlobal() {
-    return this.settings.getLandingGlobalSettings();
+  getLandingGlobal(@Query('domain') domain?: string) {
+    return this.settings.getLandingGlobalSettings(domain);
   }
 
   @Put('landing-global')
-  updateLandingGlobal(@Body() payload: Record<string, unknown>) {
-    return this.settings.updateLandingGlobalSettings(payload as any);
+  updateLandingGlobal(@Body() payload: Record<string, unknown>, @Query('domain') domain?: string) {
+    return this.settings.updateLandingGlobalSettings(payload as any, domain || String(payload?.domain || ''));
   }
 
   @Get('landing-menu')
-  getLandingMenu() {
-    return this.settings.getLandingMenuSettings();
+  getLandingMenu(@Query('domain') domain?: string) {
+    return this.settings.getLandingMenuSettings(domain);
   }
 
   @Put('landing-menu')
-  updateLandingMenu(@Body() payload: { menuItems?: Record<string, unknown>[] }) {
-    return this.settings.updateLandingMenuSettings(payload?.menuItems ?? []);
+  updateLandingMenu(@Body() payload: { menuItems?: Record<string, unknown>[]; domain?: string }, @Query('domain') domain?: string) {
+    return this.settings.updateLandingMenuSettings(payload?.menuItems ?? [], domain || payload?.domain);
   }
 
   @Post('landing-pages')
@@ -438,14 +438,16 @@ export class PublicLandingPagesController {
 
   @Public()
   @Get('global')
-  getLandingGlobal() {
-    return this.settings.getLandingGlobalSettings();
+  getLandingGlobal(@Query('domain') domain?: string, @Request() request?: { headers?: Record<string, string | string[] | undefined> }) {
+    const requestDomain = String(request?.headers?.['x-forwarded-host'] || request?.headers?.host || '').split(',')[0].trim();
+    return this.settings.getLandingGlobalSettings(domain || requestDomain);
   }
 
   @Public()
   @Get('menu')
-  getLandingMenu() {
-    return this.settings.getLandingMenuSettings();
+  getLandingMenu(@Query('domain') domain?: string, @Request() request?: { headers?: Record<string, string | string[] | undefined> }) {
+    const requestDomain = String(request?.headers?.['x-forwarded-host'] || request?.headers?.host || '').split(',')[0].trim();
+    return this.settings.getLandingMenuSettings(domain || requestDomain);
   }
 
   @Public()

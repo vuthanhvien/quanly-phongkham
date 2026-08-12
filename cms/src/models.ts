@@ -478,6 +478,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
   ],
   files: [
     { key: 'folderId', label: 'Thư mục', required: true, width: '50', tableWidth: 220 },
+    { key: 'staffId', label: 'Nhân viên', width: '50', tableWidth: 220 },
     { key: 'title', label: 'Tên hiển thị', required: true, width: '66', tableWidth: 240 },
     { key: 'originalName', label: 'Tên file gốc', disabled: true, width: '66', tableWidth: 260 },
     { key: 'mimeType', label: 'Loại file', disabled: true, width: '50', tableWidth: 180 },
@@ -649,6 +650,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'issuedBy', label: 'Người ký / Ra quyết định', width: '50', tableWidth: 200 },
     { key: 'amount', label: 'Giá trị thưởng (nếu có)', type: 'number', width: '33', tableWidth: 170 },
     { key: 'description', label: 'Nội dung', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   'staff-trainings': [
@@ -661,6 +663,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'certificateNumber', label: 'Số chứng chỉ', width: '33', tableWidth: 160 },
     { key: 'expiryDate', label: 'Ngày hết hạn', type: 'date', width: '33', tableWidth: 150 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'planned', label: 'Dự kiến' }, { value: 'in_progress', label: 'Đang học' }, { value: 'completed', label: 'Hoàn thành' }, { value: 'cancelled', label: 'Hủy' }], width: '33', tableWidth: 140 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   'performance-reviews': [
@@ -674,6 +677,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'strengths', label: 'Điểm mạnh', type: 'textarea', width: '50', tableWidth: 280 },
     { key: 'improvements', label: 'Cần cải thiện', type: 'textarea', width: '50', tableWidth: 280 },
     { key: 'goals', label: 'Mục tiêu kỳ tới', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   'position-histories': [
@@ -685,6 +689,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'toDepartmentId', label: 'Phòng ban mới', width: '50', tableWidth: 190 },
     { key: 'effectiveDate', label: 'Ngày hiệu lực', type: 'date', required: true, width: '33', tableWidth: 150 },
     { key: 'reason', label: 'Lý do / Quyết định', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   'work-contracts': [
@@ -698,6 +703,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'workingHoursPerDay', label: 'Giờ/ngày', type: 'number', width: '25', tableWidth: 110 },
     { key: 'workingDaysPerMonth', label: 'Ngày công chuẩn/tháng', type: 'number', width: '25', tableWidth: 170 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'draft', label: 'Nháp' }, { value: 'active', label: 'Đang hiệu lực' }, { value: 'expired', label: 'Hết hạn' }, { value: 'terminated', label: 'Đã chấm dứt' }], width: '33', tableWidth: 150 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   'staff-insurances': [
@@ -710,6 +716,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'startDate', label: 'Ngày bắt đầu', type: 'date', width: '33', tableWidth: 150 },
     { key: 'endDate', label: 'Ngày kết thúc', type: 'date', width: '33', tableWidth: 150 },
     { key: 'isActive', label: 'Đang đóng', width: '25', tableWidth: 110 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   attendances: [
@@ -719,6 +726,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'checkIn', label: 'Giờ vào', placeholder: 'HH:MM', inputPattern: 'time-hh-mm', width: '33', tableWidth: 120 },
     { key: 'checkOut', label: 'Giờ ra', placeholder: 'HH:MM', inputPattern: 'time-hh-mm', width: '33', tableWidth: 120 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'present', label: 'Có mặt' }, { value: 'absent', label: 'Vắng' }, { value: 'late', label: 'Đi trễ' }, { value: 'half_day', label: 'Nửa ngày' }, { value: 'holiday', label: 'Nghỉ lễ' }], required: true, width: '33', tableWidth: 140 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   'leave-requests': [
@@ -731,6 +739,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'pending', label: 'Chờ duyệt' }, { value: 'approved', label: 'Đã duyệt' }, { value: 'rejected', label: 'Từ chối' }, { value: 'cancelled', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'reason', label: 'Lý do', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'approvedById', label: 'Người duyệt', width: '50', tableWidth: 220 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
   ],
   'leave-types': [
     { key: 'code', label: 'Mã loại nghỉ', required: true, width: '33', tableWidth: 160 },
@@ -747,6 +756,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'year', label: 'Năm', type: 'number', required: true, width: '33', tableWidth: 110 },
     { key: 'allocatedDays', label: 'Ngày được cấp', type: 'number', required: true, width: '33', tableWidth: 150 },
     { key: 'carriedOverDays', label: 'Ngày chuyển sang', type: 'number', width: '33', tableWidth: 170 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   projects: [
@@ -758,6 +768,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'startDate', label: 'Bắt đầu', type: 'date', width: '33', tableWidth: 140 },
     { key: 'endDate', label: 'Kết thúc', type: 'date', width: '33', tableWidth: 140 },
     { key: 'description', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
   ],
   tasks: [
     { key: 'projectId', label: 'Dự án', required: true, width: '50', tableWidth: 220 },
@@ -768,6 +779,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'dueDate', label: 'Hạn xử lý', type: 'date', width: '33', tableWidth: 145 },
     { key: 'sortOrder', label: 'Thứ tự', type: 'number', width: '25', tableWidth: 100 },
     { key: 'description', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
   ],
   'attendance-adjustment-requests': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -779,6 +791,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'draft', label: 'Nháp' }, { value: 'pending', label: 'Chờ duyệt' }, { value: 'approved', label: 'Đã duyệt' }, { value: 'rejected', label: 'Từ chối' }, { value: 'cancelled', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'reason', label: 'Lý do', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'approvedById', label: 'Người duyệt', width: '50', tableWidth: 220 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
   ],
   'business-trip-requests': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -790,6 +803,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'draft', label: 'Nháp' }, { value: 'pending', label: 'Chờ duyệt' }, { value: 'approved', label: 'Đã duyệt' }, { value: 'rejected', label: 'Từ chối' }, { value: 'cancelled', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'purpose', label: 'Mục đích', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'approvedById', label: 'Người duyệt', width: '50', tableWidth: 220 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
   ],
   'payment-requests': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -803,6 +817,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'draft', label: 'Nháp' }, { value: 'pending', label: 'Chờ duyệt' }, { value: 'approved', label: 'Đã duyệt' }, { value: 'rejected', label: 'Từ chối' }, { value: 'paid', label: 'Đã thanh toán' }, { value: 'cancelled', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'description', label: 'Diễn giải', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'approvedById', label: 'Người duyệt', width: '50', tableWidth: 220 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
   ],
   'workflow-definitions': [
     { key: 'code', label: 'Mã flow', required: true, width: '33', tableWidth: 180 },
@@ -879,6 +894,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'paymentMethod', label: 'Hình thức chi', type: 'select', options: [{ value: 'CASH', label: 'Tiền mặt' }, { value: 'TRANSFER', label: 'Chuyển khoản' }, { value: 'CARD', label: 'Thẻ' }], width: '33', tableWidth: 150 },
     { key: 'paymentAccountNumber', label: 'TK thanh toán', width: '33', tableWidth: 150 },
     { key: 'expenseAccountNumber', label: 'TK chi phí', width: '33', tableWidth: 150 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   'work-schedules': [
@@ -891,6 +907,7 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'endTime', label: 'Kết thúc', type: 'datetime', displayFormat: 'time', width: '25', tableWidth: 100 },
     { key: 'roomId', label: 'Phòng', width: '33', tableWidth: 180 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'PLANNED', label: 'Dự kiến' }, { value: 'CONFIRMED', label: 'Đã xác nhận' }, { value: 'OFF', label: 'Nghỉ' }], width: '33', tableWidth: 140 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   consultations: [
@@ -979,5 +996,6 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'roleType', label: 'Vai trò', required: true, width: '33', tableWidth: 150 },
     { key: 'amount', label: 'Hoa hồng', type: 'number', required: true, width: '33', tableWidth: 150 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'PENDING', label: 'Chờ xử lý' }, { value: 'PAID', label: 'Đã thanh toán' }], width: '33', tableWidth: 140 },
+    { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
   ],
 };

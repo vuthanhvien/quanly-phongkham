@@ -840,6 +840,7 @@ function FieldInput({
         disabled={field.disabled}
         onChange={onChange}
         placeholder={placeholder}
+        forceArray={field.key === "files"}
         value={value}
       />
     )
@@ -1019,11 +1020,13 @@ function FileSelectInput({
   onChange,
   disabled,
   placeholder,
+  forceArray = false,
 }: {
   value?: unknown
   onChange?: (value: unknown) => void
   disabled?: boolean
   placeholder?: string
+  forceArray?: boolean
 }) {
   const screens = Grid.useBreakpoint()
   const [openPicker, setOpenPicker] = useState(false)
@@ -1031,6 +1034,7 @@ function FileSelectInput({
   const [options, setOptions] = useState<FileLibraryOption[]>([])
   const [treeData, setTreeData] = useState<FolderTreeNode[]>([])
   const [search, setSearch] = useState("")
+  const [manualLink, setManualLink] = useState("")
   const [selectedFolderId, setSelectedFolderId] = useState<string>()
   const [draftValues, setDraftValues] = useState<string[]>([])
   const [folderChildrenMap, setFolderChildrenMap] = useState<Record<string, string[]>>({})
@@ -1071,13 +1075,19 @@ function FileSelectInput({
     )
   }
 
+  const optionByValue = new Map(options.map((option) => [option.value, option]))
+  const toFileOption = (item: string) => optionByValue.get(item) || buildExternalFileOption(item)
+  const emitValue = (values: string[]) => onChange?.(forceArray ? (values.length > 0 ? values : undefined) : toSingleOrArray(values))
+  const addManualLink = (rawValue: string) => {
+    const nextValue = rawValue.trim()
+    if (!nextValue) return
+    setDraftValues((current) => Array.from(new Set([...current, nextValue])))
+    setManualLink("")
+  }
+
   const selectedValues = normalizeStringArray(value)
-  const selectedItems = selectedValues
-    .map((item) => options.find((option) => option.value === item))
-    .filter(Boolean) as FileLibraryOption[]
-  const selectedDraftItems = draftValues
-    .map((item) => options.find((option) => option.value === item))
-    .filter(Boolean) as FileLibraryOption[]
+  const selectedItems = selectedValues.map(toFileOption)
+  const selectedDraftItems = draftValues.map(toFileOption)
   const visibleOptions = options.filter((option) => {
     const keyword = search.trim().toLowerCase()
     const matchesSearch = !keyword
@@ -1126,7 +1136,7 @@ function FileSelectInput({
         width={screens.lg ? 1080 : "calc(100vw - 16px)"}
         onCancel={() => setOpenPicker(false)}
         footer={[
-          <Button key="clear" onClick={() => { setDraftValues([]); onChange?.(undefined) }}>
+          <Button key="clear" onClick={() => { setDraftValues([]); emitValue([]) }}>
             Bỏ chọn
           </Button>,
           <Button key="cancel" onClick={() => setOpenPicker(false)}>
@@ -1138,7 +1148,7 @@ function FileSelectInput({
             disabled={draftValues.length === 0}
             type="primary"
             onClick={() => {
-              onChange?.(toSingleOrArray(draftValues))
+              emitValue(draftValues)
               setOpenPicker(false)
             }}
           >
@@ -1173,6 +1183,14 @@ function FileSelectInput({
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
+              <Input.Search
+                allowClear
+                enterButton="Thêm link"
+                placeholder="Dán link Google Drive/local"
+                value={manualLink}
+                onChange={(event) => setManualLink(event.target.value)}
+                onSearch={addManualLink}
+              />
               <Button onClick={() => setOpenUpload(true)}>Tải tệp mới lên</Button>
             </div>
             <div className="image-library-current-folder">
@@ -1197,7 +1215,7 @@ function FileSelectInput({
                         onClick={() => setDraftValues((current) => toggleStringInList(current, option.value))}
                         onDoubleClick={() => {
                           const nextValues = toggleStringInList(draftValues, option.value)
-                          onChange?.(toSingleOrArray(nextValues))
+                          emitValue(nextValues)
                           setOpenPicker(false)
                         }}
                       >
@@ -1263,7 +1281,7 @@ function FileSelectInput({
             void loadOptions()
             const nextValues = Array.from(new Set([...draftValues, ...files.map((item) => item.id)]))
             setDraftValues(nextValues)
-            onChange?.(toSingleOrArray(nextValues))
+            emitValue(nextValues)
             setOpenUpload(false)
           }}
         />
@@ -1679,6 +1697,38 @@ function toggleStringInList(values: string[], nextValue: string) {
   return values.includes(nextValue)
     ? values.filter((item) => item !== nextValue)
     : [...values, nextValue]
+}
+
+function buildExternalFileOption(value: string): FileLibraryOption {
+  const title = getExternalFileTitle(value)
+  const extension = getFileExtensionFromName(title || value)
+  return {
+    value,
+    title,
+    previewUrl: resolveFileUrl(value),
+    fileId: value,
+    folderLabel: "Link ngoài",
+    isImage: ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(extension),
+    mimeType: "",
+    extension,
+  }
+}
+
+function getExternalFileTitle(value: string) {
+  try {
+    const url = new URL(value)
+    const name = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "")
+    return name || url.hostname || value
+  } catch {
+    const cleanValue = value.split(/[?#]/)[0]
+    return decodeURIComponent(cleanValue.split("/").filter(Boolean).pop() || cleanValue || value)
+  }
+}
+
+function getFileExtensionFromName(name: string) {
+  const cleanName = name.split(/[?#]/)[0]
+  const extension = cleanName.includes(".") ? cleanName.split(".").pop() || "" : ""
+  return extension.toLowerCase()
 }
 
 function renderFileIcon(file: { mimeType?: string; extension?: string; isImage?: boolean }, large = false) {

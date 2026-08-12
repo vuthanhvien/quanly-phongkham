@@ -44,7 +44,9 @@ async function getServerApiUrl() {
 export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
   try {
     const apiUrl = await getServerApiUrl()
-    const endpoint = `${apiUrl}/public/landing-pages/global`
+    const requestHeaders = await headers()
+    const domain = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').split(',')[0].trim()
+    const endpoint = `${apiUrl}/public/landing-pages/global?domain=${encodeURIComponent(domain)}`
     console.info('[landing] Fetching global settings', { endpoint })
     const res = await fetch(endpoint, { cache: 'no-store' })
     console.info('[landing] Global settings response', { endpoint, status: res.status })
@@ -61,7 +63,9 @@ export async function getGlobalSettings(): Promise<LandingGlobalSetting> {
 export async function getMenuSettings(): Promise<NavItem[]> {
   try {
     const apiUrl = await getServerApiUrl()
-    const endpoint = `${apiUrl}/public/landing-pages/menu`
+    const requestHeaders = await headers()
+    const domain = (requestHeaders.get('x-forwarded-host') || requestHeaders.get('host') || '').split(',')[0].trim()
+    const endpoint = `${apiUrl}/public/landing-pages/menu?domain=${encodeURIComponent(domain)}`
     console.info('[landing] Fetching menu settings', { endpoint })
     const res = await fetch(endpoint, { cache: 'no-store' })
     console.info('[landing] Menu settings response', { endpoint, status: res.status })

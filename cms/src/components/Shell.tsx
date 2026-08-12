@@ -137,8 +137,8 @@ const moduleNavigation: Record<string, { path: string; label: string; screen?: s
   calendar: { path: "/calendar", label: "Lịch tổng" },
   "landing-pages": { path: "/pages", label: "Trang đích", screen: "settings" },
   "landing-forms": { path: "/forms", label: "Biểu mẫu", screen: "settings" },
-  "landing-domains": { path: "/domains", label: "Tên miền", screen: "settings" },
-  "landing-config": { path: "/configs", label: "Cấu hình", screen: "settings" },
+  "landing-domains": { path: "/configs", label: "Tên miền", screen: "settings" },
+  "landing-config": { path: "/configs", label: "Cài đặt site", screen: "settings" },
   "zalo-inbox": { path: "/zalo-inbox", label: "Hộp thư Zalo", screen: "zalo-inbox" },
   "accounting-reports": { path: "/accounting-reports", label: "Báo cáo kế toán", screen: "accounting-reports" },
 }
@@ -337,6 +337,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
       groupIndex,
       label: resolveMenuGroupLabel(group.key, group.label, activeCompanyType),
       resources: sortModulesBySettingsOrder(group.modules.filter(canShowMenuModule)),
+    }))
+    .map((group) => ({
+      ...group,
+      resources: group.key === "landing" ? group.resources.filter((resource) => resource !== "landing-domains") : group.resources,
     }))
     .filter((group) => group.resources.length > 0)
   const getGroupOrder = (resources: string[]) =>

@@ -23,7 +23,6 @@ import { LoginPage } from './pages/LoginPage';
 import { LandingPagesPage } from './pages/LandingPagesPage';
 import { LandingPageListPage } from './pages/LandingPageListPage';
 import { LandingFormsPage } from './pages/LandingFormsPage';
-import { LandingDomainsPage } from './pages/LandingDomainsPage';
 import { LandingSiteSettingsPage } from './pages/LandingSiteSettingsPage';
 import { RecordDetailPage } from './pages/RecordDetailPage';
 import { RecordFormPage } from './pages/RecordFormPage';
@@ -283,8 +282,8 @@ export function App() {
                   <Route path="/landing/forms" element={<Navigate to="/forms" replace />} />
                 </Route>
                 <Route element={<ModuleGuard moduleKey="landing-domains" />}>
-                  <Route path="/domains" element={<LandingDomainsPage />} />
-                  <Route path="/landing/domains" element={<Navigate to="/domains" replace />} />
+                  <Route path="/domains" element={<Navigate to="/configs" replace />} />
+                  <Route path="/landing/domains" element={<Navigate to="/configs" replace />} />
                 </Route>
                 <Route element={<ModuleGuard moduleKey="landing-config" />}>
                   <Route path="/configs" element={<LandingSiteSettingsPage />} />

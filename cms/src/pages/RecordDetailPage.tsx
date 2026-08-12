@@ -46,6 +46,7 @@ import { hasActionAccess, hasResourceAccess } from "../access"
 import { isModuleEnabled } from "../company-types"
 import { useAppUi } from "../app-ui"
 import { RecordFormContent } from "../components/RecordFormContent"
+import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
 import { ProductForm } from "../components/ProductForm"
@@ -84,7 +85,7 @@ interface MainRecordEditState {
   recordId: string
 }
 
-interface CustomerHistoryItem {
+interface RecordHistoryItem {
   key: string
   block: RelatedBlock
   record: Record<string, any>
@@ -98,17 +99,17 @@ interface CustomerHistoryItem {
   imageValue?: unknown
 }
 
-interface CustomerHistoryGroup {
+interface RecordHistoryGroup {
   key: string
   label: string
-  items: CustomerHistoryItem[]
-  days: CustomerHistoryDayGroup[]
+  items: RecordHistoryItem[]
+  days: RecordHistoryDayGroup[]
 }
 
-interface CustomerHistoryDayGroup {
+interface RecordHistoryDayGroup {
   key: string
   label: string
-  items: CustomerHistoryItem[]
+  items: RecordHistoryItem[]
 }
 
 interface RecordDetailPageProps {
@@ -294,7 +295,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                 }}
               />
             </Tooltip>
-            {resource === "customers" && related.some((block) => hasActionAccess(block.resource, "create")) && (
+            {["customers", "staff"].includes(resource) && related.some((block) => hasActionAccess(block.resource, "create")) && (
               <Dropdown
                 menu={{
                   items: related
@@ -602,27 +603,27 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
               ),
             }))
 
-            const customerHistoryGroups = resource === "customers" ? buildCustomerHistoryGroups(related) : []
-            const customerHistoryCount = customerHistoryGroups.reduce((total, group) => total + group.items.length, 0)
-            const customerHistoryTab = resource === "customers"
+            const recordHistoryGroups = ["customers", "staff"].includes(resource) ? buildRecordHistoryGroups(related) : []
+            const recordHistoryCount = recordHistoryGroups.reduce((total, group) => total + group.items.length, 0)
+            const recordHistoryTab = ["customers", "staff"].includes(resource)
               ? [{
-                  key: "__customer-history",
+                  key: "__record-history",
                   label: (
                     <span>
                       <HistoryOutlined /> Lịch sử
-                      {customerHistoryCount > 0 && <span className="tab-count">{customerHistoryCount}</span>}
+                      {recordHistoryCount > 0 && <span className="tab-count">{recordHistoryCount}</span>}
                     </span>
                   ),
                   children: (
-                    <CustomerHistoryTimeline
-                      groups={customerHistoryGroups}
+                    <RecordHistoryTimeline
+                      groups={recordHistoryGroups}
                       onOpen={(block, recordId) => void openRelatedDetail(block, recordId)}
                     />
                   ),
                 }]
               : []
 
-            const allTabs = [...infoTabs, ...customerHistoryTab, ...accountingVoucherLinesTab, ...relatedTabs, ...serviceOrderItemsTab]
+            const allTabs = [...infoTabs, ...recordHistoryTab, ...accountingVoucherLinesTab, ...relatedTabs, ...serviceOrderItemsTab]
             if (allTabs.length === 0) {
               return <Card className="glass-card detail-card" loading={loading}><Empty description="Không có dữ liệu liên kết" /></Card>
             }
@@ -734,6 +735,16 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
               onSuccess={() => {
                 setQuickCreateBlock(null)
                 toast.success("Đã lưu đơn hàng")
+                void reloadRelatedBlocks()
+              }}
+            />
+          ) : quickCreateBlock.resource === "files" ? (
+            <FileUploadPanel
+              extraPayload={{ [quickCreateBlock.relationField]: id }}
+              onCancel={() => setQuickCreateBlock(null)}
+              onSuccess={() => {
+                setQuickCreateBlock(null)
+                toast.success("Đã upload tài liệu")
                 void reloadRelatedBlocks()
               }}
             />
@@ -1046,6 +1057,11 @@ async function loadRelated(
         field: "staffId",
       },
       {
+        title: "Tài liệu đính kèm",
+        resource: "files",
+        field: "staffId",
+      },
+      {
         title: "Hoa hồng",
         resource: "commissions",
         field: "staffName",
@@ -1127,11 +1143,11 @@ async function loadBlocks(
   }] : [])
 }
 
-function CustomerHistoryTimeline({
+function RecordHistoryTimeline({
   groups,
   onOpen,
 }: {
-  groups: CustomerHistoryGroup[]
+  groups: RecordHistoryGroup[]
   onOpen: (block: RelatedBlock, recordId: string) => void
 }) {
   if (!groups.length) {
@@ -1163,17 +1179,23 @@ function CustomerHistoryTimeline({
                         onClick={() => onOpen(item.block, String(item.record.id))}
                       >
                         {item.imageValue ? (
-                          <div className="customer-history-image">
-                            {renderCustomerHistoryImage(item.imageValue, item.title)}
-                          </div>
+                          <>
+                            <div className="customer-history-card-icon">
+                              {getCustomerHistoryIcon(item.block.resource)}
+                              <span>{item.block.title}</span>
+                            </div>
+                            <div className="customer-history-image">
+                              {renderCustomerHistoryImage(item.imageValue, item.title)}
+                            </div>
+                          </>
                         ) : (
                           <div className="customer-history-card-icon">
                             {getCustomerHistoryIcon(item.block.resource)}
+                            <span>{item.block.title}</span>
                           </div>
                         )}
                         <div className="customer-history-card-body">
                           <div className="customer-history-card-head">
-                            <span className="customer-history-resource">{item.block.title}</span>
                             {item.timeLabel ? <span className="customer-history-date">{item.timeLabel}</span> : null}
                           </div>
                           <div className="customer-history-title">{item.title}</div>
@@ -1382,15 +1404,32 @@ const CUSTOMER_HISTORY_DATE_FIELDS: Record<string, string[]> = {
   "service-orders": ["orderDate", "createdAt"],
   "customer-images": ["capturedAt", "createdAt"],
   invoices: ["createdAt", "updatedAt"],
+  "work-contracts": ["startDate", "signedDate", "createdAt"],
+  "staff-insurances": ["startDate", "createdAt"],
+  attendances: ["date", "createdAt"],
+  "leave-requests": ["startDate", "createdAt"],
+  "attendance-adjustment-requests": ["date", "createdAt"],
+  "business-trip-requests": ["startDate", "createdAt"],
+  "payment-requests": ["requestDate", "createdAt"],
+  payrolls: ["periodStart", "createdAt"],
+  "work-schedules": ["workDate", "startTime", "createdAt"],
+  "staff-rewards": ["issuedAt", "createdAt"],
+  "staff-trainings": ["completedAt", "startDate", "createdAt"],
+  "performance-reviews": ["reviewDate", "createdAt"],
+  "position-histories": ["effectiveDate", "createdAt"],
+  "branch-role-assignments": ["createdAt", "updatedAt"],
+  "user-accounts": ["createdAt", "updatedAt"],
+  files: ["createdAt", "updatedAt"],
+  commissions: ["createdAt", "updatedAt"],
 }
 
-function buildCustomerHistoryGroups(relatedBlocks: RelatedBlock[]): CustomerHistoryGroup[] {
+function buildRecordHistoryGroups(relatedBlocks: RelatedBlock[]): RecordHistoryGroup[] {
   const items = relatedBlocks
-    .flatMap((block) => block.rows.map((row) => buildCustomerHistoryItem(block, row)))
-    .filter((item): item is CustomerHistoryItem => Boolean(item))
+    .flatMap((block) => block.rows.map((row) => buildRecordHistoryItem(block, row)))
+    .filter((item): item is RecordHistoryItem => Boolean(item))
     .sort((a, b) => b.occurredAt.valueOf() - a.occurredAt.valueOf())
 
-  const groups = new Map<string, CustomerHistoryGroup>()
+  const groups = new Map<string, RecordHistoryGroup>()
   items.forEach((item) => {
     const key = item.occurredAt.format("YYYY-MM")
     const group = groups.get(key) || {
@@ -1404,12 +1443,12 @@ function buildCustomerHistoryGroups(relatedBlocks: RelatedBlock[]): CustomerHist
   })
   return Array.from(groups.values()).map((group) => ({
     ...group,
-    days: buildCustomerHistoryDayGroups(group.items),
+    days: buildRecordHistoryDayGroups(group.items),
   }))
 }
 
-function buildCustomerHistoryDayGroups(items: CustomerHistoryItem[]): CustomerHistoryDayGroup[] {
-  const groups = new Map<string, CustomerHistoryDayGroup>()
+function buildRecordHistoryDayGroups(items: RecordHistoryItem[]): RecordHistoryDayGroup[] {
+  const groups = new Map<string, RecordHistoryDayGroup>()
   items.forEach((item) => {
     const key = item.occurredAt.format("YYYY-MM-DD")
     const group = groups.get(key) || {
@@ -1423,7 +1462,7 @@ function buildCustomerHistoryDayGroups(items: CustomerHistoryItem[]): CustomerHi
   return Array.from(groups.values())
 }
 
-function buildCustomerHistoryItem(block: RelatedBlock, row: Record<string, any>): CustomerHistoryItem | null {
+function buildRecordHistoryItem(block: RelatedBlock, row: Record<string, any>): RecordHistoryItem | null {
   const occurredAt = getCustomerHistoryDate(block.resource, row)
   if (!occurredAt) return null
 
@@ -1463,6 +1502,23 @@ function getCustomerHistoryTitle(resource: string, row: Record<string, any>) {
   if (resource === "service-orders") return String(row.serviceName || row.code || "Đơn hàng / dịch vụ")
   if (resource === "customer-images") return String(row.title || getFieldLabel(resource, "mediaType", String(row.mediaType || "BEFORE")))
   if (resource === "invoices") return String(row.code || row.invoiceNumber || "Phiếu thu / hóa đơn")
+  if (resource === "work-contracts") return String(row.contractNumber || row.code || "Hợp đồng lao động")
+  if (resource === "staff-insurances") return String(row.insuranceNumber || row.insuranceType || "Bảo hiểm")
+  if (resource === "attendances") return `Chấm công ${row.checkIn ? `vào ${row.checkIn}` : ""}`.trim()
+  if (resource === "leave-requests") return String(row.leaveType ? `Nghỉ phép ${getFieldLabel(resource, "leaveType", String(row.leaveType)).toLowerCase()}` : "Nghỉ phép")
+  if (resource === "attendance-adjustment-requests") return "Đổi giờ chấm công"
+  if (resource === "business-trip-requests") return String(row.destination || "Đơn công tác")
+  if (resource === "payment-requests") return String(row.title || row.reason || "Xin thanh toán")
+  if (resource === "payrolls") return String(row.period || row.code || "Bảng lương")
+  if (resource === "work-schedules") return String(row.shiftLabel || "Lịch làm việc")
+  if (resource === "staff-rewards") return String(row.title || row.rewardType || "Khen thưởng & Kỷ luật")
+  if (resource === "staff-trainings") return String(row.title || row.courseName || "Đào tạo & Chứng chỉ")
+  if (resource === "performance-reviews") return String(row.title || row.reviewPeriod || "Đánh giá hiệu suất")
+  if (resource === "position-histories") return String(row.position || row.title || "Lịch sử thăng tiến")
+  if (resource === "branch-role-assignments") return "Quyền theo chi nhánh"
+  if (resource === "user-accounts") return String(row.email || row.username || "Tài khoản đăng nhập")
+  if (resource === "files") return String(row.title || row.originalName || "Tài liệu đính kèm")
+  if (resource === "commissions") return String(row.title || row.code || "Hoa hồng")
   return String(row.title || row.name || row.code || entityLabels[resource] || resource)
 }
 
@@ -1475,6 +1531,23 @@ function getCustomerHistoryDescription(resource: string, row: Record<string, any
     "service-orders": ["note"],
     "customer-images": ["diagnosisNote"],
     invoices: ["method"],
+    "work-contracts": ["contractType", "note"],
+    "staff-insurances": ["provider", "note"],
+    attendances: ["checkOut", "note"],
+    "leave-requests": ["reason", "note"],
+    "attendance-adjustment-requests": ["reason", "note"],
+    "business-trip-requests": ["purpose", "note"],
+    "payment-requests": ["reason", "description", "note"],
+    payrolls: ["note"],
+    "work-schedules": ["note"],
+    "staff-rewards": ["description", "note"],
+    "staff-trainings": ["provider", "description", "note"],
+    "performance-reviews": ["summary", "note"],
+    "position-histories": ["departmentName", "note"],
+    "branch-role-assignments": ["roleName", "note"],
+    "user-accounts": ["role", "status"],
+    files: ["originalName", "note"],
+    commissions: ["note"],
   }
   for (const field of fieldsByResource[resource] || ["note", "description"]) {
     const value = row[field]
@@ -1486,8 +1559,8 @@ function getCustomerHistoryDescription(resource: string, row: Record<string, any
 }
 
 function getCustomerHistoryAmount(resource: string, row: Record<string, any>) {
-  if (!["service-orders", "invoices"].includes(resource)) return undefined
-  const value = row.totalAmount || row.paidAmount
+  if (!["service-orders", "invoices", "payment-requests", "payrolls", "commissions"].includes(resource)) return undefined
+  const value = row.totalAmount || row.paidAmount || row.amount || row.netSalary || row.commissionAmount
   if (value === null || value === undefined || value === "") return undefined
   return formatCurrencyValue(value)
 }
@@ -1511,5 +1584,10 @@ function getCustomerHistoryIcon(resource: string) {
   if (resource === "consultations" || resource === "medical-episodes") return <AuditOutlined />
   if (resource === "service-orders" || resource === "invoices") return <BankOutlined />
   if (resource === "customer-images") return <FileTextOutlined />
+  if (["attendances", "leave-requests", "work-schedules", "business-trip-requests"].includes(resource)) return <CalendarOutlined />
+  if (["payment-requests", "payrolls", "commissions"].includes(resource)) return <BankOutlined />
+  if (["work-contracts", "staff-insurances", "position-histories", "user-accounts", "branch-role-assignments"].includes(resource)) return <IdcardOutlined />
+  if (resource === "files") return <FileTextOutlined />
+  if (["staff-rewards", "staff-trainings", "performance-reviews"].includes(resource)) return <AuditOutlined />
   return <HistoryOutlined />
 }

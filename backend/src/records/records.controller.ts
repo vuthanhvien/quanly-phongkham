@@ -73,7 +73,7 @@ export class RecordsController {
   @UseInterceptors(FilesInterceptor('files', 50))
   uploadFiles(
     @UploadedFiles() files: any[],
-    @Body() payload: { folderId?: string; title?: string; note?: string },
+    @Body() payload: { folderId?: string; title?: string; note?: string; staffId?: string },
     @Request() request: ExpressRequest & { user: AuthUser },
   ) {
     return this.records.uploadFiles(files, payload, request.user, request);

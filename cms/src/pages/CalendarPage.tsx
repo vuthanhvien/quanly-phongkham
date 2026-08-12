@@ -279,9 +279,6 @@ export function CalendarPage() {
       <div className="page-header">
         <div>
           <Typography.Title level={3} style={{ margin: 0 }}>Calendar điều phối</Typography.Title>
-          <Typography.Text type="secondary">
-            Quản lý booking với khách, ca làm, nghỉ phép và chấm công trên cùng một màn hình.
-          </Typography.Text>
         </div>
         <div className="calendar-header-controls">
           <Segmented<CalendarMode>
