@@ -53,6 +53,10 @@ export class LocationsService {
     return this.masterDataRepo.find({ where: { group }, order: { sortOrder: 'ASC', name: 'ASC' } })
   }
 
+  async masterDataGroups() {
+    return this.masterDataRepo.createQueryBuilder('item').select('item.group', 'group').distinct(true).orderBy('item.group', 'ASC').getRawMany<{ group: string }>()
+  }
+
   async createMasterData(payload: Partial<MasterData>) {
     await this.ensureMasterData()
     return this.masterDataRepo.save(this.masterDataRepo.create({ ...payload, group: String(payload.group || ''), name: String(payload.name || ''), value: String(payload.value || '') }))
@@ -64,4 +68,13 @@ export class LocationsService {
   }
 
   async removeMasterData(id: string) { await this.masterDataRepo.delete(id) }
+
+  async seedMasterData(items: Array<Pick<MasterData, 'group' | 'name' | 'value'> & Partial<MasterData>>) {
+    const keys = items.map((item) => `${item.group}:${item.value}`)
+    const existing = await this.masterDataRepo.find()
+    const existingKeys = new Set(existing.map((item) => `${item.group}:${item.value}`))
+    const missing = items.filter((item) => !existingKeys.has(`${item.group}:${item.value}`))
+    if (missing.length) await this.masterDataRepo.save(missing.map((item, sortOrder) => this.masterDataRepo.create({ ...item, sortOrder: item.sortOrder ?? sortOrder })))
+    return { inserted: missing.length, requested: keys.length }
+  }
 }

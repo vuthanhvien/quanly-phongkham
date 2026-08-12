@@ -33,7 +33,7 @@ import { IMaskInput } from "react-imask"
 import { api, resolveFileUrl } from "../api"
 import { controlHeightBySize, useAppUi } from "../app-ui"
 import { FileUploadPanel } from "./FileUploadPanel"
-import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
+import { CustomField, entityLabels, FieldSpec, normalizeSelectOption, relationFields } from "../models"
 import { getRelationMetaMap, loadRelationOptions, LookupMap, RelationLookupRecord } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
 import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
@@ -120,7 +120,7 @@ export function RecordFormContent({
         ? api.get("/records/leave-types", { params: { pageSize: 100 } })
         : Promise.resolve({ data: { data: [] } }),
     ])
-      .then(([fieldResponse, viewResponse, tableResponse, leaveTypesResponse]) => {
+      .then(async ([fieldResponse, viewResponse, tableResponse, leaveTypesResponse]) => {
         const tables = new Map((tableResponse.data.data || []).map((table: Record<string, unknown>) => [String(table.id), table]))
         const customFields = fieldResponse.data.data.filter(
           (field: CustomField) => field.isActive,
@@ -146,9 +146,21 @@ export function RecordFormContent({
           "FORM",
           getStoredUserRole(),
         )
+        const masterFields = nextFields.filter((field) => Array.isArray(field.options) && field.options.length > 0)
+        const seedItems = masterFields.flatMap((field) => field.options!.map((option) => {
+          const normalized = normalizeSelectOption(option)
+          return { group: `${resource}.${field.key}`, name: normalized.label, value: normalized.value }
+        }))
+        if (seedItems.length) await api.post("/master-data/seed", { items: seedItems })
+        const masterOptions = await Promise.all(masterFields.map(async (field) => {
+          const response = await api.get("/master-data", { params: { group: `${resource}.${field.key}` } })
+          return [field.key, (response.data.data || []).filter((item: Record<string, unknown>) => item.isActive !== false).map((item: Record<string, unknown>) => ({ value: String(item.value), label: String(item.name) }))] as const
+        }))
+        const masterOptionMap = new Map(masterOptions)
+        const fieldsWithMasterData = nextFields.map((field) => masterOptionMap.has(field.key) ? { ...field, options: masterOptionMap.get(field.key) } : field)
         const fieldsWithLeaveTypes = resource === "leave-requests" || resource === "leave-allocations"
-          ? nextFields.map((field) => field.key === "leaveType" || field.key === "leaveTypeCode" ? { ...field, options: leaveTypeOptions } : field)
-          : nextFields
+          ? fieldsWithMasterData.map((field) => field.key === "leaveType" || field.key === "leaveTypeCode" ? { ...field, options: leaveTypeOptions } : field)
+          : fieldsWithMasterData
         setFields(fieldsWithLeaveTypes)
         return loadRelationOptions(fieldsWithLeaveTypes)
       })

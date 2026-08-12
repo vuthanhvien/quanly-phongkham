@@ -15,6 +15,9 @@ export class LocationsController {
 export class MasterDataController {
   constructor(private readonly locations: LocationsService) {}
 
+  @Get('groups')
+  async groups() { return { data: await this.locations.masterDataGroups() }; }
+
   @Get()
   async list(@Query('group') group: string) { return { data: await this.locations.masterData(group) }; }
 
@@ -26,4 +29,7 @@ export class MasterDataController {
 
   @Delete(':id')
   async remove(@Param('id') id: string) { await this.locations.removeMasterData(id); return { data: true }; }
+
+  @Post('seed')
+  async seed(@Body('items') items: Array<{ group: string; name: string; value: string }> = []) { return { data: await this.locations.seedMasterData(items) }; }
 }
