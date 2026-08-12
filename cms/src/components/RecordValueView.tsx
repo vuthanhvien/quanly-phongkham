@@ -25,11 +25,13 @@ export function RecordValueView({ field, value, lookups, fileLookups, compact, o
   if (value === null || value === undefined || value === "") return <span>-</span>
 
   if (isAvatarField(field)) {
+    const avatarValue = normalizeStringArray(value)[0]
+    const file = avatarValue ? fileLookups[avatarValue] : undefined
     return (
       <Avatar
         className={`record-avatar${compact ? " record-avatar--table" : ""}`}
-        size={compact ? 28 : 64}
-        src={resolveFileUrl(String(value))}
+        size={compact ? 36 : 64}
+        src={resolveFileUrl(file?.publicUrl || avatarValue || "")}
       />
     )
   }
@@ -244,7 +246,9 @@ function isImageUrlField(field: string | FieldSpec, value: unknown) {
 }
 
 function isAvatarField(field: string | FieldSpec) {
-  return typeof field !== "string" && field.key === "avatarUrl"
+  if (typeof field === "string") return field === "avatarUrl"
+  const label = String(field.label || "").trim().toLowerCase()
+  return field.key === "avatarUrl" || label === "hình đại diện" || label === "avatar"
 }
 
 function isFileField(field: string | FieldSpec) {

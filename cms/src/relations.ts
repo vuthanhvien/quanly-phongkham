@@ -176,7 +176,7 @@ export async function loadFileLookupMap(pageSize = 500) {
 }
 
 export function hasFileField(fields: FieldSpec[]) {
-  return fields.some((field) => field.type === 'file');
+  return fields.some((field) => field.type === 'file' || field.type === 'image' || field.type === 'images');
 }
 
 const DATETIME_KEYS = new Set(['createdAt', 'updatedAt', 'deletedAt']);

@@ -204,9 +204,13 @@ export class SeedService implements OnApplicationBootstrap {
     const existing = await this.users.findOne({ where: { email: PROTECTED_ADMIN.email } });
     if (existing) return;
 
+    // Older installations already receive a seeded `admin` username. Keep it
+    // untouched and create the protected account with a unique fallback name.
+    const existingUsername = await this.users.findOne({ where: { username: PROTECTED_ADMIN.username } });
+
     await this.users.save(this.users.create({
       email: PROTECTED_ADMIN.email,
-      username: PROTECTED_ADMIN.username,
+      username: existingUsername ? 'admin-system' : PROTECTED_ADMIN.username,
       fullName: PROTECTED_ADMIN.fullName,
       passwordHash: await hash(PROTECTED_ADMIN.password, 10),
       role: 'ADMIN',
