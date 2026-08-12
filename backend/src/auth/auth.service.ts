@@ -19,6 +19,7 @@ const RESOURCE_ACTIONS: Record<string, string[]> = {
 };
 
 const SCREEN_KEYS = ['settings', 'audit-logs', 'zalo-inbox', 'accounting-reports'];
+const PROTECTED_ADMIN_EMAIL = 'admin@admin.com';
 
 function normalizeRole(role?: string) {
   return role?.trim().toUpperCase() || DEFAULT_ROLE_SCOPE;
@@ -127,6 +128,9 @@ export class AuthService {
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const user = await this.users.findOne({ where: { id: userId, isActive: true } });
     if (!user) throw new UnauthorizedException('Tài khoản không còn hoạt động');
+    if (user.email.toLowerCase() === PROTECTED_ADMIN_EMAIL) {
+      throw new BadRequestException('Tài khoản Admin hệ thống được bảo vệ và không thể đổi mật khẩu');
+    }
 
     if (!(await compare(currentPassword, user.passwordHash))) {
       throw new BadRequestException('Mật khẩu hiện tại không đúng');

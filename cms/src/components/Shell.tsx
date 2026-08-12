@@ -246,14 +246,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const currentResource = location.pathname.split("/")[1]
   const activeCompanyType = settings.companyType || "clinic"
   const isAdmin = isCurrentUserAdmin()
+  const canAccessScreen = (screen: string) => isAdmin || hasScreenAccess(screen)
   const visibleGroups = appModuleGroups
     .map((group) => ({
       ...group,
       label: resolveMenuGroupLabel(group.key, group.label, activeCompanyType),
       resources: group.modules.filter((resource) => {
         if (!entityLabels[resource] && !moduleNavigation[resource]) return false
-        if (moduleNavigation[resource]?.screen && !hasScreenAccess(moduleNavigation[resource].screen!)) return false
-        if (!isModuleEnabled(resource, settings.enabledModules, activeCompanyType, settings.hasCustomModuleSelection)) return false
+        if (moduleNavigation[resource]?.screen && !canAccessScreen(moduleNavigation[resource].screen!)) return false
+        if (!isAdmin && !isModuleEnabled(resource, settings.enabledModules, activeCompanyType, settings.hasCustomModuleSelection)) return false
         return hasResourceAccess(resource)
       }),
     }))
@@ -279,7 +280,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           icon: menuIcons[key] || <SolutionOutlined />,
           label: <Link to={moduleNavigation[key]?.path || `/${key}`}>{moduleNavigation[key]?.label || entityLabels[key] || appModuleLabels[key] || key}</Link>,
         })),
-        ...(group.key === "admin" && hasScreenAccess("settings")
+        ...(group.key === "admin" && canAccessScreen("settings")
           ? [
               {
                 key: "/role-module-settings",
@@ -300,49 +301,49 @@ export function Shell({ children }: { children: React.ReactNode }) {
       icon: <GoldOutlined />,
       label: "Công cụ hệ thống",
       children: [
-        hasScreenAccess("settings")
+        canAccessScreen("settings")
           ? {
               key: "/print-templates",
               icon: <FileTextOutlined />,
               label: <Link to="/print-templates">Mẫu in</Link>,
             }
           : null,
-        hasScreenAccess("settings")
+        canAccessScreen("settings")
           ? {
               key: "/ui-settings",
               icon: <SettingOutlined />,
               label: <Link to="/ui-settings">Giao diện CMS</Link>,
             }
           : null,
-        hasScreenAccess("settings")
+        canAccessScreen("settings")
           ? {
               key: "/chatbot-settings",
               icon: <RobotOutlined />,
               label: <Link to="/chatbot-settings">Trợ lý chat</Link>,
             }
           : null,
-        hasScreenAccess("settings")
+        canAccessScreen("settings")
           ? {
               key: "/custom-fields",
               icon: menuIcons["custom-fields"],
               label: <Link to="/custom-fields">Trường tuỳ biến</Link>,
             }
           : null,
-        hasScreenAccess("settings")
+        canAccessScreen("settings")
           ? {
               key: "/custom-tables",
               icon: <AppstoreOutlined />,
               label: <Link to="/custom-tables">Bảng dữ liệu động</Link>,
             }
           : null,
-        hasScreenAccess("settings")
+        canAccessScreen("settings")
           ? {
               key: "/locations",
               icon: <AppstoreOutlined />,
               label: <Link to="/locations">Master Data Địa chỉ</Link>,
             }
           : null,
-        hasScreenAccess("audit-logs")
+        canAccessScreen("audit-logs")
           ? {
               key: "/audit-logs",
               icon: <AuditOutlined />,
@@ -352,7 +353,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ].filter(Boolean),
     },
   ]
-    .filter((item) => item.key !== "/calendar" || isModuleEnabled("calendar", settings.enabledModules, activeCompanyType, settings.hasCustomModuleSelection))
+    .filter((item) => item.key !== "/calendar" || isAdmin || isModuleEnabled("calendar", settings.enabledModules, activeCompanyType, settings.hasCustomModuleSelection))
     .filter((item) => item && (item.key !== "system-tools" || ((item.children as []) || []).length > 0))
   const selected =
     location.pathname === "/"

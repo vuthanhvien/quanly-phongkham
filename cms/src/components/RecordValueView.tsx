@@ -25,7 +25,13 @@ export function RecordValueView({ field, value, lookups, fileLookups, compact, o
   if (value === null || value === undefined || value === "") return <span>-</span>
 
   if (isAvatarField(field)) {
-    return <Avatar size={compact ? 32 : 64} src={resolveFileUrl(String(value))} />
+    return (
+      <Avatar
+        className={`record-avatar${compact ? " record-avatar--table" : ""}`}
+        size={compact ? 28 : 64}
+        src={resolveFileUrl(String(value))}
+      />
+    )
   }
 
   if (isImageUrlField(field, value)) {

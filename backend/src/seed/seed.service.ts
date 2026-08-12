@@ -38,6 +38,12 @@ import {
 } from '../entities/entities';
 
 const LARGE_SEED_BATCH_SIZE = 500;
+const PROTECTED_ADMIN = {
+  email: 'admin@admin.com',
+  username: 'admin',
+  fullName: 'Admin',
+  password: 'Admin',
+} as const;
 const LARGE_SEED_PREFIXES = {
   branchSlug: 'bulk-branch-',
   branchName: 'Bulk Branch ',
@@ -187,10 +193,26 @@ export class SeedService implements OnApplicationBootstrap {
 
   private async seedTenant() {
     await this.cleanupLegacyBranchRoleAssignments();
+    await this.ensureProtectedAdmin();
     const context = await this.ensureCoreSeed();
     await this.ensureBaseSettings();
     await this.normalizeBulkAppointmentTimes();
     await this.seedLargeDataIfEnabled(context);
+  }
+
+  private async ensureProtectedAdmin() {
+    const existing = await this.users.findOne({ where: { email: PROTECTED_ADMIN.email } });
+    if (existing) return;
+
+    await this.users.save(this.users.create({
+      email: PROTECTED_ADMIN.email,
+      username: PROTECTED_ADMIN.username,
+      fullName: PROTECTED_ADMIN.fullName,
+      passwordHash: await hash(PROTECTED_ADMIN.password, 10),
+      role: 'ADMIN',
+      isActive: true,
+      isArchived: false,
+    }));
   }
 
   private async ensureCoreSeed(): Promise<CoreSeedContext> {

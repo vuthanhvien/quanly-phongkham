@@ -2777,6 +2777,18 @@ textarea.ant-input {
   gap: 6px;
 }
 
+.record-avatar {
+  flex: 0 0 auto;
+}
+
+.record-avatar .ant-avatar-img {
+  object-fit: cover;
+}
+
+.record-avatar--table {
+  display: block;
+}
+
 .record-image-thumb {
   align-items: flex-start;
   color: var(--app-text);

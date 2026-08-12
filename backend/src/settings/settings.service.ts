@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
@@ -16,6 +16,7 @@ import { assertPdfHasReadableText, renderPdfTemplate as renderPdfTemplateFile } 
 const DEFAULT_ROLE_SCOPE = 'ALL';
 const LEGACY_DEFAULT_CODE_FORMULA = '{NUMBER:6}';
 const SYSTEM_ROLES = ['ADMIN', 'STAFF', 'DOCTOR'];
+const PROTECTED_ADMIN_EMAIL = 'admin@admin.com';
 const LANDING_BLOCK_TYPES = ['title', 'text', 'image', 'video', 'form', 'slider'];
 const UI_THEME_OPTIONS = ['dark', 'light'];
 const UI_SIZE_OPTIONS = ['small', 'medium', 'large'];
@@ -1152,6 +1153,7 @@ export class SettingsService {
     if (!payload.userId || !payload.branchId) {
       throw new BadRequestException('userId và branchId là bắt buộc');
     }
+    await this.assertProtectedAdminAssignment(String(payload.userId));
     const roleKeys = await this.resolveRoleKeys(payload.roleKeys || []);
     const staffId = await this.resolveAssignmentStaffId(payload.userId);
     await this.assertAssignmentCompatible(payload.userId, roleKeys);
@@ -1177,6 +1179,7 @@ export class SettingsService {
     const assignment = await this.branchRoles.findOne({ where: { id, userId: Not(IsNull()) } });
     if (!assignment) throw new NotFoundException('Không tìm thấy gán role chi nhánh');
     const userId = String(payload.userId || assignment.userId || '');
+    await this.assertProtectedAdminAssignment(userId);
     const roleKeys = await this.resolveRoleKeys(payload.roleKeys ?? assignment.roleKeys ?? []);
     const staffId = await this.resolveAssignmentStaffId(userId);
     await this.assertAssignmentCompatible(userId, roleKeys);
@@ -1193,6 +1196,7 @@ export class SettingsService {
     this.assertSettingsAccess(user);
     const assignment = await this.branchRoles.findOne({ where: { id, userId: Not(IsNull()) } });
     if (!assignment) throw new NotFoundException('Không tìm thấy gán role chi nhánh');
+    await this.assertProtectedAdminAssignment(String(assignment.userId));
     assignment.isArchived = true;
     await this.branchRoles.save(assignment);
     return { id };
@@ -1438,6 +1442,13 @@ export class SettingsService {
 
   private isAdmin(user?: AuthUser) {
     return !user || (user.roleMain || user.role) === 'ADMIN';
+  }
+
+  private async assertProtectedAdminAssignment(userId: string) {
+    const account = await this.users.findOne({ where: { id: userId } });
+    if (account?.email.toLowerCase() === PROTECTED_ADMIN_EMAIL) {
+      throw new ForbiddenException('Không thể thay đổi phân quyền của tài khoản Admin hệ thống');
+    }
   }
 
   private assertSettingsAccess(user?: AuthUser) {

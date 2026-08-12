@@ -821,24 +821,32 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     setDynamicRoles(roleResponse.data.data)
   }
 
-  async function saveView() {
+  async function saveFieldView(viewType: ViewType, config: FieldLayoutConfig[], reused: boolean) {
     try {
-      await Promise.all([...VIEW_TYPES.map((viewType) => {
-        if (reuseInherited[viewType]) {
-          return api.delete(`/settings/views/${entityType}`, { params: { role: selectedRole, viewType } })
-        }
-        const config = viewType === "TABLE" ? tableConfig : viewType === "FORM" ? formConfig : detailConfig
-        return api.put(`/settings/views/${entityType}/${viewType}`, {
+      if (reused) {
+        await api.delete(`/settings/views/${entityType}`, { params: { role: selectedRole, viewType } })
+      } else {
+        await api.put(`/settings/views/${entityType}/${viewType}`, {
           role: selectedRole,
           config: serializeViewConfig(viewType, config, true, undefined, viewType === "TABLE"),
         })
-      }), reuseActionInherited
-        ? api.delete(`/settings/views/${entityType}`, { params: { role: selectedRole, viewType: "ACTION" } })
-        : api.put(`/settings/views/${entityType}/ACTION`, { role: selectedRole, config: { allowedActions } })])
-      toast.success("Đã lưu cấu hình module theo role")
-      await load()
+      }
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Không thể lưu cấu hình hiển thị"))
+      toast.error(getApiErrorMessage(error, "Không thể tự lưu cấu hình hiển thị"))
+      await load()
+    }
+  }
+
+  async function saveActionView(actions: string[], reused: boolean) {
+    try {
+      if (reused) {
+        await api.delete(`/settings/views/${entityType}`, { params: { role: selectedRole, viewType: "ACTION" } })
+      } else {
+        await api.put(`/settings/views/${entityType}/ACTION`, { role: selectedRole, config: { allowedActions: actions } })
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Không thể tự lưu cấu hình hiển thị"))
+      await load()
     }
   }
 
@@ -938,12 +946,13 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     if (viewType === "TABLE") setter = setTableConfig
     if (viewType === "DETAIL") setter = setDetailConfig
 
-    setter((current) =>
-      current.map((field) =>
+    const current = viewType === "TABLE" ? tableConfig : viewType === "FORM" ? formConfig : detailConfig
+    const next = current.map((field) =>
         field.key === key ? { ...field, ...patch } : field,
-      ),
     )
-  }, [])
+    setter(next)
+    void saveFieldView(viewType, next, reuseInherited[viewType])
+  }, [detailConfig, entityType, formConfig, reuseInherited, selectedRole, tableConfig])
 
   const reorderConfig = useCallback((
     viewType: ViewType,
@@ -955,18 +964,18 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     if (viewType === "TABLE") setter = setTableConfig
     if (viewType === "DETAIL") setter = setDetailConfig
 
-    setter((current) => {
-      const fromIndex = current.findIndex((field) => field.key === fromKey)
-      const toIndex = current.findIndex((field) => field.key === toKey)
+    const current = viewType === "TABLE" ? tableConfig : viewType === "FORM" ? formConfig : detailConfig
+    const fromIndex = current.findIndex((field) => field.key === fromKey)
+    const toIndex = current.findIndex((field) => field.key === toKey)
 
-      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return current
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return
 
-      const next = [...current]
-      const [moved] = next.splice(fromIndex, 1)
-      next.splice(toIndex, 0, moved)
-      return next
-    })
-  }, [])
+    const next = [...current]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    setter(next)
+    void saveFieldView(viewType, next, reuseInherited[viewType])
+  }, [detailConfig, entityType, formConfig, reuseInherited, selectedRole, tableConfig])
 
   return (
     <>
@@ -1040,12 +1049,16 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                         key: "ACTIONS",
                         label: <span className="settings-view-tab-label">Thao tác theo vai trò {reuseActionInherited && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(actionSource)}`}><LinkOutlined /></Tooltip>}</span>,
                         children: (
-                          <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseActionInherited} source={formatRoleLabel(actionSource)} onReuseChange={setReuseActionInherited}>
+                          <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseActionInherited} source={formatRoleLabel(actionSource)} onReuseChange={(checked) => { setReuseActionInherited(checked); void saveActionView(allowedActions, checked) }}>
                           <Card size="small">
                             <Checkbox
                               checked={allowedActions.length === actionOptions.length}
                               indeterminate={allowedActions.length > 0 && allowedActions.length < actionOptions.length}
-                              onChange={(event) => setAllowedActions(event.target.checked ? actionOptions.map((item) => item.key) : [])}
+                              onChange={(event) => {
+                                const next = event.target.checked ? actionOptions.map((item) => item.key) : []
+                                setAllowedActions(next)
+                                void saveActionView(next, reuseActionInherited)
+                              }}
                               style={{ marginBottom: 10 }}
                             >
                               Chọn tất cả action
@@ -1056,7 +1069,11 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                                 value: item.key,
                               }))}
                               value={allowedActions}
-                              onChange={(values) => setAllowedActions(values.map(String))}
+                              onChange={(values) => {
+                                const next = values.map(String)
+                                setAllowedActions(next)
+                                void saveActionView(next, reuseActionInherited)
+                              }}
                             />
                           </Card>
                           </ViewOverridePanel>
@@ -1065,29 +1082,20 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                       {
                         key: "TABLE",
                         label: <span className="settings-view-tab-label">Bảng {reuseInherited.TABLE && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.TABLE)}`}><LinkOutlined /></Tooltip>}</span>,
-                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.TABLE} source={formatRoleLabel(viewSources.TABLE)} onReuseChange={(checked) => setReuseInherited((current) => ({ ...current, TABLE: checked }))}><ViewConfigTable dataSource={tableConfig} viewType="TABLE" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
+                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.TABLE} source={formatRoleLabel(viewSources.TABLE)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, TABLE: checked })); void saveFieldView("TABLE", tableConfig, checked) }}><ViewConfigTable dataSource={tableConfig} viewType="TABLE" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
                       },
                       {
                         key: "FORM",
                         label: <span className="settings-view-tab-label">Form nhập liệu {reuseInherited.FORM && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.FORM)}`}><LinkOutlined /></Tooltip>}</span>,
-                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.FORM} source={formatRoleLabel(viewSources.FORM)} onReuseChange={(checked) => setReuseInherited((current) => ({ ...current, FORM: checked }))}><ViewConfigTable dataSource={formConfig} viewType="FORM" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
+                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.FORM} source={formatRoleLabel(viewSources.FORM)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, FORM: checked })); void saveFieldView("FORM", formConfig, checked) }}><ViewConfigTable dataSource={formConfig} viewType="FORM" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
                       },
                       {
                         key: "DETAIL",
                         label: <span className="settings-view-tab-label">Thông tin chi tiết {reuseInherited.DETAIL && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.DETAIL)}`}><LinkOutlined /></Tooltip>}</span>,
-                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.DETAIL} source={formatRoleLabel(viewSources.DETAIL)} onReuseChange={(checked) => setReuseInherited((current) => ({ ...current, DETAIL: checked }))}><ViewConfigTable dataSource={detailConfig} viewType="DETAIL" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
+                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.DETAIL} source={formatRoleLabel(viewSources.DETAIL)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, DETAIL: checked })); void saveFieldView("DETAIL", detailConfig, checked) }}><ViewConfigTable dataSource={detailConfig} viewType="DETAIL" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
                       },
                     ]}
                   />
-                  <Space wrap>
-                    <Button
-                      className="primary-glow"
-                      type="primary"
-                      onClick={saveView}
-                    >
-                      Lưu cấu hình hiển thị cho module
-                    </Button>
-                  </Space>
                 </div>
               ),
             },

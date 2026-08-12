@@ -78,6 +78,7 @@ import {
 import { WorkflowService } from '../workflow/workflow.service';
 
 const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print'];
+const PROTECTED_ADMIN_EMAIL = 'admin@admin.com';
 const DEFAULT_KANBAN_COLUMNS = [
   { key: 'todo', name: 'Cần làm', color: 'default', allowedToKeys: ['in_progress'] },
   { key: 'in_progress', name: 'Đang làm', color: 'blue', allowedToKeys: ['todo', 'review'] },
@@ -1069,6 +1070,7 @@ export class RecordsService {
       throw new BadRequestException('Hãy dùng endpoint upload file để tạo tệp mới');
     }
     await this.assertPermission(user, resource, 'create', this.branchIdOf(resource, payload));
+    await this.assertProtectedAdminAssignment(resource, payload);
     await this.validateCustomFields(resource, payload, true);
     const serviceOrderItems = resource === 'service-orders'
       ? await this.normalizeServiceOrderItems(payload.items)
@@ -1158,6 +1160,8 @@ export class RecordsService {
 
   async update (resource: string, id: string, payload: Record<string, unknown>, user: AuthUser) {
     const previous = await this.findStored(resource, id);
+    this.assertRecordIsNotProtected(resource, previous);
+    await this.assertProtectedAdminAssignment(resource, { ...previous, ...payload });
     const previousCustomFields = await this.loadCustomFieldsMap(resource, [id]);
     const mergedCustomFields = {
       ...(previousCustomFields.get(id) || {}),
@@ -1202,6 +1206,8 @@ export class RecordsService {
 
   async remove (resource: string, id: string, user: AuthUser) {
     const record = await this.findStored(resource, id);
+    this.assertRecordIsNotProtected(resource, record);
+    await this.assertProtectedAdminAssignment(resource, record);
     await this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
     await this.repository(resource).save({ ...record, isArchived: true });
     await this.audit(user, 'ARCHIVE', resource, id);
@@ -3323,6 +3329,7 @@ export class RecordsService {
 
     const linkedUser = await this.users.findOne({ where: { id: userId } });
     if (!linkedUser) return;
+    if (linkedUser.email.toLowerCase() === PROTECTED_ADMIN_EMAIL) return;
 
     let changed = false;
     if (linkedUser.role !== nextRole) {
@@ -4679,6 +4686,22 @@ export class RecordsService {
 
   private isAdmin (user: AuthUser | undefined) {
     return !user || (user.roleMain || user.role) === 'ADMIN';
+  }
+
+  private assertRecordIsNotProtected(resource: string, record: ConfigurableEntity) {
+    if (resource === 'user-accounts' && String((record as unknown as User).email || '').toLowerCase() === PROTECTED_ADMIN_EMAIL) {
+      throw new ForbiddenException('Tài khoản Admin hệ thống được bảo vệ và không thể chỉnh sửa hoặc xóa');
+    }
+  }
+
+  private async assertProtectedAdminAssignment(resource: string, payload: Record<string, unknown>) {
+    if (resource !== 'branch-role-assignments') return;
+    const userId = String(payload.userId || '').trim();
+    if (!userId) return;
+    const assignedUser = await this.users.findOne({ where: { id: userId } });
+    if (assignedUser?.email.toLowerCase() === PROTECTED_ADMIN_EMAIL) {
+      throw new ForbiddenException('Không thể thay đổi phân quyền của tài khoản Admin hệ thống');
+    }
   }
 
   private assertResourceAccess (user: AuthUser | undefined, resource: string) {
