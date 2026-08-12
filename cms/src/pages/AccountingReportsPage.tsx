@@ -120,9 +120,6 @@ export function AccountingReportsPage() {
       <div className="page-header">
         <div>
           <Typography.Title level={3}>Báo cáo kế toán</Typography.Title>
-          <Typography.Text type="secondary">
-            Xem sổ cái, phát sinh, dòng tiền và công nợ theo dữ liệu đã ghi sổ.
-          </Typography.Text>
         </div>
         {canBootstrapAccounting && (
           <Button loading={bootstrapping} onClick={() => setBootstrapModalOpen(true)}>

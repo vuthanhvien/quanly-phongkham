@@ -244,7 +244,9 @@ export class SettingsService {
   ) {}
 
   async getGoogleDriveConnection(user?: AuthUser) {
-    this.assertSettingsAccess(user);
+    // Any user who can use the file picker needs to know whether the shared
+    // Drive is available; connecting/disconnecting remains ADMIN-only.
+    this.assertResourceReadable(user, 'files');
     const connection = await this.googleDriveConnections.findOne({ where: { connectionKey: 'company' } });
     return {
       configured: this.isGoogleDriveConfigured(),
@@ -330,7 +332,7 @@ export class SettingsService {
   }
 
   async listGoogleDriveFiles(query?: string, pageToken?: string, parentId = 'root', user?: AuthUser) {
-    this.assertSettingsAccess(user);
+    this.assertResourceReadable(user, 'files');
     const connection = await this.googleDriveConnections.findOne({ where: { connectionKey: 'company', isConnected: true } });
     if (!connection?.refreshTokenEncrypted) throw new BadRequestException('Google Drive công ty chưa được kết nối');
     const accessToken = await this.getGoogleDriveAccessToken(connection);
@@ -368,7 +370,7 @@ export class SettingsService {
   }
 
   async listGoogleDriveFolders(user?: AuthUser) {
-    this.assertSettingsAccess(user);
+    this.assertResourceReadable(user, 'files');
     const connection = await this.googleDriveConnections.findOne({ where: { connectionKey: 'company', isConnected: true } });
     if (!connection?.refreshTokenEncrypted) throw new BadRequestException('Google Drive công ty chưa được kết nối');
     const accessToken = await this.getGoogleDriveAccessToken(connection);

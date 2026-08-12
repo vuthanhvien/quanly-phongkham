@@ -85,7 +85,6 @@ export function WorkflowTasksPage() {
       <div className="page-header">
         <div>
           <Typography.Title level={3}>Việc cần duyệt</Typography.Title>
-          <Typography.Text type="secondary">Các yêu cầu đang được giao cho bạn trong workflow.</Typography.Text>
         </div>
         <Button icon={<ReloadOutlined />} onClick={() => void load()}>Tải lại</Button>
       </div>

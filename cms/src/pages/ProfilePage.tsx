@@ -354,9 +354,6 @@ export function ProfilePage() {
           <Typography.Title level={3} style={{ marginBottom: 4 }}>
             Hồ sơ cá nhân
           </Typography.Title>
-          <Typography.Paragraph style={{ margin: 0 }}>
-            Bên trái là thông tin tài khoản, bên phải là các tab hồ sơ liên kết theo nhân viên và phân quyền.
-          </Typography.Paragraph>
         </div>
         <div className="page-header-actions">
           <Button type="primary" icon={<LockOutlined />} onClick={() => setChangePasswordOpen(true)}>

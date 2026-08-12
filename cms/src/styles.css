@@ -1805,6 +1805,14 @@ body {
   box-shadow: 0 -8px 12px -14px rgba(15, 23, 42, 0.65);
 }
 
+.record-form-actions {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  max-width: 100%;
+  width: 100%;
+}
+
 .record-form .ant-form-item {
   margin-bottom: 12px;
 }

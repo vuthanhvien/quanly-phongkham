@@ -323,7 +323,6 @@ export function DashboardPage() {
         <div>
           <Typography.Text className="eyebrow">Tổng quan</Typography.Text>
           <Typography.Title level={2}>Hôm nay có gì?</Typography.Title>
-          <Typography.Text type="secondary">Theo dõi nhịp vận hành và các việc cần xử lý trong ngày.</Typography.Text>
         </div>
         <div className="dashboard-today-meta">
           <div className="dashboard-time-card">

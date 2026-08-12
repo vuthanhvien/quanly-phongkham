@@ -394,9 +394,6 @@ export function UiSettingsPage() {
             <BgColorsOutlined />
             <span>Giao diện CMS</span>
           </Typography.Title>
-          <Typography.Paragraph style={{ margin: 0 }}>
-            Tuỳ biến sâu màu sắc và phong cách CMS cho nền, đầu trang, menu, chữ và nút bấm.
-          </Typography.Paragraph>
         </div>
         <Space>
           <Button icon={<UndoOutlined />} onClick={handleResetDefaults}>

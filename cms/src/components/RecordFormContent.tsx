@@ -494,14 +494,16 @@ export function RecordFormContent({
             onClose={() => setSubmitError(null)}
           />
         ) : null}
-        <Space className="record-form-actions">
+        <div className="record-form-actions">
+          <Space>
+            {!editing ? <Button loading={draftBusy} onClick={() => void saveDraft()}>Lưu nháp</Button> : null}
+            {!editing ? <Button onClick={() => void openDrafts()}>Bản nháp{drafts.length ? ` (${drafts.length})` : ""}</Button> : null}
+            <Button onClick={onCancel}>Hủy</Button>
+          </Space>
           <Button className="primary-glow" htmlType="submit" type="primary">
             Lưu
           </Button>
-          {!editing ? <Button loading={draftBusy} onClick={() => void saveDraft()}>Lưu nháp</Button> : null}
-          {!editing ? <Button onClick={() => void openDrafts()}>Bản nháp{drafts.length ? ` (${drafts.length})` : ""}</Button> : null}
-          <Button onClick={onCancel}>Hủy</Button>
-        </Space>
+        </div>
       </Form>
       {!editing ? (
         <Modal footer={null} onCancel={() => setDraftsOpen(false)} open={draftsOpen} title={`Bản nháp ${entityLabels[resource] || resource}`}>
@@ -1137,13 +1139,14 @@ function FileSelectInput({
         if (!popup.closed) return
         window.clearInterval(timer)
         void loadOptions()
+        void loadGoogleDriveFiles()
       }, 800)
     } catch (error) {
       toastError(getApiErrorMessage(error, "Không thể kết nối Google Drive"))
     }
   }
 
-  const optionByValue = new Map(options.map((option) => [option.value, option]))
+  const optionByValue = new Map([...options, ...googleOptions].map((option) => [option.value, option]))
   const toFileOption = (item: string) => optionByValue.get(item) || buildExternalFileOption(item)
   const emitValue = (values: string[]) => onChange?.(forceArray ? (values.length > 0 ? values : undefined) : toSingleOrArray(values))
   const addManualLink = (rawValue: string) => {
@@ -1234,14 +1237,35 @@ function FileSelectInput({
             <Button block onClick={() => setSelectedFolderId(undefined)}>
               Tất cả folder
             </Button>
+            <Tabs
+              activeKey={source}
+              items={[
+                { key: "local", label: "Thư viện" },
+                { key: "google", label: "Google Drive" },
+              ]}
+              onChange={(key) => {
+                const nextSource = key === "google" ? "google" : "local"
+                setSource(nextSource)
+                if (nextSource === "google") void loadGoogleDriveFiles(selectedGoogleFolderId)
+              }}
+            />
             <Tree
               blockNode
               className="image-library-tree"
               defaultExpandAll
               filterTreeNode={(node) => String(node.title || "").toLowerCase().includes(search.trim().toLowerCase())}
-              selectedKeys={selectedFolderId ? [selectedFolderId] : []}
-              treeData={treeData}
-              onSelect={(keys) => setSelectedFolderId(keys[0] ? String(keys[0]) : undefined)}
+              selectedKeys={source === "google" ? [selectedGoogleFolderId] : (selectedFolderId ? [selectedFolderId] : [])}
+              treeData={source === "google" ? googleTreeData : treeData}
+              onSelect={(keys) => {
+                const folderId = keys[0] ? String(keys[0]) : undefined
+                if (source === "google") {
+                  const nextFolderId = folderId || "root"
+                  setSelectedGoogleFolderId(nextFolderId)
+                  void loadGoogleDriveFiles(nextFolderId)
+                  return
+                }
+                setSelectedFolderId(folderId)
+              }}
             />
           </div>
           <div className="image-library-browser">
@@ -1251,20 +1275,26 @@ function FileSelectInput({
                 placeholder="Tìm theo tên tệp, đuôi tệp hoặc thư mục"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
+                onSearch={() => { if (source === "google") void loadGoogleDriveFiles(selectedGoogleFolderId) }}
               />
-              <Input.Search
-                allowClear
-                enterButton="Thêm link"
-                placeholder="Dán link Google Drive/local"
-                value={manualLink}
-                onChange={(event) => setManualLink(event.target.value)}
-                onSearch={addManualLink}
-              />
-              <Button onClick={() => setOpenUpload(true)}>Tải tệp mới lên</Button>
+              {source === "local" ? <>
+                <Input.Search
+                  allowClear
+                  enterButton="Thêm link"
+                  placeholder="Dán link Google Drive/local"
+                  value={manualLink}
+                  onChange={(event) => setManualLink(event.target.value)}
+                  onSearch={addManualLink}
+                />
+                <Button onClick={() => setOpenUpload(true)}>Tải tệp mới lên</Button>
+              </> : null}
+              {source === "google" && !googleDriveConnected ? <Button onClick={() => void connectGoogleDrive()}>Kết nối Google Drive</Button> : null}
             </div>
             <div className="image-library-current-folder">
               <Typography.Text type="secondary">
-                {selectedFolderId ? folderPathMap[selectedFolderId] || "Thư mục đã chọn" : "Đang xem tất cả thư mục"}
+                {source === "google"
+                  ? (googleFolderPathMap[selectedGoogleFolderId] || "Google Drive")
+                  : (selectedFolderId ? folderPathMap[selectedFolderId] || "Thư mục đã chọn" : "Đang xem tất cả thư mục")}
               </Typography.Text>
             </div>
             <div className="image-library-content">

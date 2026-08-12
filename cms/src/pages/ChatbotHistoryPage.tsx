@@ -58,7 +58,6 @@ export function ChatbotHistoryPage({ embedded = false }: { embedded?: boolean })
       {!embedded && <div className="page-header">
         <div>
           <Typography.Title level={3}>Lịch sử GIS AI</Typography.Title>
-          <Typography.Text type="secondary">Hội thoại của nhân viên với trợ lý CMS.</Typography.Text>
         </div>
         <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>Tải lại</Button>
       </div>}
