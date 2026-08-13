@@ -27,7 +27,9 @@ function normalizeDomain(value: string) {
 export class TenantDataSourceService implements OnModuleInit, OnModuleDestroy {
   private management?: DataSource;
   private readonly connections = new Map<string, TenantConnection>();
-  private readonly initializing = new Map<string, Promise<TenantConnection>>();
+  /** A database may legitimately be mapped to aliases such as a.vienvu.com and dev1.vienvu.com. */
+  private readonly dataSources = new Map<string, DataSource>();
+  private readonly initializing = new Map<string, Promise<DataSource>>();
   private readonly domainCache = new Map<string, { tenant?: Tenant; expiresAt: number }>();
   private readonly domainCacheTtlMs: number;
   private readonly isMultiTenant: boolean;
@@ -55,7 +57,7 @@ export class TenantDataSourceService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    await Promise.all([...this.connections.values()].map(({ dataSource }) => dataSource.destroy()));
+    await Promise.all([...this.dataSources.values()].map((dataSource) => dataSource.destroy()));
     if (this.management?.isInitialized) await this.management.destroy();
   }
 
@@ -127,7 +129,13 @@ export class TenantDataSourceService implements OnModuleInit, OnModuleDestroy {
     const connection = this.connections.get(tenant.id);
     if (connection) {
       this.connections.delete(tenant.id);
-      void connection.dataSource.destroy();
+      const isStillUsed = [...this.connections.values()].some(({ dataSource }) => dataSource === connection.dataSource);
+      if (!isStillUsed) {
+        for (const [databaseUrl, dataSource] of this.dataSources) {
+          if (dataSource === connection.dataSource) this.dataSources.delete(databaseUrl);
+        }
+        void connection.dataSource.destroy();
+      }
     }
   }
 
@@ -135,28 +143,35 @@ export class TenantDataSourceService implements OnModuleInit, OnModuleDestroy {
     const cached = this.connections.get(tenant.id);
     if (cached) return cached;
 
-    const pending = this.initializing.get(tenant.id);
-    if (pending) return pending;
-
-    const initialization = (async () => {
+    const databaseKey = tenant.databaseUrl;
+    let dataSource = this.dataSources.get(databaseKey);
+    if (!dataSource) {
+      let pending = this.initializing.get(databaseKey);
+      if (!pending) {
+        pending = (async () => {
       const options: DataSourceOptions = {
         type: databaseType(tenant.databaseUrl),
         url: tenant.databaseUrl,
         entities: ENTITIES,
         synchronize: this.shouldSynchronize(),
       };
-      const dataSource = new DataSource(options);
-      await dataSource.initialize();
-      const connection = { id: tenant.id, domain: tenant.domain, dataSource };
-      this.connections.set(tenant.id, connection);
-      return connection;
-    })();
-    this.initializing.set(tenant.id, initialization);
-    try {
-      return await initialization;
-    } finally {
-      this.initializing.delete(tenant.id);
+          const source = new DataSource(options);
+          await source.initialize();
+          this.dataSources.set(databaseKey, source);
+          return source;
+        })();
+        this.initializing.set(databaseKey, pending);
+      }
+      try {
+        dataSource = await pending;
+      } finally {
+        this.initializing.delete(databaseKey);
+      }
     }
+
+    const connection = { id: tenant.id, domain: tenant.domain, dataSource };
+    this.connections.set(tenant.id, connection);
+    return connection;
   }
 
   private shouldSynchronize() {

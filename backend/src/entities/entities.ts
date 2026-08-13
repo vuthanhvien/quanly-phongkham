@@ -1779,7 +1779,7 @@ export class AppUiSetting {
   @Column({ default: false })
   hasCustomModuleSelection: boolean;
 
-  @Column({ default: 'Thien Chanh CMS' })
+  @Column({ default: 'Clinic CMS' })
   appName: string;
 
   @Column({ type: 'text', nullable: true })

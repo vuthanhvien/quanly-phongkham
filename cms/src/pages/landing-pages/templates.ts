@@ -154,7 +154,7 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
       blocks: [
         { id: makeId(), type: 'title', row: 1, span: 12, order: 1, title: 'Chúng tôi luôn sẵn sàng lắng nghe bạn', level: 1, align: 'center' },
         { id: makeId(), type: 'text', row: 2, span: 4, order: 2, text: '📍 Cơ sở 1 – Quận 1\n123 Đường Nguyễn Trãi, P. Bến Thành\nQ.1, TP.HCM\n\n📍 Cơ sở 2 – Quận 7\n456 Đường Nguyễn Hữu Thọ, P. Tân Phong\nQ.7, TP.HCM', align: 'left' },
-        { id: makeId(), type: 'text', row: 2, span: 4, order: 3, text: '📞 Hotline: 1800 1234 (miễn phí)\n📱 Zalo: 0901 234 567\n📧 Email: info@thienchanh.clinic\n🌐 Website: thienchanh.clinic\n\n💬 Fanpage: fb.com/ThienChanhClinic', align: 'left' },
+        { id: makeId(), type: 'text', row: 2, span: 4, order: 3, text: '📞 Hotline: 1800 1234 (miễn phí)\n📱 Zalo: 0901 234 567\n📧 Email: info@admin.clinic\n🌐 Website: admin.clinic\n\n💬 Fanpage: fb.com/ClinicPage', align: 'left' },
         { id: makeId(), type: 'text', row: 2, span: 4, order: 4, text: '⏰ Giờ làm việc\n\nThứ 2 – Thứ 6: 8:00 – 20:00\nThứ 7: 8:00 – 18:00\nChủ nhật: 9:00 – 17:00\n\n🎄 Không nghỉ lễ Tết (trừ mùng 1 Tết)', align: 'left' },
         {
           id: makeId(), type: 'form', row: 3, span: 12, order: 5,

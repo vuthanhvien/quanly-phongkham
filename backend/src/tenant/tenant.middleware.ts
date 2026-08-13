@@ -11,7 +11,12 @@ export class TenantMiddleware implements NestMiddleware {
   ) {}
 
   async use(req: Request, _res: Response, next: NextFunction) {
-    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '');
+    // The API may be reached through an internal host (for example 127.0.0.1)
+    // while the browser's Origin contains the tenant domain.
+    const origin = String(req.headers.origin || '').split(',')[0].trim();
+    let originHost = '';
+    try { originHost = origin ? new URL(origin).host : ''; } catch { /* fall back to proxy/direct host */ }
+    const host = originHost || String(req.headers['x-forwarded-host'] || req.headers.host || '');
     const tenant = await this.tenants.resolveHost(host);
     this.context.run(tenant, next);
   }

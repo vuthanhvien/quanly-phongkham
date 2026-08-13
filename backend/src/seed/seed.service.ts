@@ -191,6 +191,12 @@ export class SeedService implements OnApplicationBootstrap {
     }
   }
 
+  /** Used by the tenant console immediately after provisioning a new database. */
+  async seedDomain(domain: string) {
+    const tenant = await this.tenants.resolveHost(domain);
+    await this.tenants.runWithTenant(tenant, () => this.seedTenant());
+  }
+
   private async seedTenant() {
     await this.cleanupLegacyBranchRoleAssignments();
     await this.ensureProtectedAdmin();
@@ -243,14 +249,14 @@ export class SeedService implements OnApplicationBootstrap {
       return { branch: branch ?? undefined, admin: admin ?? undefined, adminDepartment: adminDepartment ?? undefined, adminStaff: adminStaff ?? undefined };
     }
 
-    let branch = await this.branches.findOne({ where: { slug: 'thien-chanh' } });
+    let branch = await this.branches.findOne({ where: { slug: 'hoi-so' } });
     if (!branch) {
       branch = await this.branches.save(
-        this.branches.create({ name: 'Thien Chanh Beauty Salon', slug: 'thien-chanh', isActive: true }),
+        this.branches.create({ name: 'Hội sở', slug: 'hoi-so', isActive: true }),
       );
     }
 
-    const email = this.config.get('ADMIN_EMAIL', 'admin@thienchanh.local');
+    const email = this.config.get('ADMIN_EMAIL', 'admin@clinic.test');
     let admin = await this.users.findOne({ where: { email } });
     if (!admin) {
       admin = await this.users.save(
@@ -511,7 +517,7 @@ export class SeedService implements OnApplicationBootstrap {
     await this.insertGenerated(this.users, current + 1, target, (index) => {
       const branch = branches[(index - 1) % branches.length];
       return {
-        email: `${LARGE_SEED_PREFIXES.userEmail}${padSerial(index)}@thienchanh.local`,
+        email: `${LARGE_SEED_PREFIXES.userEmail}${padSerial(index)}@clinic.test`,
         username: `${LARGE_SEED_PREFIXES.userEmail}${padSerial(index)}`,
         fullName: `Bulk User ${index}`,
         passwordHash: defaultPasswordHash,
@@ -533,7 +539,7 @@ export class SeedService implements OnApplicationBootstrap {
         code: `${LARGE_SEED_PREFIXES.staffCode}${padSerial(index)}`,
         fullName: `Bulk Staff ${index}`,
         phone: `091${String(1000000 + index).slice(-7)}`,
-        email: `${LARGE_SEED_PREFIXES.userEmail}${padSerial(index)}@thienchanh.local`,
+        email: `${LARGE_SEED_PREFIXES.userEmail}${padSerial(index)}@clinic.test`,
         position: index % 6 === 0 ? 'Bac si' : 'Tu van vien',
         departmentId: department?.id,
         userId: user?.id,

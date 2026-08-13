@@ -1857,7 +1857,7 @@ export class SettingsService {
     const companyType = this.normalizeCompanyType(payload.companyType ?? fallback?.companyType ?? 'clinic');
     const enabledModules = this.normalizeEnabledModules(payload.enabledModules ?? fallback?.enabledModules ?? []);
     const hasCustomModuleSelection = payload.hasCustomModuleSelection ?? fallback?.hasCustomModuleSelection ?? false;
-    const appName = String(payload.appName ?? fallback?.appName ?? 'Thien Chanh CMS').trim();
+    const appName = String(payload.appName ?? fallback?.appName ?? 'Clinic CMS').trim();
     if (!appName) {
       throw new BadRequestException('appName là bắt buộc');
     }
