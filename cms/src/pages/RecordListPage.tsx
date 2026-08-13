@@ -32,7 +32,6 @@ import {
   Grid,
   Input,
   Modal,
-  Popconfirm,
   Select,
   Space,
   Table,
@@ -41,6 +40,7 @@ import {
   Tooltip,
   Typography,
   message,
+  type InputRef,
 } from "antd"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useRef, useState, type Key } from "react"
@@ -125,7 +125,9 @@ export function RecordListPage() {
   const [cloningSelected, setCloningSelected] = useState(false)
   const [staffAccountStaff, setStaffAccountStaff] = useState<Record<string, any> | null>(null)
   const [staffAccountSubmitting, setStaffAccountSubmitting] = useState(false)
+  const [shortcutModifierHeld, setShortcutModifierHeld] = useState(false)
   const [staffAccountForm] = Form.useForm()
+  const searchInputRef = useRef<InputRef>(null)
   const selectedTableTab = useMemo(() => tableTabs.find((tab) => tab.key === tableTabKey), [tableTabKey, tableTabs])
   const advancedFilterPayload = useMemo(() => {
     const filters = [
@@ -158,6 +160,61 @@ export function RecordListPage() {
     void refresh()
     if (detailId) setDetailRefreshKey((value) => value + 1)
   }
+  const canCreateRecord = hasActionAccess(resource, "create")
+  const canImportRecords = canCreateRecord && !["files", "service-orders"].includes(resource)
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  useEffect(() => {
+    const setModifierState = (event: KeyboardEvent) => {
+      setShortcutModifierHeld(event.ctrlKey || event.metaKey)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      setModifierState(event)
+      if (!event.ctrlKey && !event.metaKey) return
+
+      const key = event.key.toLowerCase()
+      if (key === "b" && !event.altKey) {
+        event.preventDefault()
+        if (canCreateRecord && !creating && !editingId) setCreating(true)
+        return
+      }
+      if (event.altKey) return
+      if (key === "r") {
+        event.preventDefault()
+        refreshData()
+        return
+      }
+      if (key === "f") {
+        event.preventDefault()
+        searchInputRef.current?.focus()
+        return
+      }
+      if (key === "i" && canImportRecords) {
+        event.preventDefault()
+        navigate(`/${resource}/import`)
+        return
+      }
+      if (event.key === ">" && currentPage < totalPages) {
+        event.preventDefault()
+        setCurrentPage((page) => Math.min(page + 1, totalPages))
+        return
+      }
+      if (event.key === "<" && currentPage > 1) {
+        event.preventDefault()
+        setCurrentPage((page) => Math.max(page - 1, 1))
+      }
+    }
+    const clearModifierState = () => setShortcutModifierHeld(false)
+
+    window.addEventListener("keydown", handleKeyDown)
+    window.addEventListener("keyup", setModifierState)
+    window.addEventListener("blur", clearModifierState)
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener("keyup", setModifierState)
+      window.removeEventListener("blur", clearModifierState)
+    }
+  }, [canCreateRecord, canImportRecords, creating, currentPage, detailId, editingId, navigate, query, resource, totalPages])
 
   useEffect(() => {
     const onDataRefresh = (event: Event) => {
@@ -396,10 +453,16 @@ export function RecordListPage() {
       ...displayFields.map((field) => ({
         title: advancedSearch ? (
           <Space direction="vertical" size={4} style={{ width: "100%" }}>
-            <span>{field.label}</span>
+            <Tooltip title={field.label}>
+              <span className="record-table-column-title">{field.label}</span>
+            </Tooltip>
             {renderAdvancedFilter(field)}
           </Space>
-        ) : field.label,
+        ) : (
+          <Tooltip title={field.label}>
+            <span className="record-table-column-title">{field.label}</span>
+          </Tooltip>
+        ),
         dataIndex: field.key,
         key: field.key,
         width: field.tableWidth,
@@ -444,7 +507,7 @@ export function RecordListPage() {
         title: "",
         key: "action",
         fixed: "right" as const,
-        width: screens.md ? (resource === "units" ? 168 : 200) : 56,
+        width: screens.md ? 120 : 56,
         render: (_: unknown, row: Record<string, any>) => {
           const recordId = String(row.id)
           const isUnitRoot = resource === "units" && !row.baseUnitId
@@ -463,19 +526,10 @@ export function RecordListPage() {
           if (resource === "accounting-vouchers" && row.status === "POSTED" && hasActionAccess(resource, "unpost")) menuItems.push({ key: "unpost", icon: <SwapOutlined />, label: "Bỏ ghi sổ", onClick: () => void unpostAccountingVoucher(recordId) })
           if (templates.length > 0 && hasActionAccess(resource, "print")) menuItems.push({ key: "print", icon: <PrinterOutlined />, label: "In biểu mẫu", onClick: () => openPrintTemplatePicker(recordId) })
           if (recordStatus === "active" && hasActionAccess(resource, "delete")) menuItems.push({ key: "archive", danger: true, icon: <DeleteOutlined />, label: "Lưu trữ", onClick: () => Modal.confirm({ title: "Lưu trữ bản ghi này?", content: "Bản ghi sẽ được chuyển vào tab Lưu trữ.", okText: "Lưu trữ", okButtonProps: { danger: true }, onOk: () => new Promise<void>((resolve) => deleteRecord({ resource, id: row.id }, { onSuccess: () => { message.success("Đã lưu trữ"); refresh(); resolve() }, onError: () => resolve() })) }) })
+          const overflowMenuItems = menuItems.filter((item) => !["full-view", "edit"].includes(String(item.key)))
           return <>
           <span className="record-row-actions-mobile"><Dropdown menu={{ items: menuItems }} trigger={["click"]}><Button type="text" icon={<MoreOutlined />} aria-label="Thao tác" /></Dropdown></span>
           <Space className="record-row-actions-desktop" size={2}>
-            {hasActionAccess(resource, "view") && (
-              <Tooltip title="Xem chi tiết">
-                <Button icon={<EyeOutlined />} type="text" onClick={() => openDetail(recordId)} />
-              </Tooltip>
-            )}
-            {resource === "projects" && recordStatus === "active" && (
-              <Tooltip title="Mở Kanban">
-                <Button icon={<AppstoreOutlined />} type="text" onClick={() => navigate(`/projects/${recordId}/board`)} />
-              </Tooltip>
-            )}
             {hasActionAccess(resource, "view") && (
               <Tooltip title="Xem đầy đủ">
                 <Button icon={<FullscreenOutlined />} type="text" onClick={() => navigate(`/${resource}/${recordId}/full`)} />
@@ -486,79 +540,12 @@ export function RecordListPage() {
                 <Button icon={<EditOutlined />} type="text" onClick={() => setEditingId(recordId)} />
               </Tooltip>
             )}
-            {isUnitRoot && recordStatus === "active" && hasActionAccess(resource, "create") && (
-              <Tooltip title="Thêm đơn vị quy đổi">
-                <Button icon={<PlusOutlined />} type="text" onClick={() => createChildUnit(recordId)} />
-              </Tooltip>
-            )}
-            {recordStatus === "active" && hasActionAccess(resource, "create") && resource !== "files" && (
-              <Tooltip title="Nhân bản">
-                <Button
-                  icon={<CopyOutlined />}
-                  loading={duplicatingId === recordId}
-                  type="text"
-                  onClick={() => void duplicateRecord(recordId)}
-                />
-              </Tooltip>
-            )}
-            {resource === "customers" && hasActionAccess(resource, "reveal-phone") && (
-              <Tooltip title="Xem số điện thoại">
-                <Button icon={<PhoneOutlined />} type="text" onClick={() => revealPhone(row.id)} />
-              </Tooltip>
-            )}
-            {resource === "leads" && !row.convertedCustomerId && hasActionAccess(resource, "convert-to-customer") && (
-              <Tooltip title="Chuyển thành khách hàng">
-                <Button icon={<SwapOutlined />} type="text" onClick={() => convertLead(row.id)} />
-              </Tooltip>
-            )}
-            {resource === "staff" && !row.linkedAccount && recordStatus === "active" && hasActionAccess("user-accounts", "create") && (
-              <Tooltip title="Tạo tài khoản liên kết">
-                <Button icon={<UserAddOutlined />} type="text" onClick={() => openStaffAccountModal(row)} />
-              </Tooltip>
-            )}
-            {["invoices", "expenses", "payrolls"].includes(resource) && hasActionAccess(resource, "generate-accounting-voucher") && (
-              <Tooltip title="Tạo chứng từ kế toán">
-                <Button icon={<AuditOutlined />} type="text" onClick={() => generateAccountingVoucher(resource, row.id)} />
-              </Tooltip>
-            )}
-            {resource === "accounting-vouchers" && row.status !== "POSTED" && hasActionAccess(resource, "post") && (
-              <Tooltip title="Ghi sổ">
-                <Button icon={<AuditOutlined />} type="text" onClick={() => postAccountingVoucher(row.id)} />
-              </Tooltip>
-            )}
-            {resource === "accounting-vouchers" && row.status === "POSTED" && hasActionAccess(resource, "unpost") && (
-              <Tooltip title="Bỏ ghi sổ">
-                <Button icon={<SwapOutlined />} type="text" onClick={() => unpostAccountingVoucher(row.id)} />
-              </Tooltip>
-            )}
-            {templates.length > 0 && hasActionAccess(resource, "print") && (
-              <Tooltip title="In biểu mẫu">
-                <Button
-                  icon={<PrinterOutlined />}
-                  type="text"
-                  onClick={() => openPrintTemplatePicker(recordId)}
-                />
-              </Tooltip>
-            )}
-            {recordStatus === "active" && hasActionAccess(resource, "delete") && (
-              <Popconfirm
-                title="Lưu trữ bản ghi này? Bản ghi chỉ bị ẩn trên giao diện này, không bị xóa khỏi cơ sở dữ liệu."
-                onConfirm={() =>
-                  deleteRecord(
-                    { resource, id: row.id },
-                    {
-                      onSuccess: () => {
-                        message.success("Đã lưu trữ")
-                        refresh()
-                      },
-                    },
-                  )
-                }
-              >
-                <Tooltip title="Lưu trữ bản ghi">
-                  <Button danger icon={<DeleteOutlined />} type="text" />
+            {overflowMenuItems.length > 0 && (
+              <Dropdown menu={{ items: overflowMenuItems }} trigger={["click"]}>
+                <Tooltip title="Thao tác khác">
+                  <Button icon={<MoreOutlined />} type="text" aria-label="Thao tác khác" />
                 </Tooltip>
-              </Popconfirm>
+              </Dropdown>
             )}
           </Space></>
         },
@@ -646,7 +633,7 @@ export function RecordListPage() {
       email: staff.email || "",
       username: String(staff.code || "").toLowerCase(),
       role: ["ADMIN", "DOCTOR", "STAFF"].includes(String(staff.type || "").toUpperCase()) ? String(staff.type).toUpperCase() : "STAFF",
-      password: "",
+      password: "123@123",
     })
   }
 
@@ -781,7 +768,11 @@ export function RecordListPage() {
               <span>{entityLabels[resource] || resource}</span>
             </Typography.Title>
             <div className="record-list-title-actions">
-              <Tooltip title="Làm mới dữ liệu"><Button aria-label="Làm mới dữ liệu" className="title-icon-action" icon={<ReloadOutlined />} size="small" type="text" onClick={refreshData} /></Tooltip>
+              <Tooltip title={shortcutModifierHeld ? "Ctrl/⌘ + R" : "Làm mới dữ liệu"}>
+                <Button aria-label="Làm mới dữ liệu" className="title-icon-action" icon={<ReloadOutlined />} size="small" type="text" onClick={refreshData}>
+                  {shortcutModifierHeld ? "Ctrl/⌘ + R" : null}
+                </Button>
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -794,7 +785,8 @@ export function RecordListPage() {
           <Input.Search
             allowClear
             className="page-search"
-            placeholder="Tìm kiếm"
+            placeholder={shortcutModifierHeld ? "Ctrl/⌘ + F" : "Tìm kiếm"}
+            ref={searchInputRef}
             onSearch={(value) => {
               setCurrentPage(1)
               setSearch(value)
@@ -837,19 +829,19 @@ export function RecordListPage() {
               </Button>
             </Dropdown>
           ) : null}
-          {hasActionAccess(resource, "create") && !["files", "service-orders"].includes(resource) && (
-            <Tooltip title="Mở màn hình import">
+          {canImportRecords && (
+            <Tooltip title={shortcutModifierHeld ? "Ctrl/⌘ + I" : "Mở màn hình import"}>
               <Button
                 icon={<ImportOutlined />}
                 className="mobile-icon-button"
                 onClick={() => navigate(`/${resource}/import`)}
               >
-                Import
+                {shortcutModifierHeld ? "Ctrl/⌘ + I" : "Import"}
               </Button>
             </Tooltip>
           )}
-          {hasActionAccess(resource, "create") && (
-            <Tooltip title="Tạo bản ghi mới">
+          {canCreateRecord && (
+            <Tooltip title={shortcutModifierHeld ? "Ctrl/⌘ + B" : "Tạo bản ghi mới"}>
               <Button
                 className="primary-glow mobile-icon-button"
                 aria-label={resource === "files" ? "Tải tệp lên" : "Thêm nhanh"}
@@ -857,7 +849,7 @@ export function RecordListPage() {
                 type="primary"
                 onClick={() => setCreating(true)}
               >
-                {resource === "files" ? "Tải tệp lên" : "Thêm nhanh"}
+                {shortcutModifierHeld ? "Ctrl/⌘ + B" : resource === "files" ? "Tải tệp lên" : "Thêm nhanh"}
               </Button>
             </Tooltip>
           )}
@@ -910,7 +902,9 @@ export function RecordListPage() {
             total,
             showSizeChanger: true,
             pageSizeOptions: [20, 50, 100, 200],
-            showTotal: (value) => `${value.toLocaleString("vi-VN")} bản ghi`,
+            showTotal: (value) => shortcutModifierHeld
+              ? `Ctrl/⌘ + < / > để chuyển trang · ${value.toLocaleString("vi-VN")} bản ghi`
+              : `${value.toLocaleString("vi-VN")} bản ghi`,
             onChange: (page, nextPageSize) => {
               setCurrentPage(page)
               setPageSize(nextPageSize)
@@ -936,6 +930,7 @@ export function RecordListPage() {
         />
       </Card>
       <Modal
+        cancelText="Hủy"
         destroyOnHidden
         okText="Lưu tab"
         open={tableTabModalOpen}
@@ -993,6 +988,7 @@ export function RecordListPage() {
         </Form>
       </Modal>
       <Modal
+        cancelText="Hủy"
         destroyOnHidden
         okButtonProps={{ className: "primary-glow", type: "primary" }}
         okText="Tạo tài khoản"
@@ -1003,14 +999,14 @@ export function RecordListPage() {
         onOk={() => void staffAccountForm.submit()}
       >
         <Form form={staffAccountForm} layout="vertical" onFinish={(values: { email: string; username?: string; password: string; role: string }) => void createStaffAccount(values)}>
-          <Form.Item label="Email đăng nhập" name="email" rules={[{ required: true, type: "email", message: "Nhập email hợp lệ" }]}>
+          <Form.Item label="Email đăng nhập (không bắt buộc)" name="email" rules={[{ type: "email", message: "Nhập email hợp lệ" }]}>
             <Input autoComplete="email" />
           </Form.Item>
-          <Form.Item label="Tên đăng nhập" name="username">
+          <Form.Item label="Tên đăng nhập" name="username" rules={[{ required: true, whitespace: true, message: "Nhập tên đăng nhập" }]}>
             <Input autoComplete="username" />
           </Form.Item>
           <Form.Item label="Mật khẩu ban đầu" name="password" rules={[{ required: true, min: 6, message: "Mật khẩu tối thiểu 6 ký tự" }]}>
-            <Input.Password autoComplete="new-password" />
+            <Input autoComplete="new-password" />
           </Form.Item>
           <Form.Item label="Vai trò hệ thống" name="role" rules={[{ required: true }]}>
             <Select options={[{ value: "STAFF", label: "Nhân viên" }, { value: "DOCTOR", label: "Bác sĩ" }, { value: "ADMIN", label: "Quản trị" }]} />

@@ -3098,6 +3098,25 @@ body {
 }
 
 .ant-table-thead > tr > th .ant-table-column-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A long sortable title must shrink inside its configured column width. */
+.record-status-tabs + .table-card .ant-table-column-sorters,
+.record-status-tabs + .table-card .ant-table-column-sorters .ant-table-column-title,
+.record-table-column-title {
+  min-width: 0;
+}
+
+.record-status-tabs + .table-card .ant-table-column-sorters .ant-table-column-title {
+  flex: 1 1 auto;
+}
+
+.record-table-column-title {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3989,6 +4008,33 @@ textarea.ant-input {
 
 .record-avatar--table {
   display: block;
+}
+
+.avatar-image-picker {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  height: 35px;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  width: 35px;
+}
+
+.avatar-image-picker img,
+.avatar-image-picker .ant-avatar {
+  height: 35px;
+  object-fit: cover;
+  width: 35px;
+}
+
+.avatar-image-picker:hover:not(:disabled),
+.avatar-image-picker:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--app-primary) 55%, transparent);
+  outline-offset: 2px;
 }
 
 .record-image-thumb {

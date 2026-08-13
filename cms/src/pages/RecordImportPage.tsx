@@ -1,6 +1,6 @@
 import { ArrowLeftOutlined, DeleteOutlined, DownloadOutlined, ImportOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons"
 import { faker } from "@faker-js/faker"
-import { Alert, Button, Card, Select, Space, Table, Tabs, Tag, Typography, Upload, message } from "antd"
+import { Alert, Button, Card, Dropdown, Select, Space, Table, Tabs, Tag, Typography, Upload, message } from "antd"
 import type { UploadProps } from "antd"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
@@ -75,7 +75,7 @@ export function RecordImportPage() {
   const [bundleSheetStats, setBundleSheetStats] = useState<Array<{ name: string; count: number }>>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [testRowCount, setTestRowCount] = useState(500)
+  const [testRowCount, setTestRowCount] = useState(1)
 
   const unsupported = UNSUPPORTED_RESOURCES.has(resource)
   const bundleMode = BUNDLE_RESOURCES.has(resource)
@@ -391,45 +391,44 @@ export function RecordImportPage() {
   return (
     <>
       <div className="page-header">
-        <div>
-          <Typography.Title level={3}>
-            Import {entityLabels[resource] || resource}
-          </Typography.Title>
-        </div>
-        <Space wrap>
+        <Space size={12}>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/${resource}`)}>
             Quay lại danh sách
           </Button>
-          <Button icon={<DownloadOutlined />} onClick={() => void downloadTemplate()}>
-            {bundleMode ? "Tải data mẫu" : "Tải file mẫu"}
-          </Button>
+          <Typography.Title level={3}>
+            Import {entityLabels[resource] || resource}
+          </Typography.Title>
+        </Space>
+        <Space wrap>
           <Select
             aria-label="Số dòng dữ liệu mẫu"
             options={[
+              { value: 1, label: '1 dòng' },
               { value: 10, label: '10 dòng' },
               { value: 50, label: '50 dòng' },
               { value: 100, label: '100 dòng' },
               { value: 250, label: '250 dòng' },
-              { value: 500, label: '500 dòng' },
             ]}
             value={testRowCount}
             onChange={setTestRowCount}
             style={{ width: 120 }}
           />
-          {!bundleMode ? (
-            <>
-              <Button icon={<ImportOutlined />} onClick={() => void downloadExportData()}>
-                Tải data mẫu + custom fields
-              </Button>
-            </>
-          ) : (
-            <Button icon={<ImportOutlined />} onClick={() => void downloadExportData()}>
-              Xuất dữ liệu hiện có
-            </Button>
-          )}
-          <Upload {...uploadProps}>
-            <Button icon={<UploadOutlined />}>Tải tệp lên</Button>
-          </Upload>
+          <Dropdown
+            menu={{
+              items: [
+                { key: "template", icon: <DownloadOutlined />, label: bundleMode ? "Tải data mẫu" : "Tải file mẫu", onClick: () => void downloadTemplate() },
+                { key: "export", icon: <ImportOutlined />, label: bundleMode ? "Xuất dữ liệu hiện có" : "Tải data mẫu + custom fields", onClick: () => void downloadExportData() },
+                {
+                  key: "upload",
+                  icon: <UploadOutlined />,
+                  label: <Upload {...uploadProps}><span>Tải tệp lên</span></Upload>,
+                },
+              ],
+            }}
+            trigger={["click"]}
+          >
+            <Button icon={<UploadOutlined />}>Tệp dữ liệu</Button>
+          </Dropdown>
           <Button
             className="primary-glow"
             disabled={bundleMode ? Object.values(bundleSheets).every((rows) => rows.length === 0) : readyRows.length === 0}

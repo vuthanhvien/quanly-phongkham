@@ -27,7 +27,7 @@ import {
   Typography,
 } from "antd"
 import { UserOutlined } from "@ant-design/icons"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import dayjs from "dayjs"
 import { IMaskInput } from "react-imask"
 import { api, resolveFileUrl } from "../api"
@@ -100,6 +100,7 @@ export function RecordFormContent({
   const [draftBusy, setDraftBusy] = useState(false)
   const [branchRoleOptions, setBranchRoleOptions] = useState<Array<{ value: string; label: string }>>([])
   const [systemRoleOptions, setSystemRoleOptions] = useState<Array<{ value: string; label: string }>>([])
+  const autoFocusedFormKey = useRef<string | null>(null)
   const { mutate: create } = useCreate()
   const { mutate: update } = useUpdate()
   const isAppointmentForm = resource === "appointments"
@@ -259,6 +260,7 @@ export function RecordFormContent({
   function buildPayload(values: Record<string, unknown>) {
     const mergedValues = { ...(initialValues || {}), ...values }
     delete mergedValues.branchRoleAssignments
+    delete mergedValues.branchRoleSummary
     if (isAppointmentForm) {
       applyAppointmentDateTimeValues(mergedValues)
     }
@@ -393,13 +395,29 @@ export function RecordFormContent({
       if (isAppointmentForm && (field.key === "startTime" || field.key === "endTime")) return false
       if (isWorkScheduleForm && (field.key === "workDate" || field.key === "startTime" || field.key === "endTime" || field.key === "recurrenceUntil")) return false
       if (isAddressForm && field.key === "address") return false
+      // The server derives this summary from the editable assignments below.
+      if (resource === "user-accounts" && field.key === "branchRoleSummary") return false
       if (hiddenFieldKeys.includes(field.key)) return false
       return true
     }),
-    [fields, hiddenFieldKeys, isAddressForm, isAppointmentForm, isWorkScheduleForm],
+    [fields, hiddenFieldKeys, isAddressForm, isAppointmentForm, isWorkScheduleForm, resource],
   )
   const fieldTabs = useMemo(() => groupFieldsByTab(visibleFields), [visibleFields])
   const usesTabs = fieldTabs.length > 1 || Boolean(fieldTabs[0]?.tab)
+
+  useEffect(() => {
+    const formKey = `${resource}:${id || "new"}`
+    const firstEditableField = visibleFields.find((field) => !field.disabled)
+    if (!firstEditableField || autoFocusedFormKey.current === formKey) return
+
+    const frame = window.requestAnimationFrame(() => {
+      const input = form.getFieldInstance(firstEditableField.key) as { focus?: () => void } | undefined
+      if (!input?.focus) return
+      input.focus()
+      autoFocusedFormKey.current = formKey
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [form, id, resource, visibleFields])
 
   function showValidationError(errorInfo: { errorFields?: Array<{ name: Array<string | number>; errors: string[] }> }) {
     const firstError = errorInfo.errorFields?.[0]
@@ -868,6 +886,7 @@ function FieldInput({
   if (field.type === "image" || field.key === "imageUrl") {
     return (
       <ImageLibrarySelectInput
+        avatar={field.key === "avatarUrl"}
         disabled={field.disabled}
         onChange={onChange}
         placeholder={placeholder}
@@ -1450,12 +1469,14 @@ function ImageLibrarySelectInput({
   disabled,
   placeholder,
   multiple = false,
+  avatar = false,
 }: {
   value?: unknown
   onChange?: (value: unknown) => void
   disabled?: boolean
   placeholder?: string
   multiple?: boolean
+  avatar?: boolean
 }) {
   const screens = Grid.useBreakpoint()
   const [openPicker, setOpenPicker] = useState(false)
@@ -1575,7 +1596,22 @@ function ImageLibrarySelectInput({
 
   return (
     <Space direction="vertical" size={10} style={{ width: "100%" }}>
-      {selectedValues.length ? (
+      {avatar ? (
+        <button
+          aria-label={selectedValues.length ? "Thay avatar" : "Chọn avatar"}
+          className="avatar-image-picker"
+          disabled={disabled}
+          title={selectedValues.length ? "Nhấp để thay avatar" : "Nhấp để chọn avatar"}
+          type="button"
+          onClick={() => setOpenPicker(true)}
+        >
+          {selectedValues.length ? (
+            <img alt="Avatar" src={resolveFileUrl(selectedValues[0])} />
+          ) : (
+            <Avatar icon={<UserOutlined />} size={35} />
+          )}
+        </button>
+      ) : selectedValues.length ? (
         <Image.PreviewGroup>
           <Space wrap>
             {selectedValues.map((imageUrl) => {
@@ -1585,17 +1621,19 @@ function ImageLibrarySelectInput({
           </Space>
         </Image.PreviewGroup>
       ) : null}
-      <Space.Compact style={{ width: "100%" }}>
-        <Input
-          disabled
-          placeholder={placeholder}
-          style={{ width: "100%" }}
-          value={selectedValues.length ? `${selectedValues.length} hình ảnh đã chọn` : undefined}
-        />
-        <Button disabled={disabled} onClick={() => setOpenPicker(true)}>
-          Chọn ảnh
-        </Button>
-      </Space.Compact>
+      {!avatar ? (
+        <Space.Compact style={{ width: "100%" }}>
+          <Input
+            disabled
+            placeholder={placeholder}
+            style={{ width: "100%" }}
+            value={selectedValues.length ? `${selectedValues.length} hình ảnh đã chọn` : undefined}
+          />
+          <Button disabled={disabled} onClick={() => setOpenPicker(true)}>
+            Chọn ảnh
+          </Button>
+        </Space.Compact>
+      ) : null}
       <Modal
         destroyOnHidden
         maskClosable={false}

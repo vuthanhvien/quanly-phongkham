@@ -80,6 +80,7 @@ import { WorkflowService } from '../workflow/workflow.service';
 
 const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print'];
 const PROTECTED_ADMIN_EMAIL = 'admin@admin.com';
+const SYSTEM_ADMIN_USERNAME = 'admin-system';
 const DEFAULT_KANBAN_COLUMNS = [
   { key: 'todo', name: 'Cần làm', color: 'default', allowedToKeys: ['in_progress'] },
   { key: 'in_progress', name: 'Đang làm', color: 'blue', allowedToKeys: ['todo', 'review'] },
@@ -1142,9 +1143,19 @@ export class RecordsService {
       || (staff.userId ? await this.users.findOne({ where: { id: staff.userId } }) : null);
     if (existing) throw new BadRequestException('Nhân viên này đã có tài khoản liên kết');
 
+    const username = String(payload.username || '').trim();
+    if (!username) throw new BadRequestException('Tên đăng nhập là bắt buộc');
+    const email = String(payload.email || staff.email || '').trim() || `${username}@local.clinic`;
+    if (await this.users.findOne({ where: { username } })) {
+      throw new BadRequestException('Tên đăng nhập đã được sử dụng');
+    }
+    if (await this.users.findOne({ where: { email } })) {
+      throw new BadRequestException('Email đã được sử dụng');
+    }
+
     const normalized = await this.normalizeInput('user-accounts', {
-      email: payload.email || staff.email,
-      username: payload.username,
+      email,
+      username,
       password: payload.password,
       role: payload.role || this.resolveStaffType(staff),
       branchId: payload.branchId,
@@ -1191,6 +1202,7 @@ export class RecordsService {
   async update (resource: string, id: string, payload: Record<string, unknown>, user: AuthUser) {
     const previous = await this.findStored(resource, id);
     this.assertRecordIsNotProtected(resource, previous);
+    this.assertSystemAdminIdentity(resource, previous, payload);
     await this.assertProtectedAdminAssignment(resource, { ...previous, ...payload });
     const previousCustomFields = await this.loadCustomFieldsMap(resource, [id]);
     const mergedCustomFields = {
@@ -1237,6 +1249,9 @@ export class RecordsService {
   async remove (resource: string, id: string, user: AuthUser) {
     const record = await this.findStored(resource, id);
     this.assertRecordIsNotProtected(resource, record);
+    if (resource === 'user-accounts' && String((record as unknown as User).username || '').toLowerCase() === SYSTEM_ADMIN_USERNAME) {
+      throw new ForbiddenException('Không thể xóa tài khoản admin-system');
+    }
     await this.assertProtectedAdminAssignment(resource, record);
     await this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
     if (resource === 'workflow-definitions') {
@@ -4154,6 +4169,12 @@ export class RecordsService {
     if (typeof value.username === 'string') {
       value.username = value.username.trim() || undefined;
     }
+    if (creating && !value.username) {
+      throw new BadRequestException('Tên đăng nhập là bắt buộc');
+    }
+    if (!value.email && value.username) {
+      value.email = `${value.username}@local.clinic`;
+    }
     if (typeof value.password === 'string' && value.password) {
       value.passwordHash = await hash(value.password, 10);
     }
@@ -4162,10 +4183,12 @@ export class RecordsService {
     if (!value.passwordHash) delete value.passwordHash;
     if (!value.username) delete value.username;
     if (typeof value.fullName !== 'string' || !value.fullName.trim()) {
-      value.fullName = typeof value.email === 'string' ? value.email.trim() : '';
+      value.fullName = typeof value.username === 'string'
+        ? value.username
+        : (typeof value.email === 'string' ? value.email.trim() : '');
     }
     if (!value.fullName) {
-      throw new BadRequestException('Email tài khoản là bắt buộc');
+      throw new BadRequestException('Tên đăng nhập hoặc email tài khoản là bắt buộc');
     }
     return value;
   }
@@ -4860,6 +4883,18 @@ export class RecordsService {
   private assertRecordIsNotProtected(resource: string, record: ConfigurableEntity) {
     if (resource === 'user-accounts' && String((record as unknown as User).email || '').toLowerCase() === PROTECTED_ADMIN_EMAIL) {
       throw new ForbiddenException('Tài khoản Admin hệ thống được bảo vệ và không thể chỉnh sửa hoặc xóa');
+    }
+  }
+
+  private assertSystemAdminIdentity(resource: string, previous: ConfigurableEntity, payload: Record<string, unknown>) {
+    if (resource !== 'user-accounts') return;
+    const account = previous as unknown as User;
+    if (String(account.username || '').toLowerCase() !== SYSTEM_ADMIN_USERNAME) return;
+    if (payload.username !== undefined && String(payload.username).trim().toLowerCase() !== SYSTEM_ADMIN_USERNAME) {
+      throw new ForbiddenException('Không thể đổi tên đăng nhập của tài khoản admin-system');
+    }
+    if (payload.role !== undefined && String(payload.role).trim().toUpperCase() !== String(account.role || '').trim().toUpperCase()) {
+      throw new ForbiddenException('Không thể đổi vai trò của tài khoản admin-system');
     }
   }
 
