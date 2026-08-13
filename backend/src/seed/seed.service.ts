@@ -210,32 +210,32 @@ export class SeedService implements OnApplicationBootstrap {
     }
   }
 
-  private async ensureBaseSettings() {
-    if ((await this.fields.count()) === 0) {
-      await this.fields.save([
-        this.fields.create({ entityType: 'customers', key: 'nguon_khach', label: 'Nguon khach', dataType: 'text', sortOrder: 1 }),
-        this.fields.create({ entityType: 'medical-episodes', key: 'hinh_anh_moc', label: 'Moc anh before/after', dataType: 'select', options: ['Truoc', '7 ngay', '1 thang', '6 thang'], sortOrder: 1 }),
-      ]);
-    }
+  // private async ensureBaseSettings() {
+  //   if ((await this.fields.count()) === 0) {
+  //     await this.fields.save([
+  //       this.fields.create({ entityType: 'customers', key: 'nguon_khach', label: 'Nguon khach', dataType: 'text', sortOrder: 1 }),
+  //       this.fields.create({ entityType: 'medical-episodes', key: 'hinh_anh_moc', label: 'Moc anh before/after', dataType: 'select', options: ['Truoc', '7 ngay', '1 thang', '6 thang'], sortOrder: 1 }),
+  //     ]);
+  //   }
 
-    if ((await this.views.count()) === 0) {
-      await this.views.save([
-        this.views.create({ entityType: 'customers', viewType: 'TABLE', role: 'ALL', config: { columns: ['code', 'fullName', 'phone', 'status', 'tier', 'nguon_khach'] } }),
-        this.views.create({ entityType: 'customers', viewType: 'FORM', role: 'ALL', config: { fields: ['code', 'fullName', 'phone', 'email', 'status', 'nguon_khach'] } }),
-        this.views.create({ entityType: 'customers', viewType: 'DETAIL', role: 'ALL', config: { fields: ['code', 'fullName', 'phone', 'email', 'status', 'tier', 'nguon_khach'] } }),
-      ]);
-    }
+  //   if ((await this.views.count()) === 0) {
+  //     await this.views.save([
+  //       this.views.create({ entityType: 'customers', viewType: 'TABLE', role: 'ALL', config: { columns: ['code', 'fullName', 'phone', 'status', 'tier', 'nguon_khach'] } }),
+  //       this.views.create({ entityType: 'customers', viewType: 'FORM', role: 'ALL', config: { fields: ['code', 'fullName', 'phone', 'email', 'status', 'nguon_khach'] } }),
+  //       this.views.create({ entityType: 'customers', viewType: 'DETAIL', role: 'ALL', config: { fields: ['code', 'fullName', 'phone', 'email', 'status', 'tier', 'nguon_khach'] } }),
+  //     ]);
+  //   }
 
-    if ((await this.templates.count()) === 0) {
-      await this.templates.save(
-        this.templates.create({
-          entityType: 'customers',
-          name: 'Phieu thong tin khach hang',
-          htmlTemplate: '<h1>PHIEU THONG TIN KHACH HANG</h1><p>Ma: {{code}}</p><p>Ho ten: {{fullName}}</p><p>Dien thoai: {{phone}}</p><p>Nguon khach: {{nguon_khach}}</p>',
-        }),
-      );
-    }
-  }
+  //   if ((await this.templates.count()) === 0) {
+  //     await this.templates.save(
+  //       this.templates.create({
+  //         entityType: 'customers',
+  //         name: 'Phieu thong tin khach hang',
+  //         htmlTemplate: '<h1>PHIEU THONG TIN KHACH HANG</h1><p>Ma: {{code}}</p><p>Ho ten: {{fullName}}</p><p>Dien thoai: {{phone}}</p><p>Nguon khach: {{nguon_khach}}</p>',
+  //       }),
+  //     );
+  //   }
+  // }
 
   private async seedLargeDataIfEnabled() {
     const enabled = this.config.get('SEED_LARGE_DATA', 'false');

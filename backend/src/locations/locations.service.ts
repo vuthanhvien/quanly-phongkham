@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { Repository } from 'typeorm';
 import { LocationCountry, LocationProvince, LocationWard, MasterData } from '../entities/entities';
@@ -12,6 +12,12 @@ type Country = { code: string; name: string };
 export class LocationsService {
   private loading?: Promise<void>;
   constructor(@InjectRepository(LocationCountry) private readonly countriesRepo: Repository<LocationCountry>, @InjectRepository(LocationProvince) private readonly provincesRepo: Repository<LocationProvince>, @InjectRepository(LocationWard) private readonly wardsRepo: Repository<LocationWard>, @InjectRepository(MasterData) private readonly masterDataRepo: Repository<MasterData>) {}
+  private dataset(name: string) {
+    const candidates = [join(__dirname, name), join(process.cwd(), 'src', 'locations', name), join(process.cwd(), 'dist', 'locations', name)]
+    const path = candidates.find(existsSync)
+    if (!path) throw new Error(`Không tìm thấy file dữ liệu địa lý: ${name}`)
+    return path
+  }
   private async ensureVietnam() {
     await this.ensureCountries();
     if (await this.provincesRepo.count({ where: { countryCode: 'VN' } }) >= 34) return;
@@ -20,11 +26,11 @@ export class LocationsService {
   }
   private async ensureCountries() {
     if (await this.countriesRepo.count() >= 200) return;
-    const countries = JSON.parse(readFileSync(join(__dirname, 'countries.json'), 'utf8')) as Country[];
+    const countries = JSON.parse(readFileSync(this.dataset('countries.json'), 'utf8')) as Country[];
     await this.countriesRepo.upsert(countries, ['code']);
   }
   private async importVietnam() {
-    const data = JSON.parse(readFileSync(join(__dirname, 'vietnam-admin-v2.json'), 'utf8')) as ApiProvince[];
+    const data = JSON.parse(readFileSync(this.dataset('vietnam-admin-v2.json'), 'utf8')) as ApiProvince[];
     await this.wardsRepo.clear(); await this.provincesRepo.clear();
     await this.provincesRepo.save(data.map((item) => this.provincesRepo.create({ code: String(item.code), countryCode: 'VN', name: item.name, divisionType: item.division_type })));
     await this.wardsRepo.save(data.flatMap((province) => (province.wards || []).map((ward) => this.wardsRepo.create({ code: String(ward.code), provinceCode: String(province.code), name: ward.name, divisionType: ward.division_type }))));

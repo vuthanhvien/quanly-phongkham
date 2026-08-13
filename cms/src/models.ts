@@ -31,6 +31,8 @@ export function getFieldLabel (resource: string, fieldKey: string, value: string
 export interface FieldSpec {
   key: string;
   label: string;
+  /** Default form/detail tab. A saved view can override this per field. */
+  tab?: string;
   type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative' | 'file' | 'image' | 'images' | 'dynamic-table';
   displayFormat?: 'currency' | 'number' | 'percent' | 'time';
   required?: boolean;
@@ -51,6 +53,50 @@ export interface RelationSpec {
   labelFields: string[];
   params?: Record<string, string>;
   lookupKey?: string;
+}
+
+/**
+ * Default tabs for records whose forms would otherwise be unnecessarily long.
+ * Keeping this separate from the field definitions makes the catalogue readable,
+ * while still making the layout available before a tenant has saved any view
+ * settings.
+ */
+const defaultFieldTabs: Record<string, Record<string, string>> = {
+  posts: { title: 'Nội dung', slug: 'Nội dung', category: 'Nội dung', imageUrl: 'Nội dung', excerpt: 'Nội dung', content: 'Nội dung', authorName: 'Xuất bản', publishedAt: 'Xuất bản', status: 'Xuất bản', isFeatured: 'Xuất bản' },
+  news: { title: 'Nội dung', slug: 'Nội dung', category: 'Nội dung', imageUrl: 'Nội dung', excerpt: 'Nội dung', content: 'Nội dung', sourceName: 'Nguồn & xuất bản', sourceUrl: 'Nguồn & xuất bản', publishedAt: 'Nguồn & xuất bản', status: 'Nguồn & xuất bản', isFeatured: 'Nguồn & xuất bản' },
+  staff: {
+    code: 'Công việc', fullName: 'Công việc', type: 'Công việc', phone: 'Công việc', email: 'Công việc', position: 'Công việc', departmentId: 'Công việc', userId: 'Công việc', leaderStaffId: 'Công việc', mentorStaffId: 'Công việc', status: 'Công việc', joinedAt: 'Công việc',
+    dateOfBirth: 'Hồ sơ cá nhân', gender: 'Hồ sơ cá nhân', idCardNumber: 'Hồ sơ cá nhân', idCardIssuedDate: 'Hồ sơ cá nhân', idCardIssuedPlace: 'Hồ sơ cá nhân', address: 'Hồ sơ cá nhân', avatarUrl: 'Hồ sơ cá nhân',
+    emergencyContactName: 'Liên hệ khẩn cấp', emergencyContactPhone: 'Liên hệ khẩn cấp', emergencyContactRelation: 'Liên hệ khẩn cấp',
+    bankAccountNumber: 'Ngân hàng', bankAccountName: 'Ngân hàng', bankName: 'Ngân hàng', bankBranch: 'Ngân hàng',
+    taxCode: 'Thuế', dependants: 'Thuế', note: 'Ghi chú',
+  },
+  'accounting-fiscal-settings': { accountingFramework: 'Thiết lập chung', baseCurrency: 'Thiết lập chung', fiscalYearStart: 'Thiết lập chung', companyLegalName: 'Thông tin doanh nghiệp', companyTaxCode: 'Thông tin doanh nghiệp', defaultBranchId: 'Thông tin doanh nghiệp', cashAccountNumber: 'Tài khoản mặc định', bankAccountNumber: 'Tài khoản mặc định', receivableAccountNumber: 'Tài khoản mặc định', payableAccountNumber: 'Tài khoản mặc định', revenueAccountNumber: 'Tài khoản mặc định', expenseAccountNumber: 'Tài khoản mặc định', note: 'Ghi chú' },
+  'accounting-chart-accounts': { accountNumber: 'Thông tin tài khoản', name: 'Thông tin tài khoản', shortName: 'Thông tin tài khoản', accountType: 'Thông tin tài khoản', parentAccountId: 'Cấu trúc & hạch toán', level: 'Cấu trúc & hạch toán', normalBalance: 'Cấu trúc & hạch toán', allowPosting: 'Cấu trúc & hạch toán', isSystem: 'Cấu trúc & hạch toán', cashFlowGroup: 'Cấu trúc & hạch toán', legalReference: 'Ghi chú', note: 'Ghi chú' },
+  'accounting-vouchers': { code: 'Chứng từ', voucherDate: 'Chứng từ', accountingDate: 'Chứng từ', voucherType: 'Chứng từ', periodId: 'Chứng từ', branchId: 'Chứng từ', referenceNumber: 'Chứng từ', sourceModule: 'Nguồn tham chiếu', sourceRecordId: 'Nguồn tham chiếu', description: 'Nguồn tham chiếu', totalDebit: 'Ghi sổ', totalCredit: 'Ghi sổ', status: 'Ghi sổ', postedAt: 'Ghi sổ', postedById: 'Ghi sổ', note: 'Ghi chú' },
+  'accounting-voucher-lines': { voucherId: 'Định khoản', accountId: 'Định khoản', branchId: 'Định khoản', debitAmount: 'Định khoản', creditAmount: 'Định khoản', customerId: 'Đối tượng', supplierId: 'Đối tượng', staffId: 'Đối tượng', cashFlowMappingId: 'Đối tượng', referenceNumber: 'Tham chiếu', lineDescription: 'Tham chiếu', note: 'Ghi chú' },
+  'medical-episodes': { customerId: 'Thông tin hồ sơ', branchId: 'Thông tin hồ sơ', serviceName: 'Thông tin hồ sơ', doctorName: 'Thông tin hồ sơ', status: 'Thông tin hồ sơ', chiefComplaint: 'Chuyên môn', allergyWarning: 'Chuyên môn', diagnosis: 'Chuyên môn', operationDate: 'Chuyên môn' },
+  appointments: { customerId: 'Lịch hẹn', branchId: 'Lịch hẹn', type: 'Lịch hẹn', startTime: 'Lịch hẹn', endTime: 'Lịch hẹn', status: 'Lịch hẹn', doctorStaffId: 'Nguồn lực', roomId: 'Nguồn lực', equipmentId: 'Nguồn lực', picStaffId: 'Nguồn lực' },
+  'performance-reviews': { staffId: 'Kỳ đánh giá', branchId: 'Kỳ đánh giá', reviewMonth: 'Kỳ đánh giá', reviewYear: 'Kỳ đánh giá', reviewerId: 'Kỳ đánh giá', score: 'Kỳ đánh giá', status: 'Kỳ đánh giá', strengths: 'Nội dung đánh giá', improvements: 'Nội dung đánh giá', goals: 'Nội dung đánh giá', files: 'Tài liệu', note: 'Ghi chú' },
+  'work-contracts': { staffId: 'Thông tin hợp đồng', branchId: 'Thông tin hợp đồng', contractType: 'Thông tin hợp đồng', startDate: 'Thông tin hợp đồng', endDate: 'Thông tin hợp đồng', status: 'Thông tin hợp đồng', baseSalary: 'Điều khoản làm việc', position: 'Điều khoản làm việc', workingHoursPerDay: 'Điều khoản làm việc', workingDaysPerMonth: 'Điều khoản làm việc', files: 'Tài liệu', note: 'Ghi chú' },
+  'staff-insurances': { staffId: 'Thông tin bảo hiểm', branchId: 'Thông tin bảo hiểm', insuranceType: 'Thông tin bảo hiểm', startDate: 'Thông tin bảo hiểm', endDate: 'Thông tin bảo hiểm', isActive: 'Thông tin bảo hiểm', employeeRate: 'Mức đóng', employerRate: 'Mức đóng', salaryBase: 'Mức đóng', files: 'Tài liệu', note: 'Ghi chú' },
+  projects: { code: 'Thông tin dự án', name: 'Thông tin dự án', status: 'Thông tin dự án', ownerStaffId: 'Thành viên & tiến độ', memberStaffIds: 'Thành viên & tiến độ', startDate: 'Thành viên & tiến độ', endDate: 'Thành viên & tiến độ', description: 'Mô tả', files: 'Tài liệu' },
+  'workflow-steps': { definitionId: 'Bước duyệt', name: 'Bước duyệt', stepOrder: 'Bước duyệt', stateKey: 'Bước duyệt', stateLabel: 'Bước duyệt', isActive: 'Bước duyệt', approverType: 'Người duyệt', approverStaffId: 'Người duyệt', approverUserId: 'Người duyệt', approverRoleKey: 'Người duyệt', approveActionLabel: 'Điều hướng', approveNextStepId: 'Điều hướng', rejectBehavior: 'Điều hướng', rejectActionLabel: 'Điều hướng', rejectNextStepId: 'Điều hướng', boardX: 'Sơ đồ', boardY: 'Sơ đồ' },
+  payrolls: { staffId: 'Kỳ lương', branchId: 'Kỳ lương', month: 'Kỳ lương', year: 'Kỳ lương', status: 'Kỳ lương', baseSalary: 'Thu nhập & công', workingDays: 'Thu nhập & công', actualDays: 'Thu nhập & công', overtimeHours: 'Thu nhập & công', bonus: 'Thu nhập & công', deduction: 'Khấu trừ', insuranceDeduction: 'Khấu trừ', pitAmount: 'Khấu trừ', employerInsuranceAmount: 'Khấu trừ', netSalary: 'Kết quả', paidAt: 'Thanh toán', paymentMethod: 'Thanh toán', paymentAccountNumber: 'Thanh toán', expenseAccountNumber: 'Thanh toán', files: 'Tài liệu', note: 'Ghi chú' },
+  consultations: { customerId: 'Thông tin thăm khám', branchId: 'Thông tin thăm khám', consultedAt: 'Thông tin thăm khám', consultantStaffId: 'Thông tin thăm khám', doctorStaffId: 'Thông tin thăm khám', status: 'Thông tin thăm khám', summary: 'Kết quả chuyên môn', diagnosis: 'Kết quả chuyên môn', nextAction: 'Kết quả chuyên môn' },
+  'service-orders': { code: 'Thông tin đơn', customerId: 'Thông tin đơn', branchId: 'Thông tin đơn', orderDate: 'Thông tin đơn', serviceName: 'Dịch vụ & giá', quantity: 'Dịch vụ & giá', unitPrice: 'Dịch vụ & giá', totalAmount: 'Dịch vụ & giá', performerStaffId: 'Thực hiện', status: 'Thực hiện', note: 'Ghi chú' },
+  'customer-images': { customerId: 'Thông tin', branchId: 'Thông tin', mediaType: 'Thông tin', title: 'Thông tin', capturedAt: 'Thông tin', imageUrl: 'Hình ảnh', files: 'Hình ảnh', diagnosisNote: 'Ghi chú chuyên môn' },
+  invoices: { code: 'Thông tin phiếu thu', customerId: 'Thông tin phiếu thu', branchId: 'Thông tin phiếu thu', status: 'Thông tin phiếu thu', taxableAmount: 'Thuế & tổng tiền', vatRate: 'Thuế & tổng tiền', vatAmount: 'Thuế & tổng tiền', totalAmount: 'Thuế & tổng tiền', paidAmount: 'Thanh toán', method: 'Thanh toán', paymentAccountNumber: 'Thanh toán', revenueAccountNumber: 'Hạch toán' },
+  expenses: { branchId: 'Thông tin chi', supplierId: 'Thông tin chi', category: 'Thông tin chi', invoiceNumber: 'Thông tin chi', description: 'Thông tin chi', paidAt: 'Thông tin chi', beforeTaxAmount: 'Thuế & số tiền', vatRate: 'Thuế & số tiền', vatAmount: 'Thuế & số tiền', amount: 'Thuế & số tiền', paymentMethod: 'Thanh toán', paymentAccountNumber: 'Thanh toán', expenseAccountNumber: 'Hạch toán' },
+};
+
+function applyDefaultTabs(fieldsByResource: Record<string, FieldSpec[]>) {
+  return Object.fromEntries(
+    Object.entries(fieldsByResource).map(([resource, fields]) => [
+      resource,
+      fields.map((field) => ({ ...field, tab: field.tab || defaultFieldTabs[resource]?.[field.key] })),
+    ]),
+  ) as Record<string, FieldSpec[]>;
 }
 
 export interface CustomField {
@@ -359,7 +405,7 @@ export const relationFields: Record<string, RelationSpec> = {
   toDepartmentId: { resource: 'departments', labelFields: ['code', 'name'] },
 };
 
-export const baseFields: Record<string, FieldSpec[]> = {
+const rawBaseFields: Record<string, FieldSpec[]> = {
   posts: [
     { key: 'title', label: 'Tiêu đề', required: true, width: '66', tableWidth: 260 },
     { key: 'slug', label: 'Slug', required: true, width: '33', tableWidth: 180 },
@@ -1003,3 +1049,5 @@ export const baseFields: Record<string, FieldSpec[]> = {
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
   ],
 };
+
+export const baseFields = applyDefaultTabs(rawBaseFields);

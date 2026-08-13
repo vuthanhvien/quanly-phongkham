@@ -362,7 +362,7 @@ export function buildFieldLayoutConfigs(
       tab:
         typeof entry.tab === 'string' && entry.tab.trim()
           ? entry.tab.trim()
-          : undefined,
+          : base.tab,
       required: base.required,
       options:
         Array.isArray(entry.options)

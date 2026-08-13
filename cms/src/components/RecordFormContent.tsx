@@ -462,6 +462,12 @@ export function RecordFormContent({
         className={`record-form${compact ? " record-form--compact" : ""}`}
         form={form}
         layout="vertical"
+        onKeyDownCapture={(event) => {
+          if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+            event.preventDefault()
+            form.submit()
+          }
+        }}
         onValuesChange={() => {
           if (submitError) setSubmitError(null)
         }}
@@ -512,7 +518,7 @@ export function RecordFormContent({
             {!editing ? <Button onClick={() => void openDrafts()}>Bản nháp{drafts.length ? ` (${drafts.length})` : ""}</Button> : null}
             <Button onClick={onCancel}>Hủy</Button>
           </Space>
-          <Button className="primary-glow" htmlType="submit" type="primary">
+          <Button className="primary-glow" htmlType="submit" title="Ctrl/⌘ + Enter" type="primary">
             Lưu
           </Button>
         </div>
