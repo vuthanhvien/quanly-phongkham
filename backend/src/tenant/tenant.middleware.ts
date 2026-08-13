@@ -11,10 +11,6 @@ export class TenantMiddleware implements NestMiddleware {
   ) {}
 
   async use(req: Request, _res: Response, next: NextFunction) {
-    if (req.path.startsWith('/api/platform/') || req.path.startsWith('/api/platform-auth/')) {
-      next();
-      return;
-    }
     const host = String(req.headers['x-forwarded-host'] || req.headers.host || '');
     const tenant = await this.tenants.resolveHost(host);
     this.context.run(tenant, next);

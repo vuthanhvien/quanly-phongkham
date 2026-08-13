@@ -1,0 +1,4 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '../../../../lib/auth'
+import { managementDb, normalizeDomain, Tenant } from '../../../../lib/db'
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) { if (!requireAdmin(request)) return NextResponse.json({ message: 'Không có quyền' }, { status: 401 }); const body = await request.json(); const repo = (await managementDb()).getRepository(Tenant); const current = await repo.findOneBy({ id: (await params).id }); if (!current) return NextResponse.json({ message: 'Không tìm thấy tenant' }, { status: 404 }); return NextResponse.json({ data: await repo.save({ ...current, ...(body.domain !== undefined ? { domain: normalizeDomain(body.domain) } : {}), ...(body.databaseUrl !== undefined ? { databaseUrl: String(body.databaseUrl).trim() } : {}), ...(typeof body.isActive === 'boolean' ? { isActive: body.isActive } : {}) }) }) }

@@ -24,13 +24,13 @@ RUN npm install
 COPY cms ./
 RUN npm run build
 
-FROM node:22-alpine AS platform-cms-build
+FROM node:22-alpine AS tenant-build
 WORKDIR /app
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
-COPY platform-cms/package*.json ./
+COPY tenant/package*.json ./
 RUN npm install
-COPY platform-cms ./
+COPY tenant ./
 RUN npm run build
 
 FROM node:22-alpine AS landing-deps
@@ -90,7 +90,8 @@ COPY --from=backend-build /app/src/locations/countries.json ./backend/dist/locat
 COPY --from=backend-build /app/storage ./backend/storage
 
 COPY --from=cms-build /app/dist ./cms-dist
-COPY --from=platform-cms-build /app/dist ./platform-cms-dist
+COPY --from=tenant-build /app/.next/standalone ./tenant/
+COPY --from=tenant-build /app/.next/static ./tenant/.next/static
 
 COPY --from=landing-build /app/.next/standalone ./landing/
 COPY --from=landing-build /app/.next/static ./landing/.next/static

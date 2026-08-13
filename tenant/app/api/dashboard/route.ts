@@ -1,0 +1,4 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '../../../lib/auth'
+import { managementDb, PlatformAdmin, Tenant } from '../../../lib/db'
+export async function GET(request: NextRequest) { if (!requireAdmin(request)) return NextResponse.json({ message: 'Không có quyền' }, { status: 401 }); const db = await managementDb(); const [total, active, admins, latest] = await Promise.all([db.getRepository(Tenant).count(), db.getRepository(Tenant).count({ where: { isActive: true } }), db.getRepository(PlatformAdmin).count({ where: { isActive: true } }), db.getRepository(Tenant).find({ order: { updatedAt: 'DESC' }, take: 5 })]); return NextResponse.json({ data: { totalTenants: total, activeTenants: active, inactiveTenants: total - active, activeAdmins: admins, latestTenants: latest.map((tenant) => ({ id: tenant.id, domain: tenant.domain, isActive: tenant.isActive, updatedAt: tenant.updatedAt })) } }) }

@@ -14,7 +14,6 @@ import { WorkflowModule } from './workflow/workflow.module';
 import { TenantMiddleware } from './tenant/tenant.middleware';
 import { TenantModule } from './tenant/tenant-orm.module';
 import { CustomerPortalModule } from './customer-portal/customer-portal.module';
-import { PlatformModule } from './platform/platform.module';
 
 @Module({
   imports: [
@@ -30,7 +29,6 @@ import { PlatformModule } from './platform/platform.module';
     LocationsModule,
     WorkflowModule,
     CustomerPortalModule,
-    PlatformModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

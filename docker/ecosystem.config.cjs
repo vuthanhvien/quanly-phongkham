@@ -35,11 +35,11 @@ module.exports = {
       },
     },
     {
-      name: 'platform-cms',
-      cwd: '/app',
-      script: '/opt/runtime/node_modules/.bin/serve',
-      args: `-s platform-cms-dist -l ${process.env.PLATFORM_CMS_PORT || '9996'}`,
-      env: { NODE_ENV: 'production' },
+      name: 'tenant',
+      cwd: '/app/tenant',
+      script: 'node',
+      args: 'server.js',
+      env: { NODE_ENV: 'production', PORT: process.env.PLATFORM_CMS_PORT || '9996', HOSTNAME: '0.0.0.0' },
     },
   ],
 };

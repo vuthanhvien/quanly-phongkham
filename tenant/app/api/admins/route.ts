@@ -1,0 +1,5 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createAdmin, requireAdmin } from '../../../lib/auth'
+import { managementDb, PlatformAdmin } from '../../../lib/db'
+export async function GET(request: NextRequest) { if (!requireAdmin(request)) return NextResponse.json({ message: 'Không có quyền' }, { status: 401 }); const rows = await (await managementDb()).getRepository(PlatformAdmin).find({ order: { createdAt: 'ASC' } }); return NextResponse.json({ data: rows.map(({ passwordHash: _passwordHash, ...admin }) => admin) }) }
+export async function POST(request: NextRequest) { if (!requireAdmin(request)) return NextResponse.json({ message: 'Không có quyền' }, { status: 401 }); try { const body = await request.json(); const admin = await createAdmin({ email: String(body.email || ''), password: String(body.password || ''), fullName: String(body.fullName || '') }); const { passwordHash: _passwordHash, ...result } = admin; return NextResponse.json({ data: result }) } catch (error) { return NextResponse.json({ message: error instanceof Error ? error.message : 'Không thể tạo Super Admin' }, { status: 400 }) } }

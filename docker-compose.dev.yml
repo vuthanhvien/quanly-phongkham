@@ -59,23 +59,26 @@ services:
       - ./cms:/app/cms
       - cms_node_modules:/app/cms/node_modules
 
-  platform-cms:
+  tenant:
     build:
       context: .
       dockerfile: Dockerfile
-      target: platform-cms-build
-    command: npm run dev -- --host 0.0.0.0 --port 9996
+      target: tenant-build
+    command: sh -c "npm install && npm run dev"
     environment:
-      VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:9998/api}
-      VITE_API_PROXY_TARGET: http://backend:9998
+      MANAGEMENT_DATABASE_URL: ${MANAGEMENT_DATABASE_URL:-}
+      PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-}
+      PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-}
+      PLATFORM_ADMIN_NAME: ${PLATFORM_ADMIN_NAME:-Super Admin}
+      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:-${JWT_SECRET}}
       CHOKIDAR_USEPOLLING: "true"
     depends_on:
       - backend
     ports:
       - "${PLATFORM_ADMIN_PORT:-9996}:9996"
     volumes:
-      - ./platform-cms:/app
-      - platform_cms_node_modules:/app/node_modules
+      - ./tenant:/app
+      - tenant_node_modules:/app/node_modules
 
   landing:
     build:
@@ -100,5 +103,5 @@ services:
 volumes:
   backend_node_modules:
   cms_node_modules:
-  platform_cms_node_modules:
+  tenant_node_modules:
   landing_node_modules:
