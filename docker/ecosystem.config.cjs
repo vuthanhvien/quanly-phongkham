@@ -34,5 +34,12 @@ module.exports = {
         NODE_ENV: 'production',
       },
     },
+    {
+      name: 'platform-cms',
+      cwd: '/app',
+      script: '/opt/runtime/node_modules/.bin/serve',
+      args: `-s platform-cms-dist -l ${process.env.PLATFORM_CMS_PORT || '9996'}`,
+      env: { NODE_ENV: 'production' },
+    },
   ],
 };

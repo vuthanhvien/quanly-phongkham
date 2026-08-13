@@ -1119,6 +1119,7 @@ export class RecordsService {
     if (resource === 'work-schedules') return this.saveWorkScheduleSchema(normalized, payload, user);
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
+    if (resource === 'workflow-definitions') await this.releaseArchivedWorkflowCode(String(normalized.code || ''));
     const record = await this.saveRecord(resource, repository.create(normalized), repository);
     if (resource === 'projects' && Array.isArray(payload.memberStaffIds)) await this.syncProjectMembers(record.id, payload.memberStaffIds);
     if (resource === 'products') await this.syncProductVariants(record.id, productVariants);
@@ -1238,9 +1239,25 @@ export class RecordsService {
     this.assertRecordIsNotProtected(resource, record);
     await this.assertProtectedAdminAssignment(resource, record);
     await this.assertPermission(user, resource, 'delete', this.branchIdOf(resource, record));
-    await this.repository(resource).save({ ...record, isArchived: true });
+    if (resource === 'workflow-definitions') {
+      await this.repository(resource).save({ ...record, code: this.archivedWorkflowCode(String(record.code || ''), record.id), isArchived: true, isActive: false });
+    } else {
+      await this.repository(resource).save({ ...record, isArchived: true });
+    }
     await this.audit(user, 'ARCHIVE', resource, id, { before: record });
     return { data: { id } };
+  }
+
+  private archivedWorkflowCode (code: string, id: string) {
+    return `${code}__archived_${id.replace(/-/g, '').slice(0, 8)}`;
+  }
+
+  private async releaseArchivedWorkflowCode (code: string) {
+    if (!code) return;
+    const archived = await this.workflowDefinitions.findOne({ where: { code, isArchived: true } });
+    if (archived) {
+      await this.workflowDefinitions.save({ ...archived, code: this.archivedWorkflowCode(code, archived.id), isActive: false });
+    }
   }
 
   async revealPhone (id: string, user: AuthUser) {

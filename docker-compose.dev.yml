@@ -22,6 +22,10 @@ services:
       GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY: ${GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-}
+      PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-}
+      PLATFORM_ADMIN_NAME: ${PLATFORM_ADMIN_NAME:-Super Admin}
+      TENANT_DOMAIN_CACHE_TTL_MS: ${TENANT_DOMAIN_CACHE_TTL_MS:-300000}
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "300"
     ports:
@@ -55,6 +59,24 @@ services:
       - ./cms:/app/cms
       - cms_node_modules:/app/cms/node_modules
 
+  platform-cms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: platform-cms-build
+    command: npm run dev -- --host 0.0.0.0 --port 9996
+    environment:
+      VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:9998/api}
+      VITE_API_PROXY_TARGET: http://backend:9998
+      CHOKIDAR_USEPOLLING: "true"
+    depends_on:
+      - backend
+    ports:
+      - "${PLATFORM_ADMIN_PORT:-9996}:9996"
+    volumes:
+      - ./platform-cms:/app
+      - platform_cms_node_modules:/app/node_modules
+
   landing:
     build:
       context: .
@@ -78,4 +100,5 @@ services:
 volumes:
   backend_node_modules:
   cms_node_modules:
+  platform_cms_node_modules:
   landing_node_modules:

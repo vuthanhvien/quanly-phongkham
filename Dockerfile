@@ -24,6 +24,15 @@ RUN npm install
 COPY cms ./
 RUN npm run build
 
+FROM node:22-alpine AS platform-cms-build
+WORKDIR /app
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+COPY platform-cms/package*.json ./
+RUN npm install
+COPY platform-cms ./
+RUN npm run build
+
 FROM node:22-alpine AS landing-deps
 WORKDIR /app
 COPY landing/package*.json ./
@@ -81,6 +90,7 @@ COPY --from=backend-build /app/src/locations/countries.json ./backend/dist/locat
 COPY --from=backend-build /app/storage ./backend/storage
 
 COPY --from=cms-build /app/dist ./cms-dist
+COPY --from=platform-cms-build /app/dist ./platform-cms-dist
 
 COPY --from=landing-build /app/.next/standalone ./landing/
 COPY --from=landing-build /app/.next/static ./landing/.next/static
@@ -88,6 +98,6 @@ RUN mkdir -p ./landing/public
 
 COPY docker ./docker
 
-EXPOSE 9997 9998 9999
+EXPOSE 9996 9997 9998 9999
 
 CMD ["tini", "--", "/opt/runtime/node_modules/.bin/pm2-runtime", "/app/docker/ecosystem.config.cjs"]

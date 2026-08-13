@@ -24,3 +24,28 @@ export class Tenant {
   @UpdateDateColumn()
   updatedAt: Date;
 }
+
+/** Account stored only in the management database; never replicated to tenant DBs. */
+@Entity('platform_admins')
+export class PlatformAdmin {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ unique: true })
+  email: string;
+
+  @Column()
+  passwordHash: string;
+
+  @Column()
+  fullName: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
