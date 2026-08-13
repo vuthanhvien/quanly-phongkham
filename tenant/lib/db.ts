@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, DataSource, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm'
+import { createConnection } from 'mysql2/promise'
 
 @Entity('tenants')
 export class Tenant {
@@ -34,6 +35,35 @@ export async function managementDb() {
 }
 
 export function normalizeDomain(value: string) { return String(value || '').split(',')[0].trim().toLowerCase().replace(/^https?:\/\//, '').replace(/:\d+$/, '').replace(/\.$/, '') }
+
+export function databaseNameFromUrl(databaseUrl: string) {
+  try { return decodeURIComponent(new URL(databaseUrl).pathname.replace(/^\//, '')) } catch { return '' }
+}
+
+function normalizeDatabaseName(value: string) {
+  const name = String(value || '').trim()
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(name)) throw new Error('Tên database chỉ gồm chữ, số, dấu gạch dưới hoặc gạch ngang (tối đa 64 ký tự)')
+  return name
+}
+
+/** Creates a tenant database on the shared DB server and returns its private URL. */
+export async function provisionTenantDatabase(value: string) {
+  const databaseName = normalizeDatabaseName(value)
+  const baseUrl = process.env.TENANT_DATABASE_SERVER_URL || process.env.DATABASE_URL
+  if (!baseUrl) throw new Error('TENANT_DATABASE_SERVER_URL chưa được cấu hình')
+  const url = new URL(baseUrl)
+  url.pathname = '/'
+  url.search = ''
+  const connection = await createConnection(url.toString())
+  try {
+    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${databaseName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+  } finally {
+    await connection.end()
+  }
+  const tenantUrl = new URL(baseUrl)
+  tenantUrl.pathname = `/${databaseName}`
+  return { databaseName, databaseUrl: tenantUrl.toString() }
+}
 
 export async function checkTenantDatabase(databaseUrl: string) {
   const url = String(databaseUrl || '')

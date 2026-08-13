@@ -12,6 +12,7 @@ services:
       PORT: 9998
       DATABASE_URL: ${DATABASE_URL}
       MANAGEMENT_DATABASE_URL: ${MANAGEMENT_DATABASE_URL:-}
+      TENANT_DATABASE_SERVER_URL: ${TENANT_DATABASE_SERVER_URL:-${DATABASE_URL}}
       TENANTS_JSON: ${TENANTS_JSON:-}
       TYPEORM_SYNCHRONIZE: ${TYPEORM_SYNCHRONIZE:-true}
       JWT_SECRET: ${JWT_SECRET}
@@ -64,9 +65,10 @@ services:
       context: .
       dockerfile: Dockerfile
       target: tenant-build
-    command: sh -c "npm install && npm run dev"
+    command: npm start
     environment:
       MANAGEMENT_DATABASE_URL: ${MANAGEMENT_DATABASE_URL:-}
+      TENANT_DATABASE_SERVER_URL: ${TENANT_DATABASE_SERVER_URL:-${DATABASE_URL}}
       PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-}
       PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-}
       PLATFORM_ADMIN_NAME: ${PLATFORM_ADMIN_NAME:-Super Admin}
@@ -76,9 +78,6 @@ services:
       - backend
     ports:
       - "${PLATFORM_ADMIN_PORT:-9996}:9996"
-    volumes:
-      - ./tenant:/app
-      - tenant_node_modules:/app/node_modules
 
   landing:
     build:
@@ -103,5 +102,4 @@ services:
 volumes:
   backend_node_modules:
   cms_node_modules:
-  tenant_node_modules:
   landing_node_modules:
