@@ -38,12 +38,6 @@ import {
 } from '../entities/entities';
 
 const LARGE_SEED_BATCH_SIZE = 500;
-const PROTECTED_ADMIN = {
-  email: 'admin@admin.com',
-  username: 'admin',
-  fullName: 'Admin',
-  password: 'Admin',
-} as const;
 const LARGE_SEED_PREFIXES = {
   branchSlug: 'bulk-branch-',
   branchName: 'Bulk Branch ',
@@ -111,13 +105,6 @@ const ALL_BULK_MODULES: BulkModuleName[] = [
   'treatments',
   'commissions',
 ];
-
-type CoreSeedContext = {
-  branch?: Branch;
-  admin?: User;
-  adminDepartment?: Department;
-  adminStaff?: Staff;
-};
 
 function padSerial(value: number, width = 6) {
   return String(value).padStart(width, '0');
@@ -198,160 +185,27 @@ export class SeedService implements OnApplicationBootstrap {
   }
 
   private async seedTenant() {
-    await this.cleanupLegacyBranchRoleAssignments();
-    await this.ensureProtectedAdmin();
-    const context = await this.ensureCoreSeed();
-    await this.ensureBaseSettings();
-    await this.normalizeBulkAppointmentTimes();
-    await this.seedLargeDataIfEnabled(context);
+    // A provisioned tenant starts intentionally empty: schema plus one admin.
+    // Teams can then clone a template tenant when they want demo/config data.
+    await this.ensureInitialAdmin();
+    await this.seedLargeDataIfEnabled();
   }
 
-  private async ensureProtectedAdmin() {
-    const existing = await this.users.findOne({ where: { email: PROTECTED_ADMIN.email } });
-    if (existing) return;
-
-    // Older installations already receive a seeded `admin` username. Keep it
-    // untouched and create the protected account with a unique fallback name.
-    const existingUsername = await this.users.findOne({ where: { username: PROTECTED_ADMIN.username } });
-
-    await this.users.save(this.users.create({
-      email: PROTECTED_ADMIN.email,
-      username: existingUsername ? 'admin-system' : PROTECTED_ADMIN.username,
-      fullName: PROTECTED_ADMIN.fullName,
-      passwordHash: await hash(PROTECTED_ADMIN.password, 10),
-      role: 'ADMIN',
-      isActive: true,
-      isArchived: false,
-    }));
-  }
-
-  private async ensureCoreSeed(): Promise<CoreSeedContext> {
-    const [branchCount, userCount, departmentCount, staffCount, assignmentCount] = await Promise.all([
-      this.branches.count(),
-      this.users.count(),
-      this.departments.count(),
-      this.staff.count(),
-      this.branchPermissions.count(),
-    ]);
-    const hasExistingCoreData = branchCount > 0 || userCount > 0 || departmentCount > 0 || staffCount > 0 || assignmentCount > 0;
-
-    if (hasExistingCoreData) {
-      const [branchRows, adminRows, departmentRows, staffRows] = await Promise.all([
-        this.branches.find({ order: { createdAt: 'ASC' }, take: 1 }),
-        this.users.find({ order: { createdAt: 'ASC' }, take: 1 }),
-        this.departments.find({ order: { createdAt: 'ASC' }, take: 1 }),
-        this.staff.find({ order: { createdAt: 'ASC' }, take: 1 }),
-      ]);
-      const branch = branchRows[0];
-      const admin = adminRows[0];
-      const adminDepartment = departmentRows[0];
-      const adminStaff = staffRows[0];
-      return { branch: branch ?? undefined, admin: admin ?? undefined, adminDepartment: adminDepartment ?? undefined, adminStaff: adminStaff ?? undefined };
-    }
-
-    let branch = await this.branches.findOne({ where: { slug: 'hoi-so' } });
-    if (!branch) {
-      branch = await this.branches.save(
-        this.branches.create({ name: 'Hội sở', slug: 'hoi-so', isActive: true }),
-      );
-    }
-
+  private async ensureInitialAdmin() {
     const email = this.config.get('ADMIN_EMAIL', 'admin@clinic.test');
-    let admin = await this.users.findOne({ where: { email } });
+    const admin = await this.users.findOne({ where: { email } });
     if (!admin) {
-      admin = await this.users.save(
+      const existingUsername = await this.users.findOne({ where: { username: 'admin' } });
+      await this.users.save(
         this.users.create({
           email,
-          username: 'admin',
+          username: existingUsername ? 'admin-system' : 'admin',
           fullName: 'Quan tri he thong',
           passwordHash: await hash(this.config.get('ADMIN_PASSWORD', 'Admin@123'), 10),
           role: 'ADMIN',
-          branchId: branch.id,
-        }),
-      );
-    }
-
-    let adminDepartment = await this.departments.findOne({ where: { code: 'BOD' } });
-    if (!adminDepartment) {
-      adminDepartment = await this.departments.save(
-        this.departments.create({ code: 'BOD', name: 'Ban dieu hanh', isActive: true }),
-      );
-    }
-
-    let adminStaff = await this.staff.findOne({ where: { code: 'NV-ADMIN' } });
-    if (!adminStaff) {
-      adminStaff = await this.staff.save(
-        this.staff.create({
-          code: 'NV-ADMIN',
-          fullName: 'Quan tri he thong',
-          email,
-          position: 'System Administrator',
-          departmentId: adminDepartment.id,
-          userId: admin.id,
-          status: 'ACTIVE',
-        }),
-      );
-      admin.staffId = adminStaff.id;
-      await this.users.save(admin);
-    }
-
-    await this.ensureSchedulingResources(branch);
-
-    if (!(await this.branchPermissions.findOne({ where: { staffId: adminStaff.id, branchId: branch.id } }))) {
-      let adminRole = await this.roles.findOne({ where: { key: 'ADMIN_OWNER' } });
-      if (!adminRole) {
-        adminRole = await this.roles.save(
-          this.roles.create({
-            key: 'ADMIN_OWNER',
-            name: 'Admin Owner',
-            roleMain: 'ADMIN',
-            isActive: true,
-          }),
-        );
-      }
-      await this.branchPermissions.save(
-        this.branchPermissions.create({
-          userId: admin.id,
-          staffId: adminStaff.id,
-          branchId: branch.id,
-          roleName: 'ADMIN_OWNER',
-          roleKeys: [adminRole.key],
           isActive: true,
+          isArchived: false,
         }),
-      );
-    }
-
-    return { branch, admin, adminDepartment, adminStaff };
-  }
-
-  private async ensureSchedulingResources(branch: Branch) {
-    const roomCount = await this.rooms.count();
-    if (roomCount === 0) {
-      await this.rooms.save(
-        ['P01', 'P02', 'P03', 'P04', 'P05'].map((code, index) =>
-          this.rooms.create({
-            code,
-            name: `Phong ${index + 1}`,
-            branchId: branch.id,
-            note: `Phong dieu tri ${index + 1}`,
-            isActive: true,
-          }),
-        ),
-      );
-    }
-
-    const equipmentCount = await this.equipments.count();
-    if (equipmentCount === 0) {
-      await this.equipments.save(
-        ['MM01', 'MM02', 'MM03', 'MM04', 'MM05'].map((code, index) =>
-          this.equipments.create({
-            code,
-            name: `May moc ${index + 1}`,
-            branchId: branch.id,
-            note: `Thiet bi dieu tri ${index + 1}`,
-            isActive: true,
-          }),
-        ),
       );
     }
   }
@@ -383,7 +237,7 @@ export class SeedService implements OnApplicationBootstrap {
     }
   }
 
-  private async seedLargeDataIfEnabled(context: CoreSeedContext) {
+  private async seedLargeDataIfEnabled() {
     const enabled = this.config.get('SEED_LARGE_DATA', 'false');
     if (!['1', 'true', 'yes', 'on'].includes(String(enabled).trim().toLowerCase())) {
       return;
@@ -453,7 +307,6 @@ export class SeedService implements OnApplicationBootstrap {
 
     await this.seedServiceOrderItems(serviceOrders, products);
     console.log('[seed] Large seed completed.');
-    void context;
   }
 
   private resolveSelectedModules() {
