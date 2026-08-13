@@ -6,7 +6,9 @@ import 'package:customer_app/app.dart';
 import 'package:customer_app/core/session/session_controller.dart';
 
 void main() {
-  testWidgets('App boots to phone entry screen when logged out', (WidgetTester tester) async {
+  testWidgets('App boots to phone entry screen when logged out', (
+    WidgetTester tester,
+  ) async {
     GetStorage.init();
     Get.put(SessionController(), permanent: true);
 

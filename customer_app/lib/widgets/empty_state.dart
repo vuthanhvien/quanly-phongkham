@@ -2,9 +2,17 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 
 class EmptyState extends StatelessWidget {
-  const EmptyState({super.key, required this.icon, required this.message});
+  const EmptyState({
+    super.key,
+    required this.icon,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
   final IconData icon;
   final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +29,10 @@ class EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.textMuted, fontSize: 14),
             ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 12),
+              OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
+            ],
           ],
         ),
       ),

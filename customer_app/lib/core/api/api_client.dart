@@ -57,8 +57,13 @@ class _ApiLogInterceptor extends Interceptor {
   }
 
   @override
-  void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
-    debugPrint('← ${response.statusCode} ${response.requestOptions.method} ${response.requestOptions.uri}');
+  void onResponse(
+    Response<dynamic> response,
+    ResponseInterceptorHandler handler,
+  ) {
+    debugPrint(
+      '← ${response.statusCode} ${response.requestOptions.method} ${response.requestOptions.uri}',
+    );
     debugPrint('  body: ${response.data}');
     handler.next(response);
   }

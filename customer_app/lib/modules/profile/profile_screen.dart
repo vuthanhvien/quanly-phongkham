@@ -4,7 +4,9 @@ import '../../core/session/session_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
 import '../../modules/auth/auth_controller.dart';
+import '../../data/repositories/customer_repository.dart';
 import '../../routes/app_routes.dart';
+import 'profile_controller.dart';
 
 const _tierLabels = {
   'MEMBER': 'Thành viên',
@@ -17,64 +19,101 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = Get.find<SessionController>();
+    final controller = Get.isRegistered<ProfileController>()
+        ? Get.find<ProfileController>()
+        : Get.put(ProfileController(CustomerRepository()));
     return Scaffold(
-      appBar: AppBar(title: const Text('Hồ sơ sức khỏe')),
+      appBar: AppBar(
+        title: const Text('Hồ sơ sức khỏe'),
+        actions: [
+          Obx(
+            () => IconButton(
+              tooltip: 'Làm mới hồ sơ',
+              onPressed: controller.isRefreshing.value
+                  ? null
+                  : controller.refreshProfile,
+              icon: controller.isRefreshing.value
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+            ),
+          ),
+        ],
+      ),
       body: Obx(() {
         final c = session.customer.value;
         if (c == null) return const SizedBox.shrink();
-        return DefaultTabController(
-          length: 2,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-            children: [
-              _ProfileHero(
-                name: c.fullName,
-                code: c.code,
-                tier: _tierLabels[c.tier] ?? c.tier,
-                totalSpent: c.totalSpent ?? 0,
-              ),
-              const SizedBox(height: 16),
-              Card(
-                child: Column(
-                  children: [
-                    _InfoTile(
-                      icon: AppIcons.phone,
-                      label: 'Số điện thoại',
-                      value: c.phone,
+        return RefreshIndicator(
+          onRefresh: controller.refreshProfile,
+          child: DefaultTabController(
+            length: 2,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              children: [
+                if (controller.errorMessage.value != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      controller.errorMessage.value!,
+                      style: const TextStyle(
+                        color: AppColors.error,
+                        fontSize: 13,
+                      ),
                     ),
-                    const Divider(height: 1),
-                    _InfoTile(
-                      icon: AppIcons.edit,
-                      label: 'Email',
-                      value: c.email ?? 'Chưa cập nhật',
-                    ),
-                    const Divider(height: 1),
-                    _InfoTile(
-                      icon: AppIcons.mapPin,
-                      label: 'Địa chỉ',
-                      value: c.addressLine ?? c.address ?? 'Chưa cập nhật',
-                    ),
+                  ),
+                _ProfileHero(
+                  name: c.fullName,
+                  code: c.code,
+                  tier: _tierLabels[c.tier] ?? c.tier,
+                  totalSpent: c.totalSpent ?? 0,
+                ),
+                const SizedBox(height: 16),
+                Card(
+                  child: Column(
+                    children: [
+                      _InfoTile(
+                        icon: AppIcons.phone,
+                        label: 'Số điện thoại',
+                        value: c.phone,
+                      ),
+                      const Divider(height: 1),
+                      _InfoTile(
+                        icon: AppIcons.edit,
+                        label: 'Email',
+                        value: c.email ?? 'Chưa cập nhật',
+                      ),
+                      const Divider(height: 1),
+                      _InfoTile(
+                        icon: AppIcons.mapPin,
+                        label: 'Địa chỉ',
+                        value: c.addressLine ?? c.address ?? 'Chưa cập nhật',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const TabBar(
+                  tabs: [
+                    Tab(text: 'Hành trình sức khỏe'),
+                    Tab(text: 'Tài khoản'),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-              const TabBar(
-                tabs: [
-                  Tab(text: 'Hành trình sức khỏe'),
-                  Tab(text: 'Tài khoản'),
-                ],
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                height: 496,
-                child: TabBarView(
-                  children: [
-                    _HealthJourney(),
-                    _AccountActions(onLogout: () => _logout(context)),
-                  ],
+                const SizedBox(height: 14),
+                SizedBox(
+                  height: 496,
+                  child: TabBarView(
+                    children: [
+                      _HealthJourney(),
+                      _AccountActions(onLogout: () => _logout(context)),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       }),

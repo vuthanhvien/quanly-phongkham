@@ -39,20 +39,36 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                   color: AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(AppIcons.heartbeat, color: AppColors.primaryDark, size: 28),
+                child: const Icon(
+                  AppIcons.heartbeat,
+                  color: AppColors.primaryDark,
+                  size: 28,
+                ),
               ),
               const SizedBox(height: 24),
-              Text('Đăng nhập', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                'Đăng nhập',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 8),
               const Text(
                 'Nhập số điện thoại đã đăng ký tại phòng khám để nhận mã xác thực',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 14, height: 1.4),
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 14,
+                  height: 1.4,
+                ),
               ),
               const SizedBox(height: 28),
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(11)],
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(11),
+                ],
                 decoration: const InputDecoration(
                   labelText: 'Số điện thoại',
                   prefixIcon: Padding(
@@ -68,7 +84,13 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                 if (error == null) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(error, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+                  child: Text(
+                    error,
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontSize: 13,
+                    ),
+                  ),
                 );
               }),
               const SizedBox(height: 8),
@@ -76,12 +98,17 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                 () => SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _controller.isSubmitting.value ? null : () => _controller.requestOtp(_phoneController.text),
+                    onPressed: _controller.isSubmitting.value
+                        ? null
+                        : () => _controller.requestOtp(_phoneController.text),
                     child: _controller.isSubmitting.value
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text('Gửi mã xác thực'),
                   ),
@@ -93,7 +120,13 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                 children: const [
                   Icon(AppIcons.shield, size: 16, color: AppColors.textMuted),
                   SizedBox(width: 6),
-                  Text('Thông tin của bạn được bảo mật', style: TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
+                  Text(
+                    'Thông tin của bạn được bảo mật',
+                    style: TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 12.5,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 24),

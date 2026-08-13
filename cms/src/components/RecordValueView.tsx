@@ -45,6 +45,9 @@ export function RecordValueView({ field, value, lookups, fileLookups, compact, o
   }
 
   const relationSpec = getRelationSpec(field)
+  if (relationSpec?.resource === "staff" && Array.isArray(value)) {
+    return renderStaffMemberList(field, value, lookups, compact, onRelationClick)
+  }
   const relationMeta = getRelationObjectValue(value) || getRelationMeta(lookups, field, value)
   if (relationSpec && isCompactRelationCard(relationSpec.resource) && relationMeta) {
     return renderRelationCardValue(field, value, lookups, compact, relationSpec.resource, relationMeta, onRelationClick)
@@ -54,6 +57,44 @@ export function RecordValueView({ field, value, lookups, fileLookups, compact, o
   }
 
   return <>{displayValue(field, value, lookups)}</>
+}
+
+function renderStaffMemberList(
+  field: string | FieldSpec,
+  values: unknown[],
+  lookups: LookupMap,
+  compact?: boolean,
+  onRelationClick?: (resource: string, id: string) => void,
+) {
+  return (
+    <div className={`staff-member-list${compact ? " compact" : ""}`}>
+      {values.map((value, index) => {
+        const id = String(value)
+        const member = getRelationMeta(lookups, field, value)
+        const name = String(member?.fullName || member?.name || member?.display_title || displayValue(field, value, lookups))
+        const code = String(member?.code || "")
+        const content = (
+          <span className="staff-member-chip">
+            <Avatar icon={<UserOutlined />} size={compact ? 24 : 32} src={member?.avatarUrl ? resolveFileUrl(String(member.avatarUrl)) : undefined} />
+            <span className="staff-member-chip__copy">
+              <strong>{name}</strong>
+              {code ? <small>{code}</small> : null}
+            </span>
+          </span>
+        )
+        return onRelationClick ? (
+          <Button
+            key={`${id}-${index}`}
+            size="small"
+            type="link"
+            onClick={() => onRelationClick("staff", id)}
+          >
+            {content}
+          </Button>
+        ) : <span key={`${id}-${index}`}>{content}</span>
+      })}
+    </div>
+  )
 }
 
 function renderRelationCardValue(

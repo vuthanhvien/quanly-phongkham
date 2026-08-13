@@ -25,13 +25,33 @@ class CustomerApp extends StatelessWidget {
       theme: AppTheme.light,
       initialRoute: session.isLoggedIn ? AppRoutes.shell : AppRoutes.phoneEntry,
       getPages: [
-        GetPage(name: AppRoutes.phoneEntry, page: () => const PhoneEntryScreen(), binding: AuthBinding()),
+        GetPage(
+          name: AppRoutes.phoneEntry,
+          page: () => const PhoneEntryScreen(),
+          binding: AuthBinding(),
+        ),
         GetPage(name: AppRoutes.otpVerify, page: () => const OtpVerifyScreen()),
-        GetPage(name: AppRoutes.shell, page: () => const ShellScreen(), binding: ShellBinding()),
-        GetPage(name: AppRoutes.bookingCreate, page: () => const BookingCreateScreen()),
-        GetPage(name: AppRoutes.bookingDetail, page: () => const BookingDetailScreen()),
-        GetPage(name: AppRoutes.invoiceDetail, page: () => const InvoiceDetailScreen()),
-        GetPage(name: AppRoutes.profileEdit, page: () => const ProfileEditScreen()),
+        GetPage(
+          name: AppRoutes.shell,
+          page: () => const ShellScreen(),
+          binding: ShellBinding(),
+        ),
+        GetPage(
+          name: AppRoutes.bookingCreate,
+          page: () => const BookingCreateScreen(),
+        ),
+        GetPage(
+          name: AppRoutes.bookingDetail,
+          page: () => const BookingDetailScreen(),
+        ),
+        GetPage(
+          name: AppRoutes.invoiceDetail,
+          page: () => const InvoiceDetailScreen(),
+        ),
+        GetPage(
+          name: AppRoutes.profileEdit,
+          page: () => const ProfileEditScreen(),
+        ),
       ],
     );
   }

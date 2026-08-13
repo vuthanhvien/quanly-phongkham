@@ -16,7 +16,9 @@ class ProfileEditScreen extends StatefulWidget {
 class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final _repository = CustomerRepository();
   late final _emailController = TextEditingController(text: _customer?.email);
-  late final _addressController = TextEditingController(text: _customer?.addressLine ?? _customer?.address);
+  late final _addressController = TextEditingController(
+    text: _customer?.addressLine ?? _customer?.address,
+  );
   String? _gender;
   bool _isSubmitting = false;
   String? _error;
@@ -43,11 +45,20 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text('Email', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+          const Text(
+            'Email',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+          ),
           const SizedBox(height: 8),
-          TextField(controller: _emailController, keyboardType: TextInputType.emailAddress),
+          TextField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+          ),
           const SizedBox(height: 18),
-          const Text('Giới tính', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+          const Text(
+            'Giới tính',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+          ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             initialValue: _gender,
@@ -59,21 +70,34 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             onChanged: (value) => setState(() => _gender = value),
           ),
           const SizedBox(height: 18),
-          const Text('Địa chỉ', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+          const Text(
+            'Địa chỉ',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+          ),
           const SizedBox(height: 8),
           TextField(controller: _addressController, maxLines: 2),
           const SizedBox(height: 20),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+              child: Text(
+                _error!,
+                style: const TextStyle(color: AppColors.error, fontSize: 13),
+              ),
             ),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _isSubmitting ? null : _submit,
               child: _isSubmitting
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Text('Lưu thay đổi'),
             ),
           ),

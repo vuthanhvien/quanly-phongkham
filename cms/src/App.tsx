@@ -1,6 +1,7 @@
 import { Authenticated, Refine } from '@refinedev/core';
 import routerProvider, { CatchAllNavigate } from '@refinedev/react-router';
 import { App as AntdApp, ConfigProvider, theme } from 'antd';
+import viVN from 'antd/locale/vi_VN';
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
 import { hasResourceAccess, hasScreenAccess } from './access';
@@ -158,6 +159,7 @@ export function App() {
     >
       <ConfigProvider
         componentSize={appUiSettings.size === 'medium' ? 'middle' : appUiSettings.size}
+        locale={viVN}
         theme={{
           algorithm: theme.defaultAlgorithm,
           token: {

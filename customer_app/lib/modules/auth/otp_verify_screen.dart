@@ -41,20 +41,39 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 8),
-              Text('Nhập mã xác thực', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                'Nhập mã xác thực',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 8),
               Text(
                 'Mã 6 số đã được gửi tới số $_phone',
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 14, height: 1.4),
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 14,
+                  height: 1.4,
+                ),
               ),
               const SizedBox(height: 28),
               TextField(
                 controller: _codeController,
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
-                style: const TextStyle(fontSize: 24, letterSpacing: 12, fontWeight: FontWeight.w700),
-                decoration: const InputDecoration(counterText: '', hintText: '••••••'),
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(6),
+                ],
+                style: const TextStyle(
+                  fontSize: 24,
+                  letterSpacing: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+                decoration: const InputDecoration(
+                  counterText: '',
+                  hintText: '••••••',
+                ),
                 maxLength: 6,
               ),
               const SizedBox(height: 12),
@@ -63,7 +82,13 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                 if (error == null) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(error, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+                  child: Text(
+                    error,
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontSize: 13,
+                    ),
+                  ),
                 );
               }),
               const SizedBox(height: 8),
@@ -73,12 +98,18 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                   child: ElevatedButton(
                     onPressed: _controller.isSubmitting.value
                         ? null
-                        : () => _controller.verifyOtp(_phone, _codeController.text),
+                        : () => _controller.verifyOtp(
+                            _phone,
+                            _codeController.text,
+                          ),
                     child: _controller.isSubmitting.value
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text('Xác nhận'),
                   ),
@@ -87,7 +118,9 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
               const SizedBox(height: 12),
               Center(
                 child: TextButton.icon(
-                  onPressed: _controller.isSubmitting.value ? null : () => _controller.requestOtp(_phone),
+                  onPressed: _controller.isSubmitting.value
+                      ? null
+                      : () => _controller.requestOtp(_phone),
                   icon: const Icon(AppIcons.chevronLeft, size: 16),
                   label: const Text('Gửi lại mã'),
                 ),

@@ -12,7 +12,11 @@ const _appointmentTypeLabels = {
 };
 
 class BookingCard extends StatelessWidget {
-  const BookingCard({super.key, required this.appointment, required this.onTap});
+  const BookingCard({
+    super.key,
+    required this.appointment,
+    required this.onTap,
+  });
 
   final Appointment appointment;
   final VoidCallback onTap;
@@ -31,8 +35,15 @@ class BookingCard extends StatelessWidget {
               Container(
                 width: 44,
                 height: 44,
-                decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(12)),
-                child: const Icon(AppIcons.calendar, color: AppColors.primaryDark, size: 22),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  AppIcons.calendar,
+                  color: AppColors.primaryDark,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -40,13 +51,22 @@ class BookingCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _appointmentTypeLabels[appointment.type] ?? appointment.type,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                      _appointmentTypeLabels[appointment.type] ??
+                          appointment.type,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      start != null ? formatDateTime(start) : 'Chưa xác định thời gian',
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                      start != null
+                          ? formatDateTime(start)
+                          : 'Chưa xác định thời gian',
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),

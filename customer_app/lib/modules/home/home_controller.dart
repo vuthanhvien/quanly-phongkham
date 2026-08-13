@@ -1,11 +1,13 @@
 import 'package:get/get.dart';
+import '../../core/appointments/appointment_sync_controller.dart';
 import '../../data/models/appointment.dart';
 import '../../data/repositories/appointment_repository.dart';
 
 class HomeController extends GetxController {
-  HomeController(this._repository);
+  HomeController(this._repository, this._sync);
 
   final AppointmentRepository _repository;
+  final AppointmentSyncController _sync;
 
   final isLoading = false.obs;
   final Rxn<Appointment> nextAppointment = Rxn<Appointment>();
@@ -13,6 +15,7 @@ class HomeController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    ever<int>(_sync.revision, (_) => load());
     load();
   }
 

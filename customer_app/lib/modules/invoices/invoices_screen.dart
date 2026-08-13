@@ -20,13 +20,21 @@ class InvoicesScreen extends StatelessWidget {
       body: RefreshIndicator(
         onRefresh: controller.load,
         child: Obx(() {
-          if (controller.isLoading.value && controller.invoices.isEmpty) return const LoadingView();
+          if (controller.isLoading.value && controller.invoices.isEmpty) {
+            return const LoadingView();
+          }
           if (controller.invoices.isEmpty) {
+            final error = controller.errorMessage.value;
             return SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: SizedBox(
                 height: 400,
-                child: EmptyState(icon: AppIcons.invoice, message: 'Chưa có hóa đơn nào'),
+                child: EmptyState(
+                  icon: AppIcons.invoice,
+                  message: error ?? 'Chưa có hóa đơn nào',
+                  actionLabel: error == null ? null : 'Thử lại',
+                  onAction: error == null ? null : controller.load,
+                ),
               ),
             );
           }
@@ -39,7 +47,10 @@ class InvoicesScreen extends StatelessWidget {
               return Card(
                 child: InkWell(
                   borderRadius: BorderRadius.circular(14),
-                  onTap: () => Get.toNamed(AppRoutes.invoiceDetail, arguments: invoice.id),
+                  onTap: () => Get.toNamed(
+                    AppRoutes.invoiceDetail,
+                    arguments: invoice.id,
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(
@@ -47,18 +58,36 @@ class InvoicesScreen extends StatelessWidget {
                         Container(
                           width: 44,
                           height: 44,
-                          decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(12)),
-                          child: const Icon(AppIcons.invoice, color: AppColors.primaryDark, size: 22),
+                          decoration: BoxDecoration(
+                            color: AppColors.primarySoft,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            AppIcons.invoice,
+                            color: AppColors.primaryDark,
+                            size: 22,
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(invoice.code, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                              Text(
+                                invoice.code,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                              ),
                               const SizedBox(height: 4),
-                              Text(formatCurrency(invoice.totalAmount),
-                                  style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                              Text(
+                                formatCurrency(invoice.totalAmount),
+                                style: const TextStyle(
+                                  color: AppColors.textMuted,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ],
                           ),
                         ),

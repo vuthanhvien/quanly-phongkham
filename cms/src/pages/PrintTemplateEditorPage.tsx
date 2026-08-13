@@ -277,7 +277,9 @@ export function PrintTemplateEditorPage() {
           <Tooltip title="Quay lại">
             <Button
               aria-label="Quay lại"
+              className="detail-header-ghost-button"
               icon={<ArrowLeftOutlined />}
+              type="text"
               onClick={() => navigate(`/settings?module=${entityType}`)}
             />
           </Tooltip>

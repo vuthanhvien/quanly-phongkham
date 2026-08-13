@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/repositories/appointment_repository.dart';
+import '../../widgets/empty_state.dart';
 import '../../widgets/loading_view.dart';
 import '../../widgets/status_badge.dart';
 import 'booking_detail_controller.dart';
@@ -14,7 +15,10 @@ class BookingDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final id = Get.arguments as String;
-    final controller = Get.put(BookingDetailController(AppointmentRepository(), id), tag: id);
+    final controller = Get.put(
+      BookingDetailController(AppointmentRepository(), id),
+      tag: id,
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Chi tiết lịch hẹn')),
@@ -22,7 +26,12 @@ class BookingDetailScreen extends StatelessWidget {
         if (controller.isLoading.value) return const LoadingView();
         final appointment = controller.appointment.value;
         if (appointment == null) {
-          return Center(child: Text(controller.errorMessage.value ?? 'Không tìm thấy lịch hẹn'));
+          return EmptyState(
+            icon: AppIcons.empty,
+            message: controller.errorMessage.value ?? 'Không tìm thấy lịch hẹn',
+            actionLabel: 'Thử lại',
+            onAction: controller.load,
+          );
         }
 
         return ListView(
@@ -39,19 +48,31 @@ class BookingDetailScreen extends StatelessWidget {
                       children: [
                         Text(
                           _typeLabel(appointment.type),
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 17,
+                          ),
                         ),
-                        StatusBadge(info: appointmentStatusInfo(appointment.status)),
+                        StatusBadge(
+                          info: appointmentStatusInfo(appointment.status),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     _InfoRow(
                       icon: AppIcons.clock,
                       label: 'Thời gian',
-                      value: appointment.startTime != null ? formatDateTime(appointment.startTime!) : 'Chưa xác định',
+                      value: appointment.startTime != null
+                          ? formatDateTime(appointment.startTime!)
+                          : 'Chưa xác định',
                     ),
-                    if (appointment.note != null && appointment.note!.isNotEmpty)
-                      _InfoRow(icon: AppIcons.note, label: 'Ghi chú', value: appointment.note!),
+                    if (appointment.note != null &&
+                        appointment.note!.isNotEmpty)
+                      _InfoRow(
+                        icon: AppIcons.note,
+                        label: 'Ghi chú',
+                        value: appointment.note!,
+                      ),
                   ],
                 ),
               ),
@@ -65,9 +86,18 @@ class BookingDetailScreen extends StatelessWidget {
                     onPressed: controller.isCancelling.value
                         ? null
                         : () => _confirmCancel(context, controller),
-                    icon: const Icon(AppIcons.cancel, color: AppColors.error, size: 18),
-                    label: const Text('Hủy lịch hẹn', style: TextStyle(color: AppColors.error)),
-                    style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.error)),
+                    icon: const Icon(
+                      AppIcons.cancel,
+                      color: AppColors.error,
+                      size: 18,
+                    ),
+                    label: const Text(
+                      'Hủy lịch hẹn',
+                      style: TextStyle(color: AppColors.error),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.error),
+                    ),
                   ),
                 ),
               ),
@@ -78,22 +108,32 @@ class BookingDetailScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmCancel(BuildContext context, BookingDetailController controller) async {
+  Future<void> _confirmCancel(
+    BuildContext context,
+    BookingDetailController controller,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Hủy lịch hẹn'),
         content: const Text('Bạn có chắc chắn muốn hủy lịch hẹn này không?'),
         actions: [
-          TextButton(onPressed: () => Get.back(result: false), child: const Text('Không')),
-          TextButton(onPressed: () => Get.back(result: true), child: const Text('Hủy lịch hẹn')),
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Không'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: const Text('Hủy lịch hẹn'),
+          ),
         ],
       ),
     );
     if (confirmed == true) await controller.cancel();
   }
 
-  String _typeLabel(String type) => const {
+  String _typeLabel(String type) =>
+      const {
         'CONSULTATION': 'Tư vấn',
         'PROCEDURE': 'Thực hiện dịch vụ',
         'FOLLOW_UP': 'Tái khám',
@@ -102,7 +142,11 @@ class BookingDetailScreen extends StatelessWidget {
 }
 
 class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.icon, required this.label, required this.value});
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
   final IconData icon;
   final String label;
   final String value;
@@ -120,7 +164,13 @@ class _InfoRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12.5,
+                  ),
+                ),
                 const SizedBox(height: 2),
                 Text(value, style: const TextStyle(fontSize: 14.5)),
               ],

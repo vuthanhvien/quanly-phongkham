@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_icons.dart';
 import '../../core/utils/error_utils.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/invoice.dart';
 import '../../data/repositories/invoice_repository.dart';
 import '../../widgets/loading_view.dart';
+import '../../widgets/empty_state.dart';
 import '../../widgets/status_badge.dart';
 
 class InvoiceDetailScreen extends StatefulWidget {
@@ -51,8 +53,13 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       body: _loading
           ? const LoadingView()
           : _invoice == null
-              ? Center(child: Text(_error ?? 'Không tìm thấy hóa đơn'))
-              : _buildDetail(_invoice!),
+          ? EmptyState(
+              icon: AppIcons.invoice,
+              message: _error ?? 'Không tìm thấy hóa đơn',
+              actionLabel: 'Thử lại',
+              onAction: _load,
+            )
+          : _buildDetail(_invoice!),
     );
   }
 
@@ -69,15 +76,26 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(invoice.code, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+                    Text(
+                      invoice.code,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 17,
+                      ),
+                    ),
                     StatusBadge(info: invoiceStatusInfo(invoice.status)),
                   ],
                 ),
                 const Divider(height: 28),
                 _row('Tổng tiền', formatCurrency(invoice.totalAmount)),
                 _row('Đã thanh toán', formatCurrency(invoice.paidAmount)),
-                _row('Còn lại', formatCurrency(invoice.remaining), emphasize: true),
-                if (invoice.createdAt != null) _row('Ngày lập', formatDate(invoice.createdAt!)),
+                _row(
+                  'Còn lại',
+                  formatCurrency(invoice.remaining),
+                  emphasize: true,
+                ),
+                if (invoice.createdAt != null)
+                  _row('Ngày lập', formatDate(invoice.createdAt!)),
               ],
             ),
           ),
@@ -92,7 +110,10 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 14)),
+          Text(
+            label,
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 14),
+          ),
           Text(
             value,
             style: TextStyle(

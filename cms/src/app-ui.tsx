@@ -69,6 +69,12 @@ export const companyTypeOptions = [
 export const fontFamilyOptions = [
   { value: '"Plus Jakarta Sans", Inter, Arial, sans-serif', label: 'Plus Jakarta Sans' },
   { value: '"Be Vietnam Pro", Inter, Arial, sans-serif', label: 'Be Vietnam Pro' },
+  { value: '"Figtree", Inter, Arial, sans-serif', label: 'Figtree' },
+  { value: '"Source Sans 3", Arial, sans-serif', label: 'Source Sans 3' },
+  { value: '"Roboto Flex", Roboto, Arial, sans-serif', label: 'Roboto Flex' },
+  { value: 'Rubik, Arial, sans-serif', label: 'Rubik' },
+  { value: 'Karla, Arial, sans-serif', label: 'Karla' },
+  { value: 'Sora, Arial, sans-serif', label: 'Sora' },
   { value: '"Manrope", Inter, Arial, sans-serif', label: 'Manrope' },
   { value: '"Space Grotesk", Inter, Arial, sans-serif', label: 'Space Grotesk' },
   { value: '"DM Sans", Inter, Arial, sans-serif', label: 'DM Sans' },

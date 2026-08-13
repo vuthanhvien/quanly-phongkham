@@ -1,5 +1,5 @@
 import { ArrowLeftOutlined, BranchesOutlined, DownOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons"
-import { Button, Card, Checkbox, Col, Dropdown, Form, Input, InputNumber, Modal, Row, Select, Space, Table, Tabs, Tag, Typography, message } from "antd"
+import { Button, Card, Checkbox, Col, Dropdown, Form, Input, InputNumber, Modal, Row, Select, Space, Table, Tabs, Tag, Tooltip, Typography, message } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { api } from "../api"
@@ -382,9 +382,11 @@ export function WorkflowDefinitionDetailPage() {
     <>
       <div className="page-header">
         <Space align="center">
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate("/workflow-definitions")} />
+          <Tooltip title="Quay lại">
+            <Button aria-label="Quay lại" className="detail-header-ghost-button" icon={<ArrowLeftOutlined />} type="text" onClick={() => navigate("/workflow-definitions")} />
+          </Tooltip>
           <div>
-            <Typography.Title level={3}>Cấu hình workflow</Typography.Title>
+            <Typography.Title level={3} style={{ margin: 0 }}>Cấu hình workflow</Typography.Title>
           </div>
         </Space>
         <Space>

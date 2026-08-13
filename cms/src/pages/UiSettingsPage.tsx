@@ -498,7 +498,11 @@ export function UiSettingsPage() {
                   <Col lg={8} md={12} xs={24}>
                     <Form.Item label="Chọn font" name="fontFamily" rules={[{ required: true }]}>
                       <Select
-                        options={fontFamilyOptions.map((font) => ({ value: font.value, label: font.label }))}
+                        optionLabelProp="label"
+                        options={fontFamilyOptions.map((font) => ({
+                          value: font.value,
+                          label: <span style={{ fontFamily: font.value }}>{font.label}</span>,
+                        }))}
                         placeholder="Chọn font cho CMS"
                         suffixIcon={<FontSizeOutlined />}
                       />

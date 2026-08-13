@@ -469,9 +469,22 @@ export function RecordListPage() {
         align: field.type === "number" ? "right" as const : undefined,
         sorter: true,
         sortOrder: (sortField === field.key ? (sortOrder === "asc" ? "ascend" : "descend") : undefined) as "ascend" | "descend" | undefined,
-        render: (_: unknown, row: Record<string, any>) => (
-          <Space size={4} wrap>
-            {resource === "projects" && field.key === "memberStaffIds"
+        render: (_: unknown, row: Record<string, any>) => {
+          if (field.key === "code") {
+            const code = resolveRecordFieldValue(row, field)
+            return code ? (
+              <Button
+                className="record-code-link"
+                type="link"
+                onClick={() => openDetail(String(row.id))}
+              >
+                {String(code)}
+              </Button>
+            ) : "—"
+          }
+          return (
+            <Space size={4} wrap>
+              {resource === "projects" && field.key === "memberStaffIds"
               ? <ProjectMemberAvatars memberIds={resolveRecordFieldValue(row, field)} lookups={lookups} />
               : resource === "products" && field.key === "category"
               ? (productCategoryNames[String(resolveRecordFieldValue(row, field) || "")] || "—")
@@ -486,8 +499,9 @@ export function RecordListPage() {
               }}
               value={resolveRecordFieldValue(row, field)}
             />}
-          </Space>
-        ),
+            </Space>
+          )
+        },
       })),
       ...(resource === "staff" ? [{
         title: "Tài khoản liên kết",
@@ -916,6 +930,13 @@ export function RecordListPage() {
             updateTableSort(String(currentSorter?.field || "") || undefined, currentSorter?.order)
           }}
           rowKey="id"
+          onRow={(row) => ({
+            onClick: (event) => {
+              const target = event.target as HTMLElement
+              if (target.closest("button, a, input, label, .ant-checkbox-wrapper, .ant-dropdown-trigger")) return
+              openDetail(String(row.id))
+            },
+          })}
           tableLayout="fixed"
           expandable={resource === "units" ? { defaultExpandAllRows: true } : undefined}
           indentSize={28}

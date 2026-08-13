@@ -1,6 +1,10 @@
 import 'package:intl/intl.dart';
 
-final _currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ', decimalDigits: 0);
+final _currencyFormat = NumberFormat.currency(
+  locale: 'vi_VN',
+  symbol: 'đ',
+  decimalDigits: 0,
+);
 final _dateFormat = DateFormat('dd/MM/yyyy');
 final _timeFormat = DateFormat('HH:mm');
 final _dateTimeFormat = DateFormat('HH:mm, dd/MM/yyyy');

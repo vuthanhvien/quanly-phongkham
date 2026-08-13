@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import '../../core/appointments/appointment_sync_controller.dart';
 import '../../core/utils/error_utils.dart';
 import '../../data/models/appointment.dart';
 import '../../data/repositories/appointment_repository.dart';
@@ -36,6 +37,7 @@ class BookingDetailController extends GetxController {
     isCancelling.value = true;
     try {
       appointment.value = await _repository.cancel(id);
+      Get.find<AppointmentSyncController>().requestRefresh();
     } catch (e) {
       Get.snackbar('Không thể hủy lịch hẹn', describeError(e));
     } finally {

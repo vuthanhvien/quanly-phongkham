@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import '../../core/appointments/appointment_sync_controller.dart';
 import '../../core/utils/error_utils.dart';
 import '../../data/models/branch.dart';
 import '../../data/models/doctor.dart';
@@ -34,7 +35,10 @@ class BookingCreateController extends GetxController {
   Future<void> _loadLookups() async {
     isLoadingLookups.value = true;
     try {
-      final results = await Future.wait([_lookupRepository.branches(), _lookupRepository.doctors()]);
+      final results = await Future.wait([
+        _lookupRepository.branches(),
+        _lookupRepository.doctors(),
+      ]);
       branches.assignAll(results[0] as List<Branch>);
       doctors.assignAll(results[1] as List<Doctor>);
       if (branches.isNotEmpty) selectedBranchId.value = branches.first.id;
@@ -76,6 +80,7 @@ class BookingCreateController extends GetxController {
         doctorStaffId: selectedDoctorId.value,
         note: note.value.trim().isEmpty ? null : note.value.trim(),
       );
+      Get.find<AppointmentSyncController>().requestRefresh();
       return true;
     } catch (e) {
       errorMessage.value = describeError(e);

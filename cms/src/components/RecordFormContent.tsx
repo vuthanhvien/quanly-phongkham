@@ -17,6 +17,7 @@ import {
   InputNumber,
   List,
   Col,
+  DatePicker,
   Modal,
   Row,
   Select,
@@ -596,7 +597,7 @@ function WorkSchedulePeriodFields() {
           name="scheduleDate"
           rules={[{ required: true, message: "Chọn ngày làm việc" }]}
         >
-          <Input type="date" />
+          <ClinicDateInput />
         </Form.Item>
       </Col>
       <Col xs={24} md={6}>
@@ -619,7 +620,7 @@ function WorkSchedulePeriodFields() {
       </Col>
       <Col xs={24} md={12}>
         <Form.Item label="Ngày kết thúc" name="recurrenceUntil" rules={[{ required: true, message: "Chọn ngày kết thúc" }]}>
-          <Input type="date" />
+          <ClinicDateInput />
         </Form.Item>
       </Col>
     </>
@@ -652,7 +653,7 @@ function AppointmentDateTimeFields({ form }: { form: ReturnType<typeof Form.useF
           name="appointmentDate"
           rules={[{ required: true, message: "Chọn ngày hẹn" }]}
         >
-          <Input type="date" />
+          <ClinicDateInput />
         </Form.Item>
       </Col>
       <Col xs={24} md={12}>
@@ -812,6 +813,34 @@ function widthToSpan(width?: FieldSpec["width"]) {
   }
 }
 
+function ClinicDateInput({
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  showTime = false,
+}: {
+  value?: string
+  onChange?: (value: string | undefined) => void
+  disabled?: boolean
+  placeholder?: string
+  showTime?: boolean
+}) {
+  const parsedValue = value ? dayjs(value) : null
+  return (
+    <DatePicker
+      allowClear
+      disabled={disabled}
+      format={showTime ? "DD/MM/YYYY HH:mm" : "DD/MM/YYYY"}
+      placeholder={placeholder}
+      showTime={showTime ? { format: "HH:mm" } : undefined}
+      style={{ width: "100%" }}
+      value={parsedValue?.isValid() ? parsedValue : null}
+      onChange={(date) => onChange?.(date ? date.format(showTime ? "YYYY-MM-DDTHH:mm" : "YYYY-MM-DD") : undefined)}
+    />
+  )
+}
+
 function FieldInput({
   field,
   lookups,
@@ -951,22 +980,21 @@ function FieldInput({
     )
   if (field.type === "date")
     return (
-      <Input
+      <ClinicDateInput
         disabled={field.disabled}
         placeholder={placeholder}
-        type="date"
         value={value as string | undefined}
-        onChange={(e) => onChange?.(e.target.value)}
+        onChange={onChange}
       />
     )
   if (field.type === "datetime")
     return (
-      <Input
+      <ClinicDateInput
         disabled={field.disabled}
+        showTime
         placeholder={placeholder}
-        type="datetime-local"
         value={value as string | undefined}
-        onChange={(e) => onChange?.(e.target.value)}
+        onChange={onChange}
       />
     )
   const inputPattern = getInputPatternConfig(field.inputPattern)

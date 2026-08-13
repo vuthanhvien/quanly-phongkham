@@ -39,7 +39,10 @@ class AuthController extends GetxController {
     errorMessage.value = null;
     try {
       final result = await _repository.verifyOtp(phoneNumber, code);
-      await Get.find<SessionController>().login(result.accessToken, result.customer);
+      await Get.find<SessionController>().login(
+        result.accessToken,
+        result.customer,
+      );
       Get.offAllNamed(AppRoutes.shell);
     } catch (e) {
       errorMessage.value = describeError(e);
