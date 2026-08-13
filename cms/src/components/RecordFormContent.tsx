@@ -402,12 +402,20 @@ export function RecordFormContent({
     }),
     [fields, hiddenFieldKeys, isAddressForm, isAppointmentForm, isWorkScheduleForm, resource],
   )
-  const fieldTabs = useMemo(() => groupFieldsByTab(visibleFields), [visibleFields])
+  const isSystemAdminAccount = resource === "user-accounts"
+    && String(recordQuery.result?.data?.username || recordQuery.query?.data?.data?.username || recordQuery.data?.data?.data?.username || "").toLowerCase() === "admin-system"
+  const formVisibleFields = useMemo(
+    () => visibleFields.map((field) => isSystemAdminAccount && ["username", "role"].includes(field.key)
+      ? { ...field, disabled: true }
+      : field),
+    [isSystemAdminAccount, visibleFields],
+  )
+  const fieldTabs = useMemo(() => groupFieldsByTab(formVisibleFields), [formVisibleFields])
   const usesTabs = fieldTabs.length > 1 || Boolean(fieldTabs[0]?.tab)
 
   useEffect(() => {
     const formKey = `${resource}:${id || "new"}`
-    const firstEditableField = visibleFields.find((field) => !field.disabled)
+    const firstEditableField = formVisibleFields.find((field) => !field.disabled)
     if (!firstEditableField || autoFocusedFormKey.current === formKey) return
 
     const frame = window.requestAnimationFrame(() => {
@@ -417,7 +425,7 @@ export function RecordFormContent({
       autoFocusedFormKey.current = formKey
     })
     return () => window.cancelAnimationFrame(frame)
-  }, [form, id, resource, visibleFields])
+  }, [form, formVisibleFields, id, resource])
 
   function showValidationError(errorInfo: { errorFields?: Array<{ name: Array<string | number>; errors: string[] }> }) {
     const firstError = errorInfo.errorFields?.[0]
@@ -502,7 +510,7 @@ export function RecordFormContent({
             }))}
             onChange={setActiveTab}
           />
-        ) : renderFieldGrid(visibleFields, true)}
+        ) : renderFieldGrid(formVisibleFields, true)}
         {resource === "user-accounts" ? (
           <Form.List name="branchRoleAssignments">
             {(items, { add, remove }) => (
