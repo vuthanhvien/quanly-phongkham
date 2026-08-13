@@ -50,6 +50,7 @@ import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
 import { ProductForm } from "../components/ProductForm"
+import { ProjectManagementCard } from "../components/ProjectManagementCard"
 import { CustomField, entityLabels, getFieldLabel } from "../models"
 import { FileLookupMap, hasFileField, loadFileLookupMap, LookupMap, resolveRecordFieldValue } from "../relations"
 import {
@@ -393,9 +394,9 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                     <Table
                       columns={[
                         { title: "Sản phẩm", dataIndex: "itemName", key: "itemName" },
-                        { title: "Số lượng", dataIndex: "quantity", key: "quantity", width: 120 },
-                        { title: "Đơn giá", dataIndex: "unitPrice", key: "unitPrice", width: 140 },
-                        { title: "Thành tiền", dataIndex: "lineTotal", key: "lineTotal", width: 160 },
+                        { title: "Số lượng", dataIndex: "quantity", key: "quantity", width: 120, align: "right" },
+                        { title: "Đơn giá", dataIndex: "unitPrice", key: "unitPrice", width: 140, align: "right" },
+                        { title: "Thành tiền", dataIndex: "lineTotal", key: "lineTotal", width: 160, align: "right" },
                       ]}
                       dataSource={Array.isArray(record?.items) ? record.items : []}
                       pagination={false}
@@ -673,6 +674,13 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                 ))}
               </div>
             </Card>
+            {resource === "projects" && record ? (
+              <ProjectManagementCard
+                canEdit={hasActionAccess(resource, "update")}
+                project={{ ...record, id }}
+                onSaved={reloadCurrentRecord}
+              />
+            ) : null}
           </div>
         </Col>
       </Row>

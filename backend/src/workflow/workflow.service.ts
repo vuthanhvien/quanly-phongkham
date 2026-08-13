@@ -93,7 +93,7 @@ export class WorkflowService {
   async bootstrapDefaults (_user?: AuthUser) {
     const created: WorkflowDefinition[] = [];
     for (const config of DEFAULT_WORKFLOWS) {
-      let definition = await this.definitions.findOne({ where: { code: config.code } });
+      let definition = await this.definitions.findOne({ where: { code: config.code, isArchived: false } });
       if (!definition) {
         definition = await this.definitions.save(this.definitions.create({
           code: config.code,
@@ -132,7 +132,7 @@ export class WorkflowService {
 
   async listDefinitions (_user?: AuthUser) {
     await this.ensureDefaultDefinitions();
-    const definitions = await this.definitions.find({ order: { targetResource: 'ASC', createdAt: 'DESC' } });
+    const definitions = await this.definitions.find({ where: { isArchived: false }, order: { targetResource: 'ASC', createdAt: 'DESC' } });
     const steps = await this.steps.find({ order: { stepOrder: 'ASC' } });
     return {
       data: definitions.map((definition) => ({
@@ -151,7 +151,7 @@ export class WorkflowService {
     if (existing) return existing;
 
     await this.ensureDefaultDefinitions();
-    const definition = await this.definitions.findOne({ where: { targetResource: resource, isActive: true } });
+    const definition = await this.definitions.findOne({ where: { targetResource: resource, isActive: true, isArchived: false } });
     if (!definition) return null;
     const status = String(record.status || '').toLowerCase();
     const submitStatuses = this.normalizeStatusList(definition.submitStatuses);

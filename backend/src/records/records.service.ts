@@ -851,6 +851,9 @@ export class RecordsService {
     if (resource === 'staff') {
       hydrated = await this.attachStaffRoleMetadata(hydrated as Staff[]);
     }
+    if (resource === 'projects') {
+      hydrated = await this.attachProjectMembersForList(hydrated as Project[]) as unknown as ConfigurableEntity[];
+    }
     return { data: hydrated.map((row) => this.protect(resource, row, request)), total };
   }
 
@@ -959,6 +962,25 @@ export class RecordsService {
       memberStaffIds: staffIds,
       members: members.map((member) => ({ ...member, staff: staffById.get(member.staffId) })),
     };
+  }
+
+  private async attachProjectMembersForList (projects: Project[]) {
+    if (projects.length === 0) return projects;
+    const projectIds = projects.map((project) => project.id);
+    const members = await this.projectMembers.find({ where: { projectId: In(projectIds), isArchived: false } });
+    const staffIds = Array.from(new Set(members.map((member) => member.staffId)));
+    const staffRows = staffIds.length ? await this.staff.find({ where: { id: In(staffIds), isArchived: false } }) : [];
+    const staffById = new Map(staffRows.map((staff) => [staff.id, staff]));
+    const membersByProjectId = new Map<string, ProjectMember[]>();
+    members.forEach((member) => membersByProjectId.set(member.projectId, [...(membersByProjectId.get(member.projectId) || []), member]));
+    return projects.map((project) => {
+      const projectMembers = membersByProjectId.get(project.id) || [];
+      return {
+        ...project,
+        memberStaffIds: projectMembers.map((member) => member.staffId),
+        members: projectMembers.map((member) => ({ ...member, staff: staffById.get(member.staffId) })),
+      };
+    });
   }
 
   async find (resource: string, id: string, user?: AuthUser, request?: RequestContext, include?: string) {

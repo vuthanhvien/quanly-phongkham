@@ -19,8 +19,10 @@ import {
   PlusOutlined,
   ReloadOutlined,
   UserAddOutlined,
+  UserOutlined,
 } from "@ant-design/icons"
 import {
+  Avatar,
   AutoComplete,
   Button,
   Card,
@@ -43,7 +45,7 @@ import {
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useRef, useState, type Key } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
-import { api } from "../api"
+import { api, resolveFileUrl } from "../api"
 import { printHtmlInPlace } from "../utils/printHtml"
 import { hasActionAccess, hasResourceAccess, isCurrentUserAdmin } from "../access"
 import { FileUploadPanel } from "../components/FileUploadPanel"
@@ -55,7 +57,7 @@ import { ProductForm } from "../components/ProductForm"
 import { StockBatchForm } from "../components/StockBatchForm"
 import { CustomField, entityLabels, normalizeSelectOption } from "../models"
 import { RecordDetailPage } from "./RecordDetailPage"
-import { displayValue, FileLookupMap, getRelationSpec, hasFileField, loadFileLookupMap, loadRelationOptions, LookupMap, resolveRecordFieldValue } from "../relations"
+import { displayValue, FileLookupMap, getRelationMetaMap, getRelationSpec, hasFileField, loadFileLookupMap, loadRelationOptions, LookupMap, resolveRecordFieldValue } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
 import { CMS_DATA_REFRESH_EVENT, type CmsDataRefreshDetail } from "../utils/dataRefresh"
 import * as XLSX from "xlsx"
@@ -401,11 +403,14 @@ export function RecordListPage() {
         dataIndex: field.key,
         key: field.key,
         width: field.tableWidth,
+        align: field.type === "number" ? "right" as const : undefined,
         sorter: true,
         sortOrder: (sortField === field.key ? (sortOrder === "asc" ? "ascend" : "descend") : undefined) as "ascend" | "descend" | undefined,
         render: (_: unknown, row: Record<string, any>) => (
           <Space size={4} wrap>
-            {resource === "products" && field.key === "category"
+            {resource === "projects" && field.key === "memberStaffIds"
+              ? <ProjectMemberAvatars memberIds={resolveRecordFieldValue(row, field)} lookups={lookups} />
+              : resource === "products" && field.key === "category"
               ? (productCategoryNames[String(resolveRecordFieldValue(row, field) || "")] || "—")
               : <RecordValueView
               compact
@@ -1231,6 +1236,27 @@ export function RecordListPage() {
         )}
       </Modal>
     </>
+  )
+}
+
+function ProjectMemberAvatars({ memberIds, lookups }: { memberIds: unknown; lookups: LookupMap }) {
+  const ids = Array.isArray(memberIds) ? memberIds.map(String).filter(Boolean) : []
+  if (ids.length === 0) return <span>—</span>
+  const staffMeta = getRelationMetaMap(lookups, "staff")
+  return (
+    <Avatar.Group max={{ count: 5 }} size="small">
+      {ids.map((id) => {
+        const member = staffMeta[id]
+        const label = String(member?.fullName || member?.label || lookups.staff?.[id] || "Thành viên")
+        return (
+          <Tooltip key={id} title={label}>
+            <Avatar icon={<UserOutlined />} src={member?.avatarUrl ? resolveFileUrl(String(member.avatarUrl)) : undefined}>
+              {label.slice(0, 1).toUpperCase()}
+            </Avatar>
+          </Tooltip>
+        )
+      })}
+    </Avatar.Group>
   )
 }
 

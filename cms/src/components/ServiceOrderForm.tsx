@@ -289,6 +289,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       dataIndex: "quantity",
       key: "quantity",
       width: 100,
+      align: "right",
       render: (_value, row) => (
         <InputNumber formatter={formatNumberInput} min={1} parser={parseNumberInput} size={row.isComboComponent ? "small" : "middle"} style={{ width: "100%" }} value={row.quantity} onChange={(value) => handleItemFieldChange(row.index, "quantity", Number(value || 0))} />
       ),
@@ -298,6 +299,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       dataIndex: "unitPrice",
       key: "unitPrice",
       width: 150,
+      align: "right",
       render: (_value, row) => row.isComboComponent
         ? <Typography.Text type="secondary">—</Typography.Text>
         : <InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} value={row.unitPrice} onChange={(value) => handleItemFieldChange(row.index, "unitPrice", Number(value || 0))} />,
@@ -306,6 +308,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       title: "Thành tiền",
       key: "lineTotal",
       width: 150,
+      align: "right",
       render: (_value, row) => {
         const currentItems = normalizeItems(form.getFieldValue("items"))
         const item = currentItems[row.index] || {}

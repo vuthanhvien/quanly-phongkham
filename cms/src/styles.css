@@ -1914,14 +1914,30 @@ body {
   gap: 16px;
 }
 
-.project-board-header h2 {
-  margin: 0 0 4px;
-}
-
 .project-board-members {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.project-management-card .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.project-management-members,
+.project-management-add-member {
+  width: 100%;
+}
+
+.project-management-add-member .ant-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-management-empty {
+  margin: 0;
 }
 
 .project-board-actions {

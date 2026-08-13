@@ -1,4 +1,4 @@
-import { DeleteOutlined, PlusOutlined, ReloadOutlined, SettingOutlined } from "@ant-design/icons"
+import { ApartmentOutlined, DeleteOutlined, PlusOutlined, ReloadOutlined, SettingOutlined } from "@ant-design/icons"
 import { Button, Empty, Input, Modal, Select, Spin, Tag, Typography } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { useParams } from "react-router-dom"
@@ -116,7 +116,10 @@ export function ProjectBoardPage() {
     <div className="project-board-page">
       <header className="project-board-header">
         <div>
-          <Typography.Title level={2}>{project.code} - {project.name}</Typography.Title>
+          <Typography.Title className="record-list-title" level={3}>
+            <ApartmentOutlined />
+            <span>{project.code} - {project.name}</span>
+          </Typography.Title>
           {project.members?.length ? <div className="project-board-members">{project.members.map((member, index) => <Tag key={index}>{member.staff?.fullName || member.staff?.code || "Thành viên"}</Tag>)}</div> : null}
         </div>
         <div className="project-board-actions">

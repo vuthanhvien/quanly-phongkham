@@ -2732,8 +2732,9 @@ export class PaymentRequest extends ConfigurableEntity {
 }
 
 @Entity('workflow_definitions')
+@Index(['code', 'isArchived'], { unique: true })
 export class WorkflowDefinition extends ConfigurableEntity {
-  @Column({ unique: true })
+  @Column()
   code: string;
 
   @Column()

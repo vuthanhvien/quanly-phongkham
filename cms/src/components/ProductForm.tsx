@@ -116,7 +116,7 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
   const rows = normalizeBundleItems(bundleItems).map((item, index) => ({ ...item, key: index, index }))
   const columns: ColumnsType<BundleItem & { key: number; index: number }> = [
     { title: "Sản phẩm / dịch vụ", dataIndex: "productId", render: (_value, row) => <Select showSearch optionFilterProp="label" options={componentOptions} placeholder="Chọn thành phần" style={{ width: "100%" }} value={row.productId} onChange={(productId) => { const items = normalizeBundleItems(form.getFieldValue("bundleItems")); items[row.index] = { ...items[row.index], productId }; setBundleItems(items) }} /> },
-    { title: "SL / số buổi", dataIndex: "quantity", width: 150, render: (_value, row) => <InputNumber formatter={formatNumberInput} min={1} parser={parseNumberInput} style={{ width: "100%" }} value={row.quantity} onChange={(quantity) => { const items = normalizeBundleItems(form.getFieldValue("bundleItems")); items[row.index] = { ...items[row.index], quantity: Number(quantity || 0) }; setBundleItems(items) }} /> },
+    { title: "SL / số buổi", dataIndex: "quantity", width: 150, align: "right", render: (_value, row) => <InputNumber formatter={formatNumberInput} min={1} parser={parseNumberInput} style={{ width: "100%" }} value={row.quantity} onChange={(quantity) => { const items = normalizeBundleItems(form.getFieldValue("bundleItems")); items[row.index] = { ...items[row.index], quantity: Number(quantity || 0) }; setBundleItems(items) }} /> },
     { title: "", width: 52, render: (_value, row) => <Button danger type="text" icon={<DeleteOutlined />} onClick={() => { const items = normalizeBundleItems(form.getFieldValue("bundleItems")); items.splice(row.index, 1); setBundleItems(items) }} /> },
   ]
   const variantRows = normalizeVariantItems(variants).map((item, index) => ({ ...item, key: index, index }))
@@ -126,7 +126,7 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
     { title: "Tên biến thể", dataIndex: "name", width: 170, render: (_v, row) => <Input placeholder="30ml, Đỏ / M" value={row.name} onChange={(event) => updateVariant(row.index, "name", event.target.value)} /> },
     { title: "Thuộc tính", dataIndex: "attributeSummary", width: 170, render: (_v, row) => <Input placeholder="30ml / Đỏ" value={row.attributeSummary} onChange={(event) => updateVariant(row.index, "attributeSummary", event.target.value)} /> },
     { title: "Barcode", dataIndex: "barcode", width: 140, render: (_v, row) => <Input value={row.barcode} onChange={(event) => updateVariant(row.index, "barcode", event.target.value)} /> },
-    { title: "Giá bán", dataIndex: "sellingPrice", width: 135, render: (_v, row) => <InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} value={row.sellingPrice} onChange={(value) => updateVariant(row.index, "sellingPrice", Number(value || 0))} /> },
+    { title: "Giá bán", dataIndex: "sellingPrice", width: 135, align: "right", render: (_v, row) => <InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} value={row.sellingPrice} onChange={(value) => updateVariant(row.index, "sellingPrice", Number(value || 0))} /> },
     { title: "", width: 52, render: (_v, row) => <Button danger type="text" icon={<DeleteOutlined />} onClick={() => { const next = normalizeVariantItems(form.getFieldValue("variants")); next.splice(row.index, 1); setVariants(next) }} /> },
   ]
 

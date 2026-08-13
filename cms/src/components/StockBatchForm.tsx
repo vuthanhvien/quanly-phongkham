@@ -356,6 +356,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
       dataIndex: "quantity",
       key: "quantity",
       width: 110,
+      align: "right",
       render: (_value, row) => (
         <InputNumber formatter={formatNumberInput} min={1} parser={parseNumberInput} style={{ width: "100%" }} value={row.quantity} onChange={(value) => handleReceiptFieldChange(row.index, "quantity", Number(value || 0))} />
       ),
@@ -422,6 +423,7 @@ export function StockBatchForm({ compact, onCancel, onSuccess }: StockBatchFormP
       dataIndex: "quantity",
       key: "quantity",
       width: 120,
+      align: "right",
       render: (_value, row) => (
         <InputNumber formatter={formatNumberInput} min={1} parser={parseNumberInput} style={{ width: "100%" }} value={row.quantity} onChange={(value) => handleIssueFieldChange(row.index, "quantity", Number(value || 0))} />
       ),

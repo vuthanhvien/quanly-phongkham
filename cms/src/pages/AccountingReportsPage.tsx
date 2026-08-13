@@ -1,6 +1,7 @@
 import { BankOutlined, DollarOutlined, FundOutlined, RiseOutlined } from "@ant-design/icons"
 import { Button, Card, Col, DatePicker, Modal, Row, Select, Space, Statistic, Table, Tabs, Typography, message } from "antd"
 import type { TabsProps } from "antd"
+import type { ColumnsType } from "antd/es/table"
 import dayjs, { Dayjs } from "dayjs"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
@@ -265,7 +266,7 @@ function getMetricCards(reportKey: ReportKey, summary: Record<string, number>) {
   ]
 }
 
-function getColumns(reportKey: ReportKey) {
+function getColumns(reportKey: ReportKey): ColumnsType<Record<string, unknown>> {
   if (reportKey === "general-ledger") {
     return [
       { title: "Ngày hạch toán", dataIndex: "accountingDate", key: "accountingDate", width: 130 },
@@ -273,17 +274,17 @@ function getColumns(reportKey: ReportKey) {
       { title: "Tài khoản", dataIndex: "accountNumber", key: "accountNumber", width: 120 },
       { title: "Tên tài khoản", dataIndex: "accountName", key: "accountName", width: 220 },
       { title: "Diễn giải", dataIndex: "description", key: "description", width: 320 },
-      { title: "Nợ", dataIndex: "debitAmount", key: "debitAmount", width: 140, render: formatNumber },
-      { title: "Có", dataIndex: "creditAmount", key: "creditAmount", width: 140, render: formatNumber },
+      { title: "Nợ", dataIndex: "debitAmount", key: "debitAmount", width: 140, render: formatNumber, align: "right" },
+      { title: "Có", dataIndex: "creditAmount", key: "creditAmount", width: 140, render: formatNumber, align: "right" },
     ]
   }
   if (reportKey === "trial-balance") {
     return [
       { title: "Tài khoản", dataIndex: "accountNumber", key: "accountNumber", width: 120 },
       { title: "Tên tài khoản", dataIndex: "accountName", key: "accountName", width: 260 },
-      { title: "Phát sinh Nợ", dataIndex: "totalDebit", key: "totalDebit", width: 160, render: formatNumber },
-      { title: "Phát sinh Có", dataIndex: "totalCredit", key: "totalCredit", width: 160, render: formatNumber },
-      { title: "Số dư", dataIndex: "balance", key: "balance", width: 160, render: formatNumber },
+      { title: "Phát sinh Nợ", dataIndex: "totalDebit", key: "totalDebit", width: 160, render: formatNumber, align: "right" },
+      { title: "Phát sinh Có", dataIndex: "totalCredit", key: "totalCredit", width: 160, render: formatNumber, align: "right" },
+      { title: "Số dư", dataIndex: "balance", key: "balance", width: 160, render: formatNumber, align: "right" },
     ]
   }
   if (reportKey === "cash-flow") {
@@ -291,27 +292,27 @@ function getColumns(reportKey: ReportKey) {
       { title: "Mã", dataIndex: "code", key: "code", width: 120 },
       { title: "Chỉ tiêu", dataIndex: "name", key: "name", width: 320 },
       { title: "Loại", dataIndex: "section", key: "section", width: 160 },
-      { title: "Thu vào", dataIndex: "inflow", key: "inflow", width: 160, render: formatNumber },
-      { title: "Chi ra", dataIndex: "outflow", key: "outflow", width: 160, render: formatNumber },
-      { title: "Thuần", dataIndex: "netAmount", key: "netAmount", width: 160, render: formatNumber },
+      { title: "Thu vào", dataIndex: "inflow", key: "inflow", width: 160, render: formatNumber, align: "right" },
+      { title: "Chi ra", dataIndex: "outflow", key: "outflow", width: 160, render: formatNumber, align: "right" },
+      { title: "Thuần", dataIndex: "netAmount", key: "netAmount", width: 160, render: formatNumber, align: "right" },
     ]
   }
   if (reportKey === "receivables") {
     return [
       { title: "Mã KH", dataIndex: "customerCode", key: "customerCode", width: 120 },
       { title: "Khách hàng", dataIndex: "customerName", key: "customerName", width: 260 },
-      { title: "Phát sinh Nợ", dataIndex: "totalDebit", key: "totalDebit", width: 160, render: formatNumber },
-      { title: "Phát sinh Có", dataIndex: "totalCredit", key: "totalCredit", width: 160, render: formatNumber },
-      { title: "Dư phải thu", dataIndex: "balance", key: "balance", width: 160, render: formatNumber },
+      { title: "Phát sinh Nợ", dataIndex: "totalDebit", key: "totalDebit", width: 160, render: formatNumber, align: "right" },
+      { title: "Phát sinh Có", dataIndex: "totalCredit", key: "totalCredit", width: 160, render: formatNumber, align: "right" },
+      { title: "Dư phải thu", dataIndex: "balance", key: "balance", width: 160, render: formatNumber, align: "right" },
     ]
   }
   if (reportKey === "payables") {
     return [
       { title: "Mã NCC", dataIndex: "supplierCode", key: "supplierCode", width: 120 },
       { title: "Nhà cung cấp", dataIndex: "supplierName", key: "supplierName", width: 260 },
-      { title: "Phát sinh Nợ", dataIndex: "totalDebit", key: "totalDebit", width: 160, render: formatNumber },
-      { title: "Phát sinh Có", dataIndex: "totalCredit", key: "totalCredit", width: 160, render: formatNumber },
-      { title: "Dư phải trả", dataIndex: "balance", key: "balance", width: 160, render: formatNumber },
+      { title: "Phát sinh Nợ", dataIndex: "totalDebit", key: "totalDebit", width: 160, render: formatNumber, align: "right" },
+      { title: "Phát sinh Có", dataIndex: "totalCredit", key: "totalCredit", width: 160, render: formatNumber, align: "right" },
+      { title: "Dư phải trả", dataIndex: "balance", key: "balance", width: 160, render: formatNumber, align: "right" },
     ]
   }
   return [
@@ -319,9 +320,9 @@ function getColumns(reportKey: ReportKey) {
     { title: "Chứng từ", dataIndex: "voucherCode", key: "voucherCode", width: 160 },
     { title: "Tài khoản", dataIndex: "accountNumber", key: "accountNumber", width: 120 },
     { title: "Diễn giải", dataIndex: "description", key: "description", width: 320 },
-    { title: "Thu", dataIndex: "debitAmount", key: "debitAmount", width: 140, render: formatNumber },
-    { title: "Chi", dataIndex: "creditAmount", key: "creditAmount", width: 140, render: formatNumber },
-    { title: "Số dư", dataIndex: "runningBalance", key: "runningBalance", width: 160, render: formatNumber },
+    { title: "Thu", dataIndex: "debitAmount", key: "debitAmount", width: 140, render: formatNumber, align: "right" },
+    { title: "Chi", dataIndex: "creditAmount", key: "creditAmount", width: 140, render: formatNumber, align: "right" },
+    { title: "Số dư", dataIndex: "runningBalance", key: "runningBalance", width: 160, render: formatNumber, align: "right" },
   ]
 }
 
