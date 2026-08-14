@@ -9,6 +9,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons"
 import {
+  Badge,
   Button,
   Card,
   Checkbox,
@@ -29,7 +30,7 @@ import {
 } from "antd"
 import type { UploadProps } from "antd"
 import type { ColumnsType } from "antd/es/table"
-import { useEffect, useMemo, useState, type Key } from "react"
+import { useEffect, useMemo, useState, type Key, type ReactNode } from "react"
 import * as XLSX from "xlsx"
 import { api } from "../api"
 import { appModuleGroups } from "../company-types"
@@ -63,6 +64,7 @@ export function CustomFieldsPage() {
   const [codeEnabled, setCodeEnabled] = useState(true)
   const [savingCode, setSavingCode] = useState(false)
   const [fields, setFields] = useState<CustomField[]>([])
+  const [customFieldCounts, setCustomFieldCounts] = useState<Record<string, number>>({})
   const [customTables, setCustomTables] = useState<Array<{ id: string; name: string; key: string }>>([])
   const [fieldModal, setFieldModal] = useState(false)
   const [editingField, setEditingField] = useState<CustomField | null>(null)
@@ -90,11 +92,16 @@ export function CustomFieldsPage() {
   }, [])
 
   async function load() {
-    const [fieldResponse, codeResponse] = await Promise.all([
+    const [fieldResponse, codeResponse, allFieldsResponse] = await Promise.all([
       api.get("/settings/custom-fields", { params: { entityType } }),
       api.get(`/settings/code-generation/${entityType}`),
+      api.get("/settings/custom-fields"),
     ])
     setFields(fieldResponse.data.data)
+    setCustomFieldCounts((allFieldsResponse.data.data || []).reduce((counts: Record<string, number>, field: CustomField) => {
+      if (field.isActive) counts[field.entityType] = (counts[field.entityType] || 0) + 1
+      return counts
+    }, {}))
     setCodeFormula(codeResponse.data?.data?.formula || "")
     setCodeEnabled(codeResponse.data?.data?.isActive !== false)
     setSelectedFieldIds([])
@@ -111,18 +118,22 @@ export function CustomFieldsPage() {
   }
 
   const moduleTree = useMemo(() => {
+    const moduleTitle = (key: string): ReactNode => {
+      const count = customFieldCounts[key] || 0
+      return <span>{entityLabels[key]}{count > 0 ? <Badge count={count} overflowCount={999} style={{ marginLeft: 8 }} /> : null}</span>
+    }
     const grouped = new Set<string>()
     const groups = appModuleGroups.map((group) => {
       const children = group.modules.filter((key) => entityLabels[key]).map((key) => {
         grouped.add(key)
-        return { key, title: entityLabels[key] }
+        return { key, title: moduleTitle(key) }
       })
       return children.length ? { key: `group-${group.key}`, title: group.label, selectable: false, children } : null
-    }).filter(Boolean) as Array<{ key: string; title: string; selectable: false; children: Array<{ key: string; title: string }> }>
-    const remaining = Object.keys(entityLabels).filter((key) => !grouped.has(key)).map((key) => ({ key, title: entityLabels[key] }))
+    }).filter(Boolean) as Array<{ key: string; title: ReactNode; selectable: false; children: Array<{ key: string; title: ReactNode }> }>
+    const remaining = Object.keys(entityLabels).filter((key) => !grouped.has(key)).map((key) => ({ key, title: moduleTitle(key) }))
     if (remaining.length) groups.push({ key: "group-other", title: "Khác", selectable: false, children: remaining })
     return groups
-  }, [])
+  }, [customFieldCounts])
 
   async function saveField(values: Record<string, unknown>) {
     const payload = normalizeFieldPayload(values, entityType)
@@ -360,12 +371,12 @@ export function CustomFieldsPage() {
           <Dropdown
             dropdownRender={() => (
               <Card size="small" styles={{ body: { display: "grid", gap: 4, minWidth: 190 } }}>
-                <Button icon={<UploadOutlined />} type="text" onClick={() => openBatch("create")}>Thêm nhiều trường</Button>
-                <Button icon={<UploadOutlined />} type="text" onClick={() => openBatch("upsert")}>Cập nhật nhiều trường</Button>
-                <Button icon={<DownloadOutlined />} type="text" onClick={exportFields}>Xuất cấu hình</Button>
-                <Button icon={<DownloadOutlined />} type="text" onClick={exportSampleFields}>Tải dữ liệu mẫu</Button>
+                <Button icon={<UploadOutlined />} style={{ justifyContent: "flex-start", textAlign: "left" }} type="text" onClick={() => openBatch("create")}>Thêm nhiều trường</Button>
+                <Button icon={<UploadOutlined />} style={{ justifyContent: "flex-start", textAlign: "left" }} type="text" onClick={() => openBatch("upsert")}>Cập nhật nhiều trường</Button>
+                <Button icon={<DownloadOutlined />} style={{ justifyContent: "flex-start", textAlign: "left" }} type="text" onClick={exportFields}>Xuất cấu hình</Button>
+                <Button icon={<DownloadOutlined />} style={{ justifyContent: "flex-start", textAlign: "left" }} type="text" onClick={exportSampleFields}>Tải dữ liệu mẫu</Button>
                 <Upload {...uploadProps}>
-                  <Button block icon={<ImportOutlined />} type="text">Nhập file</Button>
+                  <Button block icon={<ImportOutlined />} style={{ justifyContent: "flex-start", textAlign: "left" }} type="text">Nhập file</Button>
                 </Upload>
               </Card>
             )}

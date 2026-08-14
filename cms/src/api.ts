@@ -102,7 +102,7 @@ api.interceptors.request.use((config) => {
   // at the HTTP boundary so none of them can execute accidentally.
   if ((config.method || '').toLowerCase() === 'delete' && typeof window !== 'undefined') {
     const confirmed = window.confirm('Bạn có chắc muốn xóa hoặc lưu trữ mục này không?')
-    if (!confirmed) throw new axios.CanceledError('Delete cancelled by user', config)
+    if (!confirmed) throw new axios.CanceledError('Delete cancelled by user', undefined, config)
   }
   const token = localStorage.getItem('clinic-token');
   if (token) config.headers.Authorization = `Bearer ${token}`;

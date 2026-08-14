@@ -1,5 +1,5 @@
-import { DownloadOutlined, EditOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
-import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Typography, Upload, message } from 'antd'
+import { DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
+import { Button, Card, Checkbox, Form, Input, Modal, Popconfirm, Select, Space, Table, Tooltip, Typography, Upload, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
@@ -8,17 +8,22 @@ import { ModalTitleBar } from '../components/ModalTitleBar'
 
 type Column = { key: string; label: string; dataType: string; required?: boolean; options?: string[] }
 type Row = { id: string; values: Record<string, unknown> }
+type DynamicTable = { id: string; key: string; name: string; description?: string; isActive: boolean; columns: Column[] }
+const schemaTypes = [{ value: 'text', label: 'Văn bản' }, { value: 'number', label: 'Số' }, { value: 'date', label: 'Ngày' }, { value: 'boolean', label: 'Bật/tắt' }, { value: 'select', label: 'Danh sách chọn' }]
 
 export function CustomTableDataPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const [table, setTable] = useState<{ name: string; columns: Column[] }>()
-  const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
+  const [tables, setTables] = useState<DynamicTable[]>([])
   const [rows, setRows] = useState<Row[]>([])
   const [createOpen, setCreateOpen] = useState(false)
   const [editingRow, setEditingRow] = useState<Row | null>(null)
   const [fullscreenPopup, setFullscreenPopup] = useState(false)
   const [form] = Form.useForm()
+  const [schemaForm] = Form.useForm()
+  const [schemaOpen, setSchemaOpen] = useState(false)
+  const [editingSchema, setEditingSchema] = useState<DynamicTable | null>(null)
 
   useEffect(() => {
     void load()
@@ -27,8 +32,9 @@ export function CustomTableDataPage() {
   async function load() {
     const nextTables = (await api.get('/settings/custom-tables')).data.data
     setTables(nextTables)
-    setTable(nextTables.find((item: { id: string }) => item.id === id))
-    setRows((await api.get(`/settings/custom-tables/${id}/rows`)).data.data || [])
+    setTable(nextTables.find((item: DynamicTable) => item.id === id))
+    if (!id && nextTables[0]) return navigate(`/custom-tables/${nextTables[0].id}/data`, { replace: true })
+    if (id) setRows((await api.get(`/settings/custom-tables/${id}/rows`)).data.data || [])
   }
 
   async function saveRow(values: Record<string, unknown>) {
@@ -54,6 +60,26 @@ export function CustomTableDataPage() {
     setCreateOpen(true)
   }
 
+  function openSchema(tableToEdit?: DynamicTable) {
+    setEditingSchema(tableToEdit || null)
+    schemaForm.setFieldsValue(tableToEdit ? { ...tableToEdit, columns: tableToEdit.columns.map((column) => ({ ...column, options: column.options?.join(', ') })) } : { isActive: true, columns: [{ key: '', label: '', dataType: 'text' }] })
+    setSchemaOpen(true)
+  }
+
+  async function saveSchema(values: Record<string, unknown>) {
+    const payload = { ...values, columns: ((values.columns || []) as Array<Record<string, unknown>>).map((column, index) => ({ ...column, key: String(column.key || '').trim(), label: String(column.label || '').trim(), sortOrder: index, options: column.dataType === 'select' ? String(column.options || '').split(',').map((item) => item.trim()).filter(Boolean) : undefined })) }
+    const saved = editingSchema ? await api.patch(`/settings/custom-tables/${editingSchema.id}`, payload) : await api.post('/settings/custom-tables', payload)
+    setSchemaOpen(false)
+    if (!editingSchema) navigate(`/custom-tables/${saved.data.data.id}/data`)
+    else await load()
+  }
+
+  async function removeTable() {
+    if (!table || !id) return
+    await api.delete(`/settings/custom-tables/${id}`)
+    navigate('/custom-tables/data', { replace: true })
+  }
+
   function exportRows() {
     if (!table) return
     const sheet = XLSX.utils.json_to_sheet(
@@ -67,7 +93,11 @@ export function CustomTableDataPage() {
   async function importRows(file: File) {
     const book = XLSX.read(await file.arrayBuffer())
     const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(book.Sheets[book.SheetNames[0]], { defval: '' })
-    await Promise.all(data.map((values) => api.post(`/settings/custom-tables/${id}/rows`, { values })))
+    const batchSize = 100
+    for (let start = 0; start < data.length; start += batchSize) {
+      const batch = data.slice(start, start + batchSize)
+      await Promise.all(batch.map((values) => api.post(`/settings/custom-tables/${id}/rows`, { values })))
+    }
     await load()
     message.success(`Đã import ${data.length} dòng`)
     return false
@@ -83,9 +113,11 @@ export function CustomTableDataPage() {
           <Select
             value={id}
             style={{ minWidth: 260 }}
-            options={tables.map((item) => ({ value: item.id, label: item.name }))}
-            onChange={(nextId) => navigate(`/custom-tables/${nextId}/data`)}
+            options={[{ value: '__new__', label: '+ Thêm bảng mới' }, ...tables.map((item) => ({ value: item.id, label: item.name }))]}
+            onChange={(nextId) => nextId === '__new__' ? openSchema() : navigate(`/custom-tables/${nextId}/data`)}
           />
+          <Button icon={<EditOutlined />} onClick={() => openSchema(tables.find((item) => item.id === id))}>Schema</Button>
+          <Popconfirm title="Lưu trữ bảng này?" onConfirm={() => void removeTable()}><Button danger icon={<DeleteOutlined />}>Xóa</Button></Popconfirm>
         </Space>
         <Space>
           <Upload accept=".xlsx,.xls" showUploadList={false} beforeUpload={importRows}>
@@ -109,10 +141,13 @@ export function CustomTableDataPage() {
               render: (_: unknown, row: Row) => String(row.values[column.key] ?? ''),
             })),
             {
-              title: '',
+              title: 'Thao tác',
+              key: 'actions',
+              width: 96,
+              fixed: 'right',
               render: (_: unknown, row: Row) => (
                 <Space size={0}>
-                  <Button icon={<EditOutlined />} type="link" onClick={() => openEdit(row)}>Sửa</Button>
+                  <Tooltip title="Sửa dòng"><Button aria-label="Sửa dòng" icon={<EditOutlined />} type="text" onClick={() => openEdit(row)} /></Tooltip>
                   <Popconfirm
                     title="Lưu trữ dòng này?"
                     onConfirm={async () => {
@@ -120,7 +155,7 @@ export function CustomTableDataPage() {
                       await load()
                     }}
                   >
-                    <Button danger type="link">Lưu trữ</Button>
+                    <Tooltip title="Lưu trữ dòng"><Button aria-label="Lưu trữ dòng" danger icon={<DeleteOutlined />} type="text" /></Tooltip>
                   </Popconfirm>
                 </Space>
               ),
@@ -162,6 +197,13 @@ export function CustomTableDataPage() {
               )}
             </Form.Item>
           ))}
+        </Form>
+      </Modal>
+      <Modal open={schemaOpen} title={editingSchema ? 'Sửa schema bảng' : 'Thêm bảng dữ liệu động'} width={1000} onCancel={() => setSchemaOpen(false)} onOk={() => schemaForm.submit()}>
+        <Form form={schemaForm} layout="vertical" onFinish={(values) => void saveSchema(values)}>
+          <Space.Compact block><Form.Item name="name" label="Tên bảng" rules={[{ required: true }]} style={{ flex: 1 }}><Input /></Form.Item><Form.Item name="key" label="Key" rules={[{ required: true }]} style={{ flex: 1 }}><Input disabled={Boolean(editingSchema)} /></Form.Item></Space.Compact>
+          <Form.Item name="description" label="Mô tả"><Input.TextArea rows={2} /></Form.Item><Form.Item name="isActive" valuePropName="checked"><Checkbox>Đang sử dụng</Checkbox></Form.Item>
+          <Form.List name="columns">{(fields, { add, remove }) => <Table dataSource={fields} pagination={false} rowKey="key" size="small" columns={[{ title: 'Tên cột', render: (_, field) => <Form.Item name={[field.name, 'label']} rules={[{ required: true }]} style={{ margin: 0 }}><Input /></Form.Item> }, { title: 'Key', render: (_, field) => <Form.Item name={[field.name, 'key']} rules={[{ required: true }]} style={{ margin: 0 }}><Input /></Form.Item> }, { title: 'Kiểu', render: (_, field) => <Form.Item name={[field.name, 'dataType']} initialValue="text" style={{ margin: 0 }}><Select options={schemaTypes} /></Form.Item> }, { title: 'Options', render: (_, field) => <Form.Item name={[field.name, 'options']} style={{ margin: 0 }}><Input placeholder="A, B, C" /></Form.Item> }, { title: '', render: (_, field) => <Button danger type="text" onClick={() => remove(field.name)}>Xóa</Button> }]} footer={() => <Button type="dashed" onClick={() => add({ dataType: 'text' })}>Thêm cột</Button>} />}</Form.List>
         </Form>
       </Modal>
     </>

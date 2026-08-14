@@ -14,7 +14,6 @@ import { entityLabels } from './models';
 import { AuditPage } from './pages/AuditPage';
 import { AccountingReportsPage } from './pages/AccountingReportsPage';
 import { CustomFieldsPage } from './pages/CustomFieldsPage';
-import { CustomTablesPage } from './pages/CustomTablesPage';
 import { CustomTableDataPage } from './pages/CustomTableDataPage';
 import { LocationsPage } from './pages/LocationsPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -266,7 +265,8 @@ export function App() {
               </Route>
               <Route element={<ScreenGuard screen="settings" />}>
                 <Route path="/custom-fields" element={<CustomFieldsPage />} />
-                <Route path="/custom-tables" element={<CustomTablesPage />} />
+                <Route path="/custom-tables" element={<Navigate to="/custom-tables/data" replace />} />
+                <Route path="/custom-tables/data" element={<CustomTableDataPage />} />
                 <Route path="/custom-tables/:id/data" element={<CustomTableDataPage />} />
                 <Route path="/locations" element={<LocationsPage />} />
                 <Route path="/role-module-settings" element={<SettingsPage section="roles" />} />
