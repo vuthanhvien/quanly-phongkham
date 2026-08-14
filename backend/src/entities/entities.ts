@@ -1532,7 +1532,10 @@ export class CustomFieldDefinition {
   required: boolean;
 
   @Column({ type: 'simple-json', nullable: true })
-  options?: string[];
+  options?: Array<string | { value: string; label: string }>;
+
+  @Column({ type: 'simple-json', nullable: true })
+  tableColumns?: Array<{ key: string; label: string; dataType: string; options?: string[] }>;
 
   @Column({ nullable: true })
   relationResource?: string;

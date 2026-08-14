@@ -42,12 +42,14 @@ const CUSTOM_FIELD_TYPES = [
   { value: "date", label: "Ngày tháng (date)" },
   { value: "boolean", label: "Bật/tắt (boolean)" },
   { value: "select", label: "Danh sách chọn (select)" },
+  { value: "multi-select", label: "Danh sách chọn nhiều (multi-select)" },
   { value: "textarea", label: "Đoạn văn bản (textarea)" },
   { value: "relative", label: "Liên kết bản ghi (relative)" },
   { value: "file", label: "Tệp đính kèm (file)" },
   { value: "image", label: "Một hình ảnh (image)" },
   { value: "images", label: "Nhiều hình ảnh (images)" },
   { value: "dynamic-table", label: "Bảng dữ liệu động" },
+  { value: "table", label: "Bảng nhập liệu (table)" },
 ]
 
 const RELATIVE_RESOURCE_OPTIONS = Object.entries(entityLabels).map(
@@ -73,6 +75,7 @@ export function CustomFieldsPage() {
   const [selectedFieldIds, setSelectedFieldIds] = useState<Key[]>([])
   const [fieldForm] = Form.useForm()
   const currentFieldType = Form.useWatch("dataType", fieldForm)
+  const multiSelectSource = Form.useWatch("multiSelectSource", fieldForm)
   const fieldKeys = useMemo(
     () => new Set(fields.map((field) => field.key)),
     [fields],
@@ -140,7 +143,7 @@ export function CustomFieldsPage() {
   function openCreateField() {
     setEditingField(null)
     fieldForm.resetFields()
-    fieldForm.setFieldsValue({ dataType: "text", sortOrder: 0, isActive: true })
+    fieldForm.setFieldsValue({ dataType: "text", multiSelectSource: "manual", options: [], sortOrder: 0, isActive: true })
     setFieldModal(true)
   }
 
@@ -148,7 +151,9 @@ export function CustomFieldsPage() {
     setEditingField(field)
     fieldForm.setFieldsValue({
       ...field,
-      options: field.options?.join(", "),
+      multiSelectSource: field.dataType === "multi-select" && field.relationResource ? "table" : "manual",
+      options: field.dataType === "multi-select" ? normalizeMultiSelectOptions(field.options) : formatOptionsForInput(field.options),
+      tableColumns: field.tableColumns?.map((column) => ({ ...column, options: (column.options || []).join(", ") })),
     })
     setFieldModal(true)
   }
@@ -475,7 +480,7 @@ export function CustomFieldsPage() {
         open={fieldModal}
         footer={null}
         maskClosable={false}
-        width={fullscreenPopup === "field" ? "calc(100vw - 24px)" : 560}
+        width={fullscreenPopup === "field" ? "calc(100vw - 24px)" : currentFieldType === "table" ? 1080 : 560}
         onCancel={() => {
           setFieldModal(false)
           setEditingField(null)
@@ -505,6 +510,18 @@ export function CustomFieldsPage() {
               <Input />
             </Form.Item>
           )}
+          {currentFieldType === "multi-select" && <>
+            <Form.Item name="multiSelectSource" label="Nguồn lựa chọn" initialValue="manual">
+              <Select options={[{ value: "manual", label: "Nhập tay" }, { value: "table", label: "Chọn table" }]} />
+            </Form.Item>
+            {multiSelectSource === "table" ? (
+              <Form.Item name="relationResource" label="Table dữ liệu" rules={[{ required: true, message: "Chọn table dữ liệu" }]}>
+                <Select options={RELATIVE_RESOURCE_OPTIONS} placeholder="Ví dụ: Khách hàng" />
+              </Form.Item>
+            ) : (
+              <ManualMultiSelectOptions />
+            )}
+          </>}
           {currentFieldType === "relative" && (
             <Form.Item
               name="relationResource"
@@ -523,6 +540,7 @@ export function CustomFieldsPage() {
               <Select options={customTables.map((table) => ({ value: table.id, label: `${table.name} (${table.key})` }))} />
             </Form.Item>
           )}
+          {currentFieldType === "table" && <TableColumnConfigurator />}
           <Form.Item name="sortOrder" label="Thứ tự" initialValue={0}>
             <InputNumber />
           </Form.Item>
@@ -754,18 +772,80 @@ function normalizeFieldPayload(
     required: false,
     isActive: values.isActive ?? true,
     sortOrder: Number(values.sortOrder || 0),
-    options:
-      values.dataType === "select" && values.options
+    options: values.dataType === "multi-select" && values.multiSelectSource === "manual"
+      ? normalizeMultiSelectOptions(values.options)
+      : values.dataType === "select" && values.options
         ? normalizeOptions(values.options)
         : undefined,
     relationResource:
       values.dataType === "file"
         ? "files"
-        : values.dataType === "relative"
+        : values.dataType === "relative" || (values.dataType === "multi-select" && values.multiSelectSource === "table")
           ? values.relationResource
-          : undefined,
+          : null,
     customTableId: values.dataType === "dynamic-table" ? values.customTableId : undefined,
+    tableColumns: values.dataType === "table" ? normalizeTableColumns(values.tableColumns) : undefined,
   }
+}
+
+function TableColumnConfigurator() {
+  const columnTypes = [
+    { value: "text", label: "Văn bản" }, { value: "number", label: "Số" }, { value: "money", label: "Tiền" },
+    { value: "date", label: "Ngày" }, { value: "time", label: "Giờ" }, { value: "select", label: "Danh sách chọn" },
+  ]
+  return <Form.List name="tableColumns">
+    {(fields, { add, remove }) => <Form.Item label="Danh sách cột"><Table
+      bordered dataSource={fields} pagination={false} rowKey="key" size="small"
+      columns={[
+        { title: "Key", render: (_, field) => <Form.Item name={[field.name, "key"]} rules={[{ required: true }]} style={{ margin: 0 }}><Input placeholder="service" /></Form.Item> },
+        { title: "Tên cột", render: (_, field) => <Form.Item name={[field.name, "label"]} rules={[{ required: true }]} style={{ margin: 0 }}><Input placeholder="Dịch vụ" /></Form.Item> },
+        { title: "Kiểu", width: 160, render: (_, field) => <Form.Item name={[field.name, "dataType"]} initialValue="text" style={{ margin: 0 }}><Select options={columnTypes} /></Form.Item> },
+        { title: "Options (select)", width: 190, render: (_, field) => <Form.Item name={[field.name, "options"]} style={{ margin: 0 }}><Input placeholder="A, B, C" /></Form.Item> },
+        { title: "", width: 60, render: (_, field) => <Button danger size="small" type="text" onClick={() => remove(field.name)}>Xóa</Button> },
+      ]}
+      footer={() => <Button size="small" type="dashed" onClick={() => add({ key: "", label: "", dataType: "text" })}>Thêm cột</Button>}
+    /></Form.Item>}
+  </Form.List>
+}
+
+function normalizeTableColumns(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value.map((column) => ({
+    key: sanitizeFieldKey(String(column?.key || "")), label: String(column?.label || "").trim(), dataType: String(column?.dataType || "text"),
+    options: String(column?.options || "").split(",").map((item) => item.trim()).filter(Boolean),
+  })).filter((column) => column.key && column.label)
+}
+
+function ManualMultiSelectOptions() {
+  return (
+    <Form.List name="options">
+      {(fields, { add, remove }) => <Form.Item label="Lựa chọn"><Table
+        bordered
+        dataSource={fields}
+        pagination={false}
+        rowKey="key"
+        size="small"
+        columns={[
+          { title: "Key", render: (_, field) => <Form.Item name={[field.name, "value"]} rules={[{ required: true, message: "Nhập key" }]} style={{ margin: 0 }}><Input placeholder="vd: VIP" /></Form.Item> },
+          { title: "Label", render: (_, field) => <Form.Item name={[field.name, "label"]} rules={[{ required: true, message: "Nhập label" }]} style={{ margin: 0 }}><Input placeholder="Ví dụ: Khách VIP" /></Form.Item> },
+          { title: "", width: 64, render: (_, field) => <Button danger size="small" type="text" onClick={() => remove(field.name)}>Xóa</Button> },
+        ]}
+        footer={() => <Button size="small" type="dashed" onClick={() => add({ value: "", label: "" })}>Thêm lựa chọn</Button>}
+      /></Form.Item>}
+    </Form.List>
+  )
+}
+
+function normalizeMultiSelectOptions(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value.map((option) => typeof option === "string"
+    ? { value: option, label: option }
+    : { value: String(option?.value || "").trim(), label: String(option?.label || "").trim() })
+    .filter((option) => option.value && option.label)
+}
+
+function formatOptionsForInput(options?: Array<string | { value: string; label: string }>) {
+  return (options || []).map((option) => typeof option === "string" ? option : option.value).join(", ")
 }
 
 function normalizeOptions(value: unknown) {
@@ -901,7 +981,7 @@ function buildBatchColumns(
                         value === "relative"
                           ? item.relationResource
                           : undefined,
-                      options: value === "select" ? item.options : "",
+                      options: value === "select" || value === "multi-select" ? item.options : "",
                     }
                   : item,
               ),
@@ -915,7 +995,7 @@ function buildBatchColumns(
       dataIndex: "options",
       width: 260,
       render: (_, row) =>
-        row.dataType === "select" ? (
+        row.dataType === "select" || row.dataType === "multi-select" ? (
           <Input
             value={row.options}
             placeholder="A, B, C"

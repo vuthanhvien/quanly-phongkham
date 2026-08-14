@@ -64,7 +64,7 @@ import { buildGroupedModuleOptions, resolveEnabledModules } from "../company-typ
 import { useAppUi } from "../app-ui"
 import { getInputPatternLabel, INPUT_PATTERN_OPTIONS } from "../input-patterns"
 import { getApiErrorMessage } from "../utils/apiError"
-import { baseFields, CustomField, DynamicRole, entityLabels, FieldSpec, getResourceActionOptions, normalizeSelectOption, permissionLabels, relationFields, type SelectOption } from "../models"
+import { baseFields, CustomField, DynamicRole, entityLabels, FieldSpec, getResourceActionOptions, normalizeSelectOption, permissionLabels, relationFields, systemRoleOptions, type SelectOption } from "../models"
 import {
   buildFieldLayoutConfigs,
   DEFAULT_ROLE_SCOPE,
@@ -719,6 +719,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
 
   const roleTreeData = useMemo(() => {
     const allRoles = Array.from(new Set([...selectableRoles, ...dynamicRoles.map((role) => normalizeRole(role.key))]))
+    const systemRoleKeys = new Set(systemRoleOptions)
     const defaultRoleLabels: Record<string, string> = {
       ALL: "Tất cả",
       ADMIN: "Quản trị viên",
@@ -728,12 +729,15 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     const childrenByParent = new Map<string, string[]>()
     dynamicRoles.forEach((role) => {
       const key = normalizeRole(role.key)
+      // System roles are always roots. Ignore legacy dynamic definitions with
+      // the same key so a self-reference (ADMIN → ADMIN) cannot hide them.
+      if (systemRoleKeys.has(key)) return
       const parent = normalizeRole(role.roleMain)
       childrenByParent.set(parent, [...(childrenByParent.get(parent) || []), key])
     })
     type RoleTreeNode = { value: string; title: React.ReactNode; searchTitle: string; children?: RoleTreeNode[] }
     const buildNode = (role: string, seen = new Set<string>()): RoleTreeNode => {
-      const dynamic = dynamicRoles.find((item) => normalizeRole(item.key) === role)
+      const dynamic = systemRoleKeys.has(role) ? undefined : dynamicRoles.find((item) => normalizeRole(item.key) === role)
       const children = (childrenByParent.get(role) || []).filter((child) => !seen.has(child)).map((child) => buildNode(child, new Set([...seen, role])))
       const title = dynamic ? `${dynamic.name} (${role})` : defaultRoleLabels[role] || role
       const isActionInherited = role !== DEFAULT_ROLE_SCOPE && !views.some((view) => normalizeRole(view.role) === role && (view.viewType === "ACTION" || (view.viewType === "TABLE" && Array.isArray(view.config?.allowedActions))))
@@ -750,8 +754,14 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
         children: children.length ? children : undefined,
       }
     }
-    const rootChildren = allRoles
-      .filter((role) => role !== DEFAULT_ROLE_SCOPE && !dynamicRoles.some((item) => normalizeRole(item.key) === role && allRoles.includes(normalizeRole(item.roleMain))))
+    const rootChildren = [
+      ...systemRoleOptions,
+      ...allRoles.filter((role) =>
+        role !== DEFAULT_ROLE_SCOPE &&
+        !systemRoleKeys.has(role) &&
+        !dynamicRoles.some((item) => normalizeRole(item.key) === role && allRoles.includes(normalizeRole(item.roleMain))),
+      ),
+    ]
       .map((role) => buildNode(role))
     const allNode = buildNode(DEFAULT_ROLE_SCOPE)
     return [{ ...allNode, children: [...(allNode.children || []), ...rootChildren] }]

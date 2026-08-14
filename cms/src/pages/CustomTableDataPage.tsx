@@ -1,4 +1,4 @@
-import { DownloadOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
+import { DownloadOutlined, EditOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
 import { Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Typography, Upload, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -16,6 +16,7 @@ export function CustomTableDataPage() {
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [rows, setRows] = useState<Row[]>([])
   const [createOpen, setCreateOpen] = useState(false)
+  const [editingRow, setEditingRow] = useState<Row | null>(null)
   const [fullscreenPopup, setFullscreenPopup] = useState(false)
   const [form] = Form.useForm()
 
@@ -30,13 +31,27 @@ export function CustomTableDataPage() {
     setRows((await api.get(`/settings/custom-tables/${id}/rows`)).data.data || [])
   }
 
-  async function add(values: Record<string, unknown>) {
-    await api.post(`/settings/custom-tables/${id}/rows`, { values })
+  async function saveRow(values: Record<string, unknown>) {
+    if (editingRow) await api.patch(`/settings/custom-tables/${id}/rows/${editingRow.id}`, { values })
+    else await api.post(`/settings/custom-tables/${id}/rows`, { values })
     form.resetFields()
     setCreateOpen(false)
+    setEditingRow(null)
     setFullscreenPopup(false)
     await load()
-    message.success('Đã thêm dòng')
+    message.success(editingRow ? 'Đã cập nhật dòng' : 'Đã thêm dòng')
+  }
+
+  function openCreate() {
+    form.resetFields()
+    setEditingRow(null)
+    setCreateOpen(true)
+  }
+
+  function openEdit(row: Row) {
+    form.setFieldsValue(row.values)
+    setEditingRow(row)
+    setCreateOpen(true)
   }
 
   function exportRows() {
@@ -77,7 +92,7 @@ export function CustomTableDataPage() {
             <Button icon={<UploadOutlined />}>Nhập Excel</Button>
           </Upload>
           <Button icon={<DownloadOutlined />} onClick={exportRows}>Xuất Excel</Button>
-          <Button icon={<PlusOutlined />} type="primary" onClick={() => setCreateOpen(true)}>Thêm nhanh</Button>
+          <Button icon={<PlusOutlined />} type="primary" onClick={openCreate}>Thêm nhanh</Button>
           <Button onClick={() => navigate('/custom-tables')}>Quay lại</Button>
         </Space>
       </div>
@@ -96,15 +111,18 @@ export function CustomTableDataPage() {
             {
               title: '',
               render: (_: unknown, row: Row) => (
-                <Popconfirm
-                  title="Lưu trữ dòng này?"
-                  onConfirm={async () => {
-                    await api.delete(`/settings/custom-tables/${id}/rows/${row.id}`)
-                    await load()
-                  }}
-                >
-                  <Button danger type="link">Lưu trữ</Button>
-                </Popconfirm>
+                <Space size={0}>
+                  <Button icon={<EditOutlined />} type="link" onClick={() => openEdit(row)}>Sửa</Button>
+                  <Popconfirm
+                    title="Lưu trữ dòng này?"
+                    onConfirm={async () => {
+                      await api.delete(`/settings/custom-tables/${id}/rows/${row.id}`)
+                      await load()
+                    }}
+                  >
+                    <Button danger type="link">Lưu trữ</Button>
+                  </Popconfirm>
+                </Space>
               ),
             },
           ]}
@@ -116,7 +134,7 @@ export function CustomTableDataPage() {
         title={
           <ModalTitleBar
             fullscreen={fullscreenPopup}
-            title={`Thêm dữ liệu: ${table.name}`}
+            title={`${editingRow ? 'Chỉnh sửa' : 'Thêm'} dữ liệu: ${table.name}`}
             onToggleFullscreen={() => setFullscreenPopup((current) => !current)}
           />
         }
@@ -124,11 +142,12 @@ export function CustomTableDataPage() {
         width={fullscreenPopup ? "calc(100vw - 24px)" : 560}
         onCancel={() => {
           setCreateOpen(false)
+          setEditingRow(null)
           setFullscreenPopup(false)
         }}
         onOk={() => form.submit()}
       >
-        <Form form={form} layout="vertical" onFinish={(values) => void add(values)}>
+        <Form form={form} layout="vertical" onFinish={(values) => void saveRow(values)}>
           {table.columns.map((column) => (
             <Form.Item
               key={column.key}

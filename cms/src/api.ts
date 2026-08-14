@@ -97,6 +97,13 @@ export function resolveFileUrl(url: string | null | undefined): string {
 }
 
 api.interceptors.request.use((config) => {
+  // DELETE endpoints in the CMS are soft-archive operations in most modules,
+  // but some screens do not own a local confirmation dialog. Keep this guard
+  // at the HTTP boundary so none of them can execute accidentally.
+  if ((config.method || '').toLowerCase() === 'delete' && typeof window !== 'undefined') {
+    const confirmed = window.confirm('Bạn có chắc muốn xóa hoặc lưu trữ mục này không?')
+    if (!confirmed) throw new axios.CanceledError('Delete cancelled by user', config)
+  }
   const token = localStorage.getItem('clinic-token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   if ((config.method || 'get').toLowerCase() === 'get' && shouldAttachGlobalBranchFilter(config.url)) {
@@ -119,6 +126,7 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    if (axios.isCancel(error)) return Promise.reject(error);
     if (error?.response?.status === 401) {
       clearAuthSession();
       redirectToLogin();

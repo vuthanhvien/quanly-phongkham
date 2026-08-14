@@ -615,7 +615,7 @@ export function RolesPage() {
             <Input placeholder="VD: Lễ tân, Bác sĩ điều trị..." />
           </Form.Item>
           <Form.Item name="key" label="Key (mã định danh)" rules={[{ required: true, message: "Nhập key" }]}>
-            <Input placeholder="VD: RECEPTIONIST" disabled={Boolean(editingRole)} />
+            <Input placeholder="VD: RECEPTIONIST" />
           </Form.Item>
           <Form.Item name="roleMain" label="Loại vai trò" rules={[{ required: true }]}>
             <Select options={systemRoleSelectOptions} />

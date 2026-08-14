@@ -23,6 +23,7 @@ import {
   Select,
   Space,
   Tabs,
+  Table,
   Tree,
   TreeSelect,
   Typography,
@@ -857,6 +858,7 @@ function FieldInput({
   const { settings } = useAppUi()
   const placeholder = field.placeholder?.trim() || getDefaultFieldPlaceholder(field)
   const relation = field.relation || relationFields[field.key]
+  if (field.type === "table") return <InlineTableInput columns={field.tableColumns || []} value={value} onChange={onChange} disabled={field.disabled} />
   if (field.type === "number")
     return (
       <InputNumber
@@ -1020,6 +1022,23 @@ function FieldInput({
       onChange={(e) => onChange?.(e.target.value)}
     />
   )
+}
+
+function InlineTableInput({ columns, value, onChange, disabled }: { columns: NonNullable<FieldSpec["tableColumns"]>; value?: unknown; onChange?: (value: unknown) => void; disabled?: boolean }) {
+  const rows = Array.isArray(value) ? value as Array<Record<string, unknown>> : []
+  const updateRow = (index: number, key: string, nextValue: unknown) => onChange?.(rows.map((row, rowIndex) => rowIndex === index ? { ...row, [key]: nextValue } : row))
+  return <Space direction="vertical" size={8} style={{ width: "100%" }}>
+    <Table size="small" bordered pagination={false} rowKey={(_, index) => String(index)} dataSource={rows} scroll={{ x: "max-content" }} columns={[
+      ...columns.map((column) => ({ title: column.label, key: column.key, width: 180, render: (_: unknown, row: Record<string, unknown>, index: number) => {
+        const current = row[column.key]
+        if (column.dataType === "select") return <Select disabled={disabled} value={current as string | undefined} options={(column.options || []).map((item) => ({ value: item, label: item }))} onChange={(next) => updateRow(index, column.key, next)} style={{ width: "100%" }} />
+        if (column.dataType === "number" || column.dataType === "money") return <InputNumber disabled={disabled} value={current as number | undefined} onChange={(next) => updateRow(index, column.key, next)} style={{ width: "100%" }} />
+        return <Input disabled={disabled} type={column.dataType === "date" ? "date" : column.dataType === "time" ? "time" : "text"} value={current as string | undefined} onChange={(event) => updateRow(index, column.key, event.target.value)} />
+      }})),
+      { title: "", key: "remove", width: 64, fixed: "right" as const, render: (_: unknown, __: Record<string, unknown>, index: number) => <Button disabled={disabled} danger size="small" type="text" onClick={() => onChange?.(rows.filter((_, rowIndex) => rowIndex !== index))}>Xóa</Button> },
+    ]} />
+    <Button disabled={disabled || columns.length === 0} size="small" type="dashed" onClick={() => onChange?.([...rows, {}])}>Thêm dòng</Button>
+  </Space>
 }
 
 function getDefaultFieldPlaceholder(field: FieldSpec) {

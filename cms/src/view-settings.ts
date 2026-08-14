@@ -227,11 +227,17 @@ export function getRoleOptions(views: ViewSettingRecord[], extraRoles: string[] 
 }
 
 export function getFieldCatalog(resource: string, customFields: CustomField[]) {
+  const builtInFields = (baseFields[resource] || [])
+    .filter((field) => !isFieldHiddenForResource(resource, field.key))
+  const builtInKeys = new Set(builtInFields.map((field) => field.key))
+
   return [
-    ...(baseFields[resource] || []).filter((field) => !isFieldHiddenForResource(resource, field.key)),
+    ...builtInFields,
     ...customFields
       .filter((field) => field.isActive)
       .filter((field) => !isFieldHiddenForResource(resource, field.key))
+      // A custom field must not replace or duplicate a system-owned field.
+      .filter((field) => !builtInKeys.has(field.key))
       .map(
         (field): FieldSpec => ({
           key: field.key,
@@ -240,10 +246,11 @@ export function getFieldCatalog(resource: string, customFields: CustomField[]) {
           required: field.required,
           options: field.options,
           customTableId: field.customTableId,
+          tableColumns: field.tableColumns,
           relation:
             field.dataType === 'file'
               ? { resource: 'files', labelFields: ['title', 'originalName'] }
-              : field.dataType === 'relative' && field.relationResource
+              : (field.dataType === 'relative' || field.dataType === 'multi-select') && field.relationResource
                 ? { resource: field.relationResource, labelFields: ['code', 'name', 'fullName', 'title'] }
                 : undefined,
         }),

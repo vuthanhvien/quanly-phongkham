@@ -1711,8 +1711,8 @@ export class RecordsService {
     if (field.dataType === 'boolean') return context.index % 2 === 0;
     if (field.dataType === 'date') return this.fakeDate(context.index);
     if (field.dataType === 'datetime') return this.fakeDateTime(context.index);
-    if (field.dataType === 'select' && field.options?.length) return field.options[context.index % field.options.length];
-    if (field.dataType === 'multi-select' && field.options?.length) return field.options.slice(0, Math.min(2, field.options.length));
+    if (field.dataType === 'select' && field.options?.length) return this.customFieldOptionValues(field.options)[context.index % field.options.length];
+    if (field.dataType === 'multi-select' && field.options?.length) return this.customFieldOptionValues(field.options).slice(0, Math.min(2, field.options.length));
     return `Mau ${field.key} ${context.index + 1}`;
   }
 
@@ -4293,7 +4293,8 @@ export class RecordsService {
       const valid =
         field.dataType === 'number' ? !Number.isNaN(Number(value)) :
           field.dataType === 'boolean' ? typeof value === 'boolean' :
-            field.dataType === 'select' ? !field.options || field.options.includes(String(value)) :
+            field.dataType === 'select' ? !field.options || this.customFieldOptionValues(field.options).includes(String(value)) :
+              field.dataType === 'multi-select' ? Array.isArray(value) && value.length > 0 && (!field.options || value.every((item) => this.customFieldOptionValues(field.options!).includes(String(item)))) :
               field.dataType === 'file' ? Boolean(
                 (await this.files.count({ where: { id: In(valueItems.map((item) => String(item))), isActive: true } })) === valueItems.length,
               ) :
@@ -4347,6 +4348,9 @@ export class RecordsService {
   private parseCustomFieldValue (valueText: string, dataType?: string) {
     if (dataType === 'number') return Number(valueText);
     if (dataType === 'boolean') return valueText === 'true';
+    if (dataType === 'table') {
+      try { return JSON.parse(valueText); } catch { return []; }
+    }
     return valueText;
   }
 
@@ -4647,9 +4651,14 @@ export class RecordsService {
 
   private async replaceCustomFieldValues (resource: string, recordId: string, values: Record<string, unknown>) {
     await this.customFieldValues.delete({ entityType: resource, recordId });
+    const definitions = await this.fieldDefinitions.find({ where: { entityType: resource } });
+    const typeByKey = new Map(definitions.map((field) => [field.key, field.dataType]));
 
     const rows = Object.entries(values).flatMap(([fieldKey, value]) => {
       if (this.isEmptyCustomFieldValue(value)) return [];
+      if (typeByKey.get(fieldKey) === 'table') {
+        return [this.customFieldValues.create({ entityType: resource, recordId, fieldKey, valueText: JSON.stringify(value) })];
+      }
       const valueItems = Array.isArray(value) ? value : [value];
       const uniqueItems = Array.from(
         new Set(
@@ -4676,6 +4685,10 @@ export class RecordsService {
   private isEmptyCustomFieldValue (value: unknown) {
     if (Array.isArray(value)) return value.length === 0;
     return value === undefined || value === null || value === '';
+  }
+
+  private customFieldOptionValues (options: Array<string | { value: string; label: string }>) {
+    return options.map((option) => typeof option === 'string' ? option : option.value);
   }
 
   private async copyCustomFieldValues (

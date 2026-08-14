@@ -1,7 +1,9 @@
 export type SelectOption = string | { value: string; label: string };
 
 const RESOURCE_HIDDEN_FIELD_KEYS: Record<string, string[]> = {
-  customers: ['branchId'],
+  // `avatar` was a legacy custom field. Customer profiles have a single
+  // canonical avatar field: `avatarUrl`.
+  customers: ['branchId', 'avatar'],
   leads: ['branchId'],
   staff: ['defaultBranchId'],
   departments: ['branchId'],
@@ -33,7 +35,7 @@ export interface FieldSpec {
   label: string;
   /** Default form/detail tab. A saved view can override this per field. */
   tab?: string;
-  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative' | 'file' | 'image' | 'images' | 'dynamic-table';
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative' | 'file' | 'image' | 'images' | 'dynamic-table' | 'table';
   displayFormat?: 'currency' | 'number' | 'percent' | 'time';
   required?: boolean;
   options?: SelectOption[];
@@ -46,6 +48,7 @@ export interface FieldSpec {
   inputPattern?: string;
   relation?: RelationSpec;
   customTableId?: string;
+  tableColumns?: Array<{ key: string; label: string; dataType: string; options?: string[] }>;
 }
 
 export interface RelationSpec {
@@ -106,9 +109,10 @@ export interface CustomField {
   label: string;
   dataType: string;
   required: boolean;
-  options?: string[];
+  options?: SelectOption[];
   relationResource?: string;
   customTableId?: string;
+  tableColumns?: Array<{ key: string; label: string; dataType: string; options?: string[] }>;
   isActive: boolean;
   sortOrder?: number;
 }

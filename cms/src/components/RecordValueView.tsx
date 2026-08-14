@@ -24,6 +24,10 @@ interface RecordValueViewProps {
 export function RecordValueView({ field, value, lookups, fileLookups, compact, onRelationClick }: RecordValueViewProps) {
   if (value === null || value === undefined || value === "") return <span>-</span>
 
+  if (typeof field !== "string" && field.type === "table") {
+    return renderInlineTableValue(field, value, compact)
+  }
+
   if (isAvatarField(field)) {
     const avatarValue = normalizeStringArray(value)[0]
     const file = avatarValue ? fileLookups[avatarValue] : undefined
@@ -57,6 +61,28 @@ export function RecordValueView({ field, value, lookups, fileLookups, compact, o
   }
 
   return <>{displayValue(field, value, lookups)}</>
+}
+
+function renderInlineTableValue(field: FieldSpec, value: unknown, compact?: boolean) {
+  const rows = Array.isArray(value) ? value.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row)) : []
+  const columns = field.tableColumns || []
+  if (!rows.length) return <span>-</span>
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: compact ? 180 : 260 }}>
+      {rows.map((row, index) => {
+        const summary = columns
+          .map((column) => {
+            const raw = row[column.key]
+            if (raw === undefined || raw === null || raw === "") return ""
+            const text = column.dataType === "money" ? `${new Intl.NumberFormat("vi-VN").format(Number(raw) || 0)} đ` : String(raw)
+            return compact ? text : `${column.label}: ${text}`
+          })
+          .filter(Boolean)
+          .join(" · ")
+        return <span key={index} style={{ whiteSpace: "normal" }}>{summary || "-"}</span>
+      })}
+    </div>
+  )
 }
 
 function renderStaffMemberList(

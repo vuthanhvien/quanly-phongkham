@@ -20,6 +20,7 @@ const PROTECTED_ADMIN_EMAIL = 'admin@admin.com';
 const LANDING_BLOCK_TYPES = ['title', 'text', 'image', 'video', 'form', 'slider'];
 const UI_THEME_OPTIONS = ['dark', 'light'];
 const UI_SIZE_OPTIONS = ['small', 'medium', 'large'];
+const CUSTOMER_AVATAR_FIELD_KEYS = new Set(['avatar', 'avatarUrl']);
 const UI_FONT_FAMILIES = [
   '"Plus Jakarta Sans", Inter, Arial, sans-serif',
   '"Be Vietnam Pro", Inter, Arial, sans-serif',
@@ -585,6 +586,7 @@ export class SettingsService {
       throw new BadRequestException('entityType, key va label la bat buoc');
     }
     const key = payload.key.replace(/[^a-zA-Z0-9_]/g, '_');
+    this.assertCustomFieldKeyIsAvailable(payload.entityType, key);
     if (payload.dataType === 'relative' && !payload.relationResource) {
       throw new BadRequestException('Field relative can relationResource');
     }
@@ -607,6 +609,7 @@ export class SettingsService {
     const field = await this.fields.findOne({ where: { id } });
     if (!field) throw new NotFoundException('Không tìm thấy custom field');
     const next = this.fields.merge(field, payload, { required: false });
+    this.assertCustomFieldKeyIsAvailable(next.entityType, next.key);
     if (next.dataType === 'relative' && !next.relationResource) {
       throw new BadRequestException('Field relative can relationResource');
     }
@@ -621,7 +624,7 @@ export class SettingsService {
     } else {
       next.customTableId = null as unknown as string;
     }
-    if (!['relative', 'file'].includes(next.dataType)) {
+    if (!['relative', 'file', 'multi-select'].includes(next.dataType)) {
       next.relationResource = null as unknown as string;
     }
     return this.fields.save(next);
@@ -634,6 +637,12 @@ export class SettingsService {
     field.isArchived = true;
     await this.fields.save(field);
     return { id };
+  }
+
+  private assertCustomFieldKeyIsAvailable(entityType: string | undefined, key: string | undefined) {
+    if (entityType === 'customers' && key && CUSTOMER_AVATAR_FIELD_KEYS.has(key)) {
+      throw new BadRequestException('Khách hàng chỉ dùng trường avatarUrl cho ảnh đại diện');
+    }
   }
 
   async listCustomTables(user?: AuthUser, includeRows = false) {
@@ -1167,6 +1176,9 @@ export class SettingsService {
       throw new BadRequestException('roleMain không hợp lệ');
     }
     const key = payload.key.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+    if (SYSTEM_ROLES.includes(key)) {
+      throw new BadRequestException('ADMIN, STAFF và DOCTOR là role hệ thống; không thể tạo role động trùng key');
+    }
     const exists = await this.roles.findOne({ where: { key } });
     if (exists) throw new BadRequestException('Key role đã tồn tại');
     return this.roles.save(this.roles.create({
@@ -1180,11 +1192,39 @@ export class SettingsService {
     this.assertSettingsAccess(user);
     const role = await this.roles.findOne({ where: { id } });
     if (!role) throw new NotFoundException('Không tìm thấy role');
-    const next = this.roles.merge(role, payload);
+    const key = payload.key === undefined
+      ? role.key
+      : payload.key.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+    if (!key) throw new BadRequestException('key là bắt buộc');
+    if (key !== role.key) {
+      const exists = await this.roles.findOne({ where: { key } });
+      if (exists) throw new BadRequestException('Key role đã tồn tại');
+    }
+    const next = this.roles.merge(role, { ...payload, key });
     if (!SYSTEM_ROLES.includes(next.roleMain)) {
       throw new BadRequestException('roleMain không hợp lệ');
     }
-    return this.roles.save(next);
+    if (SYSTEM_ROLES.includes(next.key) && next.key !== role.key) {
+      throw new BadRequestException('ADMIN, STAFF và DOCTOR là role hệ thống; không thể dùng làm role động');
+    }
+    const saved = await this.roles.save(next);
+
+    if (key !== role.key) {
+      const [assignments, views] = await Promise.all([
+        this.branchRoles.find(),
+        this.views.find({ where: { role: role.key } }),
+      ]);
+      const affectedAssignments = assignments
+        .filter((assignment) => (assignment.roleKeys || []).includes(role.key))
+        .map((assignment) => this.branchRoles.merge(assignment, {
+          roleKeys: assignment.roleKeys.map((roleKey) => roleKey === role.key ? key : roleKey),
+          roleName: assignment.roleKeys.map((roleKey) => roleKey === role.key ? key : roleKey).join(', '),
+        }));
+      if (affectedAssignments.length) await this.branchRoles.save(affectedAssignments);
+      if (views.length) await this.views.save(views.map((view) => this.views.merge(view, { role: key })));
+    }
+
+    return saved;
   }
 
   async deleteRole(id: string, user?: AuthUser) {
