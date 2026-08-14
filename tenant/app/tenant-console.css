@@ -1,0 +1,83 @@
+/* Tenant creation/clone form refinements. Loaded after the legacy console CSS. */
+.content > header > div:last-child,
+.form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.form-grid fieldset {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.form-grid select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 36px 9px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+}
+
+.form-grid select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px #2563eb1f;
+}
+
+.form-grid small {
+  color: #64748b;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.form-grid .check input {
+  accent-color: #1d4ed8;
+}
+
+button:disabled,
+fieldset:disabled {
+  cursor: not-allowed;
+  opacity: .62;
+}
+
+.primary:hover:not(:disabled) {
+  background: #1e40af;
+  border-color: #1e40af;
+}
+
+.form-progress {
+  margin-top: 12px !important;
+  color: #1d4ed8 !important;
+  font-weight: 600;
+}
+
+.form-progress::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 8px;
+  border: 2px solid #93c5fd;
+  border-top-color: #1d4ed8;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: tenant-console-spin .8s linear infinite;
+}
+
+.message.loading {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+@keyframes tenant-console-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 760px) {
+  .content > header > div:last-child { flex-wrap: wrap; }
+}

@@ -185,21 +185,37 @@ export class SeedService implements OnApplicationBootstrap {
   }
 
   private async seedTenant() {
-    // A provisioned tenant starts intentionally empty: schema plus one admin.
+    // A provisioned tenant starts with the minimum usable workspace.
     // Teams can then clone a template tenant when they want demo/config data.
+    await this.ensureInitialBranch();
     await this.ensureInitialAdmin();
     await this.seedLargeDataIfEnabled();
   }
 
+  private async ensureInitialBranch() {
+    const existing = await this.branches.findOne({ where: { slug: 'main' } });
+    if (existing) return;
+    await this.branches.save(this.branches.create({
+      name: 'Chi nhánh chính',
+      slug: 'main',
+      isActive: true,
+    }));
+  }
+
   private async ensureInitialAdmin() {
     const email = this.config.get('ADMIN_EMAIL', 'admin@clinic.test');
-    const admin = await this.users.findOne({ where: { email } });
+    // Older tenant databases may already have the system account under the
+    // legacy admin-system username but a different configured email. Treat
+    // either reserved username as the initial account so restart seeding is
+    // idempotent and never violates either unique key.
+    const admin = await this.users.findOne({
+      where: [{ email }, { username: 'admin' }, { username: 'admin-system' }],
+    });
     if (!admin) {
-      const existingUsername = await this.users.findOne({ where: { username: 'admin' } });
       await this.users.save(
         this.users.create({
           email,
-          username: existingUsername ? 'admin-system' : 'admin',
+          username: 'admin',
           fullName: 'Quan tri he thong',
           passwordHash: await hash(this.config.get('ADMIN_PASSWORD', 'Admin@123'), 10),
           role: 'ADMIN',

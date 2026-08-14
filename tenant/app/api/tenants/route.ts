@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '../../../lib/auth'
 import { cloneTenantDatabase, databaseNameFromUrl, managementDb, normalizeDomain, provisionTenantDatabase, seedTenantDatabase, Tenant } from '../../../lib/db'
+
+// Self-hosted Next has no request timeout by default. This gives hosted
+// runtimes enough time for a large schema/data clone as well.
+export const maxDuration = 900
+
 const denied = () => NextResponse.json({ message: 'Không có quyền' }, { status: 401 })
 const view = (tenant: Tenant) => ({ id: tenant.id, domain: tenant.domain, databaseName: databaseNameFromUrl(tenant.databaseUrl), isActive: tenant.isActive, createdAt: tenant.createdAt, updatedAt: tenant.updatedAt })
 export async function GET(request: NextRequest) { if (!requireAdmin(request)) return denied(); const rows = await (await managementDb()).getRepository(Tenant).find({ order: { domain: 'ASC' } }); return NextResponse.json({ data: rows.map(view) }) }

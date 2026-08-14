@@ -18,11 +18,15 @@ export class TenantMiddleware implements NestMiddleware {
     let originHost = '';
     try { originHost = origin ? new URL(origin).host : ''; } catch { /* fall back to proxy/direct host */ }
     const isGoogleDriveCallback = req.originalUrl.split('?')[0].endsWith('/settings/google-drive/callback');
+    const isInternalTenantSeed = req.originalUrl.split('?')[0].endsWith('/internal/tenants/seed');
     const callbackDomain = isGoogleDriveCallback ? parseGoogleDriveOAuthState(typeof req.query.state === 'string' ? req.query.state : undefined)?.domain : undefined;
+    const seedDomain = isInternalTenantSeed ? String(req.headers['x-tenant-domain'] || '').trim() : undefined;
     // Google redirects to the one shared API domain and has no browser Origin.
     // In that specific callback, the signed/verified OAuth state tells us which
     // tenant database owns the connection.
-    const host = callbackDomain || originHost || String(req.headers['x-forwarded-host'] || req.headers.host || '');
+    // Provisioning runs server-to-server, therefore it has no Origin. Its
+    // internal-secret-protected endpoint explicitly supplies the target tenant.
+    const host = callbackDomain || seedDomain || originHost || String(req.headers['x-forwarded-host'] || req.headers.host || '');
     const tenant = await this.tenants.resolveHost(host);
     this.context.run(tenant, next);
   }
