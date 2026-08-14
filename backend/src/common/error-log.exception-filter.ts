@@ -1,4 +1,4 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { appendFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { Request, Response } from 'express';
@@ -66,6 +66,8 @@ function uploadedFilesInfo(request: Request) {
 
 @Catch()
 export class ErrorLogExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(ErrorLogExceptionFilter.name);
+
   constructor(private readonly tenantContext?: TenantContextService) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
@@ -82,6 +84,12 @@ export class ErrorLogExceptionFilter implements ExceptionFilter {
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      const error = exception instanceof Error ? exception : undefined;
+      const tenant = this.tenantContext?.get();
+      this.logger.error(
+        `${request.method} ${request.originalUrl || request.url} failed with ${status}${tenant ? ` [tenant=${tenant.domain}]` : ''}: ${error?.message || String(exception)}`,
+        error?.stack,
+      );
       // Logging deliberately happens asynchronously: an unavailable disk must
       // never delay or replace the application's HTTP error response.
       void this.writeErrorLog(exception, status, request).catch(() => undefined);
@@ -120,6 +128,7 @@ export class ErrorLogExceptionFilter implements ExceptionFilter {
       method: request.method,
       path: request.originalUrl || request.url,
       requestId: request.headers['x-request-id'],
+      tenant: this.tenantContext?.get()?.domain,
       user: request.user ? { id: request.user.id, email: request.user.email } : undefined,
       params: compactForLog(request.params),
       query: compactForLog(request.query),

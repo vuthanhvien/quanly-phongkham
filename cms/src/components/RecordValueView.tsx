@@ -270,7 +270,7 @@ function renderFileValue(value: unknown, lookups: LookupMap, fileLookups: FileLo
                 rel="noreferrer"
                 target="_blank"
               >
-                {renderFileIcon(file, true)}
+                {renderFileIcon(file)}
               </a>
             </Tooltip>
           )

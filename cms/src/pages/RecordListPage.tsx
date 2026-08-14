@@ -875,10 +875,10 @@ export function RecordListPage() {
         activeKey={tableTabKey}
         className="record-status-tabs"
         items={[
-          { key: "active", label: <span>Tất cả{tableTabCounts.active > 0 ? <Badge count={tableTabCounts.active} overflowCount={999} style={{ marginLeft: 8 }} /> : null}</span> },
+          { key: "active", label: <span>Tất cả{tableTabCounts.active > 0 ? <Badge count={tableTabCounts.active} overflowCount={999} style={{ marginLeft: 8, backgroundColor: "var(--app-primary)", color: "#fff" }} /> : null}</span> },
           ...tableTabs.map((tab) => ({
             key: tab.key,
-            label: canManageTableTabs ? <span className="custom-table-tab-label"><span>{tab.label}{tableTabCounts[tab.key] > 0 ? <Badge count={tableTabCounts[tab.key]} overflowCount={999} style={{ marginLeft: 8 }} /> : null}</span><Tooltip title="Sửa tab"><button aria-label={`Sửa tab ${tab.label}`} className="edit-table-tab-button" onClick={(event) => {
+            label: canManageTableTabs ? <span className="custom-table-tab-label"><span>{tab.label}{tableTabCounts[tab.key] > 0 ? <Badge count={tableTabCounts[tab.key]} overflowCount={999} style={{ marginLeft: 8, backgroundColor: "var(--app-primary)", color: "#fff" }} /> : null}</span><Tooltip title="Sửa tab"><button aria-label={`Sửa tab ${tab.label}`} className="edit-table-tab-button" onClick={(event) => {
               event.preventDefault()
               event.stopPropagation()
               setEditingTableTab(tab)

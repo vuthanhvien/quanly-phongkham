@@ -120,7 +120,7 @@ export function CustomFieldsPage() {
   const moduleTree = useMemo(() => {
     const moduleTitle = (key: string): ReactNode => {
       const count = customFieldCounts[key] || 0
-      return <span>{entityLabels[key]}{count > 0 ? <Badge count={count} overflowCount={999} style={{ marginLeft: 8 }} /> : null}</span>
+      return <span>{entityLabels[key]}{count > 0 ? <Badge count={count} overflowCount={999} style={{ marginLeft: 8, backgroundColor: "var(--app-primary)", color: "#fff" }} /> : null}</span>
     }
     const grouped = new Set<string>()
     const groups = appModuleGroups.map((group) => {
@@ -387,7 +387,7 @@ export function CustomFieldsPage() {
         </Space>
       </div>
       <div className="custom-fields-workspace">
-        <Card className="glass-card custom-fields-module-tree" title="Module">
+        <Card className="glass-card custom-fields-module-tree">
           <Tree
             defaultExpandAll
             selectedKeys={[entityType]}

@@ -52,7 +52,7 @@ import { ServiceOrderForm } from "../components/ServiceOrderForm"
 import { ProductForm } from "../components/ProductForm"
 import { ProjectManagementCard } from "../components/ProjectManagementCard"
 import { CustomField, entityLabels, getFieldLabel } from "../models"
-import { FileLookupMap, hasFileField, loadFileLookupMap, LookupMap, resolveRecordFieldValue } from "../relations"
+import { FileLookupMap, hasFileField, loadFileLookupMap, loadRelationOptions, LookupMap, resolveRecordFieldValue } from "../relations"
 import {
   FieldLayoutConfig,
   getFieldCatalog,
@@ -197,9 +197,10 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
         ...relatedResponse.flatMap((block) => [...block.tableFields, ...block.detailFields]),
       ]
       const fileLookupRequest = hasFileField(visibleFields) ? loadFileLookupMap() : Promise.resolve({})
-      fileLookupRequest.then((nextFileLookups) => {
+      const relationLookupRequest = loadRelationOptions(visibleFields)
+      Promise.all([fileLookupRequest, relationLookupRequest]).then(([nextFileLookups, nextLookups]) => {
         if (!mounted) return
-        setLookups({})
+        setLookups(nextLookups)
         setFileLookups(nextFileLookups)
         setLoading(false)
       })

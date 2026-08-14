@@ -4126,11 +4126,11 @@ textarea.ant-input {
 
 .record-media-stack.compact .record-media-card--icon {
   align-items: center;
-  flex: 0 0 64px;
-  height: 64px;
+  flex: 0 0 32px;
+  height: 32px;
   justify-content: center;
   padding: 0;
-  width: 64px;
+  width: 32px;
 }
 
 .record-media-card--icon .anticon {
@@ -5906,7 +5906,7 @@ textarea.ant-input {
   align-items: start;
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(270px, 330px) minmax(0, 1fr);
 }
 
 .custom-fields-module-tree {
@@ -5941,7 +5941,7 @@ textarea.ant-input {
 }
 
 .custom-fields-module-tree .ant-tree-indent-unit {
-  width: 14px;
+  width: 0;
 }
 
 .custom-fields-content { min-width: 0; }
