@@ -2029,10 +2029,12 @@ export class LandingForm {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({ default: 'Gửi thông tin' })
+  // The explicit charset keeps these Vietnamese defaults valid even when an
+  // existing tenant database was originally created with a legacy charset.
+  @Column({ default: 'Gửi thông tin', charset: 'utf8mb4' })
   submitLabel: string;
 
-  @Column({ default: 'Đã gửi thành công' })
+  @Column({ default: 'Đã gửi thành công', charset: 'utf8mb4' })
   successMessage: string;
 
   @Column({ default: false })

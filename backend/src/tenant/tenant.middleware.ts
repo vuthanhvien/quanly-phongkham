@@ -2,6 +2,7 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import { NextFunction, Request, Response } from 'express';
 import { TenantDataSourceService } from './tenant-data-source.service';
 import { TenantContextService } from './tenant-context.service';
+import { parseGoogleDriveOAuthState } from './google-drive-oauth-state';
 
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
@@ -16,7 +17,12 @@ export class TenantMiddleware implements NestMiddleware {
     const origin = String(req.headers.origin || '').split(',')[0].trim();
     let originHost = '';
     try { originHost = origin ? new URL(origin).host : ''; } catch { /* fall back to proxy/direct host */ }
-    const host = originHost || String(req.headers['x-forwarded-host'] || req.headers.host || '');
+    const isGoogleDriveCallback = req.originalUrl.split('?')[0].endsWith('/settings/google-drive/callback');
+    const callbackDomain = isGoogleDriveCallback ? parseGoogleDriveOAuthState(typeof req.query.state === 'string' ? req.query.state : undefined)?.domain : undefined;
+    // Google redirects to the one shared API domain and has no browser Origin.
+    // In that specific callback, the signed/verified OAuth state tells us which
+    // tenant database owns the connection.
+    const host = callbackDomain || originHost || String(req.headers['x-forwarded-host'] || req.headers.host || '');
     const tenant = await this.tenants.resolveHost(host);
     this.context.run(tenant, next);
   }

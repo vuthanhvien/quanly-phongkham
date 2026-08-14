@@ -10,6 +10,8 @@ import { defaultCodeFormula } from '../common/code-generation';
 import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CodeGenerationSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, GoogleDriveConnection, ItemCategory, LandingDomain, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, Product, Unit, User, ViewSetting } from '../entities/entities';
 import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
+import { TenantContextService } from '../tenant/tenant-context.service';
+import { createGoogleDriveOAuthState } from '../tenant/google-drive-oauth-state';
 import { renderDocxTemplate } from './docx-template';
 import { assertPdfHasReadableText, renderPdfTemplate as renderPdfTemplateFile } from './pdf-template';
 
@@ -242,6 +244,7 @@ export class SettingsService {
     @InjectRepository(ItemCategory) private readonly itemCategories: Repository<ItemCategory>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
     private readonly records: RecordsService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
   async getGoogleDriveConnection(user?: AuthUser) {
@@ -260,7 +263,7 @@ export class SettingsService {
   async beginGoogleDriveConnection(user?: AuthUser) {
     this.assertSettingsAccess(user);
     this.assertGoogleDriveConfigured();
-    const state = randomBytes(32).toString('hex');
+    const state = createGoogleDriveOAuthState(this.tenantContext.require().domain);
     const existing = await this.googleDriveConnections.findOne({ where: { connectionKey: 'company' } });
     const connection = existing
       ? this.googleDriveConnections.merge(existing, { oauthState: state })

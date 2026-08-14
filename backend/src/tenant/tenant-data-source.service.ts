@@ -13,6 +13,19 @@ function databaseType(databaseUrl: string): 'mysql' | 'postgres' {
   throw new Error('Unsupported database URL. Use mysql:// or postgresql://');
 }
 
+function connectionOptions(databaseUrl: string, entities: DataSourceOptions['entities']): DataSourceOptions {
+  const type = databaseType(databaseUrl);
+  return {
+    type,
+    url: databaseUrl,
+    entities,
+    // Required for Vietnamese labels/defaults in both the management DB and
+    // tenant DBs. This affects new connections; existing databases should
+    // still have their default charset migrated to utf8mb4 once.
+    ...(type === 'mysql' ? { charset: 'utf8mb4' } : {}),
+  } as DataSourceOptions;
+}
+
 function normalizeDomain(value: string) {
   return String(value || '')
     .split(',')[0]
@@ -47,9 +60,7 @@ export class TenantDataSourceService implements OnModuleInit, OnModuleDestroy {
 
     const managementUrl = this.config.getOrThrow<string>('MANAGEMENT_DATABASE_URL');
     this.management = new DataSource({
-      type: databaseType(managementUrl),
-      url: managementUrl,
-      entities: [Tenant, PlatformAdmin],
+      ...connectionOptions(managementUrl, [Tenant, PlatformAdmin]),
       synchronize: this.shouldSynchronize(),
     });
     await this.management.initialize();
@@ -149,12 +160,10 @@ export class TenantDataSourceService implements OnModuleInit, OnModuleDestroy {
       let pending = this.initializing.get(databaseKey);
       if (!pending) {
         pending = (async () => {
-      const options: DataSourceOptions = {
-        type: databaseType(tenant.databaseUrl),
-        url: tenant.databaseUrl,
-        entities: ENTITIES,
-        synchronize: this.shouldSynchronize(),
-      };
+          const options: DataSourceOptions = {
+            ...connectionOptions(tenant.databaseUrl, ENTITIES),
+            synchronize: this.shouldSynchronize(),
+          };
           const source = new DataSource(options);
           await source.initialize();
           this.dataSources.set(databaseKey, source);

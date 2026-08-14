@@ -1,5 +1,5 @@
 import { DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
-import { Button, Card, Checkbox, Form, Input, Modal, Popconfirm, Select, Space, Table, Tooltip, Typography, Upload, message } from 'antd'
+import { Button, Card, Checkbox, Empty, Form, Input, Modal, Popconfirm, Select, Space, Spin, Table, Tooltip, Typography, Upload, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
@@ -24,17 +24,31 @@ export function CustomTableDataPage() {
   const [schemaForm] = Form.useForm()
   const [schemaOpen, setSchemaOpen] = useState(false)
   const [editingSchema, setEditingSchema] = useState<DynamicTable | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     void load()
   }, [id])
 
   async function load() {
-    const nextTables = (await api.get('/settings/custom-tables')).data.data
-    setTables(nextTables)
-    setTable(nextTables.find((item: DynamicTable) => item.id === id))
-    if (!id && nextTables[0]) return navigate(`/custom-tables/${nextTables[0].id}/data`, { replace: true })
-    if (id) setRows((await api.get(`/settings/custom-tables/${id}/rows`)).data.data || [])
+    setLoading(true)
+    try {
+      const nextTables = (await api.get('/settings/custom-tables')).data.data || []
+      setTables(nextTables)
+      const selectedTable = nextTables.find((item: DynamicTable) => item.id === id)
+      setTable(selectedTable)
+      if (!id && nextTables[0]) {
+        navigate(`/custom-tables/${nextTables[0].id}/data`, { replace: true })
+        return
+      }
+      setRows(id && selectedTable ? (await api.get(`/settings/custom-tables/${id}/rows`)).data.data || [] : [])
+    } catch {
+      setTable(undefined)
+      setRows([])
+      message.error('Không tải được bảng dữ liệu động')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function saveRow(values: Record<string, unknown>) {
@@ -103,8 +117,6 @@ export function CustomTableDataPage() {
     return false
   }
 
-  if (!table) return null
-
   return (
     <>
       <div className="page-header">
@@ -116,21 +128,21 @@ export function CustomTableDataPage() {
             options={[{ value: '__new__', label: '+ Thêm bảng mới' }, ...tables.map((item) => ({ value: item.id, label: item.name }))]}
             onChange={(nextId) => nextId === '__new__' ? openSchema() : navigate(`/custom-tables/${nextId}/data`)}
           />
-          <Button icon={<EditOutlined />} onClick={() => openSchema(tables.find((item) => item.id === id))}>Schema</Button>
-          <Popconfirm title="Lưu trữ bảng này?" onConfirm={() => void removeTable()}><Button danger icon={<DeleteOutlined />}>Xóa</Button></Popconfirm>
+          <Button disabled={!table} icon={<EditOutlined />} onClick={() => openSchema(tables.find((item) => item.id === id))}>Schema</Button>
+          <Popconfirm title="Lưu trữ bảng này?" onConfirm={() => void removeTable()}><Button disabled={!table} danger icon={<DeleteOutlined />}>Xóa</Button></Popconfirm>
         </Space>
         <Space>
           <Upload accept=".xlsx,.xls" showUploadList={false} beforeUpload={importRows}>
-            <Button icon={<UploadOutlined />}>Nhập Excel</Button>
+            <Button disabled={!table} icon={<UploadOutlined />}>Nhập Excel</Button>
           </Upload>
-          <Button icon={<DownloadOutlined />} onClick={exportRows}>Xuất Excel</Button>
-          <Button icon={<PlusOutlined />} type="primary" onClick={openCreate}>Thêm nhanh</Button>
+          <Button disabled={!table} icon={<DownloadOutlined />} onClick={exportRows}>Xuất Excel</Button>
+          <Button disabled={!table} icon={<PlusOutlined />} type="primary" onClick={openCreate}>Thêm nhanh</Button>
           <Button onClick={() => navigate('/custom-tables')}>Quay lại</Button>
         </Space>
       </div>
 
       <Card className="table-card">
-        <Table
+        {loading ? <Spin /> : !table ? <Empty description="Chưa có bảng dữ liệu động" /> : <Table
           rowKey="id"
           dataSource={rows}
           pagination={{ pageSize: 50 }}
@@ -161,9 +173,10 @@ export function CustomTableDataPage() {
               ),
             },
           ]}
-        />
+        />}
       </Card>
 
+      {table && <>
       <Modal
         className={`quick-drawer${fullscreenPopup ? " quick-drawer-fullscreen" : ""}`}
         title={
@@ -199,6 +212,7 @@ export function CustomTableDataPage() {
           ))}
         </Form>
       </Modal>
+      </>}
       <Modal open={schemaOpen} title={editingSchema ? 'Sửa schema bảng' : 'Thêm bảng dữ liệu động'} width={1000} onCancel={() => setSchemaOpen(false)} onOk={() => schemaForm.submit()}>
         <Form form={schemaForm} layout="vertical" onFinish={(values) => void saveSchema(values)}>
           <Space.Compact block><Form.Item name="name" label="Tên bảng" rules={[{ required: true }]} style={{ flex: 1 }}><Input /></Form.Item><Form.Item name="key" label="Key" rules={[{ required: true }]} style={{ flex: 1 }}><Input disabled={Boolean(editingSchema)} /></Form.Item></Space.Compact>

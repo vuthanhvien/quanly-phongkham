@@ -4,6 +4,7 @@ import type { Response } from 'express';
 import { AuthUser, Public } from '../common/auth';
 import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CodeGenerationSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, DynamicRoleDefinition, LandingForm, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
 import { SettingsService } from './settings.service';
+import { parseGoogleDriveOAuthState } from '../tenant/google-drive-oauth-state';
 
 function escapeHtml(value: string) {
   return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character] || character));
@@ -269,7 +270,9 @@ export class SettingsController {
   ) {
     try {
       await this.settings.completeGoogleDriveConnection(code, state, error);
-      response.type('html').send('<!doctype html><html><body style="font-family:Arial,sans-serif;padding:32px;color:#173d1c"><h2>Đã kết nối Google Drive</h2><p>Drive này sẽ được dùng chung cho công ty. Bạn có thể đóng cửa sổ này.</p><script>window.opener&&window.opener.postMessage({type:"google-drive-connected"}, window.location.origin)</script></body></html>');
+      const domain = parseGoogleDriveOAuthState(state)?.domain;
+      const openerOrigin = domain ? `https://${domain}` : 'null';
+      response.type('html').send(`<!doctype html><html><body style="font-family:Arial,sans-serif;padding:32px;color:#173d1c"><h2>Đã kết nối Google Drive</h2><p>Drive này sẽ được dùng chung cho công ty. Bạn có thể đóng cửa sổ này.</p><script>window.opener&&window.opener.postMessage({type:"google-drive-connected"}, ${JSON.stringify(openerOrigin)})</script></body></html>`);
     } catch (callbackError) {
       const detail = callbackError instanceof Error ? callbackError.message : 'Không thể kết nối Google Drive';
       response.status(400).type('html').send(`<!doctype html><html><body style="font-family:Arial,sans-serif;padding:32px;color:#a8071a"><h2>Kết nối Google Drive chưa thành công</h2><p>${escapeHtml(detail)}</p><p>Đóng cửa sổ này rồi thử lại.</p></body></html>`);
