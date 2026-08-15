@@ -1555,6 +1555,33 @@ body {
   padding: 8px;
 }
 
+/* Shared flat tabs used at the top of list/CRUD cards. */
+.list-crud-tabs > .ant-tabs-nav {
+  margin-bottom: 14px !important;
+}
+
+.list-crud-tabs > .ant-tabs-nav::before {
+  border-bottom-color: var(--app-line) !important;
+}
+
+.list-crud-tabs .ant-tabs-tab {
+  color: var(--app-text-soft);
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0 28px 0 0 !important;
+  padding: 10px 0 9px !important;
+}
+
+.list-crud-tabs .ant-tabs-tab:hover,
+.list-crud-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--app-primary) !important;
+}
+
+.list-crud-tabs .ant-tabs-ink-bar {
+  background: var(--app-primary) !important;
+  height: 2px !important;
+}
+
 .record-status-tabs {
   margin-bottom: 0;
   padding-inline: 0;

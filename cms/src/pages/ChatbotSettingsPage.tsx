@@ -21,6 +21,7 @@ interface ChatbotConfig {
   id?: string
   systemPrompt?: string
   apiKey?: string
+  enabled: boolean
   model: string
   toolSearchServices: boolean
   toolCreateAppointment: boolean
@@ -28,6 +29,7 @@ interface ChatbotConfig {
   toolLookupAppointments: boolean
   adminEnabled: boolean
   adminApiKey?: string
+  adminModel: string
   adminSystemPrompt?: string
   adminToolReadData: boolean
   adminToolReports: boolean
@@ -35,12 +37,6 @@ interface ChatbotConfig {
   adminToolImport: boolean
   updatedAt?: string
 }
-
-const MODEL_OPTIONS = [
-  { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Khuyến nghị)' },
-  { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (Nhanh, tiết kiệm)' },
-  { value: 'claude-opus-4-8', label: 'Claude Opus 4.8 (Mạnh nhất)' },
-]
 
 const DEFAULT_SYSTEM_PROMPT = `Bạn là trợ lý tư vấn dịch vụ của phòng khám Thiện Chánh. Nhiệm vụ của bạn là:
 - Tư vấn khách hàng về các dịch vụ, liệu trình điều trị của phòng khám
@@ -58,6 +54,9 @@ export function ChatbotSettingsPage() {
   const [form] = Form.useForm<ChatbotConfig>()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [landingModels, setLandingModels] = useState<string[]>([])
+  const [adminModels, setAdminModels] = useState<string[]>([])
+  const [loadingModels, setLoadingModels] = useState({ landing: false, admin: false })
   const [masked, setMasked] = useState(true)
   const [activeTab, setActiveTab] = useState('landing')
 
@@ -75,10 +74,26 @@ export function ChatbotSettingsPage() {
         apiKey: data.apiKey ? '••••••••••••••••••••••••••' : '',
         adminApiKey: data.adminApiKey ? '••••••••••••••••••••••••••' : '',
       })
+      await Promise.all([loadModels('landing', true), loadModels('admin', true)])
     } catch {
       message.error('Không thể tải cấu hình chatbot')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadModels(scope: 'landing' | 'admin', silent = false) {
+    setLoadingModels((current) => ({ ...current, [scope]: true }))
+    try {
+      const response = await api.get(`/settings/chatbot/models?scope=${scope}`)
+      if (scope === 'admin') setAdminModels(response.data.data as string[])
+      else setLandingModels(response.data.data as string[])
+    } catch {
+      if (scope === 'admin') setAdminModels([])
+      else setLandingModels([])
+      if (!silent) message.error(`Không thể tải model ${scope === 'admin' ? 'CMS' : 'Landing'}. Kiểm tra OpenAI API key rồi lưu lại.`)
+    } finally {
+      setLoadingModels((current) => ({ ...current, [scope]: false }))
     }
   }
 
@@ -122,6 +137,7 @@ export function ChatbotSettingsPage() {
 
         <Form form={form} layout="vertical" onFinish={save}>
           <Tabs
+            className="list-crud-tabs"
             activeKey={activeTab}
             items={[
               { key: 'landing', label: 'Chatbot Landing' },
@@ -136,13 +152,26 @@ export function ChatbotSettingsPage() {
             Kết nối AI cho Landing
           </Typography.Title>
 
+          <Card size="small" style={{ marginBottom: 16 }}>
+            <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+              <div>
+                <Typography.Text strong>Bật chatbot Landing</Typography.Text>
+                <br />
+                <Typography.Text type="secondary">Hiển thị chatbot tư vấn trên landing page.</Typography.Text>
+              </div>
+              <Form.Item name="enabled" valuePropName="checked" style={{ margin: 0 }}>
+                <Switch />
+              </Form.Item>
+            </Space>
+          </Card>
+
           <Form.Item
             name="apiKey"
-            label="Anthropic API Key"
-            extra="Lấy API key tại console.anthropic.com. Key sẽ được mã hóa và không hiển thị lại."
+            label="OpenAI API Key"
+            extra="Lấy API key tại platform.openai.com. Lưu key rồi bấm “Tải model” để lấy các model mà project của bạn dùng được."
           >
             <Input.Password
-              placeholder="sk-ant-..."
+              placeholder="sk-..."
               visibilityToggle={{ visible: !masked, onVisibleChange: (v) => setMasked(!v) }}
               onFocus={() => {
                 const current = form.getFieldValue('apiKey') as string
@@ -153,8 +182,14 @@ export function ChatbotSettingsPage() {
             />
           </Form.Item>
 
-          <Form.Item name="model" label="Model AI" initialValue="claude-sonnet-4-6">
-            <Select options={MODEL_OPTIONS} style={{ maxWidth: 360 }} />
+          <Form.Item name="model" label="Model AI" initialValue="gpt-4o-mini">
+            <Select
+              loading={loadingModels.landing}
+              options={landingModels.map((model) => ({ value: model, label: model }))}
+              placeholder="Lưu OpenAI API key rồi tải model"
+              style={{ maxWidth: 360 }}
+              dropdownRender={(menu) => <>{menu}<Divider style={{ margin: '8px 0' }} /><Button type="link" loading={loadingModels.landing} onClick={() => void loadModels('landing')}>Tải lại model</Button></>}
+            />
           </Form.Item>
 
           <Divider />
@@ -257,8 +292,8 @@ export function ChatbotSettingsPage() {
           </>}
 
           {activeTab === 'cms' && <>
-          <Typography.Title level={5} style={{ marginBottom: 8 }}>
-            Trợ lý nội bộ GIS AI
+          <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 16 }}>
+            Kết nối AI cho CMS
           </Typography.Title>
           {/* <Alert
             icon={<RobotOutlined />}
@@ -274,7 +309,7 @@ export function ChatbotSettingsPage() {
               <div>
                 <Typography.Text strong>Bật trợ lý CMS</Typography.Text>
                 <br />
-                <Typography.Text type="secondary">Dùng Anthropic API Key riêng cho trợ lý CMS.</Typography.Text>
+                <Typography.Text type="secondary">Dùng OpenAI API Key riêng cho trợ lý CMS.</Typography.Text>
               </div>
               <Form.Item name="adminEnabled" valuePropName="checked" style={{ margin: 0 }}>
                 <Switch />
@@ -284,11 +319,11 @@ export function ChatbotSettingsPage() {
 
           <Form.Item
             name="adminApiKey"
-            label="Anthropic API Key cho CMS"
+            label="OpenAI API Key cho CMS"
             extra="Key này tách biệt hoàn toàn với chatbot Landing và được mã hóa, không hiển thị lại."
           >
             <Input.Password
-              placeholder="sk-ant-..."
+              placeholder="sk-..."
               visibilityToggle={{ visible: !masked, onVisibleChange: (v) => setMasked(!v) }}
               onFocus={() => {
                 const current = form.getFieldValue('adminApiKey') as string
@@ -297,6 +332,22 @@ export function ChatbotSettingsPage() {
             />
           </Form.Item>
 
+          <Form.Item name="adminModel" label="Model AI cho CMS" initialValue="gpt-4o-mini">
+            <Select
+              loading={loadingModels.admin}
+              options={adminModels.map((model) => ({ value: model, label: model }))}
+              placeholder="Lưu OpenAI API key CMS rồi tải model"
+              style={{ maxWidth: 360 }}
+              dropdownRender={(menu) => <>{menu}<Divider style={{ margin: '8px 0' }} /><Button type="link" loading={loadingModels.admin} onClick={() => void loadModels('admin')}>Tải lại model</Button></>}
+            />
+          </Form.Item>
+
+          <Divider />
+
+          <Typography.Title level={5} style={{ marginBottom: 16 }}>
+            System Prompt
+          </Typography.Title>
+
           <Form.Item
             name="adminSystemPrompt"
             label="Hướng dẫn riêng cho trợ lý CMS"
@@ -304,6 +355,12 @@ export function ChatbotSettingsPage() {
           >
             <Input.TextArea rows={6} placeholder={DEFAULT_ADMIN_SYSTEM_PROMPT} style={{ fontFamily: 'monospace', fontSize: 13 }} />
           </Form.Item>
+
+          <Divider />
+
+          <Typography.Title level={5} style={{ marginBottom: 16 }}>
+            Công cụ (Tools)
+          </Typography.Title>
 
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
             <ToolToggle name="adminToolReadData" title="Tra cứu & kiểm tra dữ liệu" description="Cho phép đọc danh sách và chi tiết bản ghi theo đúng quyền của người đăng nhập." />

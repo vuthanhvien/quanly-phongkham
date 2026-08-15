@@ -178,7 +178,7 @@ export function AuditPage() {
       <Card className="glass-card table-card">
         <Tabs
           activeKey={mode}
-          className="audit-log-tabs"
+          className="list-crud-tabs"
           items={[
             { key: 'logs', label: 'Hoạt động hệ thống' },
             { key: 'errors', label: 'Lỗi hệ thống (500)' },

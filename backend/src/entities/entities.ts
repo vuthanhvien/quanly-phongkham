@@ -2086,7 +2086,10 @@ export class ChatbotSetting {
   @Column({ type: 'text', nullable: true })
   apiKey?: string;
 
-  @Column({ default: 'claude-sonnet-4-6' })
+  @Column({ default: true })
+  enabled: boolean;
+
+  @Column({ default: 'gpt-4o-mini' })
   model: string;
 
   @Column({ default: true })
@@ -2106,6 +2109,9 @@ export class ChatbotSetting {
 
   @Column({ type: 'text', nullable: true })
   adminApiKey?: string;
+
+  @Column({ default: 'gpt-4o-mini' })
+  adminModel: string;
 
   @Column({ type: 'text', nullable: true })
   adminSystemPrompt?: string;

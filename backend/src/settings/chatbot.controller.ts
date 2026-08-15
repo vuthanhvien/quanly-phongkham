@@ -162,7 +162,7 @@ export class ChatbotController {
       (msg) => msg.role === 'user' || msg.role === 'assistant',
     );
 
-    let response = await this.callClaude(config.apiKey, config.model, systemPrompt, messages, enabledTools);
+    let response = await this.callOpenAi(config.apiKey, config.model, systemPrompt, messages, enabledTools);
 
     while (response.stop_reason === 'tool_use') {
       const toolUseBlocks = response.content.filter((block) => block.type === 'tool_use');
@@ -180,7 +180,7 @@ export class ChatbotController {
       messages.push({ role: 'assistant', content: response.content });
       messages.push({ role: 'user', content: toolResults });
 
-      response = await this.callClaude(config.apiKey, config.model, systemPrompt, messages, enabledTools);
+      response = await this.callOpenAi(config.apiKey, config.model, systemPrompt, messages, enabledTools);
     }
 
     const textBlock = response.content.find((block) => block.type === 'text');
@@ -235,7 +235,7 @@ Bạn hỗ trợ nhập liệu, kiểm tra dữ liệu, báo cáo và hướng d
 Nếu ngữ cảnh có resource và recordId, đó chính là bản ghi mà người dùng đang xem; các cách nói như “khách hàng này”, “ca này”, “bản ghi này” phải được hiểu là bản ghi đó. Không hỏi lại mã hoặc ID; khi cần kiểm tra dữ liệu, gọi inspect_record với resource và recordId trước. Các tool tra cứu, xem chi tiết, tạo và cập nhật sẽ tự sinh nút link CMS; không cần tự viết URL hoặc UUID trong câu trả lời. Khi hướng dẫn, hãy gọi open_screen hoặc open_import để CMS hiển thị đường dẫn có thể bấm. Khi yêu cầu tạo hoặc cập nhật đã rõ và đủ dữ liệu, BẮT BUỘC gọi propose_record_change ngay. Create/update được thực hiện ngay bởi công cụ, vì vậy sau khi gọi hãy chỉ thông báo “đã tạo/đã cập nhật”, tuyệt đối không nói “đề xuất”, không yêu cầu bấm xác nhận và không hỏi lại. Chỉ hỏi khi thiếu dữ liệu bắt buộc hoặc ý định thực sự mơ hồ. Lưu trữ/xóa luôn cần xác nhận trong CMS. Không tự bịa dữ liệu, không tiết lộ dữ liệu ngoài kết quả công cụ, và không đề xuất thao tác không có quyền.
 QUY TẮC HIỂN THỊ DỮ LIỆU: Tuyệt đối không hiển thị UUID/ID kỹ thuật cho người dùng, kể cả trong Markdown, ví dụ hay ghi chú. Với bất kỳ dữ liệu liên kết nào, luôn gọi bằng tên hiển thị đã được trả về (khách hàng, bác sĩ, nhân viên, sản phẩm, chi nhánh…), không gọi bằng trường kết thúc bằng Id. Các mã tham chiếu nội bộ trong kết quả công cụ chỉ phục vụ cho việc gọi công cụ tiếp theo. Khi trình bày danh sách bằng bảng Markdown, chỉ chọn tối đa 4 cột thực sự hữu ích cho câu hỏi; ưu tiên tên, thời gian, trạng thái và thông tin cần quyết định. Không đưa cột #, ID, chi nhánh hay trường kỹ thuật trừ khi người dùng yêu cầu rõ.`;
     const systemPrompt = `${defaultPrompt}\n\n${config.adminSystemPrompt || ''}`.trim();
-    let response = await this.callClaude(config.adminApiKey, config.model, systemPrompt, messages, enabledTools as typeof TOOL_DEFINITIONS);
+    let response = await this.callOpenAi(config.adminApiKey, config.adminModel || config.model, systemPrompt, messages, enabledTools as typeof TOOL_DEFINITIONS);
 
     while (response.stop_reason === 'tool_use') {
       const toolResults: AnthropicContent[] = [];
@@ -251,7 +251,7 @@ QUY TẮC HIỂN THỊ DỮ LIỆU: Tuyệt đối không hiển thị UUID/ID k
       }
       messages.push({ role: 'assistant', content: response.content });
       messages.push({ role: 'user', content: toolResults });
-      response = await this.callClaude(config.adminApiKey, config.model, systemPrompt, messages, enabledTools as typeof TOOL_DEFINITIONS);
+      response = await this.callOpenAi(config.adminApiKey, config.adminModel || config.model, systemPrompt, messages, enabledTools as typeof TOOL_DEFINITIONS);
     }
 
     const textBlock = response.content.find((block) => block.type === 'text');
@@ -447,35 +447,70 @@ QUY TẮC HIỂN THỊ DỮ LIỆU: Tuyệt đối không hiển thị UUID/ID k
     }
   }
 
-  private async callClaude(
+  private async callOpenAi(
     apiKey: string,
     model: string,
     system: string,
     messages: ChatMessage[],
     tools: typeof TOOL_DEFINITIONS,
   ): Promise<AnthropicResponse> {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        authorization: `Bearer ${apiKey}`,
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: model || 'claude-sonnet-4-6',
+        model: model || 'gpt-4o-mini',
         max_tokens: 1024,
-        system,
-        messages,
-        tools: tools.length ? tools : undefined,
+        messages: this.toOpenAiMessages(system, messages),
+        tools: tools.length ? tools.map((tool) => ({ type: 'function', function: { name: tool.name, description: tool.description, parameters: tool.input_schema } })) : undefined,
       }),
     });
 
     if (!res.ok) {
       const error = await res.text();
-      throw new Error(`Anthropic API error: ${error}`);
+      throw new Error(`OpenAI API error: ${error}`);
     }
 
-    return res.json() as Promise<AnthropicResponse>;
+    const payload = await res.json() as { choices?: Array<{ finish_reason?: string; message?: { content?: string | null; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> } }> };
+    const message = payload.choices?.[0]?.message;
+    const toolCalls = message?.tool_calls || [];
+    if (toolCalls.length) {
+      return {
+        stop_reason: 'tool_use',
+        content: toolCalls.map((call) => ({ type: 'tool_use', id: call.id, name: call.function.name, input: this.parseToolArguments(call.function.arguments) })),
+      };
+    }
+    return { stop_reason: payload.choices?.[0]?.finish_reason || 'end_turn', content: [{ type: 'text', text: message?.content || '' }] };
+  }
+
+  private toOpenAiMessages(system: string, messages: ChatMessage[]) {
+    const result: Array<Record<string, unknown>> = [{ role: 'system', content: system }];
+    for (const message of messages) {
+      if (typeof message.content === 'string') {
+        result.push({ role: message.role, content: message.content });
+        continue;
+      }
+      const blocks = message.content;
+      const toolResults = blocks.filter((block) => block.type === 'tool_result');
+      if (toolResults.length) {
+        for (const toolResult of toolResults) result.push({ role: 'tool', tool_call_id: toolResult.tool_use_id, content: String(toolResult.content || '') });
+        continue;
+      }
+      const text = blocks.find((block) => block.type === 'text')?.text;
+      const toolCalls = blocks.filter((block) => block.type === 'tool_use');
+      result.push({
+        role: 'assistant',
+        content: text || null,
+        ...(toolCalls.length ? { tool_calls: toolCalls.map((tool) => ({ id: tool.id, type: 'function', function: { name: tool.name, arguments: JSON.stringify(tool.input || {}) } })) } : {}),
+      });
+    }
+    return result;
+  }
+
+  private parseToolArguments(value: string): Record<string, unknown> {
+    try { return JSON.parse(value) as Record<string, unknown>; } catch { return {}; }
   }
 
   /** Convert hydrated record relations to their human labels before sending them to the LLM. */

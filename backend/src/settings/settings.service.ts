@@ -953,12 +953,34 @@ export class SettingsService {
     return this.ensureChatbotSettings();
   }
 
+  async getChatbotModels(scope: 'landing' | 'admin' = 'landing', user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const config = await this.ensureChatbotSettings();
+    const apiKey = scope === 'admin' ? config.adminApiKey : config.apiKey;
+    if (!apiKey) throw new BadRequestException(`Hãy lưu OpenAI API key cho ${scope === 'admin' ? 'CMS' : 'Landing'} trước khi tải danh sách model.`);
+
+    const response = await fetch('https://api.openai.com/v1/models', {
+      headers: { authorization: `Bearer ${apiKey}` },
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new BadRequestException(`Không thể tải model từ OpenAI: ${detail}`);
+    }
+    const payload = await response.json() as { data?: Array<{ id?: string }> };
+    return (payload.data || [])
+      .map((item) => String(item.id || ''))
+      .filter((id) => /^(gpt-|chatgpt-|o[1-9])/.test(id))
+      .filter((id) => !/(audio|image|realtime|transcribe|tts|embedding|moderation|search)/i.test(id))
+      .sort((a, b) => a.localeCompare(b));
+  }
+
   async updateChatbotSettings(payload: Partial<ChatbotSetting>, user?: AuthUser) {
     this.assertSettingsAccess(user);
     const current = await this.ensureChatbotSettings();
     const next = this.chatbotSettings.merge(current, {
       systemPrompt: payload.systemPrompt !== undefined ? String(payload.systemPrompt || '').trim() || undefined : current.systemPrompt,
       apiKey: payload.apiKey !== undefined ? String(payload.apiKey || '').trim() || undefined : current.apiKey,
+      enabled: payload.enabled !== undefined ? Boolean(payload.enabled) : current.enabled,
       model: payload.model ? String(payload.model).trim() : current.model,
       toolSearchServices: payload.toolSearchServices !== undefined ? Boolean(payload.toolSearchServices) : current.toolSearchServices,
       toolCreateAppointment: payload.toolCreateAppointment !== undefined ? Boolean(payload.toolCreateAppointment) : current.toolCreateAppointment,
@@ -966,6 +988,7 @@ export class SettingsService {
       toolLookupAppointments: payload.toolLookupAppointments !== undefined ? Boolean(payload.toolLookupAppointments) : current.toolLookupAppointments,
       adminEnabled: payload.adminEnabled !== undefined ? Boolean(payload.adminEnabled) : current.adminEnabled,
       adminApiKey: payload.adminApiKey !== undefined ? String(payload.adminApiKey || '').trim() || undefined : current.adminApiKey,
+      adminModel: payload.adminModel ? String(payload.adminModel).trim() : current.adminModel,
       adminSystemPrompt: payload.adminSystemPrompt !== undefined ? String(payload.adminSystemPrompt || '').trim() || undefined : current.adminSystemPrompt,
       adminToolReadData: payload.adminToolReadData !== undefined ? Boolean(payload.adminToolReadData) : current.adminToolReadData,
       adminToolReports: payload.adminToolReports !== undefined ? Boolean(payload.adminToolReports) : current.adminToolReports,
@@ -978,7 +1001,7 @@ export class SettingsService {
   async getChatbotPublicConfig() {
     const config = await this.ensureChatbotSettings();
     return {
-      enabled: Boolean(config.apiKey),
+      enabled: Boolean(config.enabled && config.apiKey),
       toolSearchServices: config.toolSearchServices,
       toolCreateAppointment: config.toolCreateAppointment,
       toolCheckDoctorSchedule: config.toolCheckDoctorSchedule,
@@ -995,12 +1018,14 @@ export class SettingsService {
     if (existing) return existing;
     return this.chatbotSettings.save(this.chatbotSettings.create({
       settingKey: 'default',
-      model: 'claude-sonnet-4-6',
+      enabled: true,
+      model: 'gpt-4o-mini',
       toolSearchServices: true,
       toolCreateAppointment: true,
       toolCheckDoctorSchedule: true,
       toolLookupAppointments: true,
       adminEnabled: false,
+      adminModel: 'gpt-4o-mini',
       adminToolReadData: true,
       adminToolReports: true,
       adminToolMutations: true,

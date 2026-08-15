@@ -284,6 +284,11 @@ export class SettingsController {
     return { data: await this.settings.getChatbotSettings(request?.user) };
   }
 
+  @Get('chatbot/models')
+  async getChatbotModels(@Query('scope') scope: 'landing' | 'admin' | undefined, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.getChatbotModels(scope === 'admin' ? 'admin' : 'landing', request?.user) };
+  }
+
   @Put('chatbot')
   async updateChatbotSettings(@Body() payload: Partial<ChatbotSetting>, @Request() request?: { user: AuthUser }) {
     return { data: await this.settings.updateChatbotSettings(payload, request?.user) };
