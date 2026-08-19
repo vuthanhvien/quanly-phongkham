@@ -3,12 +3,12 @@ import routerProvider, { CatchAllNavigate } from '@refinedev/react-router';
 import { App as AntdApp, ConfigProvider, theme } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import { useCallback, useEffect, useState } from 'react';
-import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { hasResourceAccess, hasScreenAccess } from './access';
 import { authProvider, dataProvider, api, getGlobalBranchFilterIds, onGlobalBranchFilterChange } from './api';
 import { AppUiContext, cardPaddingBySize, controlHeightBySize, defaultAppUiSettings, layoutMetricsBySize, loadCachedAppUiSettings, normalizeAppUiSettings, persistAppUiSettings, syncDocumentBranding, tablePaddingBySize, useAppUi, type AppUiSettings } from './app-ui';
 import { isModuleEnabled } from './company-types';
-import { Shell } from './components/Shell';
+import { resolveBrowserPageTitle, Shell } from './components/Shell';
 import { AdminChatbotWidget } from './components/AdminChatbotWidget';
 import { entityLabels } from './models';
 import { AuditPage } from './pages/AuditPage';
@@ -24,6 +24,7 @@ import { LandingPagesPage } from './pages/LandingPagesPage';
 import { LandingPageListPage } from './pages/LandingPageListPage';
 import { LandingFormsPage } from './pages/LandingFormsPage';
 import { LandingSiteSettingsPage } from './pages/LandingSiteSettingsPage';
+import { CustomerAppSettingsPage } from './pages/CustomerAppSettingsPage';
 import { RecordDetailPage } from './pages/RecordDetailPage';
 import { RecordFormPage } from './pages/RecordFormPage';
 import { RecordImportPage } from './pages/RecordImportPage';
@@ -52,6 +53,18 @@ const resources = Object.entries(entityLabels).map(([name, label]) => ({
   show: `/${name}/:id`,
   meta: { label },
 }));
+
+function BrowserPageTitle() {
+  const location = useLocation();
+  const { settings } = useAppUi();
+
+  useEffect(() => {
+    const appName = String(settings.appName || 'CMS').trim() || 'CMS';
+    document.title = `${resolveBrowserPageTitle(location.pathname)} | ${appName}`;
+  }, [location.pathname, settings.appName]);
+
+  return null;
+}
 
 function ProtectedLayout() {
   const { refresh } = useAppUi();
@@ -262,6 +275,7 @@ export function App() {
         <AntdApp>
           <ToastBridge />
           <Refine dataProvider={dataProvider} authProvider={authProvider} routerProvider={routerProvider} resources={resources}>
+          <BrowserPageTitle />
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedLayout />}>
@@ -307,6 +321,9 @@ export function App() {
                 <Route element={<ModuleGuard moduleKey="landing-config" />}>
                   <Route path="/configs" element={<LandingSiteSettingsPage />} />
                   <Route path="/landing/configs" element={<Navigate to="/configs" replace />} />
+                </Route>
+                <Route element={<ModuleGuard moduleKey="customer-app" />}>
+                  <Route path="/customer-app" element={<CustomerAppSettingsPage />} />
                 </Route>
                 <Route path="/chatbot-settings" element={<ChatbotSettingsPage />} />
                 <Route path="/chatbot-history" element={<ChatbotHistoryPage />} />

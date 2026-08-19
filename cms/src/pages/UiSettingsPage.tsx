@@ -422,8 +422,8 @@ export function UiSettingsPage() {
                     </Form.Item>
                   </Col>
                   <Col md={12} xs={24}>
-                    <Form.Item label="URL icon app" name="appIconUrl">
-                      <ImagePickerInput placeholder="https://.../icon.png" />
+                    <Form.Item extra="Dùng cho logo trong CMS và favicon trên tab trình duyệt. Hỗ trợ PNG, ICO, SVG." label="Favicon CMS / URL icon app" name="appIconUrl">
+                      <ImagePickerInput placeholder="https://.../favicon.png" />
                     </Form.Item>
                   </Col>
                   <Col span={24}>

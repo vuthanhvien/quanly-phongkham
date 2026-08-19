@@ -4,6 +4,7 @@ import {
   FileOutlined,
   FilePdfOutlined,
   FileTextOutlined,
+  PlusOutlined,
 } from "@ant-design/icons"
 import {
   Alert,
@@ -29,13 +30,14 @@ import {
   Typography,
 } from "antd"
 import { UserOutlined } from "@ant-design/icons"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
 import dayjs from "dayjs"
 import InputMask from "react-input-mask"
 import { api, resolveFileUrl } from "../api"
+import { hasActionAccess } from "../access"
 import { controlHeightBySize, useAppUi } from "../app-ui"
 import { FileUploadPanel } from "./FileUploadPanel"
-import { CustomField, entityLabels, FieldSpec, normalizeSelectOption, relationFields } from "../models"
+import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
 import { getRelationMetaMap, loadRelationOptions, LookupMap, RelationLookupRecord } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
 import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
@@ -102,6 +104,8 @@ export function RecordFormContent({
   const [draftBusy, setDraftBusy] = useState(false)
   const [branchRoleOptions, setBranchRoleOptions] = useState<Array<{ value: string; label: string }>>([])
   const [systemRoleOptions, setSystemRoleOptions] = useState<Array<{ value: string; label: string }>>([])
+  const [quickCreateRelationResource, setQuickCreateRelationResource] = useState<string | null>(null)
+  const [relationReloadKey, setRelationReloadKey] = useState(0)
   const autoFocusedFormKey = useRef<string | null>(null)
   const { mutate: create } = useCreate()
   const { mutate: update } = useUpdate()
@@ -150,11 +154,6 @@ export function RecordFormContent({
           getStoredUserRole(),
         )
         const masterFields = nextFields.filter((field) => Array.isArray(field.options) && field.options.length > 0)
-        const seedItems = masterFields.flatMap((field) => field.options!.map((option) => {
-          const normalized = normalizeSelectOption(option)
-          return { group: `${resource}.${field.key}`, name: normalized.label, value: normalized.value }
-        }))
-        if (seedItems.length) await api.post("/master-data/seed", { items: seedItems })
         const masterOptions = await Promise.all(masterFields.map(async (field) => {
           const response = await api.get("/master-data", { params: { group: `${resource}.${field.key}` } })
           return [field.key, (response.data.data || []).filter((item: Record<string, unknown>) => item.isActive !== false).map((item: Record<string, unknown>) => ({ value: String(item.value), label: String(item.name) }))] as const
@@ -168,7 +167,7 @@ export function RecordFormContent({
         return loadRelationOptions(fieldsWithLeaveTypes)
       })
       .then(setLookups)
-  }, [resource])
+  }, [relationReloadKey, resource])
 
   useEffect(() => {
     if (resource !== "user-accounts") return
@@ -475,7 +474,12 @@ export function RecordFormContent({
                 }] : []),
               ]}
             >
-              <FieldInput field={field} lookups={lookups} resource={resource} />
+              <FieldInput
+                field={field}
+                lookups={lookups}
+                resource={resource}
+                onCreateRelation={setQuickCreateRelationResource}
+              />
             </Form.Item>
           </Col>
         )
@@ -579,6 +583,27 @@ export function RecordFormContent({
           />
         </Modal>
       ) : null}
+      <Modal
+        destroyOnHidden
+        footer={null}
+        open={Boolean(quickCreateRelationResource)}
+        title={quickCreateRelationResource ? `Thêm ${entityLabels[quickCreateRelationResource] || quickCreateRelationResource}` : "Thêm mới"}
+        width={760}
+        onCancel={() => setQuickCreateRelationResource(null)}
+      >
+        {quickCreateRelationResource ? (
+          <RecordFormContent
+            compact
+            resource={quickCreateRelationResource}
+            notifyOnSuccess={false}
+            onCancel={() => setQuickCreateRelationResource(null)}
+            onSuccess={() => {
+              setQuickCreateRelationResource(null)
+              setRelationReloadKey((current) => current + 1)
+            }}
+          />
+        ) : null}
+      </Modal>
     </>
   )
 }
@@ -717,7 +742,7 @@ function TimeInput({
       alwaysShowMask
       style={{ width: "100%", height: controlHeightBySize(settings.size), borderRadius: settings.borderRadius }}
       value={value || ""}
-      onChange={(event) => onChange?.(event.target.value)}
+      onChange={(event: ChangeEvent<HTMLInputElement>) => onChange?.(event.target.value)}
     />
   )
 }
@@ -855,12 +880,14 @@ function FieldInput({
   resource,
   value,
   onChange,
+  onCreateRelation,
 }: {
   field: FieldSpec
   lookups: LookupMap
   resource: string
   value?: unknown
   onChange?: (value: unknown) => void
+  onCreateRelation?: (resource: string) => void
 }) {
   const { settings } = useAppUi()
   const placeholder = field.placeholder?.trim() || getDefaultFieldPlaceholder(field)
@@ -964,17 +991,33 @@ function FieldInput({
     }
     const isBaseUnitPicker = resource === "units" && field.key === "baseUnitId"
     const options = buildRelationSelectOptions(lookups, relation.lookupKey || relation.resource, relation.resource)
+    const canCreateRelation = Boolean(
+      onCreateRelation
+      && relation.resource !== resource
+      && hasActionAccess(relation.resource, "create"),
+    )
     return (
-      <Select
-        allowClear
-        disabled={field.disabled}
-        showSearch
-        optionFilterProp="searchLabel"
-        options={isBaseUnitPicker ? [{ value: "__BASE_UNIT__", label: "Đơn vị cơ sở (không quy đổi)" }, ...options] : options}
-        placeholder={placeholder}
-        value={isBaseUnitPicker && !value ? "__BASE_UNIT__" : value}
-        onChange={(nextValue) => onChange?.(isBaseUnitPicker && nextValue === "__BASE_UNIT__" ? null : nextValue)}
-      />
+      <Space.Compact block>
+        <Select
+          allowClear
+          disabled={field.disabled}
+          showSearch
+          optionFilterProp="searchLabel"
+          options={isBaseUnitPicker ? [{ value: "__BASE_UNIT__", label: "Đơn vị cơ sở (không quy đổi)" }, ...options] : options}
+          placeholder={placeholder}
+          value={isBaseUnitPicker && !value ? "__BASE_UNIT__" : value}
+          onChange={(nextValue) => onChange?.(isBaseUnitPicker && nextValue === "__BASE_UNIT__" ? null : nextValue)}
+        />
+        {canCreateRelation ? (
+          <Button
+            aria-label={`Thêm ${entityLabels[relation.resource] || relation.resource}`}
+            disabled={field.disabled}
+            icon={<PlusOutlined />}
+            title={`Thêm ${entityLabels[relation.resource] || relation.resource}`}
+            onClick={() => onCreateRelation?.(relation.resource)}
+          />
+        ) : null}
+      </Space.Compact>
     )
   }
   if (field.type === "textarea")
@@ -1018,7 +1061,7 @@ function FieldInput({
         alwaysShowMask
         style={{ width: "100%", height: controlHeightBySize(settings.size), borderRadius: settings.borderRadius }}
         value={String(value ?? "")}
-        onChange={(event) => onChange?.(event.target.value)}
+        onChange={(event: ChangeEvent<HTMLInputElement>) => onChange?.(event.target.value)}
       />
     )
   }

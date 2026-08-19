@@ -15,7 +15,7 @@ interface FileRecord {
 function isImage(file: FileRecord) {
   const mime = (file.mimeType || "").toLowerCase()
   if (mime.startsWith("image/")) return true
-  return ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"].includes(
+  return ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "ico"].includes(
     (file.extension || "").toLowerCase(),
   )
 }

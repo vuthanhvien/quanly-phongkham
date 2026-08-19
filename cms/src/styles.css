@@ -1540,11 +1540,47 @@ body {
 }
 
 .calendar-range-label {
+  align-items: center;
   color: var(--app-text) !important;
+  display: inline-flex;
   font-size: 12px;
   font-weight: 700;
-  min-width: 132px;
+  justify-content: center;
+  width: 150px;
   text-align: center;
+}
+
+.role-permission-table {
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  min-width: 0;
+  overflow: auto;
+}
+
+.role-permission-table .ant-table-wrapper {
+  min-width: 760px;
+}
+
+.role-permission-parent-row > td {
+  background: color-mix(in srgb, var(--app-text) 5%, var(--app-surface)) !important;
+  font-weight: 700;
+}
+
+.role-permission-child-title {
+  display: inline-block;
+  padding-left: 26px;
+  position: relative;
+}
+
+.role-permission-child-title::before {
+  border-bottom: 1px solid var(--app-line);
+  border-left: 1px solid var(--app-line);
+  content: "";
+  height: 12px;
+  left: 9px;
+  position: absolute;
+  top: 1px;
+  width: 10px;
 }
 
 .ant-timeline-item-tail {
@@ -4487,6 +4523,53 @@ textarea.ant-input {
 
 .calendar-planner-types {
   min-width: 280px;
+}
+
+.coordination-calendar {
+  --fc-border-color: var(--app-line);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: color-mix(in srgb, var(--app-surface) 94%, var(--app-primary));
+  --fc-today-bg-color: color-mix(in srgb, var(--app-primary) 8%, transparent);
+  --fc-event-border-color: transparent;
+  --fc-now-indicator-color: var(--app-primary);
+  height: max(720px, calc(100vh - 230px));
+}
+
+.coordination-calendar .fc {
+  color: var(--app-text);
+  font-size: 13px;
+}
+
+.coordination-calendar .fc-scrollgrid,
+.coordination-calendar .fc-theme-standard td,
+.coordination-calendar .fc-theme-standard th {
+  border-color: var(--app-line);
+}
+
+.coordination-calendar .fc-col-header-cell-cushion,
+.coordination-calendar .fc-timegrid-slot-label-cushion {
+  color: var(--app-text-soft);
+  font-weight: 600;
+  padding: 9px 6px;
+}
+
+.coordination-calendar .fc-timegrid-slot {
+  height: 2.6em;
+}
+
+.coordination-calendar .fc-event {
+  border-radius: 7px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.coordination-calendar .fc-event-main {
+  font-weight: 600;
+}
+
+.coordination-calendar .fc-highlight {
+  background: color-mix(in srgb, var(--app-primary) 20%, transparent);
 }
 
 .calendar-summary-grid {

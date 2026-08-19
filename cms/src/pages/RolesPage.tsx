@@ -16,7 +16,9 @@ import {
   Popconfirm,
   Select,
   Space,
+  Table,
   Tag,
+  Tabs,
   Typography,
   message,
 } from "antd"
@@ -25,7 +27,8 @@ import { api } from "../api"
 import { appModuleGroups, appModuleLabels, resolveEnabledModules } from "../company-types"
 import { useAppUi } from "../app-ui"
 import { ModalTitleBar } from "../components/ModalTitleBar"
-import { BranchRoleAssignment, DynamicRole, systemRoleSelectOptions } from "../models"
+import { BranchRoleAssignment, DynamicRole, getResourceActionOptions, systemRoleSelectOptions } from "../models"
+import type { ViewSettingRecord } from "../view-settings"
 import { getFirstOptionValue } from "../utils/branchDefaults"
 
 interface RoleFormValues {
@@ -53,16 +56,29 @@ const ROLE_MAIN_LABEL: Record<string, string> = {
   DOCTOR: "Bác sĩ",
 }
 
+const ROLE_PERMISSION_ACTIONS = [
+  { key: "view", label: "Xem" },
+  { key: "create", label: "Thêm" },
+  { key: "update", label: "Sửa" },
+  { key: "delete", label: "Xoá" },
+  { key: "clone", label: "Clone" },
+  { key: "duplicate", label: "Duplicate" },
+  { key: "print", label: "In" },
+]
+
 export function RolesPage() {
   const { settings } = useAppUi()
   const [roles, setRoles] = useState<DynamicRole[]>([])
+  const [views, setViews] = useState<ViewSettingRecord[]>([])
   const [assignments, setAssignments] = useState<BranchRoleAssignment[]>([])
   const [userOptions, setUserOptions] = useState<Array<{ value: string; label: string; email?: string; role?: string }>>([])
   const [branchOptions, setBranchOptions] = useState<Array<{ value: string; label: string }>>([])
   const [loading, setLoading] = useState(false)
   const [selectedRoleKey, setSelectedRoleKey] = useState<string | null>(null)
   const [selectedModules, setSelectedModules] = useState<string[]>([])
+  const [roleContentTab, setRoleContentTab] = useState<"permissions" | "users">("permissions")
   const moduleSaveQueue = useRef(Promise.resolve())
+  const actionSaveQueue = useRef(Promise.resolve())
 
   const [roleModal, setRoleModal] = useState(false)
   const [editingRole, setEditingRole] = useState<DynamicRole | null>(null)
@@ -78,15 +94,17 @@ export function RolesPage() {
   async function load() {
     setLoading(true)
     try {
-      const [rolesRes, assignRes, usersRes, branchesRes] = await Promise.all([
+      const [rolesRes, assignRes, usersRes, branchesRes, viewsRes] = await Promise.all([
         api.get("/settings/dynamic-roles"),
         api.get("/settings/branch-role-assignments"),
         api.get("/records/user-accounts", { params: { pageSize: 200 } }),
         api.get("/records/branches", { params: { pageSize: 200 } }),
+        api.get("/settings/views"),
       ])
       const nextRoles: DynamicRole[] = rolesRes.data.data
       setRoles(nextRoles)
       setAssignments(assignRes.data.data)
+      setViews(viewsRes.data.data)
       setUserOptions(
         usersRes.data.data.map((r: Record<string, unknown>) => ({
           value: String(r.id),
@@ -255,6 +273,54 @@ export function RolesPage() {
       })
   }
 
+  function getAllowedActions(module: string) {
+    const setting = views.find((view) => view.entityType === module && view.viewType === "ACTION" && view.role === selectedRoleKey)
+    const actions = setting?.config?.allowedActions
+    return Array.isArray(actions) ? actions.map(String) : getResourceActionOptions(module).map((action) => action.key)
+  }
+
+  function updateModuleActions(module: string, nextActions: string[]) {
+    if (!selectedRoleKey) return
+    const role = selectedRoleKey
+    setViews((current) => {
+      const remaining = current.filter((view) => !(view.entityType === module && view.viewType === "ACTION" && view.role === role))
+      return [...remaining, { entityType: module, viewType: "ACTION", role, config: { allowedActions: nextActions } }]
+    })
+    actionSaveQueue.current = actionSaveQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        await api.put(`/settings/views/${module}/ACTION`, { role, config: { allowedActions: nextActions } })
+      })
+      .catch(() => {
+        message.error("Không thể lưu quyền thao tác")
+        void load()
+      })
+  }
+
+  function updateGroupAction(modules: string[], action: string, allowed: boolean) {
+    const nextByModule = modules.map((module) => ({
+      module,
+      actions: allowed
+        ? Array.from(new Set([...getAllowedActions(module), action]))
+        : getAllowedActions(module).filter((key) => key !== action),
+    }))
+    if (!selectedRoleKey) return
+    const role = selectedRoleKey
+    setViews((current) => [
+      ...current.filter((view) => !nextByModule.some(({ module }) => view.entityType === module && view.viewType === "ACTION" && view.role === role)),
+      ...nextByModule.map(({ module, actions }) => ({ entityType: module, viewType: "ACTION", role, config: { allowedActions: actions } })),
+    ])
+    actionSaveQueue.current = actionSaveQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        await Promise.all(nextByModule.map(({ module, actions }) => api.put(`/settings/views/${module}/ACTION`, { role, config: { allowedActions: actions } })))
+      })
+      .catch(() => {
+        message.error("Không thể lưu quyền thao tác")
+        void load()
+      })
+  }
+
   // Only users whose account.role matches the selected role's roleMain (ADMIN users can have any role)
   const compatibleUserOptions = useMemo(() => {
     if (!selectedRole) return userOptions
@@ -276,6 +342,21 @@ export function RolesPage() {
     })
     return map
   }, [roleAssignments])
+
+  const permissionGroups = useMemo(
+    () => appModuleGroups.map((group) => ({
+      ...group,
+      modules: group.modules.filter((module) => Boolean(appModuleLabels[module]) && globallyEnabledModules.includes(module)),
+    })).filter((group) => group.modules.length > 0),
+    [globallyEnabledModules],
+  )
+  const permissionRows = useMemo(
+    () => permissionGroups.flatMap((group) => [
+      { key: `group-${group.key}`, kind: "group" as const, label: group.label, modules: group.modules },
+      ...group.modules.map((module) => ({ key: module, kind: "module" as const, label: appModuleLabels[module] || module, module, modules: [module] })),
+    ]),
+    [permissionGroups],
+  )
 
   return (
     <>
@@ -388,75 +469,80 @@ export function RolesPage() {
             </div>
           ) : (
             <>
-              {/* Role info header */}
-              <div style={{
-                padding: "14px 18px",
-                borderRadius: "var(--app-radius)",
-                border: "1px solid var(--app-line)",
-                background: "color-mix(in srgb, var(--app-surface) 96%, var(--app-primary))",
-              }}>
-                <Flex align="center" justify="space-between">
-                  <Flex align="center" gap={10}>
-                    <Tag color={ROLE_MAIN_COLOR[selectedRole.roleMain] || "default"} style={{ fontSize: 12 }}>
-                      {ROLE_MAIN_LABEL[selectedRole.roleMain] || selectedRole.roleMain}
-                    </Tag>
-                    <Typography.Title level={4} style={{ margin: 0 }}>{selectedRole.name}</Typography.Title>
-                    <code style={{ fontSize: 12, opacity: 0.5 }}>{selectedRole.key}</code>
-                    <Tag color={selectedRole.isActive ? "success" : "default"}>
-                      {selectedRole.isActive ? "Bật" : "Tắt"}
-                    </Tag>
-                  </Flex>
-                  <Button
-                    type="primary"
-                    className="primary-glow"
-                    icon={<UserAddOutlined />}
-                    onClick={openCreateAssign}
-                    loading={loading}
-                  >
-                    Thêm phân quyền
-                  </Button>
-                </Flex>
-              </div>
-
-              <Card
-                size="small"
-                title="Quyền truy cập module"
-              >
-                <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
-                  Tick/bỏ tick để lưu ngay quyền menu/module của role này.
-                </Typography.Paragraph>
-                <div className="role-module-permission-grid">
-                  {appModuleGroups.map((group) => {
-                    const groupModules = group.modules.filter((module) => Boolean(appModuleLabels[module]) && globallyEnabledModules.includes(module))
-                    if (!groupModules.length) return null
-                    const checkedCount = groupModules.filter((module) => selectedModules.includes(module)).length
-                    return (
-                      <div className="role-module-permission-group" key={group.key}>
-                        <Checkbox
-                          checked={checkedCount === groupModules.length && groupModules.length > 0}
-                          indeterminate={checkedCount > 0 && checkedCount < groupModules.length}
-                          onChange={(event) => updateRoleModules(event.target.checked
-                            ? Array.from(new Set([...selectedModules, ...groupModules]))
-                            : selectedModules.filter((module) => !groupModules.includes(module)),
-                          )}
-                        >
-                          <Typography.Text strong>{group.label}</Typography.Text>
-                        </Checkbox>
-                        <Checkbox.Group
-                          options={groupModules.map((module) => ({ label: appModuleLabels[module], value: module }))}
-                          value={selectedModules.filter((module) => groupModules.includes(module))}
-                          onChange={(values) => updateRoleModules([
-                            ...selectedModules.filter((module) => !groupModules.includes(module)),
-                            ...values.map(String),
-                          ])}
-                        />
-                      </div>
-                    )
-                  })}
+              <Tabs
+                activeKey={roleContentTab}
+                items={[
+                  { key: "permissions", label: "Phân quyền" },
+                  { key: "users", label: `Danh sách user${roleAssignments.length ? ` (${roleAssignments.length})` : ""}` },
+                ]}
+                onChange={(key) => setRoleContentTab(key as "permissions" | "users")}
+              />
+              {roleContentTab === "permissions" ? <div>
+                <div className="role-permission-table">
+                  <Table
+                    size="small"
+                    pagination={false}
+                    rowKey="key"
+                    rowClassName={(row) => row.kind === "group" ? "role-permission-parent-row" : "role-permission-child-row"}
+                    scroll={{ x: 960 }}
+                    dataSource={permissionRows}
+                    columns={[
+                      {
+                        title: "Module",
+                        dataIndex: "label",
+                        fixed: "left",
+                        width: 280,
+                        render: (label, row) => row.kind === "group"
+                          ? <Typography.Text strong>{label}</Typography.Text>
+                          : <span className="role-permission-child-title">{label}</span>,
+                      },
+                      {
+                        title: "Bật module",
+                        width: 112,
+                        align: "center",
+                        render: (_: unknown, row: { kind: "group" | "module"; module?: string; modules: string[] }) => {
+                          const enabledCount = row.modules.filter((module) => selectedModules.includes(module)).length
+                          const checked = enabledCount === row.modules.length
+                          return <Checkbox checked={checked} indeterminate={enabledCount > 0 && !checked} onChange={(event) => {
+                            if (row.kind === "group") {
+                              updateRoleModules(event.target.checked ? Array.from(new Set([...selectedModules, ...row.modules])) : selectedModules.filter((module) => !row.modules.includes(module)))
+                            } else if (row.module) {
+                              updateRoleModules(event.target.checked ? Array.from(new Set([...selectedModules, row.module])) : selectedModules.filter((module) => module !== row.module))
+                            }
+                          }} />
+                        },
+                      },
+                      ...ROLE_PERMISSION_ACTIONS.map((action) => ({
+                        title: action.label,
+                        key: action.key,
+                        width: 96,
+                        align: "center" as const,
+                        render: (_: unknown, row: { kind: "group" | "module"; module?: string; modules: string[] }) => {
+                          const checkedCount = row.modules.filter((module) => getAllowedActions(module).includes(action.key)).length
+                          const checked = checkedCount === row.modules.length
+                          return <Checkbox
+                            checked={checked}
+                            indeterminate={checkedCount > 0 && !checked}
+                            onChange={(event) => {
+                              if (row.kind === "group") updateGroupAction(row.modules, action.key, event.target.checked)
+                              else if (row.module) updateModuleActions(row.module, event.target.checked
+                                ? Array.from(new Set([...getAllowedActions(row.module), action.key]))
+                                : getAllowedActions(row.module).filter((key) => key !== action.key))
+                            }}
+                          />
+                        },
+                      })),
+                    ]}
+                  />
                 </div>
-              </Card>
+              </div> : null}
 
-              {/* Assignments grouped by branch */}
+              {roleContentTab === "users" ? <>
+              <Flex justify="flex-end">
+                <Button type="primary" className="primary-glow" icon={<UserAddOutlined />} loading={loading} onClick={openCreateAssign}>
+                  Thêm phân quyền
+                </Button>
+              </Flex>
               <div style={{ flex: 1, overflowY: "auto" }}>
                 {byBranch.size === 0 ? (
                   <div style={{
@@ -585,6 +671,7 @@ export function RolesPage() {
                   </div>
                 )}
               </div>
+              </> : null}
             </>
           )}
         </Card>

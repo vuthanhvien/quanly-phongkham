@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Header, Param, Patch, Post, Put, Query, 
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { AuthUser, Public } from '../common/auth';
-import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CodeGenerationSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, DynamicRoleDefinition, LandingForm, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CodeGenerationSetting, CustomerAppSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, DynamicRoleDefinition, LandingForm, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
 import { SettingsService } from './settings.service';
 import { parseGoogleDriveOAuthState } from '../tenant/google-drive-oauth-state';
 
@@ -327,6 +327,17 @@ export class SettingsController {
   @Put('landing-menu')
   updateLandingMenu(@Body() payload: { menuItems?: Record<string, unknown>[]; domain?: string }, @Query('domain') domain?: string) {
     return this.settings.updateLandingMenuSettings(payload?.menuItems ?? [], domain || payload?.domain);
+  }
+
+  @Public()
+  @Get('customer-app')
+  async getCustomerApp() {
+    return { data: await this.settings.getCustomerAppSettings() };
+  }
+
+  @Put('customer-app')
+  async updateCustomerApp(@Body() payload: Partial<CustomerAppSetting>, @Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.updateCustomerAppSettings(payload, request?.user) };
   }
 
   @Post('landing-pages')

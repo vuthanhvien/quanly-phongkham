@@ -5,8 +5,15 @@ import {
   FileDoneOutlined,
   TeamOutlined,
 } from "@ant-design/icons"
+import FullCalendar from "@fullcalendar/react"
+import dayGridPlugin from "@fullcalendar/daygrid"
+import timeGridPlugin from "@fullcalendar/timegrid"
+import interactionPlugin from "@fullcalendar/interaction"
+import type { EventResizeDoneArg } from "@fullcalendar/interaction"
+import viLocale from "@fullcalendar/core/locales/vi"
+import type { DateSelectArg, EventClickArg, EventDropArg } from "@fullcalendar/core"
 import dayjs, { type Dayjs } from "dayjs"
-import { Avatar, Button, Calendar, Card, Col, Empty, List, Modal, Row, Segmented, Select, Space, Tag, Typography, message } from "antd"
+import { Avatar, Button, Card, Col, Empty, List, Modal, Row, Segmented, Select, Space, Tag, Typography, message } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { hasActionAccess } from "../access"
@@ -44,6 +51,8 @@ interface PlannerEvent {
   staffAvatarUrl?: string
   staffType?: string
   shiftLabel?: string
+  recordId?: string
+  isRecurring?: boolean
 }
 
 interface CalendarQuickDetailState {
@@ -140,13 +149,14 @@ async function fetchListSafe<T>(resource: string, pageSize = 500) {
 export function CalendarPage() {
   const navigate = useNavigate()
   const [toast, toastContextHolder] = message.useMessage()
-  const [calendarMode, setCalendarMode] = useState<CalendarMode>("day")
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("week")
   const [selectedDate, setSelectedDate] = useState(dayjs())
   const [calendarSource, setCalendarSource] = useState<CalendarSourceData | null>(null)
   const [lookups, setLookups] = useState<LookupMap>({})
   const [selectedTypes, setSelectedTypes] = useState<PlannerEventType[]>(["appointment", "schedule"])
   const [doctorFilter, setDoctorFilter] = useState<string | undefined>(undefined)
   const [quickCreateResource, setQuickCreateResource] = useState<QuickCreateResource | null>(null)
+  const [quickCreateRange, setQuickCreateRange] = useState<{ start: Dayjs; end: Dayjs } | null>(null)
   const [quickDetail, setQuickDetail] = useState<CalendarQuickDetailState | null>(null)
   const [quickDetailLoading, setQuickDetailLoading] = useState(false)
 
@@ -208,16 +218,6 @@ export function CalendarPage() {
     [filteredEvents, selectedDate],
   )
 
-  const weekDays = useMemo(() => {
-    const start = selectedDate.startOf("week")
-    return Array.from({ length: 7 }, (_, index) => start.add(index, "day"))
-  }, [selectedDate])
-
-  const weekEvents = useMemo(
-    () => filteredEvents.filter((item) => parseClinicDateTime(item.start).isSame(selectedDate, "week")),
-    [filteredEvents, selectedDate],
-  )
-
   const countsForSelectedDay = useMemo(() => {
     const dayEvents = selectedEvents
     return {
@@ -250,7 +250,23 @@ export function CalendarPage() {
       ? selectedDate.format("DD/MM/YYYY")
       : calendarMode === "week"
         ? `${selectedDate.startOf("week").format("DD/MM")} - ${selectedDate.endOf("week").format("DD/MM/YYYY")}`
-        : selectedDate.format("MM/YYYY")
+      : selectedDate.format("MM/YYYY")
+
+  const fullCalendarEvents = useMemo(
+    () => filteredEvents.map((event) => ({
+      id: event.id,
+      title: event.title,
+      start: event.start,
+      end: event.end,
+      allDay: event.type === "leave",
+      backgroundColor: resolveFullCalendarEventColor(event.type),
+      borderColor: resolveFullCalendarEventColor(event.type),
+      textColor: "#fff",
+      editable: (event.type === "appointment" || event.type === "schedule") && !event.isRecurring,
+      extendedProps: { plannerEvent: event },
+    })),
+    [filteredEvents],
+  )
 
   function shiftCalendar(offset: number) {
     if (calendarMode === "day") {
@@ -281,15 +297,6 @@ export function CalendarPage() {
           <Typography.Title level={3} style={{ margin: 0 }}>Calendar điều phối</Typography.Title>
         </div>
         <div className="calendar-header-controls">
-          <Segmented<CalendarMode>
-            options={[
-              { label: "Ngày", value: "day" },
-              { label: "Tuần", value: "week" },
-              { label: "Tháng", value: "month" },
-            ]}
-            value={calendarMode}
-            onChange={(value) => setCalendarMode(value)}
-          />
           <Select
             allowClear
             className="calendar-planner-select"
@@ -315,6 +322,15 @@ export function CalendarPage() {
             title="Lịch tổng hợp"
             extra={(
               <Space wrap>
+                <Segmented<CalendarMode>
+                  options={[
+                    { label: "Ngày", value: "day" },
+                    { label: "Tuần", value: "week" },
+                    { label: "Tháng", value: "month" },
+                  ]}
+                  value={calendarMode}
+                  onChange={(value) => setCalendarMode(value)}
+                />
                 <Button onClick={() => shiftCalendar(-1)}>Trước</Button>
                 <Typography.Text className="calendar-range-label">{calendarRangeLabel}</Typography.Text>
                 <Button onClick={() => shiftCalendar(1)}>Sau</Button>
@@ -322,85 +338,33 @@ export function CalendarPage() {
               </Space>
             )}
           >
-            {calendarMode === "month" ? (
-              <Calendar
-                fullscreen={false}
-                value={selectedDate}
-                onSelect={setSelectedDate}
-                fullCellRender={(value) => renderMonthCell(value, filteredEvents, openQuickDetail)}
+            <div className="coordination-calendar">
+              <FullCalendar
+                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                key={`${calendarMode}-${selectedDate.format("YYYY-MM-DD")}`}
+                initialView={calendarMode === "month" ? "dayGridMonth" : calendarMode === "week" ? "timeGridWeek" : "timeGridDay"}
+                initialDate={selectedDate.toDate()}
+                locale={viLocale}
+                firstDay={1}
+                headerToolbar={false}
+                height="100%"
+                events={fullCalendarEvents}
+                editable
+                selectable
+                selectMirror
+                slotDuration="00:15:00"
+                snapDuration="00:15:00"
+                slotMinTime="06:00:00"
+                slotMaxTime="22:00:00"
+                allDaySlot={calendarMode === "month"}
+                nowIndicator
+                eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
+                select={(arg) => handleTimeSelect(arg)}
+                eventClick={(arg) => handleCalendarEventClick(arg)}
+                eventDrop={(arg) => void handleEventTimeChange(arg)}
+                eventResize={(arg) => void handleEventTimeChange(arg)}
               />
-            ) : calendarMode === "week" ? (
-              <div className="calendar-week-grid">
-                {weekDays.map((date) => {
-                  const dayEvents = weekEvents
-                    .filter((item) => parseClinicDateTime(item.start).isSame(date, "day"))
-                    .sort((left, right) => parseClinicDateTime(left.start).valueOf() - parseClinicDateTime(right.start).valueOf())
-                  return (
-                    <div
-                      key={date.format("YYYY-MM-DD")}
-                      className={`calendar-week-column${date.isSame(selectedDate, "day") ? " is-selected" : ""}`}
-                      onClick={() => setSelectedDate(date)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault()
-                          setSelectedDate(date)
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <div className="calendar-week-column-head">
-                        <strong>{date.format("DD/MM")}</strong>
-                        <span>{dayEvents.length} mục</span>
-                      </div>
-                      <div className="calendar-week-column-body">
-                        {dayEvents.length === 0 ? (
-                          <Typography.Text type="secondary">Trống</Typography.Text>
-                        ) : (
-                          dayEvents.slice(0, 5).map((event) => event.type === "schedule" ? (
-                            <Tag className="calendar-schedule-tag" key={event.id}>
-                              {formatEventTime(event.start, event.end)} · {event.staffName || event.title}
-                            </Tag>
-                          ) : (
-                            <button
-                              key={event.id}
-                              className={`calendar-event-chip tone-${event.type}`}
-                              type="button"
-                              onClick={(clickEvent) => {
-                                clickEvent.stopPropagation()
-                                void openQuickDetail(event)
-                              }}
-                            >
-                              <strong>{formatEventTime(event.start, event.end)}</strong>
-                              <span>{event.title}</span>
-                            </button>
-                          ))
-                        )}
-                        {dayEvents.length > 5 ? <Typography.Text type="secondary">+{dayEvents.length - 5} mục khác</Typography.Text> : null}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="calendar-day-planner-layout">
-                <DayPlannerTimeline
-                  events={selectedEvents.filter((item) => item.type !== "schedule")}
-                  selectedDate={selectedDate}
-                  onOpenQuickDetail={(item) => void openQuickDetail(item)}
-                />
-                <div className="calendar-day-work-schedule-panels">
-                  <DayWorkSchedulePanel
-                    title="Ca làm bác sĩ"
-                    events={selectedScheduleEvents.filter((item) => item.staffType === "DOCTOR")}
-                  />
-                  <DayWorkSchedulePanel
-                    title="Ca làm nhân viên"
-                    events={selectedScheduleEvents.filter((item) => item.staffType !== "DOCTOR")}
-                  />
-                </div>
-              </div>
-            )}
+            </div>
           </Card>
         </div>
 
@@ -536,17 +500,24 @@ export function CalendarPage() {
         title={quickCreateResource ? `Thêm nhanh ${resolveQuickCreateTitle(quickCreateResource)}` : "Thêm nhanh"}
         width={620}
         footer={null}
-        onCancel={() => setQuickCreateResource(null)}
+        onCancel={() => {
+          setQuickCreateResource(null)
+          setQuickCreateRange(null)
+        }}
       >
         {quickCreateResource ? (
           <RecordFormContent
             compact
-            initialValues={buildQuickCreateInitialValues(quickCreateResource, selectedDate)}
+            initialValues={buildQuickCreateInitialValues(quickCreateResource, selectedDate, quickCreateRange)}
             resource={quickCreateResource}
             notifyOnSuccess={false}
-            onCancel={() => setQuickCreateResource(null)}
+            onCancel={() => {
+              setQuickCreateResource(null)
+              setQuickCreateRange(null)
+            }}
             onSuccess={() => {
               setQuickCreateResource(null)
+              setQuickCreateRange(null)
               toast.success("Đã lưu dữ liệu")
               void loadCalendar()
             }}
@@ -643,6 +614,39 @@ export function CalendarPage() {
       })
     } finally {
       setQuickDetailLoading(false)
+    }
+  }
+
+  function handleTimeSelect(selection: DateSelectArg) {
+    const start = dayjs(selection.start)
+    const end = dayjs(selection.end)
+    setQuickCreateRange({ start, end })
+    setQuickCreateResource("appointments")
+  }
+
+  function handleCalendarEventClick(arg: EventClickArg) {
+    const event = arg.event.extendedProps.plannerEvent as PlannerEvent | undefined
+    if (event) void openQuickDetail(event)
+  }
+
+  async function handleEventTimeChange(arg: EventDropArg | EventResizeDoneArg) {
+    const event = arg.event.extendedProps.plannerEvent as PlannerEvent | undefined
+    if (!event || !arg.event.start || event.isRecurring) {
+      arg.revert()
+      return
+    }
+    const start = dayjs(arg.event.start)
+    const end = dayjs(arg.event.end || start.add(event.type === "appointment" ? 30 : 60, "minute"))
+    const payload = event.type === "appointment"
+      ? { startTime: start.format("YYYY-MM-DDTHH:mm"), endTime: end.format("YYYY-MM-DDTHH:mm") }
+      : { workDate: start.format("YYYY-MM-DD"), startTime: start.format("YYYY-MM-DDTHH:mm"), endTime: end.format("YYYY-MM-DDTHH:mm") }
+    try {
+      await api.patch(`/records/${event.resource}/${event.recordId || event.id}`, payload)
+      toast.success("Đã cập nhật thời gian")
+      void loadCalendar()
+    } catch {
+      arg.revert()
+      toast.error("Không thể cập nhật thời gian, đã hoàn tác thay đổi")
     }
   }
 }
@@ -976,16 +980,22 @@ function detailWidthToSpan(width?: FieldLayoutConfig["width"]) {
   }
 }
 
-function buildQuickCreateInitialValues(resource: QuickCreateResource, selectedDate: Dayjs) {
+function buildQuickCreateInitialValues(
+  resource: QuickCreateResource,
+  selectedDate: Dayjs,
+  selectedRange?: { start: Dayjs; end: Dayjs } | null,
+) {
   const selectedDay = selectedDate.format("YYYY-MM-DD")
+  const rangeStart = selectedRange?.start || selectedDate.hour(9).minute(0)
+  const rangeEnd = selectedRange?.end || selectedDate.hour(10).minute(0)
 
   switch (resource) {
     case "appointments":
       return {
         type: "CONSULTATION",
         status: "SCHEDULED",
-        startTime: buildLocalDateTime(selectedDate, 9, 0),
-        endTime: buildLocalDateTime(selectedDate, 10, 0),
+        startTime: rangeStart.format("YYYY-MM-DDTHH:mm"),
+        endTime: rangeEnd.format("YYYY-MM-DDTHH:mm"),
       }
     case "work-schedules":
       return {
@@ -1105,6 +1115,7 @@ function buildPlannerEvents({
 
   const appointmentEvents: PlannerEvent[] = appointments.map((item) => ({
     id: String(item.id),
+    recordId: String(item.id),
     resource: "appointments",
     type: "appointment",
     title: customerDisplayName(customerById.get(String(item.customerId || "")), item.customerId),
@@ -1129,7 +1140,9 @@ function buildPlannerEvents({
   }))
 
   const scheduleEvents: PlannerEvent[] = workSchedules.flatMap((item) => expandWorkScheduleOccurrences(item, scheduleDisplayWindow).map((schedule) => ({
-    id: String(item.id),
+    id: `${String(item.id)}:${String(schedule.workDate || schedule.startTime || "")}`,
+    recordId: String(item.id),
+    isRecurring: isRecurringSchedule(item),
     resource: "work-schedules",
     type: "schedule",
     title: staffDisplayName(staffById.get(String(schedule.staffId || "")), schedule.staffId),
@@ -1152,6 +1165,7 @@ function buildPlannerEvents({
 
   const leaveEvents: PlannerEvent[] = leaveRequests.map((item) => ({
     id: String(item.id),
+    recordId: String(item.id),
     resource: "leave-requests",
     type: "leave",
     title: `${lookups.staff?.[item.staffId] || item.staffId || "Nhân sự"} xin nghỉ`,
@@ -1167,6 +1181,7 @@ function buildPlannerEvents({
 
   const attendanceEvents: PlannerEvent[] = attendances.map((item) => ({
     id: String(item.id),
+    recordId: String(item.id),
     resource: "attendances",
     type: "attendance",
     title: `${lookups.staff?.[item.staffId] || item.staffId || "Nhân sự"} chấm công`,
@@ -1183,6 +1198,22 @@ function buildPlannerEvents({
   return [...appointmentEvents, ...scheduleEvents, ...leaveEvents, ...attendanceEvents]
     .filter((item) => item.start)
     .sort((left, right) => parseClinicDateTime(left.start).valueOf() - parseClinicDateTime(right.start).valueOf())
+}
+
+function isRecurringSchedule(item: Record<string, any>) {
+  const schema = item.scheduleSchema && typeof item.scheduleSchema === "object" && !Array.isArray(item.scheduleSchema)
+    ? item.scheduleSchema as Record<string, unknown>
+    : {}
+  return String(schema.recurrenceType || item.recurrenceType || "NONE").toUpperCase() !== "NONE"
+}
+
+function resolveFullCalendarEventColor(type: PlannerEventType) {
+  switch (type) {
+    case "appointment": return "#c95787"
+    case "schedule": return "#1296ad"
+    case "leave": return "#d48806"
+    default: return "#389e0d"
+  }
 }
 
 function buildAttendanceStart(item: Record<string, any>) {

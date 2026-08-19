@@ -40,7 +40,6 @@ import {
   Tooltip,
   Typography,
   message,
-  type InputRef,
 } from "antd"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useRef, useState, type Key } from "react"
@@ -141,9 +140,7 @@ export function RecordListPage() {
   const [cloningSelected, setCloningSelected] = useState(false)
   const [staffAccountStaff, setStaffAccountStaff] = useState<Record<string, any> | null>(null)
   const [staffAccountSubmitting, setStaffAccountSubmitting] = useState(false)
-  const [shortcutModifierHeld, setShortcutModifierHeld] = useState(false)
   const [staffAccountForm] = Form.useForm()
-  const searchInputRef = useRef<InputRef>(null)
   const selectedTableTab = useMemo(() => tableTabs.find((tab) => tab.key === tableTabKey), [tableTabKey, tableTabs])
   const advancedFilterPayload = useMemo(() => {
     const filters = [
@@ -178,60 +175,6 @@ export function RecordListPage() {
   }
   const canCreateRecord = hasActionAccess(resource, "create")
   const canImportRecords = canCreateRecord && !["files", "service-orders"].includes(resource)
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-
-  useEffect(() => {
-    const setModifierState = (event: KeyboardEvent) => {
-      setShortcutModifierHeld(event.ctrlKey || event.metaKey)
-    }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      setModifierState(event)
-      if (!event.ctrlKey && !event.metaKey) return
-
-      const key = event.key.toLowerCase()
-      if (key === "b" && !event.altKey) {
-        event.preventDefault()
-        if (canCreateRecord && !creating && !editingId) setCreating(true)
-        return
-      }
-      if (event.altKey) return
-      if (key === "r") {
-        event.preventDefault()
-        refreshData()
-        return
-      }
-      if (key === "f") {
-        event.preventDefault()
-        searchInputRef.current?.focus()
-        return
-      }
-      if (key === "i" && canImportRecords) {
-        event.preventDefault()
-        navigate(`/${resource}/import`)
-        return
-      }
-      if (event.key === ">" && currentPage < totalPages) {
-        event.preventDefault()
-        setCurrentPage((page) => Math.min(page + 1, totalPages))
-        return
-      }
-      if (event.key === "<" && currentPage > 1) {
-        event.preventDefault()
-        setCurrentPage((page) => Math.max(page - 1, 1))
-      }
-    }
-    const clearModifierState = () => setShortcutModifierHeld(false)
-
-    window.addEventListener("keydown", handleKeyDown)
-    window.addEventListener("keyup", setModifierState)
-    window.addEventListener("blur", clearModifierState)
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown)
-      window.removeEventListener("keyup", setModifierState)
-      window.removeEventListener("blur", clearModifierState)
-    }
-  }, [canCreateRecord, canImportRecords, creating, currentPage, detailId, editingId, navigate, query, resource, totalPages])
-
   useEffect(() => {
     const onDataRefresh = (event: Event) => {
       const targetResource = (event as CustomEvent<CmsDataRefreshDetail>).detail?.resource
@@ -573,7 +516,7 @@ export function RecordListPage() {
           if (hasActionAccess(resource, "view")) menuItems.push({ key: "full-view", icon: <FullscreenOutlined />, label: "Xem đầy đủ", onClick: () => navigate(`/${resource}/${recordId}/full`) })
           if (recordStatus === "active" && hasActionAccess(resource, "update")) menuItems.push({ key: "edit", icon: <EditOutlined />, label: "Chỉnh sửa", onClick: () => setEditingId(recordId) })
           if (isUnitRoot && recordStatus === "active" && hasActionAccess(resource, "create")) menuItems.push({ key: "add-child", icon: <PlusOutlined />, label: "Thêm đơn vị quy đổi", onClick: () => createChildUnit(recordId) })
-          if (recordStatus === "active" && hasActionAccess(resource, "create") && resource !== "files") menuItems.push({ key: "copy", icon: <CopyOutlined />, label: "Nhân bản", onClick: () => void duplicateRecord(recordId) })
+          if (recordStatus === "active" && hasActionAccess(resource, "clone") && resource !== "files") menuItems.push({ key: "copy", icon: <CopyOutlined />, label: "Nhân bản", onClick: () => void duplicateRecord(recordId) })
           if (resource === "leads" && !row.convertedCustomerId && hasActionAccess(resource, "convert-to-customer")) menuItems.push({ key: "convert", icon: <SwapOutlined />, label: "Chuyển thành khách hàng", onClick: () => void convertLead(recordId) })
           if (resource === "staff" && !row.linkedAccount && recordStatus === "active" && hasActionAccess("user-accounts", "create")) menuItems.push({ key: "create-account", icon: <UserAddOutlined />, label: "Tạo tài khoản", onClick: () => openStaffAccountModal(row) })
           if (["invoices", "expenses", "payrolls"].includes(resource) && hasActionAccess(resource, "generate-accounting-voucher")) menuItems.push({ key: "voucher", icon: <AuditOutlined />, label: "Tạo chứng từ kế toán", onClick: () => void generateAccountingVoucher(resource, recordId) })
@@ -813,9 +756,8 @@ export function RecordListPage() {
               <span>{entityLabels[resource] || resource}</span>
             </Typography.Title>
             <div className="record-list-title-actions">
-              <Tooltip title={shortcutModifierHeld ? "Ctrl/⌘ + R" : "Làm mới dữ liệu"}>
+              <Tooltip title="Làm mới dữ liệu">
                 <Button aria-label="Làm mới dữ liệu" className="title-icon-action" icon={<ReloadOutlined />} size="small" type="text" onClick={refreshData}>
-                  {shortcutModifierHeld ? "Ctrl/⌘ + R" : null}
                 </Button>
               </Tooltip>
             </div>
@@ -830,8 +772,7 @@ export function RecordListPage() {
           <Input.Search
             allowClear
             className="page-search"
-            placeholder={shortcutModifierHeld ? "Ctrl/⌘ + F" : "Tìm kiếm"}
-            ref={searchInputRef}
+            placeholder="Tìm kiếm"
             onSearch={(value) => {
               setCurrentPage(1)
               setSearch(value)
@@ -856,7 +797,7 @@ export function RecordListPage() {
                 items: [
                   { key: "archive", danger: true, icon: <DeleteOutlined />, label: "Lưu trữ" },
                   { key: "export", icon: <DownloadOutlined />, label: "Xuất Excel" },
-                  ...(hasActionAccess(resource, "create") ? [{ key: "clone", icon: <CopyOutlined />, label: "Nhân bản" }] : []),
+                  ...(hasActionAccess(resource, "duplicate") ? [{ key: "clone", icon: <CopyOutlined />, label: "Nhân bản" }] : []),
                   { type: "divider" },
                   { key: "clear", icon: <ClearOutlined />, label: "Bỏ chọn tất cả" },
                 ],
@@ -875,18 +816,18 @@ export function RecordListPage() {
             </Dropdown>
           ) : null}
           {canImportRecords && (
-            <Tooltip title={shortcutModifierHeld ? "Ctrl/⌘ + I" : "Mở màn hình import"}>
+            <Tooltip title="Mở màn hình import">
               <Button
                 icon={<ImportOutlined />}
                 className="mobile-icon-button"
                 onClick={() => navigate(`/${resource}/import`)}
               >
-                {shortcutModifierHeld ? "Ctrl/⌘ + I" : "Import"}
+                Import
               </Button>
             </Tooltip>
           )}
           {canCreateRecord && (
-            <Tooltip title={shortcutModifierHeld ? "Ctrl/⌘ + B" : "Tạo bản ghi mới"}>
+            <Tooltip title="Thao tác nhanh">
               <Button
                 className="primary-glow mobile-icon-button"
                 aria-label={resource === "files" ? "Tải tệp lên" : "Thêm nhanh"}
@@ -894,7 +835,7 @@ export function RecordListPage() {
                 type="primary"
                 onClick={() => setCreating(true)}
               >
-                {shortcutModifierHeld ? "Ctrl/⌘ + B" : resource === "files" ? "Tải tệp lên" : "Thêm nhanh"}
+                {resource === "files" ? "Tải tệp lên" : "Thao tác nhanh"}
               </Button>
             </Tooltip>
           )}
@@ -947,9 +888,7 @@ export function RecordListPage() {
             total,
             showSizeChanger: true,
             pageSizeOptions: [20, 50, 100, 200],
-            showTotal: (value) => shortcutModifierHeld
-              ? `Ctrl/⌘ + < / > để chuyển trang · ${value.toLocaleString("vi-VN")} bản ghi`
-              : `${value.toLocaleString("vi-VN")} bản ghi`,
+            showTotal: (value) => `${value.toLocaleString("vi-VN")} bản ghi`,
             onChange: (page, nextPageSize) => {
               setCurrentPage(page)
               setPageSize(nextPageSize)

@@ -7,7 +7,7 @@ import { BranchRoleAssignment, DynamicRoleDefinition, Staff, User, ViewSetting }
 import { TenantContextService } from '../tenant/tenant-context.service';
 
 const DEFAULT_ROLE_SCOPE = 'ALL';
-const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print'];
+const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'clone', 'duplicate', 'print'];
 
 const RESOURCE_ACTIONS: Record<string, string[]> = {
   customers: DEFAULT_RESOURCE_ACTIONS,

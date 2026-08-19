@@ -3037,6 +3037,46 @@ export class LandingGlobalSetting {
   updatedAt: Date;
 }
 
+/** CMS-managed configuration for the Flutter customer application. */
+@Entity('customer_app_settings')
+export class CustomerAppSetting {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ unique: true, default: 'default' })
+  settingKey: string;
+
+  @Column({ default: 'Ứng dụng khách hàng' })
+  appTitle: string;
+
+  @Column({ nullable: true })
+  businessName?: string;
+
+  @Column({ nullable: true })
+  logoUrl?: string;
+
+  @Column({ nullable: true })
+  primaryColor?: string;
+
+  @Column({ nullable: true })
+  customerAppUrl?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  layout: Record<string, unknown> = {};
+
+  @Column({ type: 'simple-json', nullable: true })
+  blocks: Record<string, unknown>[] = [];
+
+  @Column({ type: 'simple-json', nullable: true })
+  bottomMenu: Record<string, unknown>[] = [];
+
+  @Column({ type: 'simple-json', nullable: true })
+  features: Record<string, boolean> = {};
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
 @Entity('audit_logs')
 export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
@@ -3210,6 +3250,7 @@ export const ENTITIES = [
   LandingThemeSetting,
   ItemCategory,
   LandingGlobalSetting,
+  CustomerAppSetting,
   StaffReward,
   StaffTraining,
   PerformanceReview,

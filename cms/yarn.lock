@@ -284,6 +284,35 @@
   resolved "https://registry.npmjs.org/@faker-js/faker/-/faker-9.9.0.tgz"
   integrity sha512-OEl393iCOoo/z8bMezRlJu+GlRGlsKbUAN7jKB6LhnKoqKve5DXRpalbItIIcwnCjs1k/FOPjFzcA6Qn+H+YbA==
 
+"@fullcalendar/core@^6.1.21", "@fullcalendar/core@~6.1.21":
+  version "6.1.21"
+  resolved "https://registry.npmjs.org/@fullcalendar/core/-/core-6.1.21.tgz"
+  integrity sha512-t3u/+sqh3Iq7TWtUnVLcGDUE6OWZh0UD3c04bI/l7lSLAgAKr3kngBmhHiQD1QXpwC8ZN5iNqG7a7gOVixhSKQ==
+  dependencies:
+    preact "~10.12.1"
+
+"@fullcalendar/daygrid@^6.1.21", "@fullcalendar/daygrid@~6.1.21":
+  version "6.1.21"
+  resolved "https://registry.npmjs.org/@fullcalendar/daygrid/-/daygrid-6.1.21.tgz"
+  integrity sha512-QYb1y40RGYLlOxKpYWg8O+7njEnKnFG8Tt7qjnubJGR35s1phQg67E+81y2TyAbbm59p2JFOCXGDk9t6KDujIA==
+
+"@fullcalendar/interaction@^6.1.21":
+  version "6.1.21"
+  resolved "https://registry.npmjs.org/@fullcalendar/interaction/-/interaction-6.1.21.tgz"
+  integrity sha512-WPYpqtljDWmU0Xm2cOtFrLlocgxv7cgkOppj34Q6OUUat8a6Cnd6kYo2JR+irP223PE5lBYHFNp1qh7SIpJc0w==
+
+"@fullcalendar/react@^6.1.21":
+  version "6.1.21"
+  resolved "https://registry.npmjs.org/@fullcalendar/react/-/react-6.1.21.tgz"
+  integrity sha512-TLpmGUd5k/PMdCh8XbeFC9PW9wuGvMms1oCxWgXyjK3EFPXAAd0PLfcvwKdyxoAS5eK1E4RJFkjMHvsYHpimcg==
+
+"@fullcalendar/timegrid@^6.1.21":
+  version "6.1.21"
+  resolved "https://registry.npmjs.org/@fullcalendar/timegrid/-/timegrid-6.1.21.tgz"
+  integrity sha512-2DnShx/jallGmb8QCkr6pAOu/zuPhJrP7+uTrAtSnbqsX7GF3lTxqSeNGkTQwsgF5g/ia8udhQ+JNYaE+TN1cQ==
+  dependencies:
+    "@fullcalendar/daygrid" "~6.1.21"
+
 "@jridgewell/gen-mapping@^0.3.12", "@jridgewell/gen-mapping@^0.3.5":
   version "0.3.13"
   resolved "https://registry.npmjs.org/@jridgewell/gen-mapping/-/gen-mapping-0.3.13.tgz"
@@ -606,14 +635,7 @@
   resolved "https://registry.npmjs.org/@types/react-dom/-/react-dom-19.2.3.tgz"
   integrity sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==
 
-"@types/react-input-mask@^3.0.6":
-  version "3.0.6"
-  resolved "https://registry.npmjs.org/@types/react-input-mask/-/react-input-mask-3.0.6.tgz"
-  integrity sha512-+5I18WKyG3eWIj7TVPWfK1VitI9mPpS9y6jE/BfmTCe+iL27NfBw/yzKRvCFp1DRBvlvvcsiZf05bub0YC1k8A==
-  dependencies:
-    "@types/react" "*"
-
-"@types/react@*", "@types/react@^18.0.0 || ^19.0.0", "@types/react@^19.1.6", "@types/react@^19.2.0", "@types/react@>=16.8", "@types/react@>=17", "@types/react@>=18":
+"@types/react@^18.0.0 || ^19.0.0", "@types/react@^19.1.6", "@types/react@^19.2.0", "@types/react@>=16.8", "@types/react@>=17", "@types/react@>=18":
   version "19.2.15"
   resolved "https://registry.npmjs.org/@types/react/-/react-19.2.15.tgz"
   integrity sha512-eRwcGNHve+E8qtEQSSRl6urh+rFop4v8gm6O8rGv25CodbvFdLjA1vVQ1KkiFE0w0UPOnb8tDiFKL5lp0rtY5Q==
@@ -1900,12 +1922,17 @@ postcss@^8.5.3:
     picocolors "^1.1.1"
     source-map-js "^1.2.1"
 
+preact@~10.12.1:
+  version "10.12.1"
+  resolved "https://registry.npmjs.org/preact/-/preact-10.12.1.tgz"
+  integrity sha512-l8386ixSsBdbreOAkqtrwqHwdvR35ID8c3rKPa8lCWuO86dBi32QWHV4vfsZK1utLLFMvw+Z5Ad4XLkZzchscg==
+
 print-js@^1.6.0:
   version "1.6.0"
   resolved "https://registry.npmjs.org/print-js/-/print-js-1.6.0.tgz"
   integrity sha512-BfnOIzSKbqGRtO4o0rnj/K3681BSd2QUrsIZy/+WdCIugjIswjmx3lDEZpXB2ruGf9d4b3YNINri81+J0FsBWg==
 
-prop-types@^15.6.2:
+prop-types@^15.6.2, prop-types@^15.7.2:
   version "15.8.1"
   resolved "https://registry.npmjs.org/prop-types/-/prop-types-15.8.1.tgz"
   integrity sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==
@@ -2282,20 +2309,21 @@ rc-virtual-list@^3.14.2, rc-virtual-list@^3.5.1, rc-virtual-list@^3.5.2:
     rc-resize-observer "^1.0.0"
     rc-util "^5.36.0"
 
-react-dom@*, "react-dom@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom@^18.0.0 || ^19.0.0", "react-dom@^19.0.0 || ^18.0.0 || ^17.0.1 || ^16.7.0", react-dom@^19.1.0, react-dom@>=0.14.0, react-dom@>=16.0.0, react-dom@>=16.11.0, react-dom@>=16.8.0, react-dom@>=16.9.0, react-dom@>=17, react-dom@>=18:
+react-dom@*, "react-dom@^16.7.0 || ^17 || ^18 || ^19", "react-dom@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom@^18.0.0 || ^19.0.0", "react-dom@^19.0.0 || ^18.0.0 || ^17.0.1 || ^16.7.0", react-dom@^19.1.0, react-dom@>=16.0.0, react-dom@>=16.11.0, react-dom@>=16.8, react-dom@>=16.8.0, react-dom@>=16.9.0, react-dom@>=17, react-dom@>=18:
   version "19.2.6"
   resolved "https://registry.npmjs.org/react-dom/-/react-dom-19.2.6.tgz"
   integrity sha512-0prMI+hvBbPjsWnxDLxlCGyM8PN6UuWjEUCYmZhO67xIV9Xasa/r/vDnq+Xyq4Lo27g8QSbO5YzARu0D1Sps3g==
   dependencies:
     scheduler "^0.27.0"
 
-react-input-mask@^2.0.4:
-  version "2.0.4"
-  resolved "https://registry.npmjs.org/react-input-mask/-/react-input-mask-2.0.4.tgz"
-  integrity sha512-1hwzMr/aO9tXfiroiVCx5EtKohKwLk/NT8QlJXHQ4N+yJJFyUuMT+zfTpLBwX/lK3PkuMlievIffncpMZ3HGRQ==
+"react-input-mask@npm:@kerim-keskin/react-input-mask@^1.0.7":
+  version "1.0.7"
+  resolved "https://registry.npmjs.org/@kerim-keskin/react-input-mask/-/react-input-mask-1.0.7.tgz"
+  integrity sha512-/yCI46C+vJlK5Nncrq5NJcKufT0L0q7bGlLlsFD5gzXBBN/Xclq9LIraq6wk8AdYdLuIpc23PMauGVcoJaxayQ==
   dependencies:
     invariant "^2.2.4"
-    warning "^4.0.2"
+    prop-types "^15.7.2"
+    warning "^4.0.3"
 
 react-is@^16.13.1:
   version "16.13.1"
@@ -2344,7 +2372,7 @@ react-router@^7.0.2, react-router@7.15.1:
     cookie "^1.0.1"
     set-cookie-parser "^2.6.0"
 
-react@*, "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^18 || ^19", "react@^18.0.0 || ^19.0.0", "react@^19.0.0 || ^18.0.0 || ^17.0.1 || ^16.7.0", react@^19.1.0, react@^19.2.6, react@>=0.14.0, react@>=16.0.0, react@>=16.11.0, react@>=16.8, react@>=16.8.0, react@>=16.9.0, react@>=17, react@>=18:
+react@*, "react@^16.7.0 || ^17 || ^18 || ^19", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^18 || ^19", "react@^18.0.0 || ^19.0.0", "react@^19.0.0 || ^18.0.0 || ^17.0.1 || ^16.7.0", react@^19.1.0, react@^19.2.6, react@>=16.0.0, react@>=16.11.0, react@>=16.8, react@>=16.8.0, react@>=16.9.0, react@>=17, react@>=18:
   version "19.2.6"
   resolved "https://registry.npmjs.org/react/-/react-19.2.6.tgz"
   integrity sha512-sfWGGfavi0xr8Pg0sVsyHMAOziVYKgPLNrS7ig+ivMNb3wbCBw3KxtflsGBAwD3gYQlE/AEZsTLgToRrSCjb0Q==
@@ -2698,7 +2726,7 @@ warn-once@^0.1.0:
   resolved "https://registry.npmjs.org/warn-once/-/warn-once-0.1.1.tgz"
   integrity sha512-VkQZJbO8zVImzYFteBXvBOZEl1qL175WH8VmZcxF2fZAoudNhNDvHi+doCaAEdU2l2vtcIwa2zn0QK5+I1HQ3Q==
 
-warning@^4.0.2:
+warning@^4.0.3:
   version "4.0.3"
   resolved "https://registry.npmjs.org/warning/-/warning-4.0.3.tgz"
   integrity sha512-rpJyN222KWIvHJ/F53XSZv0Zl/accqHR8et1kpaMTD/fLCRxtV8iX8czMzY7sVZupTI3zcUTg8eycS2kNF9l6w==

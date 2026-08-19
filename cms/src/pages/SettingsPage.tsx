@@ -60,11 +60,11 @@ import type { ColumnsType } from "antd/es/table"
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { api } from "../api"
-import { buildGroupedModuleOptions, resolveEnabledModules } from "../company-types"
+import { appModuleLabels, buildGroupedModuleOptions, resolveEnabledModules } from "../company-types"
 import { useAppUi } from "../app-ui"
 import { getInputPatternLabel } from "../input-patterns"
 import { getApiErrorMessage } from "../utils/apiError"
-import { baseFields, CustomField, DynamicRole, entityLabels, FieldSpec, getResourceActionOptions, normalizeSelectOption, permissionLabels, relationFields, systemRoleOptions, type SelectOption } from "../models"
+import { baseFields, CustomField, DynamicRole, entityLabels, FieldSpec, getResourceActionOptions, normalizeSelectOption, relationFields, systemRoleOptions, type SelectOption } from "../models"
 import {
   buildFieldLayoutConfigs,
   DEFAULT_ROLE_SCOPE,
@@ -714,7 +714,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     [entityType],
   )
   const roleModuleOptions = useMemo(
-    () => buildGroupedModuleOptions(permissionLabels, resolveEnabledModules(settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection)),
+    () => buildGroupedModuleOptions(appModuleLabels, resolveEnabledModules(settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection)),
     [settings.companyType, settings.enabledModules, settings.hasCustomModuleSelection],
   )
   const roleModuleTree = useMemo(
@@ -834,7 +834,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   }, [searchParams])
 
   useEffect(() => {
-    const allowed = resolveEnabledModules(settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection).filter((module) => Boolean(permissionLabels[module]))
+    const allowed = resolveEnabledModules(settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection).filter((module) => Boolean(appModuleLabels[module]))
     if (allowed.length > 0 && !allowed.includes(entityType)) setEntityType(allowed[0])
   }, [entityType, settings.companyType, settings.enabledModules, settings.hasCustomModuleSelection])
 
@@ -1136,7 +1136,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
               value={entityType}
               onChange={setEntityType}
               style={{ width: 420 }}
-              options={buildGroupedModuleOptions(permissionLabels, resolveEnabledModules(settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection))}
+              options={buildGroupedModuleOptions(appModuleLabels, resolveEnabledModules(settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection))}
             />
           )}
         </Space>
@@ -1172,7 +1172,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                 <div className="settings-tab-panel">
                   <div className="settings-tab-header settings-tab-header-wrap">
                     <Typography.Text>
-                      Đang cấu hình <strong>{permissionLabels[entityType] || entityType}</strong> cho vai trò <strong>{selectedRole}</strong>. Chuỗi kế thừa: <strong>{inheritanceChain.join(" → ")}</strong>.
+                      Đang cấu hình <strong>{appModuleLabels[entityType] || entityType}</strong> cho vai trò <strong>{formatRoleLabel(selectedRole, dynamicRoles)}</strong>. Chuỗi kế thừa: <strong>{inheritanceChain.map((role) => formatRoleLabel(role, dynamicRoles)).join(" → ")}</strong>.
                     </Typography.Text>
                   </div>
                   <Tabs
@@ -1180,9 +1180,9 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                     items={[
                       {
                         key: "ACTIONS",
-                        label: <span className="settings-view-tab-label">Thao tác theo vai trò {reuseActionInherited && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(actionSource)}`}><LinkOutlined /></Tooltip>}</span>,
+                        label: <span className="settings-view-tab-label">Thao tác theo vai trò {reuseActionInherited && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(actionSource, dynamicRoles)}`}><LinkOutlined /></Tooltip>}</span>,
                         children: (
-                          <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseActionInherited} source={formatRoleLabel(actionSource)} onReuseChange={(checked) => { setReuseActionInherited(checked); void saveActionView(allowedActions, checked) }}>
+                          <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseActionInherited} source={formatRoleLabel(actionSource, dynamicRoles)} onReuseChange={(checked) => { setReuseActionInherited(checked); void saveActionView(allowedActions, checked) }}>
                           <Card size="small">
                             <DndContext collisionDetection={closestCenter} onDragEnd={reorderActions} sensors={actionDndSensors}>
                               <SortableContext items={orderedActionOptions.map((action) => action.key)} strategy={verticalListSortingStrategy}>
@@ -1272,18 +1272,18 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                       },
                       {
                         key: "TABLE",
-                        label: <span className="settings-view-tab-label">Bảng {reuseInherited.TABLE && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.TABLE)}`}><LinkOutlined /></Tooltip>}</span>,
-                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.TABLE} source={formatRoleLabel(viewSources.TABLE)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, TABLE: checked })); void saveFieldView("TABLE", tableConfig, checked) }}><ViewConfigTable dataSource={tableConfig} viewType="TABLE" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
+                        label: <span className="settings-view-tab-label">Bảng {reuseInherited.TABLE && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.TABLE, dynamicRoles)}`}><LinkOutlined /></Tooltip>}</span>,
+                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.TABLE} source={formatRoleLabel(viewSources.TABLE, dynamicRoles)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, TABLE: checked })); void saveFieldView("TABLE", tableConfig, checked) }}><ViewConfigTable dataSource={tableConfig} viewType="TABLE" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
                       },
                       {
                         key: "FORM",
-                        label: <span className="settings-view-tab-label">Form nhập liệu {reuseInherited.FORM && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.FORM)}`}><LinkOutlined /></Tooltip>}</span>,
-                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.FORM} source={formatRoleLabel(viewSources.FORM)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, FORM: checked })); void saveFieldView("FORM", formConfig, checked) }}><ViewConfigTable dataSource={formConfig} viewType="FORM" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
+                        label: <span className="settings-view-tab-label">Form nhập liệu {reuseInherited.FORM && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.FORM, dynamicRoles)}`}><LinkOutlined /></Tooltip>}</span>,
+                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.FORM} source={formatRoleLabel(viewSources.FORM, dynamicRoles)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, FORM: checked })); void saveFieldView("FORM", formConfig, checked) }}><ViewConfigTable dataSource={formConfig} viewType="FORM" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
                       },
                       {
                         key: "DETAIL",
-                        label: <span className="settings-view-tab-label">Thông tin chi tiết {reuseInherited.DETAIL && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.DETAIL)}`}><LinkOutlined /></Tooltip>}</span>,
-                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.DETAIL} source={formatRoleLabel(viewSources.DETAIL)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, DETAIL: checked })); void saveFieldView("DETAIL", detailConfig, checked) }}><ViewConfigTable dataSource={detailConfig} viewType="DETAIL" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
+                        label: <span className="settings-view-tab-label">Thông tin chi tiết {reuseInherited.DETAIL && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.DETAIL, dynamicRoles)}`}><LinkOutlined /></Tooltip>}</span>,
+                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.DETAIL} source={formatRoleLabel(viewSources.DETAIL, dynamicRoles)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, DETAIL: checked })); void saveFieldView("DETAIL", detailConfig, checked) }}><ViewConfigTable dataSource={detailConfig} viewType="DETAIL" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
                       },
                     ]}
                   />
@@ -1415,8 +1415,9 @@ function ViewOverridePanel({
   )
 }
 
-function formatRoleLabel(role: string) {
-  return ({ ALL: "Tất cả", ADMIN: "Quản trị viên", STAFF: "Nhân viên", DOCTOR: "Bác sĩ" } as Record<string, string>)[role] || role
+function formatRoleLabel(role: string, dynamicRoles: DynamicRole[] = []) {
+  const systemLabel = ({ ALL: "Tất cả", ADMIN: "Quản trị viên", STAFF: "Nhân viên", DOCTOR: "Bác sĩ" } as Record<string, string>)[role]
+  return systemLabel || dynamicRoles.find((item) => normalizeRole(item.key) === role)?.name || role
 }
 
 type SettingsDragHandleContextValue = Pick<ReturnType<typeof useSortable>, "attributes" | "listeners" | "setActivatorNodeRef">

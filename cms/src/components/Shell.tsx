@@ -21,6 +21,7 @@ import {
   LogoutOutlined,
   MessageOutlined,
   MedicineBoxOutlined,
+  MobileOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   PictureOutlined,
@@ -63,6 +64,7 @@ export const menuIcons: Record<string, React.ReactNode> = {
   "landing-forms": <FileDoneOutlined />,
   "landing-domains": <GlobalOutlined />,
   "landing-config": <SettingOutlined />,
+  "customer-app": <MobileOutlined />,
   posts: <FileTextOutlined />,
   news: <ReadOutlined />,
   departments: <SolutionOutlined />,
@@ -139,6 +141,7 @@ const moduleNavigation: Record<string, { path: string; label: string; screen?: s
   "landing-forms": { path: "/forms", label: "Biểu mẫu", screen: "settings" },
   "landing-domains": { path: "/configs", label: "Tên miền", screen: "settings" },
   "landing-config": { path: "/configs", label: "Cài đặt site", screen: "settings" },
+  "customer-app": { path: "/customer-app", label: "App khách hàng", screen: "settings" },
   "zalo-inbox": { path: "/zalo-inbox", label: "Hộp thư Zalo", screen: "zalo-inbox" },
   "accounting-reports": { path: "/accounting-reports", label: "Báo cáo kế toán", screen: "accounting-reports" },
 }
@@ -161,7 +164,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
     staffId?: string
   }>()
   const { settings } = useAppUi()
-  const browserPageTitle = useMemo(() => resolveBrowserPageTitle(location.pathname), [location.pathname])
   const [staffDisplayName, setStaffDisplayName] = useState<string>()
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -175,11 +177,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>(() => getGlobalBranchFilterIds())
   const [branchPickerOpen, setBranchPickerOpen] = useState(false)
   const [pendingBranchIds, setPendingBranchIds] = useState<string[]>([])
-
-  useEffect(() => {
-    const appName = String(settings.appName || 'CMS').trim() || 'CMS'
-    document.title = browserPageTitle ? `${browserPageTitle} | ${appName}` : appName
-  }, [browserPageTitle, settings.appName])
 
   useEffect(() => {
     let active = true
@@ -468,7 +465,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     (location.pathname.startsWith("/zalo-inbox")
       ? "front-office"
       : undefined) ||
-    (["/pages", "/forms", "/posts", "/news", "/domains", "/configs"].some((path) => location.pathname.startsWith(path))
+    (["/pages", "/forms", "/posts", "/news", "/domains", "/configs", "/customer-app"].some((path) => location.pathname.startsWith(path))
       ? "landing"
       : undefined) ||
     (location.pathname === "/roles" || location.pathname === "/role-module-settings"
@@ -612,11 +609,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
   )
 }
 
-function resolveBrowserPageTitle(pathname: string) {
-  const root = pathname.split('/').filter(Boolean)[0] || ''
+export function resolveBrowserPageTitle(pathname: string) {
+  const segments = pathname.split('/').filter(Boolean)
+  const root = segments[0] || ''
   if (!root) return 'Tổng quan'
 
+  if (root === 'settings' && segments[1] === 'print-templates') return 'Chỉnh sửa mẫu in'
+  if (root === 'projects' && segments[2] === 'board') return 'Bảng công việc dự án'
+  if (root === 'pages' && segments[1]) return 'Chỉnh sửa trang đích'
+
   const staticTitles: Record<string, string> = {
+    login: 'Đăng nhập',
     calendar: 'Lịch tổng',
     profile: 'Hồ sơ cá nhân',
     'accounting-reports': 'Báo cáo kế toán',
@@ -624,11 +627,14 @@ function resolveBrowserPageTitle(pathname: string) {
     'custom-fields': 'Trường tuỳ biến',
     'custom-tables': 'Bảng dữ liệu động',
     locations: 'Địa chỉ',
+    'role-module-settings': 'Hiển thị theo role/module',
+    'print-templates': 'Mẫu in',
     settings: 'Cấu hình động',
-    pages: 'Landing pages',
-    forms: 'Landing forms',
-    domains: 'Landing domains',
-    configs: 'Landing configs',
+    pages: 'Trang đích',
+    forms: 'Biểu mẫu',
+    domains: 'Tên miền',
+    configs: 'Cài đặt site',
+    'customer-app': 'App khách hàng',
     'chatbot-settings': 'Chatbot',
     'chatbot-history': 'Lịch sử GIS AI',
     'landing-theme': 'Giao diện landing',

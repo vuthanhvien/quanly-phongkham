@@ -336,16 +336,26 @@ function applyFavicon(href: string) {
 
 function syncFavicon(id: string, rel: string, href: string) {
   const previous = document.getElementById(id) as HTMLLinkElement | null
-  if (previous?.href === toAbsoluteUrl(href)) return
+  const type = faviconMimeType(href)
+  if (previous?.href === toAbsoluteUrl(href) && previous.type === type) return
 
   // Replacing the element prompts browsers to reload a newly selected icon.
   const icon = document.createElement('link')
   icon.id = id
   icon.rel = rel
   icon.href = href
-  if (/\.svg(?:$|[?#])/i.test(href)) icon.type = 'image/svg+xml'
+  if (type) icon.type = type
   previous?.replaceWith(icon)
   if (!previous) document.head.appendChild(icon)
+}
+
+function faviconMimeType(href: string) {
+  if (/\.svg(?:$|[?#])/i.test(href)) return 'image/svg+xml'
+  if (/\.ico(?:$|[?#])/i.test(href)) return 'image/x-icon'
+  if (/\.png(?:$|[?#])/i.test(href)) return 'image/png'
+  if (/\.webp(?:$|[?#])/i.test(href)) return 'image/webp'
+  if (/\.gif(?:$|[?#])/i.test(href)) return 'image/gif'
+  return ''
 }
 
 function hexToRgb(hex: string) {

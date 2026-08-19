@@ -273,6 +273,8 @@ const DEFAULT_RESOURCE_ACTIONS: ResourceActionOption[] = [
   { key: 'create', label: 'Tạo mới' },
   { key: 'update', label: 'Cập nhật' },
   { key: 'delete', label: 'Lưu trữ' },
+  { key: 'clone', label: 'Nhân bản' },
+  { key: 'duplicate', label: 'Nhân bản hàng loạt' },
   { key: 'print', label: 'In biểu mẫu' },
 ];
 

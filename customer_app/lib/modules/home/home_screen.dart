@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../core/session/session_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
+import '../../core/config/customer_app_config_controller.dart';
 import '../../data/demo/clinic_content.dart';
 import '../../routes/app_routes.dart';
 import '../bookings/booking_card.dart';
@@ -52,6 +53,7 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             const _ClinicHero(),
+            const _ConfiguredBlocks(),
             const SizedBox(height: 28),
             _SectionTitle(
               title: 'Lịch hẹn gần nhất',
@@ -134,45 +136,112 @@ class HomeScreen extends StatelessWidget {
 class _ClinicHero extends StatelessWidget {
   const _ClinicHero();
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(22),
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xFF2A303E), Color(0xFF4A3850)],
-      ),
-      borderRadius: BorderRadius.circular(24),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'YOUR WELLNESS,\nOUR DEVOTION.',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            height: 1.08,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.5,
+  Widget build(BuildContext context) {
+    final config = Get.find<CustomerAppConfigController>();
+    return Obx(() {
+      final businessName = config.config['businessName'] as String? ?? '';
+      final logoUrl = config.config['logoUrl'] as String? ?? '';
+      final layout = config.config['layout'] as Map?;
+      final showLogo = layout?['showLogo'] != false;
+      return Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2A303E), Color(0xFF4A3850)],
           ),
+          borderRadius: BorderRadius.circular(24),
         ),
-        const SizedBox(height: 13),
-        const Text(
-          'Chăm sóc tận tâm • Kết quả bền vững',
-          style: TextStyle(color: Color(0xFFE6DDE4), fontSize: 13),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (showLogo && logoUrl.isNotEmpty) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(logoUrl, height: 36, fit: BoxFit.contain),
+              ),
+              const SizedBox(height: 12),
+            ],
+            Text(
+              businessName.isEmpty
+                  ? 'YOUR WELLNESS,\nOUR DEVOTION.'
+                  : businessName,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                height: 1.08,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -.5,
+              ),
+            ),
+            const SizedBox(height: 13),
+            const Text(
+              'Chăm sóc tận tâm • Kết quả bền vững',
+              style: TextStyle(color: Color(0xFFE6DDE4), fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.tonal(
+              onPressed: () => Get.toNamed(AppRoutes.bookingCreate),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.title,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 11,
+                ),
+              ),
+              child: const Text('Đặt lịch tư vấn'),
+            ),
+          ],
         ),
-        const SizedBox(height: 20),
-        FilledButton.tonal(
-          onPressed: () => Get.toNamed(AppRoutes.bookingCreate),
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: AppColors.title,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-          ),
-          child: const Text('Đặt lịch tư vấn'),
+      );
+    });
+  }
+}
+
+class _ConfiguredBlocks extends StatelessWidget {
+  const _ConfiguredBlocks();
+
+  @override
+  Widget build(BuildContext context) {
+    final config = Get.find<CustomerAppConfigController>();
+    return Obx(() {
+      final blocks = config.config['blocks'];
+      if (blocks is! List) return const SizedBox.shrink();
+      final layout = config.config['layout'] as Map?;
+      final maxBlocks = layout?['maxHomeBlocks'] as int? ?? blocks.length;
+      final visible = blocks
+          .whereType<Map>()
+          .where((block) => block['enabled'] != false)
+          .take(maxBlocks)
+          .toList();
+      if (visible.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Column(
+          children: visible
+              .map(
+                (block) => Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    '${block['title'] ?? ''}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryDark,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
         ),
-      ],
-    ),
-  );
+      );
+    });
+  }
 }
 
 class _SectionTitle extends StatelessWidget {

@@ -7,7 +7,7 @@ import { basename, join } from 'path';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { AuthUser } from '../common/auth';
 import { defaultCodeFormula } from '../common/code-generation';
-import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CodeGenerationSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, GoogleDriveConnection, ItemCategory, LandingDomain, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, Product, Unit, User, ViewSetting } from '../entities/entities';
+import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CodeGenerationSetting, CustomerAppSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, GoogleDriveConnection, ItemCategory, LandingDomain, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, Product, Unit, User, ViewSetting } from '../entities/entities';
 import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
@@ -98,6 +98,7 @@ const APP_MODULE_KEYS = [
   'news',
   'landing-domains',
   'landing-config',
+  'customer-app',
   'leads',
   'lead-activities',
   'customers',
@@ -240,6 +241,7 @@ export class SettingsService {
     @InjectRepository(BranchRoleAssignment) private readonly branchRoles: Repository<BranchRoleAssignment>,
     @InjectRepository(LandingThemeSetting) private readonly landingThemeSettings: Repository<LandingThemeSetting>,
     @InjectRepository(LandingGlobalSetting) private readonly landingGlobalSettings: Repository<LandingGlobalSetting>,
+    @InjectRepository(CustomerAppSetting) private readonly customerAppSettings: Repository<CustomerAppSetting>,
     @InjectRepository(Unit) private readonly units: Repository<Unit>,
     @InjectRepository(ItemCategory) private readonly itemCategories: Repository<ItemCategory>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
@@ -549,6 +551,42 @@ export class SettingsService {
     const saved = await this.landingGlobalSettings.save(current);
     await this.revalidateLandingCache();
     return { data: saved.menuItems ?? [] };
+  }
+
+  async getCustomerAppSettings() {
+    const existing = await this.customerAppSettings.findOne({ where: { settingKey: 'default' } });
+    if (existing) return existing;
+    return this.customerAppSettings.save(this.customerAppSettings.create({
+      settingKey: 'default',
+      appTitle: 'Đặt lịch khám',
+      layout: { homeStyle: 'cards', showLogo: true },
+      blocks: [],
+      bottomMenu: [
+        { key: 'home', label: 'Trang chủ', icon: 'home', enabled: true },
+        { key: 'bookings', label: 'Lịch hẹn', icon: 'calendar', enabled: true },
+        { key: 'booking-create', label: 'Đặt lịch', icon: 'plus', enabled: true, primary: true },
+        { key: 'chat', label: 'Tin nhắn', icon: 'chat', enabled: true },
+        { key: 'profile', label: 'Cá nhân', icon: 'profile', enabled: true },
+      ],
+      features: { appointments: true, chat: true, invoices: true, profile: true },
+    }));
+  }
+
+  async updateCustomerAppSettings(payload: Partial<CustomerAppSetting>, user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    const current = await this.getCustomerAppSettings();
+    const safe = {
+      appTitle: payload.appTitle !== undefined ? String(payload.appTitle || '').trim().slice(0, 120) || current.appTitle : current.appTitle,
+      businessName: payload.businessName !== undefined ? String(payload.businessName || '').trim() || undefined : current.businessName,
+      logoUrl: payload.logoUrl !== undefined ? String(payload.logoUrl || '').trim() || undefined : current.logoUrl,
+      primaryColor: payload.primaryColor !== undefined ? String(payload.primaryColor || '').trim() || undefined : current.primaryColor,
+      customerAppUrl: payload.customerAppUrl !== undefined ? String(payload.customerAppUrl || '').trim() || undefined : current.customerAppUrl,
+      layout: payload.layout !== undefined && payload.layout && typeof payload.layout === 'object' ? payload.layout : current.layout,
+      blocks: Array.isArray(payload.blocks) ? payload.blocks : current.blocks,
+      bottomMenu: Array.isArray(payload.bottomMenu) ? payload.bottomMenu : current.bottomMenu,
+      features: payload.features && typeof payload.features === 'object' ? payload.features : current.features,
+    };
+    return this.customerAppSettings.save(this.customerAppSettings.merge(current, safe));
   }
 
   listFields(entityType?: string, user?: AuthUser) {

@@ -48,7 +48,7 @@ export function hasActionAccess(resource: string, action: string) {
   const user = readStoredUser()
   if (!user) return true
   const allowedActions = user?.actionPermissions?.[resource]
-  if (!Array.isArray(allowedActions) || allowedActions.length === 0) return true
+  if (!Array.isArray(allowedActions)) return true
   return allowedActions.includes(action)
 }
 
