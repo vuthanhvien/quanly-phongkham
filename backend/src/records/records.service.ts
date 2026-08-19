@@ -90,6 +90,7 @@ const DEFAULT_KANBAN_COLUMNS = [
 
 const RESOURCE_ACTIONS: Record<string, string[]> = {
   customers: DEFAULT_RESOURCE_ACTIONS,
+  projects: [...DEFAULT_RESOURCE_ACTIONS, 'board'],
   leads: [...DEFAULT_RESOURCE_ACTIONS, 'convert-to-customer'],
   invoices: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
   expenses: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],

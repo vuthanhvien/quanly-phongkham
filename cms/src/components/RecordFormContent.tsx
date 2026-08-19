@@ -471,7 +471,7 @@ export function RecordFormContent({
                 ...(field.inputPattern ? [{
                   validator: (_rule: unknown, value: unknown) => isInputPatternComplete(field.inputPattern, value)
                     ? Promise.resolve()
-                    : Promise.reject(new Error(`${field.label} phải đúng định dạng HH:MM`)),
+                    : Promise.reject(new Error(`${field.label} không đúng mẫu nhập`)),
                 }] : []),
               ]}
             >

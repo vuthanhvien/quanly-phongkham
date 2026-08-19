@@ -11,6 +11,7 @@ const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print']
 
 const RESOURCE_ACTIONS: Record<string, string[]> = {
   customers: DEFAULT_RESOURCE_ACTIONS,
+  projects: [...DEFAULT_RESOURCE_ACTIONS, 'board'],
   leads: [...DEFAULT_RESOURCE_ACTIONS, 'convert-to-customer'],
   invoices: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
   expenses: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
@@ -95,7 +96,10 @@ export class AuthService {
     const roleMain = roleMap.get(activeRole)?.roleMain || user.role;
     const isAdmin = normalizeRole(roleMain) === 'ADMIN';
     const disabledModules = isAdmin ? [] : await this.resolveDisabledModules(activeRole, roleMain);
-    const actionPermissions = isAdmin ? {} : await this.resolveActionPermissions(activeRole, roleMain);
+    // Quyền action vẫn cần trả về cho Admin để cấu hình theo role/module có hiệu lực
+    // nhất quán ở giao diện. Nếu chưa có cấu hình, hàm resolve trả về action mặc định.
+    const actionPermissions = await this.resolveActionPermissions(activeRole, roleMain);
+    const actionPresentation = await this.resolveActionPresentation(activeRole, roleMain);
     const screenPermissions = isAdmin ? SCREEN_KEYS : await this.resolveScreenPermissions(activeRole, roleMain);
     const profile = {
       tenantId: this.tenantContext.require().id,
@@ -112,6 +116,7 @@ export class AuthService {
       hasPin: Boolean(user.pinHash),
       disabledModules,
       actionPermissions,
+      actionPresentation,
       screenPermissions,
       branchPermissions: branchPermissions.map((item) => ({
         branchId: item.branchId,
@@ -166,6 +171,23 @@ export class AuthService {
     return Object.fromEntries(
       entityTypes.map((entityType) => [entityType, this.resolveAllowedActionsForEntity(views, entityType, roleChain)]),
     );
+  }
+
+  private async resolveActionPresentation(role?: string, mainRole?: string) {
+    const roleChain = buildRoleChain(role, mainRole);
+    const views = await this.viewSettings.find({ where: { viewType: 'ACTION' } });
+    const entityTypes = Array.from(new Set(views.map((view) => view.entityType).filter(Boolean)));
+    return Object.fromEntries(entityTypes.map((entityType) => {
+      const view = roleChain
+        .map((roleKey) => views.find((item) => item.entityType === entityType && normalizeRole(item.role) === roleKey))
+        .find(Boolean);
+      const config = view?.config || {};
+      return [entityType, {
+        labels: config.actionLabels && typeof config.actionLabels === 'object' ? config.actionLabels : {},
+        orders: config.actionOrders && typeof config.actionOrders === 'object' ? config.actionOrders : {},
+        inline: config.actionInline && typeof config.actionInline === 'object' ? config.actionInline : {},
+      }];
+    }));
   }
 
   private async resolveDisabledModules(role?: string, mainRole?: string) {

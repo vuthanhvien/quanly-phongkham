@@ -5936,6 +5936,48 @@ textarea.ant-input {
   grid-template-columns: minmax(270px, 330px) minmax(0, 1fr);
 }
 
+.settings-role-workspace {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(270px, 330px) minmax(0, 1fr);
+}
+
+.settings-role-module-tree {
+  position: sticky;
+  top: 82px;
+}
+
+.settings-role-module-tree .ant-card-body {
+  max-height: calc(100vh - 185px);
+  overflow: auto;
+  padding: 8px 10px !important;
+}
+
+.settings-role-module-tree .ant-tree {
+  font-size: 13px;
+}
+
+.settings-role-module-tree .ant-tree-treenode {
+  align-items: center;
+  min-height: 26px;
+  padding: 0 !important;
+}
+
+.settings-role-module-tree .ant-tree-node-content-wrapper,
+.settings-role-module-tree .ant-tree-switcher {
+  line-height: 26px !important;
+  min-height: 26px;
+}
+
+.settings-role-module-tree .ant-tree-node-content-wrapper {
+  padding: 0 4px !important;
+}
+
+.settings-role-module-tree .ant-tree-indent-unit {
+  width: 0;
+}
+
 .custom-fields-module-tree {
   position: sticky;
   top: 82px;
@@ -6004,6 +6046,9 @@ textarea.ant-input {
   .custom-fields-workspace { grid-template-columns: 1fr; }
   .custom-fields-module-tree { position: static; }
   .custom-fields-module-tree .ant-card-body { max-height: 260px; }
+  .settings-role-workspace { grid-template-columns: 1fr; }
+  .settings-role-module-tree { position: static; }
+  .settings-role-module-tree .ant-card-body { max-height: 260px; }
 }
 
 @media (max-width: 640px) {

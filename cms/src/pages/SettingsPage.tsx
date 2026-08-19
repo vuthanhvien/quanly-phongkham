@@ -49,6 +49,7 @@ import {
   Switch,
   Table,
   Tabs,
+  Tree,
   Tag,
   TreeSelect,
   Tooltip,
@@ -62,7 +63,7 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { buildGroupedModuleOptions, resolveEnabledModules } from "../company-types"
 import { useAppUi } from "../app-ui"
-import { getInputPatternLabel, INPUT_PATTERN_OPTIONS } from "../input-patterns"
+import { getInputPatternLabel } from "../input-patterns"
 import { getApiErrorMessage } from "../utils/apiError"
 import { baseFields, CustomField, DynamicRole, entityLabels, FieldSpec, getResourceActionOptions, normalizeSelectOption, permissionLabels, relationFields, systemRoleOptions, type SelectOption } from "../models"
 import {
@@ -655,12 +656,16 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   const [expandedRoleKeys, setExpandedRoleKeys] = useState<string[]>([])
   const [fields, setFields] = useState<CustomField[]>([])
   const [views, setViews] = useState<ViewSettingRecord[]>([])
+  const [moduleViews, setModuleViews] = useState<ViewSettingRecord[]>([])
   const [tableConfig, setTableConfig] = useState<FieldLayoutConfig[]>([])
   const [formConfig, setFormConfig] = useState<FieldLayoutConfig[]>([])
   const [detailConfig, setDetailConfig] = useState<FieldLayoutConfig[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [dynamicRoles, setDynamicRoles] = useState<DynamicRole[]>([])
   const [allowedActions, setAllowedActions] = useState<string[]>([])
+  const [actionLabels, setActionLabels] = useState<Record<string, string>>({})
+  const [actionOrders, setActionOrders] = useState<Record<string, number>>({})
+  const [actionInline, setActionInline] = useState<Record<string, boolean>>({})
   const [reuseInherited, setReuseInherited] = useState<Record<ViewType, boolean>>({ TABLE: false, FORM: false, DETAIL: false })
   const [reuseActionInherited, setReuseActionInherited] = useState(false)
   const [toast, toastContextHolder] = message.useMessage()
@@ -694,15 +699,39 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     () => TEMPLATE_PRESETS.filter((preset) => preset.entityType === entityType),
     [entityType],
   )
-  const roleAllowedModules = useMemo(() => {
-    const globallyEnabledModules = resolveEnabledModules(settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection)
-    const role = dynamicRoles.find((item) => normalizeRole(item.key) === selectedRole)
-    const roleModules = Array.isArray(role?.allowedModules) ? role.allowedModules : globallyEnabledModules
-    return roleModules.filter((module) => globallyEnabledModules.includes(module))
-  }, [dynamicRoles, selectedRole, settings.companyType, settings.enabledModules, settings.hasCustomModuleSelection])
   const roleModuleOptions = useMemo(
-    () => buildGroupedModuleOptions(permissionLabels, roleAllowedModules),
-    [roleAllowedModules],
+    () => buildGroupedModuleOptions(permissionLabels, resolveEnabledModules(settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection)),
+    [settings.companyType, settings.enabledModules, settings.hasCustomModuleSelection],
+  )
+  const roleModuleTree = useMemo(
+    () => {
+      const isInherited = (module: string, viewType: ViewType | "ACTION") => {
+        if (selectedRole === DEFAULT_ROLE_SCOPE) return false
+        return !moduleViews.some((view) =>
+          view.entityType === module &&
+          normalizeRole(view.role) === selectedRole &&
+          (viewType === "ACTION"
+            ? view.viewType === "ACTION" || (view.viewType === "TABLE" && Array.isArray(view.config?.allowedActions))
+            : view.viewType === viewType),
+        )
+      }
+      const moduleTitle = (module: string, label: string) => {
+        const statusItems = [
+          { icon: <KeyOutlined />, inherited: isInherited(module, "ACTION"), label: "Thao tác" },
+          { icon: <TableOutlined />, inherited: isInherited(module, "TABLE"), label: "Bảng" },
+          { icon: <FileTextOutlined />, inherited: isInherited(module, "FORM"), label: "Biểu mẫu" },
+          { icon: <ProfileOutlined />, inherited: isInherited(module, "DETAIL"), label: "Chi tiết" },
+        ]
+        return <span className="role-tree-node-title"><span>{label}</span><span className="role-tree-node-status">{statusItems.map((item) => <Tooltip key={item.label} title={`${item.label}: ${item.inherited ? "đang kế thừa" : "cấu hình riêng"}`}><span className={item.inherited ? "is-inherited" : "is-custom"}>{item.icon}</span></Tooltip>)}</span></span>
+      }
+      return roleModuleOptions.map((group, index) => ({
+        key: `group-${index}`,
+        title: group.label,
+        selectable: false,
+        children: group.options.map((module) => ({ key: module.value, title: moduleTitle(module.value, module.label) })),
+      }))
+    },
+    [moduleViews, roleModuleOptions, selectedRole],
   )
   const viewSources = useMemo(
     () =>
@@ -791,9 +820,9 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   }, [searchParams])
 
   useEffect(() => {
-    const allowed = roleAllowedModules.filter((module) => Boolean(permissionLabels[module]))
+    const allowed = resolveEnabledModules(settings.enabledModules, settings.companyType, settings.hasCustomModuleSelection).filter((module) => Boolean(permissionLabels[module]))
     if (allowed.length > 0 && !allowed.includes(entityType)) setEntityType(allowed[0])
-  }, [entityType, roleAllowedModules])
+  }, [entityType, settings.companyType, settings.enabledModules, settings.hasCustomModuleSelection])
 
   useEffect(() => {
     const nextParams = new URLSearchParams(searchParams)
@@ -812,6 +841,19 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
 
   useEffect(() => {
     setAllowedActions(resolveAllowedActions(views, entityType, selectedRole, dynamicRoles))
+    const savedActionLabels = resolveActionSetting(views, selectedRole, dynamicRoles)?.config?.actionLabels
+    const savedActionOrders = resolveActionSetting(views, selectedRole, dynamicRoles)?.config?.actionOrders
+    const savedActionInline = resolveActionSetting(views, selectedRole, dynamicRoles)?.config?.actionInline
+    setActionLabels(
+      Object.fromEntries(actionOptions.map((action) => [
+        action.key,
+        typeof savedActionLabels === "object" && savedActionLabels && typeof (savedActionLabels as Record<string, unknown>)[action.key] === "string"
+          ? String((savedActionLabels as Record<string, unknown>)[action.key])
+          : action.label,
+      ])),
+    )
+    setActionOrders(Object.fromEntries(actionOptions.map((action, index) => [action.key, typeof savedActionOrders === "object" && savedActionOrders && Number.isFinite(Number((savedActionOrders as Record<string, unknown>)[action.key])) ? Number((savedActionOrders as Record<string, unknown>)[action.key]) : index + 1])))
+    setActionInline(Object.fromEntries(actionOptions.map((action) => [action.key, typeof savedActionInline === "object" && savedActionInline && typeof (savedActionInline as Record<string, unknown>)[action.key] === "boolean" ? Boolean((savedActionInline as Record<string, unknown>)[action.key]) : ["view", "update"].includes(action.key)])))
     setTableConfig(
       buildFieldLayoutConfigs(
         fieldCatalog,
@@ -839,17 +881,43 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
       DETAIL: selectedRole !== DEFAULT_ROLE_SCOPE && !hasExactRoleSetting(views, "DETAIL", selectedRole),
     })
     setReuseActionInherited(selectedRole !== DEFAULT_ROLE_SCOPE && !views.some((view) => normalizeRole(view.role) === selectedRole && (view.viewType === "ACTION" || (view.viewType === "TABLE" && Array.isArray(view.config?.allowedActions)))))
-  }, [dynamicRoles, entityType, fieldCatalog, selectedRole, views])
+  }, [actionOptions, dynamicRoles, entityType, fieldCatalog, selectedRole, views])
+
+  // Phiên đăng nhập lưu quyền để các màn hình danh sách đọc nhanh. Đồng bộ lại
+  // ngay khi đang cấu hình chính role hiện tại, tránh phải đăng xuất/đăng nhập.
+  function syncCurrentSessionActions(actions: string[], labels: Record<string, string>, orders: Record<string, number>, inline: Record<string, boolean>) {
+    try {
+      const stored = JSON.parse(localStorage.getItem("clinic-user") || "null")
+      if (!stored || typeof stored !== "object" || normalizeRole(stored.activeRole || stored.role) !== selectedRole) return
+      stored.actionPermissions = { ...(stored.actionPermissions || {}), [entityType]: actions }
+      stored.actionPresentation = { ...(stored.actionPresentation || {}), [entityType]: { labels, orders, inline } }
+      localStorage.setItem("clinic-user", JSON.stringify(stored))
+    } catch {
+      // Local storage hỏng không được làm gián đoạn việc lưu cấu hình server.
+    }
+  }
+
+  useEffect(() => {
+    const config = resolveActionSetting(views, selectedRole, dynamicRoles)?.config || {}
+    syncCurrentSessionActions(
+      resolveAllowedActions(views, entityType, selectedRole, dynamicRoles),
+      config.actionLabels && typeof config.actionLabels === "object" ? config.actionLabels as Record<string, string> : {},
+      config.actionOrders && typeof config.actionOrders === "object" ? config.actionOrders as Record<string, number> : {},
+      config.actionInline && typeof config.actionInline === "object" ? config.actionInline as Record<string, boolean> : {},
+    )
+  }, [dynamicRoles, entityType, selectedRole, views])
 
   async function load() {
-    const [fieldResponse, viewResponse, templateResponse, roleResponse] = await Promise.all([
+    const [fieldResponse, viewResponse, moduleViewResponse, templateResponse, roleResponse] = await Promise.all([
       api.get("/settings/custom-fields", { params: { entityType } }),
       api.get("/settings/views", { params: { entityType } }),
+      api.get("/settings/views"),
       api.get("/settings/print-templates", { params: { entityType } }),
       api.get("/settings/dynamic-roles"),
     ])
     setFields(fieldResponse.data.data)
     setViews(viewResponse.data.data)
+    setModuleViews(moduleViewResponse.data.data)
     setTemplates(templateResponse.data.data)
     setDynamicRoles(roleResponse.data.data)
   }
@@ -870,12 +938,13 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     }
   }
 
-  async function saveActionView(actions: string[], reused: boolean) {
+  async function saveActionView(actions: string[], reused: boolean, labels = actionLabels, orders = actionOrders, inline = actionInline) {
     try {
       if (reused) {
         await api.delete(`/settings/views/${entityType}`, { params: { role: selectedRole, viewType: "ACTION" } })
       } else {
-        await api.put(`/settings/views/${entityType}/ACTION`, { role: selectedRole, config: { allowedActions: actions } })
+        await api.put(`/settings/views/${entityType}/ACTION`, { role: selectedRole, config: { allowedActions: actions, actionLabels: labels, actionOrders: orders, actionInline: inline } })
+        syncCurrentSessionActions(actions, labels, orders, inline)
       }
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Không thể tự lưu cấu hình hiển thị"))
@@ -1032,17 +1101,6 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
               onTreeExpand={(keys) => setExpandedRoleKeys(keys as string[])}
             />
           )}
-          {section === "roles" && (
-            <Select
-              showSearch
-              optionFilterProp="label"
-              value={entityType}
-              onChange={setEntityType}
-              placeholder="Chọn module"
-              style={{ width: 420 }}
-              options={roleModuleOptions}
-            />
-          )}
           {section !== "roles" && (
             <Select
               showSearch
@@ -1055,6 +1113,20 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
           )}
         </Space>
       </div>
+      <div className={section === "roles" ? "settings-role-workspace" : undefined}>
+      {section === "roles" && (
+        <Card className="glass-card settings-role-module-tree">
+          <Tree
+            defaultExpandAll
+            selectedKeys={[entityType]}
+            treeData={roleModuleTree}
+            onSelect={(keys) => {
+              const selected = String(keys[0] || "")
+              if (selected && !selected.startsWith("group-")) setEntityType(selected)
+            }}
+          />
+        </Card>
+      )}
       <Card className="glass-card settings-card">
         <Tabs
           className="settings-tabs"
@@ -1084,29 +1156,49 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                         children: (
                           <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseActionInherited} source={formatRoleLabel(actionSource)} onReuseChange={(checked) => { setReuseActionInherited(checked); void saveActionView(allowedActions, checked) }}>
                           <Card size="small">
-                            <Checkbox
-                              checked={allowedActions.length === actionOptions.length}
-                              indeterminate={allowedActions.length > 0 && allowedActions.length < actionOptions.length}
-                              onChange={(event) => {
-                                const next = event.target.checked ? actionOptions.map((item) => item.key) : []
-                                setAllowedActions(next)
-                                void saveActionView(next, reuseActionInherited)
-                              }}
-                              style={{ marginBottom: 10 }}
-                            >
-                              Chọn tất cả action
-                            </Checkbox>
-                            <Checkbox.Group
-                              options={actionOptions.map((item) => ({
-                                label: item.label,
-                                value: item.key,
-                              }))}
-                              value={allowedActions}
-                              onChange={(values) => {
-                                const next = values.map(String)
-                                setAllowedActions(next)
-                                void saveActionView(next, reuseActionInherited)
-                              }}
+                            <Table
+                              size="small"
+                              pagination={false}
+                              rowKey="key"
+                              dataSource={actionOptions}
+                              columns={[
+                                {
+                                  title: <Checkbox checked={allowedActions.length === actionOptions.length} indeterminate={allowedActions.length > 0 && allowedActions.length < actionOptions.length} onChange={(event) => {
+                                    const next = event.target.checked ? actionOptions.map((item) => item.key) : []
+                                    setAllowedActions(next)
+                                    void saveActionView(next, reuseActionInherited)
+                                  }} aria-label="Chọn tất cả action" />,
+                                  key: "enabled",
+                                  width: 64,
+                                  render: (_, action) => <Checkbox checked={allowedActions.includes(action.key)} onChange={(event) => {
+                                    const next = event.target.checked ? [...allowedActions, action.key] : allowedActions.filter((key) => key !== action.key)
+                                    setAllowedActions(next)
+                                    void saveActionView(next, reuseActionInherited)
+                                  }} aria-label={`Bật ${action.label}`} />,
+                                },
+                                { title: "Mã thao tác", dataIndex: "key", width: 180, render: (value) => <Typography.Text strong>{value}</Typography.Text> },
+                                {
+                                  title: "Nhãn hiển thị",
+                                  dataIndex: "key",
+                                  render: (key, action) => <Input value={actionLabels[String(key)] ?? action.label} onChange={(event) => setActionLabels((current) => ({ ...current, [String(key)]: event.target.value }))} onBlur={() => void saveActionView(allowedActions, reuseActionInherited)} onPressEnter={(event) => event.currentTarget.blur()} />,
+                                },
+                                {
+                                  title: "Thứ tự",
+                                  dataIndex: "key",
+                                  width: 110,
+                                  render: (key) => <Input inputMode="numeric" value={String(actionOrders[String(key)] ?? "")} onChange={(event) => setActionOrders((current) => ({ ...current, [String(key)]: Number(event.target.value.replace(/\D/g, "")) || 0 }))} onBlur={() => void saveActionView(allowedActions, reuseActionInherited)} onPressEnter={(event) => event.currentTarget.blur()} />,
+                                },
+                                {
+                                  title: "Hiện ở row",
+                                  dataIndex: "key",
+                                  width: 120,
+                                  render: (key, action) => <Checkbox checked={Boolean(actionInline[String(key)])} onChange={(event) => {
+                                    const next = { ...actionInline, [String(key)]: event.target.checked }
+                                    setActionInline(next)
+                                    void saveActionView(allowedActions, reuseActionInherited, actionLabels, actionOrders, next)
+                                  }} aria-label={`Hiện ${action.label} ở row`} />,
+                                },
+                              ]}
                             />
                           </Card>
                           </ViewOverridePanel>
@@ -1211,6 +1303,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
           ].filter((item) => item.key === (section === "roles" ? "view-config" : "print-templates"))}
         />
       </Card>
+      </div>
       <Modal title={docxTemplateTarget ? `Tải lại file ${uploadedTemplateType}` : `Tải mẫu in ${uploadedTemplateType}`} open={docxTemplateModal} footer={null} onCancel={() => { setDocxTemplateModal(false); setDocxFile(null); setDocxTemplateTarget(null) }}>
         <Typography.Paragraph type="secondary">
           {uploadedTemplateType === "PDF"
@@ -1358,10 +1451,16 @@ function ViewConfigTable({
       render: (value) => <Typography.Text strong>{value}</Typography.Text>,
     },
     {
+      title: "Hiển thị",
+      dataIndex: "visible",
+      width: 100,
+      render: (value, row) => <Checkbox checked={Boolean(value)} disabled aria-label={`Hiển thị ${row.label}`} />,
+    },
+    {
       title: "Mã trường",
       dataIndex: "key",
       width: 160,
-      render: (value) => <Typography.Text type="secondary">{value}</Typography.Text>,
+      render: (value) => <Typography.Text strong>{value}</Typography.Text>,
     },
     {
       title: "Loại",
@@ -1394,7 +1493,7 @@ function ViewConfigTable({
         title: "Thẻ",
         dataIndex: "tab",
         width: 160,
-        render: (value) => value || "Không có",
+        render: (value) => value || "",
       },
       {
         title: "Kích thước",
@@ -1408,14 +1507,30 @@ function ViewConfigTable({
         title: "Khóa sửa",
         dataIndex: "disabled",
         width: 100,
-        render: (value) => value ? "Có" : "Không",
+        render: (value, row) => <Checkbox checked={Boolean(value)} disabled aria-label={`Khóa sửa ${row.label}`} />,
       })
       columns.push({
         title: "Mẫu nhập",
         dataIndex: "inputPattern",
         width: 140,
-        render: (value) => getInputPatternLabel(value) || "Không có",
+        render: (value) => getInputPatternLabel(value) || "",
       })
+    }
+    if (viewType === "DETAIL") {
+      columns.push(
+        {
+          title: "Yêu cầu PIN",
+          dataIndex: "requiresPasswordToReveal",
+          width: 120,
+          render: (value, row) => <Checkbox checked={Boolean(value)} disabled aria-label={`Yêu cầu mã PIN để xem ${row.label}`} />,
+        },
+        {
+          title: "Ẩn 3 số cuối",
+          dataIndex: "maskLastThreeDigits",
+          width: 130,
+          render: (value, row) => <Checkbox checked={Boolean(value)} disabled aria-label={`Ẩn 3 số cuối của ${row.label}`} />,
+        },
+      )
     }
   }
   columns.push({
@@ -1512,9 +1627,9 @@ function FieldConfigEditor({
       <Form.Item label="Hiển thị">
         <Checkbox checked={field.visible} onChange={(event) => update({ visible: event.target.checked })}>Hiển thị field này</Checkbox>
       </Form.Item>
-      {viewType === "FORM" && <Form.Item><Checkbox checked={Boolean(field.disabled)} onChange={(event) => update({ disabled: event.target.checked })}>Khóa sửa</Checkbox></Form.Item>}
       {viewType === "DETAIL" && <Form.Item><Checkbox checked={Boolean(field.requiresPasswordToReveal)} onChange={(event) => update({ requiresPasswordToReveal: event.target.checked })}>Yêu cầu nhập mã PIN để xem giá trị</Checkbox></Form.Item>}
       {viewType === "DETAIL" && <Form.Item><Checkbox checked={Boolean(field.maskLastThreeDigits)} onChange={(event) => update({ maskLastThreeDigits: event.target.checked })}>Ẩn 3 số cuối, nhập mã PIN để xem</Checkbox></Form.Item>}
+      {viewType === "FORM" && <Form.Item><Checkbox checked={Boolean(field.disabled)} onChange={(event) => update({ disabled: event.target.checked })}>Khóa sửa</Checkbox></Form.Item>}
       <Form.Item label="Nhãn hiển thị">
         <Input value={field.label} onChange={(event) => update({ label: event.target.value })} placeholder="Tên field hiển thị" />
       </Form.Item>
@@ -1562,14 +1677,8 @@ function FieldConfigEditor({
         <Form.Item label="Gợi ý nhập">
           <Input value={field.placeholder} onChange={(event) => update({ placeholder: event.target.value })} placeholder="Gợi ý nhập liệu" />
         </Form.Item>
-        <Form.Item label="Mẫu nhập">
-          <Select
-            allowClear
-            placeholder="Không có"
-            value={field.inputPattern}
-            onChange={(value) => update({ inputPattern: value || "" })}
-            options={INPUT_PATTERN_OPTIONS}
-          />
+        <Form.Item label="Mẫu nhập" extra="Dùng 9 cho chữ số, A cho chữ cái; ví dụ: 9999AAAA hoặc HH-MM.">
+          <Input value={field.inputPattern} onChange={(event) => update({ inputPattern: event.target.value })} placeholder="Ví dụ: 9999AAAA hoặc HH-MM" />
         </Form.Item>
         <Form.Item label="Giá trị mặc định">
           <Input value={Array.isArray(field.defaultValue) ? field.defaultValue.join(", ") : field.defaultValue === undefined || field.defaultValue === null ? "" : String(field.defaultValue)} onChange={(event) => update({ defaultValue: parseDefaultValue(field.type, event.target.value) })} placeholder="Giá trị mặc định" />

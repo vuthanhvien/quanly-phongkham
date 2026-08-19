@@ -1,31 +1,42 @@
 import IMask from "imask"
 
-export const INPUT_PATTERN_OPTIONS = [
-  { value: "time-hh-mm", label: "Giờ (HH:MM)" },
-]
-
 export function getInputPatternConfig(pattern?: string) {
-  if (pattern !== "time-hh-mm") return undefined
+  const normalized = String(pattern || "").trim()
+  if (!normalized) return undefined
 
-  return {
-    mask: "HH:MM",
-    blocks: {
-      HH: { mask: IMask.MaskedRange, from: 0, to: 23, maxLength: 2 },
-      MM: { mask: IMask.MaskedRange, from: 0, to: 59, maxLength: 2 },
-    },
+  if (normalized === "time-hh-mm" || /^HH[:-]MM$/.test(normalized)) {
+    const separator = normalized === "time-hh-mm" ? ":" : normalized.charAt(2)
+    return {
+      mask: `HH${separator}MM`,
+      blocks: {
+        HH: { mask: IMask.MaskedRange, from: 0, to: 23, maxLength: 2 },
+        MM: { mask: IMask.MaskedRange, from: 0, to: 59, maxLength: 2 },
+      },
+    }
   }
+
+  if (!/[9A]/.test(normalized)) return undefined
+  return { mask: normalized.replace(/9/g, "0").replace(/A/g, "a"), blocks: {} }
 }
 
 export function getInputPatternLabel(pattern?: string) {
-  return INPUT_PATTERN_OPTIONS.find((item) => item.value === pattern)?.label
+  return String(pattern || "").trim()
 }
 
 export function isInputPatternComplete(pattern: string | undefined, value: unknown) {
   if (value === undefined || value === null || value === "") return true
-  if (pattern === "time-hh-mm") {
-    const match = /^(\d{2}):(\d{2})$/.exec(String(value))
+  const normalized = String(pattern || "").trim()
+  if (normalized === "time-hh-mm" || /^HH[:-]MM$/.test(normalized)) {
+    const separator = normalized === "time-hh-mm" ? ":" : normalized.charAt(2)
+    const match = new RegExp(`^(\\d{2})${separator === ":" ? "\\:" : "-"}(\\d{2})$`).exec(String(value))
     if (!match) return false
     return Number(match[1]) <= 23 && Number(match[2]) <= 59
   }
-  return true
+  if (!/[9A]/.test(normalized)) return true
+  const expression = Array.from(normalized).map((character) => {
+    if (character === "9") return "\\d"
+    if (character === "A") return "[A-Za-z]"
+    return character.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  }).join("")
+  return new RegExp(`^${expression}$`).test(String(value))
 }

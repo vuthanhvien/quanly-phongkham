@@ -47,7 +47,7 @@ import { useEffect, useMemo, useRef, useState, type Key } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { api, resolveFileUrl } from "../api"
 import { printHtmlInPlace } from "../utils/printHtml"
-import { hasActionAccess, hasResourceAccess, isCurrentUserAdmin } from "../access"
+import { getActionPresentation, hasActionAccess, hasResourceAccess, isCurrentUserAdmin } from "../access"
 import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
@@ -76,6 +76,16 @@ type SavedTableTab = {
   key: string
   label: string
   filters: Array<{ field: string; operator: string; value: string | number | string[] }>
+}
+
+function menuActionKey(key: string) {
+  if (["quick-view", "full-view"].includes(key)) return "view"
+  if (key === "edit") return "update"
+  if (["archive", "delete"].includes(key)) return "delete"
+  if (["copy", "add-child"].includes(key)) return "create"
+  if (key === "convert") return "convert-to-customer"
+  if (key === "voucher") return "generate-accounting-voucher"
+  return key
 }
 
 function isSavedTableTab(value: unknown): value is SavedTableTab {
@@ -556,8 +566,10 @@ export function RecordListPage() {
           const isUnitRoot = resource === "units" && !row.baseUnitId
           const isSystemAdminAccount = resource === "user-accounts" && ["admin", "admin-system"].includes(String(row.username || "").trim().toLowerCase())
           const menuItems: any[] = []
-          if (hasActionAccess(resource, "view")) menuItems.push({ key: "quick-view", icon: <EyeOutlined />, label: "Xem chi tiết", onClick: () => openDetail(recordId) })
-          if (resource === "projects" && recordStatus === "active") menuItems.push({ key: "board", icon: <AppstoreOutlined />, label: "Mở Kanban", onClick: () => navigate(`/projects/${recordId}/board`) })
+          // Dự án chỉ có một thao tác xem được cấu hình (mở trang chi tiết đầy đủ).
+          // Kanban là thao tác riêng và phải tuân theo cấu hình action của Dự án.
+          if (resource !== "projects" && hasActionAccess(resource, "view")) menuItems.push({ key: "quick-view", icon: <EyeOutlined />, label: "Xem chi tiết", onClick: () => openDetail(recordId) })
+          if (resource === "projects" && recordStatus === "active" && hasActionAccess(resource, "board")) menuItems.push({ key: "board", icon: <AppstoreOutlined />, label: "Mở Kanban", onClick: () => navigate(`/projects/${recordId}/board`) })
           if (hasActionAccess(resource, "view")) menuItems.push({ key: "full-view", icon: <FullscreenOutlined />, label: "Xem đầy đủ", onClick: () => navigate(`/${resource}/${recordId}/full`) })
           if (recordStatus === "active" && hasActionAccess(resource, "update")) menuItems.push({ key: "edit", icon: <EditOutlined />, label: "Chỉnh sửa", onClick: () => setEditingId(recordId) })
           if (isUnitRoot && recordStatus === "active" && hasActionAccess(resource, "create")) menuItems.push({ key: "add-child", icon: <PlusOutlined />, label: "Thêm đơn vị quy đổi", onClick: () => createChildUnit(recordId) })
@@ -569,20 +581,17 @@ export function RecordListPage() {
           if (resource === "accounting-vouchers" && row.status === "POSTED" && hasActionAccess(resource, "unpost")) menuItems.push({ key: "unpost", icon: <SwapOutlined />, label: "Bỏ ghi sổ", onClick: () => void unpostAccountingVoucher(recordId) })
           if (templates.length > 0 && hasActionAccess(resource, "print")) menuItems.push({ key: "print", icon: <PrinterOutlined />, label: "In biểu mẫu", onClick: () => openPrintTemplatePicker(recordId) })
           if (recordStatus === "active" && !isSystemAdminAccount && hasActionAccess(resource, "delete")) menuItems.push({ key: "archive", danger: true, icon: <DeleteOutlined />, label: "Lưu trữ", onClick: () => Modal.confirm({ title: "Lưu trữ bản ghi này?", content: "Bản ghi sẽ được chuyển vào tab Lưu trữ.", okText: "Lưu trữ", okButtonProps: { danger: true }, onOk: () => new Promise<void>((resolve) => deleteRecord({ resource, id: row.id }, { onSuccess: () => { message.success("Đã lưu trữ"); refresh(); resolve() }, onError: () => resolve() })) }) })
-          const overflowMenuItems = menuItems.filter((item) => !["full-view", "edit"].includes(String(item.key)))
+          const actionPresentation = getActionPresentation(resource)
+          const orderedMenuItems = menuItems
+            .map((item, index) => ({ ...item, actionKey: menuActionKey(String(item.key)), originalIndex: index }))
+            .sort((left, right) => Number(actionPresentation.orders?.[left.actionKey] ?? left.originalIndex) - Number(actionPresentation.orders?.[right.actionKey] ?? right.originalIndex))
+            .map((item) => ({ ...item, label: actionPresentation.labels?.[item.actionKey]?.trim() || item.label }))
+          const rowMenuItems = orderedMenuItems.filter((item) => item.key !== "quick-view" && (actionPresentation.inline?.[item.actionKey] ?? ["view", "update"].includes(item.actionKey)))
+          const overflowMenuItems = orderedMenuItems.filter((item) => !rowMenuItems.includes(item))
           return <>
-          <span className="record-row-actions-mobile"><Dropdown menu={{ items: menuItems }} trigger={["click"]}><Button type="text" icon={<MoreOutlined />} aria-label="Thao tác" /></Dropdown></span>
+          <span className="record-row-actions-mobile"><Dropdown menu={{ items: orderedMenuItems }} trigger={["click"]}><Button type="text" icon={<MoreOutlined />} aria-label="Thao tác" /></Dropdown></span>
           <Space className="record-row-actions-desktop" size={2}>
-            {hasActionAccess(resource, "view") && (
-              <Tooltip title="Xem đầy đủ">
-                <Button icon={<FullscreenOutlined />} type="text" onClick={() => navigate(`/${resource}/${recordId}/full`)} />
-              </Tooltip>
-            )}
-            {recordStatus === "active" && hasActionAccess(resource, "update") && (
-              <Tooltip title="Chỉnh sửa">
-                <Button icon={<EditOutlined />} type="text" onClick={() => setEditingId(recordId)} />
-              </Tooltip>
-            )}
+            {rowMenuItems.map((item) => <Tooltip key={String(item.key)} title={item.label}><Button danger={item.danger} icon={item.icon} type="text" onClick={item.onClick} /></Tooltip>)}
             {overflowMenuItems.length > 0 && (
               <Dropdown menu={{ items: overflowMenuItems }} trigger={["click"]}>
                 <Tooltip title="Thao tác khác">

@@ -278,6 +278,7 @@ const DEFAULT_RESOURCE_ACTIONS: ResourceActionOption[] = [
 
 export const resourceActionOptions: Record<string, ResourceActionOption[]> = {
   customers: DEFAULT_RESOURCE_ACTIONS,
+  projects: [...DEFAULT_RESOURCE_ACTIONS, { key: 'board', label: 'Mở Kanban' }],
   leads: [...DEFAULT_RESOURCE_ACTIONS, { key: 'convert-to-customer', label: 'Chuyển thành khách hàng' }],
   invoices: [...DEFAULT_RESOURCE_ACTIONS, { key: 'generate-accounting-voucher', label: 'Tạo chứng từ kế toán' }],
   expenses: [...DEFAULT_RESOURCE_ACTIONS, { key: 'generate-accounting-voucher', label: 'Tạo chứng từ kế toán' }],

@@ -10,6 +10,7 @@ export interface StoredUserAccess {
   staffId?: string
   disabledModules?: string[]
   actionPermissions?: Record<string, string[]>
+  actionPresentation?: Record<string, { labels?: Record<string, string>; orders?: Record<string, number>; inline?: Record<string, boolean> }>
   screenPermissions?: string[]
 }
 
@@ -45,10 +46,14 @@ export function hasScreenAccess(screen: string) {
 
 export function hasActionAccess(resource: string, action: string) {
   const user = readStoredUser()
-  if (!user || isAdmin(user)) return true
+  if (!user) return true
   const allowedActions = user?.actionPermissions?.[resource]
   if (!Array.isArray(allowedActions) || allowedActions.length === 0) return true
   return allowedActions.includes(action)
+}
+
+export function getActionPresentation(resource: string) {
+  return readStoredUser()?.actionPresentation?.[resource] || {}
 }
 
 export function currentUserRoleKey() {
