@@ -1172,19 +1172,22 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                                   rowKey="key"
                                   dataSource={orderedActionOptions}
                                   scroll={{ x: 900 }}
+                                  tableLayout="fixed"
                                   columns={[
                                 {
                                   title: "",
                                   key: "sort",
-                                  width: 56,
+                                  width: 104,
                                   fixed: "left",
                                   render: (_, action) => {
                                     const index = orderedActionOptions.findIndex((item) => item.key === action.key)
-                                    return <Space size={0}>
+                                    return <div className="settings-order-controls">
                                       <Typography.Text type="secondary">#{index + 1}</Typography.Text>
-                                      <Button type="text" size="small" icon={<ArrowUpOutlined />} disabled={index === 0} aria-label={`Đưa ${action.label} lên`} onClick={() => moveAction(action.key, -1)} />
-                                      <Button type="text" size="small" icon={<ArrowDownOutlined />} disabled={index === orderedActionOptions.length - 1} aria-label={`Đưa ${action.label} xuống`} onClick={() => moveAction(action.key, 1)} />
-                                    </Space>
+                                      <Space size={0}>
+                                        <Button type="text" size="small" icon={<ArrowUpOutlined />} disabled={index === 0} aria-label={`Đưa ${action.label} lên`} onClick={() => moveAction(action.key, -1)} />
+                                        <Button type="text" size="small" icon={<ArrowDownOutlined />} disabled={index === orderedActionOptions.length - 1} aria-label={`Đưa ${action.label} xuống`} onClick={() => moveAction(action.key, 1)} />
+                                      </Space>
+                                    </div>
                                   },
                                 },
                                 {
@@ -1425,24 +1428,19 @@ function ViewConfigTable({
     {
       title: "",
       key: "sort",
-      width: 56,
+      width: 104,
       fixed: "left",
       render: (_, row) => {
         const index = visibleFields.findIndex((item) => item.key === row.key)
         if (!onReorder || index < 0) return null
-        return <Space size={0}>
+        return <div className="settings-order-controls">
           <Typography.Text type="secondary">#{index + 1}</Typography.Text>
-          <Button type="text" size="small" icon={<ArrowUpOutlined />} disabled={index === 0} aria-label={`Đưa ${row.label} lên`} onClick={() => onReorder(viewType, row.key, visibleFields[index - 1].key)} />
-          <Button type="text" size="small" icon={<ArrowDownOutlined />} disabled={index === visibleFields.length - 1} aria-label={`Đưa ${row.label} xuống`} onClick={() => onReorder(viewType, row.key, visibleFields[index + 1].key)} />
-        </Space>
+          <Space size={0}>
+            <Button type="text" size="small" icon={<ArrowUpOutlined />} disabled={index === 0} aria-label={`Đưa ${row.label} lên`} onClick={() => onReorder(viewType, row.key, visibleFields[index - 1].key)} />
+            <Button type="text" size="small" icon={<ArrowDownOutlined />} disabled={index === visibleFields.length - 1} aria-label={`Đưa ${row.label} xuống`} onClick={() => onReorder(viewType, row.key, visibleFields[index + 1].key)} />
+          </Space>
+        </div>
       },
-    },
-    {
-      title: "Trường",
-      key: "field",
-      width: 180,
-      dataIndex: "label",
-      render: (value) => <Typography.Text strong>{value}</Typography.Text>,
     },
     {
       title: "Hiển thị",
@@ -1466,6 +1464,7 @@ function ViewConfigTable({
       title: "Nhãn hiển thị",
       dataIndex: "label",
       width: 180,
+      render: (value) => <Typography.Text strong>{value}</Typography.Text>,
     },
     {
       title: "Định dạng",
@@ -1552,7 +1551,7 @@ function ViewConfigTable({
   return (
     <>
       <Card className="settings-view-config-table-card" size="small">
-        <Table columns={columns} dataSource={visibleFields} pagination={false} rowKey="key" scroll={{ x: 1100 }} size="small" />
+        <Table columns={columns} dataSource={visibleFields} pagination={false} rowKey="key" scroll={{ x: 960 }} size="small" tableLayout="fixed" />
       </Card>
       <Modal
         open={Boolean(editingField)}

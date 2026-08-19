@@ -3175,6 +3175,12 @@ body {
   cursor: pointer;
 }
 
+.chatbot-history-embedded-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 10px;
+}
+
 
 .ant-table-wrapper .ant-table-cell-fix-left,
 .ant-table-wrapper .ant-table-cell-fix-right {
@@ -3191,22 +3197,35 @@ body {
 }
 
 /* Cột thao tác của các bảng cấu hình luôn bám mép phải khi cuộn ngang. */
-.settings-table-actions-cell.ant-table-cell-fix-right,
-.settings-table-actions-header.ant-table-cell-fix-right {
+.settings-table-actions-cell,
+.settings-table-actions-header {
   background: var(--app-surface) !important;
   box-shadow: -8px 0 12px -12px rgba(15, 23, 42, 0.55);
   position: sticky !important;
   right: 0 !important;
-  z-index: 3;
+  z-index: 10;
 }
 
-.settings-table-actions-header.ant-table-cell-fix-right {
-  z-index: 4;
+.settings-table-actions-header {
+  z-index: 11;
 }
 
 .settings-table-actions-cell .ant-space {
   justify-content: flex-end;
   width: 100%;
+}
+
+.settings-order-controls {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.settings-order-controls .ant-typography {
+  min-width: 25px;
+  text-align: left;
 }
 
 .ant-input,

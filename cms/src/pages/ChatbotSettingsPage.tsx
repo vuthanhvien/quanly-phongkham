@@ -148,10 +148,7 @@ export function ChatbotSettingsPage() {
             onChange={setActiveTab}
           />
 
-          {activeTab === 'landing' && <>
-          <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 16 }}>
-            Kết nối AI cho Landing
-          </Typography.Title>
+          {activeTab === 'landing' && <Card className="glass-card chatbot-settings-panel">
 
           <Card size="small" style={{ marginBottom: 16 }}>
             <Space style={{ justifyContent: 'space-between', width: '100%' }}>
@@ -290,12 +287,9 @@ export function ChatbotSettingsPage() {
           >
             Lưu cấu hình
           </Button>
-          </>}
+          </Card>}
 
-          {activeTab === 'cms' && <>
-          <Typography.Title level={5} style={{ marginTop: 0, marginBottom: 16 }}>
-            Kết nối AI cho CMS
-          </Typography.Title>
+          {activeTab === 'cms' && <Card className="glass-card chatbot-settings-panel">
           {/* <Alert
             icon={<RobotOutlined />}
             showIcon
@@ -375,9 +369,9 @@ export function ChatbotSettingsPage() {
           <Button className="primary-glow" htmlType="submit" loading={saving} type="primary" size="large">
             Lưu cấu hình trợ lý
           </Button>
-          </>}
+          </Card>}
 
-          {activeTab === 'history' && <ChatbotHistoryPage embedded />}
+          {activeTab === 'history' && <Card className="glass-card chatbot-settings-panel"><ChatbotHistoryPage embedded /></Card>}
         </Form>
       </Spin>
     </>
