@@ -175,6 +175,9 @@ export function RecordListPage() {
   }
   const canCreateRecord = hasActionAccess(resource, "create")
   const canImportRecords = canCreateRecord && !["files", "service-orders"].includes(resource)
+  const canShowRecordActions = ["view", "update", "delete", "clone", "print", "board", "convert-to-customer", "generate-accounting-voucher", "post", "unpost"]
+    .some((action) => hasActionAccess(resource, action))
+  const canManageSelectedRecords = hasActionAccess(resource, "delete") || hasActionAccess(resource, "duplicate")
   useEffect(() => {
     const onDataRefresh = (event: Event) => {
       const targetResource = (event as CustomEvent<CmsDataRefreshDetail>).detail?.resource
@@ -499,7 +502,7 @@ export function RecordListPage() {
           ) : <Typography.Text type="secondary">Chưa có tài khoản</Typography.Text>
         },
       }] : []),
-      {
+      ...(canShowRecordActions ? [{
         title: "",
         key: "action",
         fixed: "right" as const,
@@ -544,9 +547,9 @@ export function RecordListPage() {
             )}
           </Space></>
         },
-      },
+      }] : []),
     ],
-    [advancedFilters, advancedSearch, displayFields, resource, recordStatus, templates, lookups, fileLookups, productCategoryNames, screens.md, passwordProtectedFieldKeys, revealedValues],
+    [advancedFilters, advancedSearch, canShowRecordActions, displayFields, resource, recordStatus, templates, lookups, fileLookups, productCategoryNames, screens.md, passwordProtectedFieldKeys, revealedValues],
   )
 
   const doctorOptions = useMemo(
@@ -791,11 +794,11 @@ export function RecordListPage() {
               }}
             />
           ) : null}
-          {recordStatus === "active" && hasActionAccess(resource, "delete") && selectedRowKeys.length > 0 ? (
+          {recordStatus === "active" && canManageSelectedRecords && selectedRowKeys.length > 0 ? (
             <Dropdown
               menu={{
                 items: [
-                  { key: "archive", danger: true, icon: <DeleteOutlined />, label: "Lưu trữ" },
+                  ...(hasActionAccess(resource, "delete") ? [{ key: "archive", danger: true, icon: <DeleteOutlined />, label: "Lưu trữ" }] : []),
                   { key: "export", icon: <DownloadOutlined />, label: "Xuất Excel" },
                   ...(hasActionAccess(resource, "duplicate") ? [{ key: "clone", icon: <CopyOutlined />, label: "Nhân bản" }] : []),
                   { type: "divider" },
@@ -909,7 +912,7 @@ export function RecordListPage() {
           tableLayout="fixed"
           expandable={resource === "units" ? { defaultExpandAllRows: true } : undefined}
           indentSize={28}
-          rowSelection={recordStatus === "active" && hasActionAccess(resource, "delete") ? {
+          rowSelection={recordStatus === "active" && canManageSelectedRecords ? {
             selectedRowKeys,
             onChange: setSelectedRowKeys,
             preserveSelectedRowKeys: true,

@@ -1557,13 +1557,66 @@ body {
   overflow: auto;
 }
 
+.roles-content-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.roles-content-panel > .record-status-tabs {
+  flex: 0 0 auto;
+}
+
+.roles-tab-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.roles-tab-content--permissions .role-permission-table {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.roles-tab-content--users {
+  gap: 12px;
+  overflow: hidden;
+}
+
+.roles-tab-content--users > div:last-child {
+  min-height: 0;
+}
+
 .role-permission-table .ant-table-wrapper {
   min-width: 760px;
 }
 
-.role-permission-parent-row > td {
+.role-permission-table .ant-table,
+.role-permission-table .ant-table-container,
+.role-permission-table .ant-table-thead > tr > th,
+.role-permission-table .ant-table-tbody > tr > td {
+  background: #fff !important;
+}
+
+.role-permission-table .ant-table-tbody > tr.role-permission-parent-row > td {
   background: color-mix(in srgb, var(--app-text) 5%, var(--app-surface)) !important;
   font-weight: 700;
+}
+
+.role-permission-table .ant-table-tbody > tr.role-permission-parent-row > .ant-table-cell-fix-left,
+.role-permission-table .ant-table-tbody > tr.role-permission-parent-row > .ant-table-cell-fix-left-last {
+  background: color-mix(in srgb, var(--app-text) 5%, var(--app-surface)) !important;
+}
+
+.role-permission-table .ant-table-tbody > tr.role-permission-all-row > td,
+.role-permission-table .ant-table-tbody > tr.role-permission-all-row > .ant-table-cell-fix-left,
+.role-permission-table .ant-table-tbody > tr.role-permission-all-row > .ant-table-cell-fix-left-last {
+  background: color-mix(in srgb, var(--app-primary) 8%, var(--app-surface)) !important;
 }
 
 .role-permission-child-title {

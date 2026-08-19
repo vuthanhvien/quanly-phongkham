@@ -300,7 +300,9 @@ export function RolesPage() {
   function updateGroupAction(modules: string[], action: string, allowed: boolean) {
     const nextByModule = modules.map((module) => ({
       module,
-      actions: allowed
+      actions: action === "view" && !allowed
+        ? []
+        : allowed
         ? Array.from(new Set([...getAllowedActions(module), action]))
         : getAllowedActions(module).filter((key) => key !== action),
     }))
@@ -351,13 +353,15 @@ export function RolesPage() {
     [globallyEnabledModules],
   )
   const permissionRows = useMemo(
-    () => permissionGroups.flatMap((group) => [
+    () => [
+      { key: "all-permissions", kind: "all" as const, label: "Chọn tất cả", modules: permissionGroups.flatMap((group) => group.modules) },
+      ...permissionGroups.flatMap((group) => [
       { key: `group-${group.key}`, kind: "group" as const, label: group.label, modules: group.modules },
       ...group.modules.map((module) => ({ key: module, kind: "module" as const, label: appModuleLabels[module] || module, module, modules: [module] })),
-    ]),
+      ]),
+    ],
     [permissionGroups],
   )
-
   return (
     <>
       <div className="page-header">
@@ -451,11 +455,7 @@ export function RolesPage() {
         </Card>
 
         {/* ── Right: assignments for selected role ─── */}
-        <Card
-          className="glass-card"
-          style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}
-          bodyStyle={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0, height: "100%" }}
-        >
+        <div className="roles-content-panel">
           {!selectedRole ? (
             <div style={{
               flex: 1,
@@ -471,19 +471,20 @@ export function RolesPage() {
             <>
               <Tabs
                 activeKey={roleContentTab}
+                className="record-status-tabs"
                 items={[
                   { key: "permissions", label: "Phân quyền" },
                   { key: "users", label: `Danh sách user${roleAssignments.length ? ` (${roleAssignments.length})` : ""}` },
                 ]}
                 onChange={(key) => setRoleContentTab(key as "permissions" | "users")}
               />
-              {roleContentTab === "permissions" ? <div>
+              {roleContentTab === "permissions" ? <div className="roles-tab-content roles-tab-content--permissions">
                 <div className="role-permission-table">
                   <Table
                     size="small"
                     pagination={false}
                     rowKey="key"
-                    rowClassName={(row) => row.kind === "group" ? "role-permission-parent-row" : "role-permission-child-row"}
+                    rowClassName={(row) => row.kind === "all" ? "role-permission-all-row" : row.kind === "group" ? "role-permission-parent-row" : "role-permission-child-row"}
                     scroll={{ x: 960 }}
                     dataSource={permissionRows}
                     columns={[
@@ -492,7 +493,7 @@ export function RolesPage() {
                         dataIndex: "label",
                         fixed: "left",
                         width: 280,
-                        render: (label, row) => row.kind === "group"
+                        render: (label, row) => row.kind === "all" || row.kind === "group"
                           ? <Typography.Text strong>{label}</Typography.Text>
                           : <span className="role-permission-child-title">{label}</span>,
                       },
@@ -500,11 +501,11 @@ export function RolesPage() {
                         title: "Bật module",
                         width: 112,
                         align: "center",
-                        render: (_: unknown, row: { kind: "group" | "module"; module?: string; modules: string[] }) => {
+                        render: (_: unknown, row: { kind: "all" | "group" | "module"; module?: string; modules: string[] }) => {
                           const enabledCount = row.modules.filter((module) => selectedModules.includes(module)).length
                           const checked = enabledCount === row.modules.length
                           return <Checkbox checked={checked} indeterminate={enabledCount > 0 && !checked} onChange={(event) => {
-                            if (row.kind === "group") {
+                            if (row.kind === "all" || row.kind === "group") {
                               updateRoleModules(event.target.checked ? Array.from(new Set([...selectedModules, ...row.modules])) : selectedModules.filter((module) => !row.modules.includes(module)))
                             } else if (row.module) {
                               updateRoleModules(event.target.checked ? Array.from(new Set([...selectedModules, row.module])) : selectedModules.filter((module) => module !== row.module))
@@ -517,17 +518,19 @@ export function RolesPage() {
                         key: action.key,
                         width: 96,
                         align: "center" as const,
-                        render: (_: unknown, row: { kind: "group" | "module"; module?: string; modules: string[] }) => {
+                        render: (_: unknown, row: { kind: "all" | "group" | "module"; module?: string; modules: string[] }) => {
                           const checkedCount = row.modules.filter((module) => getAllowedActions(module).includes(action.key)).length
                           const checked = checkedCount === row.modules.length
                           return <Checkbox
                             checked={checked}
                             indeterminate={checkedCount > 0 && !checked}
                             onChange={(event) => {
-                              if (row.kind === "group") updateGroupAction(row.modules, action.key, event.target.checked)
+                              if (row.kind === "all" || row.kind === "group") updateGroupAction(row.modules, action.key, event.target.checked)
                               else if (row.module) updateModuleActions(row.module, event.target.checked
                                 ? Array.from(new Set([...getAllowedActions(row.module), action.key]))
-                                : getAllowedActions(row.module).filter((key) => key !== action.key))
+                                : action.key === "view"
+                                  ? []
+                                  : getAllowedActions(row.module).filter((key) => key !== action.key))
                             }}
                           />
                         },
@@ -537,7 +540,7 @@ export function RolesPage() {
                 </div>
               </div> : null}
 
-              {roleContentTab === "users" ? <>
+              {roleContentTab === "users" ? <div className="roles-tab-content roles-tab-content--users">
               <Flex justify="flex-end">
                 <Button type="primary" className="primary-glow" icon={<UserAddOutlined />} loading={loading} onClick={openCreateAssign}>
                   Thêm phân quyền
@@ -671,10 +674,10 @@ export function RolesPage() {
                   </div>
                 )}
               </div>
-              </> : null}
+              </div> : null}
             </>
           )}
-        </Card>
+        </div>
       </div>
 
       {/* Role Modal */}

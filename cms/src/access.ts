@@ -32,8 +32,8 @@ export function isCurrentUserAdmin() {
 
 export function hasResourceAccess(resource: string) {
   const user = readStoredUser()
-  if (!user || isAdmin(user)) return true
-  return !(user?.disabledModules || []).includes(resource)
+  if (!user) return true
+  return !(user.disabledModules || []).includes(resource) && hasActionAccess(resource, "view")
 }
 
 export function hasScreenAccess(screen: string) {
