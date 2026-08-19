@@ -5,6 +5,8 @@ import {
   Col,
   Dropdown,
   Empty,
+  Form,
+  Input,
   Modal,
   Popconfirm,
   Tabs,
@@ -142,6 +144,10 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   const [relatedEdit, setRelatedEdit] = useState<RelatedRecordEditState | null>(null)
   const [mainEdit, setMainEdit] = useState<MainRecordEditState | null>(null)
   const [quickCreateBlock, setQuickCreateBlock] = useState<RelatedBlock | null>(null)
+  const [passwordProtectedField, setPasswordProtectedField] = useState<FieldLayoutConfig | null>(null)
+  const [revealPassword, setRevealPassword] = useState("")
+  const [revealedValues, setRevealedValues] = useState<Record<string, unknown>>({})
+  const [revealingValue, setRevealingValue] = useState(false)
   const { mutate: deleteRecord } = useDelete()
   const canShowRelatedResource = useCallback((relatedResource: string) =>
     isModuleEnabled(
@@ -151,6 +157,67 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
       settings.hasCustomModuleSelection,
     ) && hasResourceAccess(relatedResource),
   [settings.companyType, settings.enabledModules, settings.hasCustomModuleSelection])
+
+  function renderDetailValue(field: FieldLayoutConfig, source: Record<string, any> | null) {
+    const value = Object.prototype.hasOwnProperty.call(revealedValues, field.key)
+      ? revealedValues[field.key]
+      : resolveRecordFieldValue(source, field)
+    if (!field.requiresPasswordToReveal || Object.prototype.hasOwnProperty.call(revealedValues, field.key)) {
+      return <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={value} />
+    }
+    return (
+      <Space size={8}>
+        <span>••••••</span>
+        <Button icon={<EyeOutlined />} size="small" onClick={() => {
+          setRevealPassword("")
+          setPasswordProtectedField(field)
+        }}>
+          Xem
+        </Button>
+      </Space>
+    )
+  }
+
+  async function revealProtectedField() {
+    if (!passwordProtectedField) return
+    setRevealingValue(true)
+    try {
+      const response = await api.post(`/records/${resource}/${id}/reveal-field`, {
+        fieldKey: passwordProtectedField.key,
+        password: revealPassword,
+      })
+      setRevealedValues((current) => ({ ...current, [passwordProtectedField.key]: response.data.data.value }))
+      setPasswordProtectedField(null)
+      setRevealPassword("")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể xác thực mật khẩu")
+    } finally {
+      setRevealingValue(false)
+    }
+  }
+
+  const passwordRevealModal = (
+    <Modal
+      destroyOnHidden
+      maskClosable={false}
+      open={Boolean(passwordProtectedField)}
+      title={`Xem ${passwordProtectedField?.label || "giá trị bảo mật"}`}
+      okText="Xác thực và xem"
+      cancelText="Hủy"
+      confirmLoading={revealingValue}
+      onOk={() => void revealProtectedField()}
+      onCancel={() => {
+        setPasswordProtectedField(null)
+        setRevealPassword("")
+      }}
+    >
+      <Form layout="vertical">
+        <Form.Item label="Mật khẩu hiện tại" required>
+          <Input.Password autoFocus value={revealPassword} onChange={(event) => setRevealPassword(event.target.value)} onPressEnter={() => void revealProtectedField()} />
+        </Form.Item>
+      </Form>
+    </Modal>
+  )
 
   useEffect(() => {
     const onDataRefresh = (event: Event) => {
@@ -233,12 +300,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                     ) : field.label}
                   </div>
                   <div className="detail-item-content">
-                    <RecordValueView
-                      field={field}
-                      fileLookups={fileLookups}
-                      lookups={lookups}
-                      value={resolveRecordFieldValue(record, field)}
-                    />
+                    {renderDetailValue(field, record)}
                   </div>
                 </div>
               </Col>
@@ -249,6 +311,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
     }))
 
     return (
+      <>
       <Card className="glass-card detail-card" loading={loading}>
         {detailTabs.length > 1 ? (
           <Tabs items={detailTabs} />
@@ -261,6 +324,8 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
           </>
         )}
       </Card>
+      {passwordRevealModal}
+      </>
     )
   }
 
@@ -462,7 +527,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                             ) : field.label}
                           </div>
                           <div className="detail-item-content">
-                            <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={resolveRecordFieldValue(record, field)} />
+                            {renderDetailValue(field, record)}
                           </div>
                         </div>
                       </Col>
@@ -855,6 +920,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
           )
         )}
       </Modal>
+      {passwordRevealModal}
     </>
   )
 

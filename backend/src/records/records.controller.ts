@@ -29,6 +29,16 @@ export class RecordsController {
     return this.records.revealPhone(id, request.user);
   }
 
+  @Post('records/:resource/:id/reveal-field')
+  revealField(
+    @Param('resource') resource: string,
+    @Param('id') id: string,
+    @Body() payload: { fieldKey?: string; password?: string },
+    @Request() request: { user: AuthUser },
+  ) {
+    return this.records.revealField(resource, id, String(payload.fieldKey || ''), String(payload.password || ''), request.user);
+  }
+
   @Post('records/leads/:id/convert-to-customer')
   convertLeadToCustomer(@Param('id') id: string, @Request() request: { user: AuthUser }) {
     return this.records.convertLeadToCustomer(id, request.user);

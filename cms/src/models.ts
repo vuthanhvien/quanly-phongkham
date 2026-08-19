@@ -46,6 +46,8 @@ export interface FieldSpec {
   description?: string;
   placeholder?: string;
   inputPattern?: string;
+  /** Requires the current user's password before this value can be revealed in detail view. */
+  requiresPasswordToReveal?: boolean;
   relation?: RelationSpec;
   customTableId?: string;
   tableColumns?: Array<{ key: string; label: string; dataType: string; options?: string[] }>;

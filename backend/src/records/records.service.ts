@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { hash } from 'bcryptjs';
+import { compare, hash } from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { extname, join } from 'path';
@@ -987,7 +987,24 @@ export class RecordsService {
   async find (resource: string, id: string, user?: AuthUser, request?: RequestContext, include?: string) {
     const record = await this.findRaw(resource, id, include, request);
     await this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
-    return { data: this.protect(resource, record, request) };
+    return { data: await this.protectDetailFields(resource, this.protect(resource, record, request) as ConfigurableEntity, user) };
+  }
+
+  async revealField (resource: string, id: string, fieldKey: string, password: string, user: AuthUser) {
+    const key = fieldKey.trim();
+    if (!key || !password) throw new BadRequestException('Vui lòng nhập mật khẩu');
+    const record = await this.findRaw(resource, id);
+    await this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
+    if (!(await this.isPasswordProtectedDetailField(resource, key, user))) {
+      throw new ForbiddenException('Trường này không yêu cầu xác thực để xem');
+    }
+    const account = await this.users.findOne({ where: { id: user.id, isActive: true } });
+    if (!account || !(await compare(password, account.passwordHash))) {
+      throw new ForbiddenException('Mật khẩu không đúng');
+    }
+    const value = (record as Record<string, unknown>)[key] ?? ((record as Record<string, any>).customFields || {})[key];
+    await this.audit(user, 'REVEAL_FIELD', resource, id, { fieldKey: key });
+    return { data: { fieldKey: key, value } };
   }
 
   async exportImportBundle (resource: string, template = false, fake = false, user?: AuthUser, request?: RequestContext, sampleSize = 5) {
@@ -3350,6 +3367,46 @@ export class RecordsService {
       .take(Math.min(Math.max(pageSize, 1), 200))
       .getManyAndCount();
     return { data, total };
+  }
+
+  private async protectDetailFields (resource: string, record: ConfigurableEntity, user?: AuthUser) {
+    if (!user) return record;
+    const protectedKeys = await this.passwordProtectedDetailFieldKeys(resource, user);
+    if (!protectedKeys.length) return record;
+
+    const protectedRecord = { ...(record as unknown as Record<string, unknown>) };
+    const customFields = protectedRecord.customFields && typeof protectedRecord.customFields === 'object'
+      ? { ...(protectedRecord.customFields as Record<string, unknown>) }
+      : undefined;
+    for (const key of protectedKeys) {
+      if (Object.prototype.hasOwnProperty.call(protectedRecord, key)) protectedRecord[key] = '••••••';
+      if (customFields && Object.prototype.hasOwnProperty.call(customFields, key)) customFields[key] = '••••••';
+    }
+    if (customFields) protectedRecord.customFields = customFields;
+    return protectedRecord as unknown as ConfigurableEntity;
+  }
+
+  private async isPasswordProtectedDetailField (resource: string, fieldKey: string, user: AuthUser) {
+    return (await this.passwordProtectedDetailFieldKeys(resource, user)).includes(fieldKey);
+  }
+
+  private async passwordProtectedDetailFieldKeys (resource: string, user: AuthUser) {
+    const roleChain = Array.from(new Set([
+      normalizeRole(user.activeRole),
+      normalizeRole(user.roleMain),
+      normalizeRole(user.role),
+      'ALL',
+    ]));
+    const views = await this.viewSettings.find({ where: { entityType: resource, viewType: 'DETAIL' } });
+    const view = roleChain
+      .map((role) => views.find((item) => normalizeRole(item.role) === role))
+      .find(Boolean);
+    const fields = Array.isArray(view?.config?.fields) ? view.config.fields : [];
+    return fields
+      .filter((field): field is Record<string, unknown> => Boolean(field) && typeof field === 'object' && !Array.isArray(field))
+      .filter((field) => field.requiresPasswordToReveal === true)
+      .map((field) => String(field.key || '').trim())
+      .filter(Boolean);
   }
 
   private protect (resource: string, record: ConfigurableEntity, request?: RequestContext) {

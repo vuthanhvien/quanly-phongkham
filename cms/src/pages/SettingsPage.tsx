@@ -1513,6 +1513,7 @@ function FieldConfigEditor({
         <Input value={`${field.label} (${field.key})`} disabled />
       </Form.Item>
       {viewType === "FORM" && <Form.Item><Checkbox checked={Boolean(field.disabled)} onChange={(event) => update({ disabled: event.target.checked })}>Khóa sửa</Checkbox></Form.Item>}
+      {viewType === "DETAIL" && <Form.Item><Checkbox checked={Boolean(field.requiresPasswordToReveal)} onChange={(event) => update({ requiresPasswordToReveal: event.target.checked })}>Yêu cầu nhập mật khẩu để xem giá trị</Checkbox></Form.Item>}
       <Form.Item label="Nhãn hiển thị">
         <Input value={field.label} onChange={(event) => update({ label: event.target.value })} placeholder="Tên field hiển thị" />
       </Form.Item>

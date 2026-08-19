@@ -396,7 +396,6 @@ export function RecordFormContent({
     () => fields.filter((field) => {
       if (isAppointmentForm && (field.key === "startTime" || field.key === "endTime")) return false
       if (isWorkScheduleForm && (field.key === "workDate" || field.key === "startTime" || field.key === "endTime" || field.key === "recurrenceUntil")) return false
-      if (isAddressForm && field.key === "address") return false
       // The server derives this summary from the editable assignments below.
       if (resource === "user-accounts" && field.key === "branchRoleSummary") return false
       if (hiddenFieldKeys.includes(field.key)) return false
@@ -450,32 +449,39 @@ export function RecordFormContent({
 
   const renderFieldGrid = (tabFields: FieldLayoutConfig[], includeSpecialFields: boolean) => (
     <Row gutter={[16, 0]}>
-      {tabFields.map((field) => (
-        <Col key={field.key} xs={24} md={widthToSpan(field.width)}>
-          <Form.Item
-            label={field.description ? (
-              <Space direction="vertical" size={0}>
-                <span>{field.label}</span>
-                <Typography.Text type="secondary">{field.description}</Typography.Text>
-              </Space>
-            ) : field.key === "code" && !editing ? `${field.label} (tự sinh nếu để trống)` : field.label}
-            name={field.key}
-            rules={[
-              { required: Boolean(field.required && !field.disabled && !(field.key === "code" && !editing)), message: `Nhập ${field.label}` },
-              ...(field.inputPattern ? [{
-                validator: (_rule: unknown, value: unknown) => isInputPatternComplete(field.inputPattern, value)
-                  ? Promise.resolve()
-                  : Promise.reject(new Error(`${field.label} phải đúng định dạng HH:MM`)),
-              }] : []),
-            ]}
-          >
-            <FieldInput field={field} lookups={lookups} resource={resource} />
-          </Form.Item>
-        </Col>
-      ))}
+      {tabFields.map((field) => {
+        // `address` is represented by the province/ward/address-line controls.
+        // Keep its configured slot so the special control follows the saved form order.
+        if (isAddressForm && field.key === "address") {
+          return <VietnamAddressFields key={field.key} form={form} />
+        }
+
+        return (
+          <Col key={field.key} xs={24} md={widthToSpan(field.width)}>
+            <Form.Item
+              label={field.description ? (
+                <Space direction="vertical" size={0}>
+                  <span>{field.label}</span>
+                  <Typography.Text type="secondary">{field.description}</Typography.Text>
+                </Space>
+              ) : field.key === "code" && !editing ? `${field.label} (tự sinh nếu để trống)` : field.label}
+              name={field.key}
+              rules={[
+                { required: Boolean(field.required && !field.disabled && !(field.key === "code" && !editing)), message: `Nhập ${field.label}` },
+                ...(field.inputPattern ? [{
+                  validator: (_rule: unknown, value: unknown) => isInputPatternComplete(field.inputPattern, value)
+                    ? Promise.resolve()
+                    : Promise.reject(new Error(`${field.label} phải đúng định dạng HH:MM`)),
+                }] : []),
+              ]}
+            >
+              <FieldInput field={field} lookups={lookups} resource={resource} />
+            </Form.Item>
+          </Col>
+        )
+      })}
       {includeSpecialFields && isAppointmentForm ? <AppointmentDateTimeFields form={form} /> : null}
       {includeSpecialFields && isWorkScheduleForm ? <WorkSchedulePeriodFields /> : null}
-      {includeSpecialFields && isAddressForm ? <VietnamAddressFields form={form} /> : null}
     </Row>
   )
 

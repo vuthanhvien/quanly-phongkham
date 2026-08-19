@@ -398,6 +398,10 @@ export function buildFieldLayoutConfigs(
         typeof entry.inputPattern === 'string'
           ? entry.inputPattern
           : base.inputPattern,
+      requiresPasswordToReveal:
+        typeof entry.requiresPasswordToReveal === 'boolean'
+          ? entry.requiresPasswordToReveal
+          : base.requiresPasswordToReveal,
       defaultValue:
         entry.defaultValue !== undefined
           ? entry.defaultValue
@@ -464,6 +468,7 @@ export function serializeViewConfig(
     if (field.description?.trim()) next.description = field.description.trim()
     if (field.placeholder?.trim()) next.placeholder = field.placeholder.trim()
     if (field.inputPattern !== undefined) next.inputPattern = field.inputPattern.trim()
+    if (field.requiresPasswordToReveal) next.requiresPasswordToReveal = true
     if (field.defaultValue !== undefined && field.defaultValue !== '') {
       next.defaultValue = field.defaultValue
     }
