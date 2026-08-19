@@ -89,7 +89,7 @@ const DEFAULT_KANBAN_COLUMNS = [
 ];
 
 const RESOURCE_ACTIONS: Record<string, string[]> = {
-  customers: [...DEFAULT_RESOURCE_ACTIONS, 'reveal-phone'],
+  customers: DEFAULT_RESOURCE_ACTIONS,
   leads: [...DEFAULT_RESOURCE_ACTIONS, 'convert-to-customer'],
   invoices: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
   expenses: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
@@ -1298,13 +1298,6 @@ export class RecordsService {
     if (archived) {
       await this.workflowDefinitions.save({ ...archived, code: this.archivedWorkflowCode(code, archived.id), isActive: false });
     }
-  }
-
-  async revealPhone (id: string, user: AuthUser) {
-    const customer = (await this.findRaw('customers', id)) as Customer;
-    await this.assertPermission(user, 'customers', 'reveal-phone');
-    await this.audit(user, 'REVEAL_PHONE', 'customers', id);
-    return { data: { phone: customer.phone } };
   }
 
   async convertLeadToCustomer (id: string, user: AuthUser) {
@@ -3384,16 +3377,16 @@ export class RecordsService {
   }
 
   private async protectPasswordFields (resource: string, record: ConfigurableEntity, user?: AuthUser) {
-    const protectedKeys = await this.passwordProtectedDetailFieldKeys(resource, user);
-    if (!protectedKeys.length) return record;
+    const protectedFields = await this.passwordProtectedDetailFields(resource, user);
+    if (!protectedFields.length) return record;
 
     const protectedRecord = { ...(record as unknown as Record<string, unknown>) };
     const customFields = protectedRecord.customFields && typeof protectedRecord.customFields === 'object'
       ? { ...(protectedRecord.customFields as Record<string, unknown>) }
       : undefined;
-    for (const key of protectedKeys) {
-      if (Object.prototype.hasOwnProperty.call(protectedRecord, key)) protectedRecord[key] = '••••••';
-      if (customFields && Object.prototype.hasOwnProperty.call(customFields, key)) customFields[key] = '••••••';
+    for (const field of protectedFields) {
+      if (Object.prototype.hasOwnProperty.call(protectedRecord, field.key)) protectedRecord[field.key] = this.maskProtectedFieldValue(protectedRecord[field.key], field.maskLastThreeDigits);
+      if (customFields && Object.prototype.hasOwnProperty.call(customFields, field.key)) customFields[field.key] = this.maskProtectedFieldValue(customFields[field.key], field.maskLastThreeDigits);
     }
     if (customFields) protectedRecord.customFields = customFields;
     return protectedRecord as unknown as ConfigurableEntity;
@@ -3404,6 +3397,10 @@ export class RecordsService {
   }
 
   private async passwordProtectedDetailFieldKeys (resource: string, user?: AuthUser) {
+    return (await this.passwordProtectedDetailFields(resource, user)).map((field) => field.key);
+  }
+
+  private async passwordProtectedDetailFields (resource: string, user?: AuthUser) {
     const roleChain = Array.from(new Set([
       normalizeRole(user?.activeRole),
       normalizeRole(user?.roleMain),
@@ -3417,9 +3414,14 @@ export class RecordsService {
     const fields = Array.isArray(view?.config?.fields) ? view.config.fields : [];
     return fields
       .filter((field): field is Record<string, unknown> => Boolean(field) && typeof field === 'object' && !Array.isArray(field))
-      .filter((field) => field.requiresPasswordToReveal === true)
-      .map((field) => String(field.key || '').trim())
-      .filter(Boolean);
+      .filter((field) => field.requiresPasswordToReveal === true || field.maskLastThreeDigits === true)
+      .map((field) => ({ key: String(field.key || '').trim(), maskLastThreeDigits: field.maskLastThreeDigits === true }))
+      .filter((field) => Boolean(field.key));
+  }
+
+  private maskProtectedFieldValue(value: unknown, maskLastThreeDigits: boolean) {
+    if (maskLastThreeDigits && typeof value === 'string') return value.replace(/\d{3}$/, '***');
+    return '••••••';
   }
 
   private protect (resource: string, record: ConfigurableEntity, request?: RequestContext) {
@@ -3434,10 +3436,7 @@ export class RecordsService {
       file.publicUrl = this.toAbsolutePublicUrl(file.publicUrl, request);
       return file;
     }
-    if (resource !== 'customers') return record;
-    const customer = { ...(record as Customer) };
-    customer.phone = customer.phone.replace(/\d{3}$/, '***');
-    return customer;
+    return record;
   }
 
   private async attachStaffRoleMetadata (records: Staff[]) {

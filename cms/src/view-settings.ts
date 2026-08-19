@@ -402,6 +402,10 @@ export function buildFieldLayoutConfigs(
         typeof entry.requiresPasswordToReveal === 'boolean'
           ? entry.requiresPasswordToReveal
           : base.requiresPasswordToReveal,
+      maskLastThreeDigits:
+        typeof entry.maskLastThreeDigits === 'boolean'
+          ? entry.maskLastThreeDigits
+          : base.maskLastThreeDigits,
       defaultValue:
         entry.defaultValue !== undefined
           ? entry.defaultValue
@@ -469,6 +473,7 @@ export function serializeViewConfig(
     if (field.placeholder?.trim()) next.placeholder = field.placeholder.trim()
     if (field.inputPattern !== undefined) next.inputPattern = field.inputPattern.trim()
     if (field.requiresPasswordToReveal) next.requiresPasswordToReveal = true
+    if (field.maskLastThreeDigits) next.maskLastThreeDigits = true
     if (field.defaultValue !== undefined && field.defaultValue !== '') {
       next.defaultValue = field.defaultValue
     }

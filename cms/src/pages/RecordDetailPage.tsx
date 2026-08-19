@@ -161,12 +161,12 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
     const value = Object.prototype.hasOwnProperty.call(revealedValues, field.key)
       ? revealedValues[field.key]
       : resolveRecordFieldValue(source, field)
-    if (!field.requiresPasswordToReveal || Object.prototype.hasOwnProperty.call(revealedValues, field.key)) {
+    if ((!field.requiresPasswordToReveal && !field.maskLastThreeDigits) || Object.prototype.hasOwnProperty.call(revealedValues, field.key)) {
       return <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={value} />
     }
     return (
       <Space size={8}>
-        <span>••••••</span>
+        <RecordValueView field={field} fileLookups={fileLookups} lookups={lookups} value={value} />
         <Button icon={<EyeOutlined />} size="small" onClick={() => {
           setProtectedFieldTarget({ resource, recordId: id, fieldKey: field.key, label: field.label })
         }}>
@@ -568,16 +568,6 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                                 />
                               </Tooltip>
                             )}
-                            {block.resource === "customers" && hasActionAccess(block.resource, "reveal-phone") && (
-                              <Tooltip title="Xem số điện thoại">
-                                <Button
-                                  icon={<PhoneOutlined />}
-                                  size="small"
-                                  type="text"
-                                  onClick={() => void revealPhone(row.id)}
-                                />
-                              </Tooltip>
-                            )}
                             {block.resource === "leads" && !row.convertedCustomerId && hasActionAccess(block.resource, "convert-to-customer") && (
                               <Tooltip title="Chuyển thành khách hàng">
                                 <Button
@@ -918,11 +908,6 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   async function reloadCurrentRecord() {
     const response = await api.get(`/records/${resource}/${id}`, { params: { include: '*' } })
     setRecord(response.data.data)
-  }
-
-  async function revealPhone(recordId: string) {
-    const response = await api.post(`/records/customers/${recordId}/reveal-phone`)
-    message.info(`Số điện thoại: ${response.data.data.phone}`)
   }
 
   async function convertRelatedLead(recordId: string) {

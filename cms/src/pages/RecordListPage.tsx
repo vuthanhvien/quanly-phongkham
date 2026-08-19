@@ -13,7 +13,6 @@ import {
   InboxOutlined,
   MinusCircleOutlined,
   MoreOutlined,
-  PhoneOutlined,
   PrinterOutlined,
   SwapOutlined,
   PlusOutlined,
@@ -493,7 +492,7 @@ export function RecordListPage() {
               <RecordValueView compact field={field} fileLookups={fileLookups} lookups={lookups} value={revealedValues[revealKey]} />
             ) : (
               <Space size={4}>
-                <span>••••••</span>
+                <RecordValueView compact field={field} fileLookups={fileLookups} lookups={lookups} value={resolveRecordFieldValue(row, field)} />
                 <Tooltip title="Xem bằng mã PIN">
                   <Button type="text" size="small" icon={<EyeOutlined />} aria-label={`Xem ${field.label}`} onClick={() => setProtectedFieldTarget({ resource, recordId: String(row.id), fieldKey: field.key, label: field.label })} />
                 </Tooltip>
@@ -563,7 +562,6 @@ export function RecordListPage() {
           if (recordStatus === "active" && hasActionAccess(resource, "update")) menuItems.push({ key: "edit", icon: <EditOutlined />, label: "Chỉnh sửa", onClick: () => setEditingId(recordId) })
           if (isUnitRoot && recordStatus === "active" && hasActionAccess(resource, "create")) menuItems.push({ key: "add-child", icon: <PlusOutlined />, label: "Thêm đơn vị quy đổi", onClick: () => createChildUnit(recordId) })
           if (recordStatus === "active" && hasActionAccess(resource, "create") && resource !== "files") menuItems.push({ key: "copy", icon: <CopyOutlined />, label: "Nhân bản", onClick: () => void duplicateRecord(recordId) })
-          if (resource === "customers" && hasActionAccess(resource, "reveal-phone")) menuItems.push({ key: "phone", icon: <PhoneOutlined />, label: "Xem số điện thoại", onClick: () => void revealPhone(recordId) })
           if (resource === "leads" && !row.convertedCustomerId && hasActionAccess(resource, "convert-to-customer")) menuItems.push({ key: "convert", icon: <SwapOutlined />, label: "Chuyển thành khách hàng", onClick: () => void convertLead(recordId) })
           if (resource === "staff" && !row.linkedAccount && recordStatus === "active" && hasActionAccess("user-accounts", "create")) menuItems.push({ key: "create-account", icon: <UserAddOutlined />, label: "Tạo tài khoản", onClick: () => openStaffAccountModal(row) })
           if (["invoices", "expenses", "payrolls"].includes(resource) && hasActionAccess(resource, "generate-accounting-voucher")) menuItems.push({ key: "voucher", icon: <AuditOutlined />, label: "Tạo chứng từ kế toán", onClick: () => void generateAccountingVoucher(resource, recordId) })
@@ -656,13 +654,6 @@ export function RecordListPage() {
     const recordId = printTarget.recordId
     setPrintTarget(null)
     void printRecord(template, recordId)
-  }
-
-  async function revealPhone(recordId: string) {
-    const response = await api.post(
-      `/records/customers/${recordId}/reveal-phone`,
-    )
-    message.info(`Số điện thoại: ${response.data.data.phone}`)
   }
 
   async function convertLead(recordId: string) {

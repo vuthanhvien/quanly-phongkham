@@ -48,6 +48,8 @@ export interface FieldSpec {
   inputPattern?: string;
   /** Requires the current user's 6-digit PIN before this value can be revealed in detail view. */
   requiresPasswordToReveal?: boolean;
+  /** Masks the last three digits until the current user enters their PIN. */
+  maskLastThreeDigits?: boolean;
   relation?: RelationSpec;
   customTableId?: string;
   tableColumns?: Array<{ key: string; label: string; dataType: string; options?: string[] }>;
@@ -275,7 +277,7 @@ const DEFAULT_RESOURCE_ACTIONS: ResourceActionOption[] = [
 ];
 
 export const resourceActionOptions: Record<string, ResourceActionOption[]> = {
-  customers: [...DEFAULT_RESOURCE_ACTIONS, { key: 'reveal-phone', label: 'Xem số điện thoại' }],
+  customers: DEFAULT_RESOURCE_ACTIONS,
   leads: [...DEFAULT_RESOURCE_ACTIONS, { key: 'convert-to-customer', label: 'Chuyển thành khách hàng' }],
   invoices: [...DEFAULT_RESOURCE_ACTIONS, { key: 'generate-accounting-voucher', label: 'Tạo chứng từ kế toán' }],
   expenses: [...DEFAULT_RESOURCE_ACTIONS, { key: 'generate-accounting-voucher', label: 'Tạo chứng từ kế toán' }],

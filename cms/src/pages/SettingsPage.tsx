@@ -1513,7 +1513,8 @@ function FieldConfigEditor({
         <Checkbox checked={field.visible} onChange={(event) => update({ visible: event.target.checked })}>Hiển thị field này</Checkbox>
       </Form.Item>
       {viewType === "FORM" && <Form.Item><Checkbox checked={Boolean(field.disabled)} onChange={(event) => update({ disabled: event.target.checked })}>Khóa sửa</Checkbox></Form.Item>}
-      {viewType === "DETAIL" && <Form.Item><Checkbox checked={Boolean(field.requiresPasswordToReveal)} onChange={(event) => update({ requiresPasswordToReveal: event.target.checked })}>Yêu cầu nhập mật khẩu để xem giá trị</Checkbox></Form.Item>}
+      {viewType === "DETAIL" && <Form.Item><Checkbox checked={Boolean(field.requiresPasswordToReveal)} onChange={(event) => update({ requiresPasswordToReveal: event.target.checked })}>Yêu cầu nhập mã PIN để xem giá trị</Checkbox></Form.Item>}
+      {viewType === "DETAIL" && <Form.Item><Checkbox checked={Boolean(field.maskLastThreeDigits)} onChange={(event) => update({ maskLastThreeDigits: event.target.checked })}>Ẩn 3 số cuối, nhập mã PIN để xem</Checkbox></Form.Item>}
       <Form.Item label="Nhãn hiển thị">
         <Input value={field.label} onChange={(event) => update({ label: event.target.value })} placeholder="Tên field hiển thị" />
       </Form.Item>

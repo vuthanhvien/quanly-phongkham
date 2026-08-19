@@ -24,11 +24,6 @@ export class RecordsController {
     return this.records.list(resource, page, pageSize, search, filters, request?.user, request, query?.include, advanced, query?.sort, query?.order);
   }
 
-  @Post('records/customers/:id/reveal-phone')
-  revealPhone(@Param('id') id: string, @Request() request: { user: AuthUser }) {
-    return this.records.revealPhone(id, request.user);
-  }
-
   @Post('records/:resource/:id/reveal-field')
   revealField(
     @Param('resource') resource: string,

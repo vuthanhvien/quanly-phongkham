@@ -10,7 +10,7 @@ const DEFAULT_ROLE_SCOPE = 'ALL';
 const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print'];
 
 const RESOURCE_ACTIONS: Record<string, string[]> = {
-  customers: [...DEFAULT_RESOURCE_ACTIONS, 'reveal-phone'],
+  customers: DEFAULT_RESOURCE_ACTIONS,
   leads: [...DEFAULT_RESOURCE_ACTIONS, 'convert-to-customer'],
   invoices: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
   expenses: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
