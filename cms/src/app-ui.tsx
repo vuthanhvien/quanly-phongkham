@@ -284,14 +284,59 @@ export function syncDocumentBranding(settings: AppUiSettings) {
   }
   description.setAttribute('content', settings.appDescription || appName)
 
-  const iconUrl = settings.appIconUrl || `${import.meta.env.BASE_URL}favicon.svg`
-  syncFavicon('app-favicon', 'icon', iconUrl)
-  syncFavicon('app-shortcut-icon', 'shortcut icon', iconUrl)
+  syncBrandFavicon(settings.appIconUrl?.trim() || '')
+}
+
+const DEFAULT_FAVICON_URL = `${import.meta.env.BASE_URL}favicon.svg`
+
+function toAbsoluteUrl(href: string) {
+  try {
+    return new URL(href, window.location.href).href
+  } catch {
+    return ''
+  }
+}
+
+// Only bumped so a stale probe cannot overwrite a newer icon choice.
+let faviconProbeId = 0
+
+function syncBrandFavicon(iconUrl: string) {
+  const probeId = ++faviconProbeId
+  if (!iconUrl) {
+    applyFavicon(DEFAULT_FAVICON_URL)
+    return
+  }
+
+  const current = document.getElementById('app-favicon') as HTMLLinkElement | null
+  const target = toAbsoluteUrl(iconUrl)
+  if (!target) {
+    applyFavicon(DEFAULT_FAVICON_URL)
+    return
+  }
+  if (current?.href === target) return
+
+  // The icon URL comes from settings and can easily be dead: the file was
+  // removed, or its absolute host was recorded from a different origin than the
+  // one the browser is on. Pointing <link> at a 404 leaves the tab with no icon
+  // at all, so only swap once the image really decodes.
+  const probe = new Image()
+  probe.onload = () => {
+    if (probeId === faviconProbeId) applyFavicon(iconUrl)
+  }
+  probe.onerror = () => {
+    if (probeId === faviconProbeId) applyFavicon(DEFAULT_FAVICON_URL)
+  }
+  probe.src = iconUrl
+}
+
+function applyFavicon(href: string) {
+  syncFavicon('app-favicon', 'icon', href)
+  syncFavicon('app-shortcut-icon', 'shortcut icon', href)
 }
 
 function syncFavicon(id: string, rel: string, href: string) {
   const previous = document.getElementById(id) as HTMLLinkElement | null
-  if (previous?.href === new URL(href, window.location.href).href) return
+  if (previous?.href === toAbsoluteUrl(href)) return
 
   // Replacing the element prompts browsers to reload a newly selected icon.
   const icon = document.createElement('link')

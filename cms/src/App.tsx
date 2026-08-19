@@ -143,6 +143,13 @@ export function App() {
   }, []);
 
   const controlHeight = controlHeightBySize(appUiSettings.size);
+  // antd derives borderRadiusLG/SM/XS from borderRadius with its own curve, and
+  // caps borderRadiusLG at 16px. Size-aware components (Input, Select, DatePicker,
+  // Button, Modal…) read those derived tokens instead of borderRadius, so they
+  // drift away from the configured radius. Drive the whole scale from the setting.
+  const radius = appUiSettings.borderRadius;
+  const radiusSM = Math.max(4, radius - 4);
+  const radiusXS = Math.max(2, radius - 8);
   const cardPadding = cardPaddingBySize(appUiSettings.size);
   const tablePadding = tablePaddingBySize(appUiSettings.size);
   const layoutMetrics = layoutMetricsBySize(appUiSettings.size);
@@ -175,7 +182,10 @@ export function App() {
             colorText: appUiSettings.textColor,
             colorTextSecondary: appUiSettings.textMutedColor,
             colorTextHeading: appUiSettings.titleColor,
-            borderRadius: appUiSettings.borderRadius,
+            borderRadius: radius,
+            borderRadiusLG: radius,
+            borderRadiusSM: radiusSM,
+            borderRadiusXS: radiusXS,
             fontFamily: appUiSettings.fontFamily,
             controlHeight,
             controlHeightSM: Math.max(28, controlHeight - 4),
@@ -198,7 +208,9 @@ export function App() {
           components: {
             Button: {
               controlHeight,
-              borderRadius: appUiSettings.borderRadius,
+              borderRadius: radius,
+              borderRadiusLG: radius,
+              borderRadiusSM: radius,
               fontWeight: 700,
               primaryShadow: 'none',
               primaryColor: appUiSettings.buttonPrimaryTextColor,
@@ -215,17 +227,22 @@ export function App() {
               colorErrorActive: appUiSettings.buttonErrorBgColor,
             },
             Card: {
-              borderRadius: appUiSettings.borderRadius,
-              borderRadiusLG: appUiSettings.borderRadius,
+              borderRadius: radius,
+              borderRadiusLG: radius,
               paddingLG: cardPadding,
               boxShadowTertiary: 'var(--app-shadow-soft)',
             },
-            Input: { controlHeight },
-            InputNumber: { controlHeight },
-            Select: { controlHeight },
+            // Text controls keep the exact configured radius at every size so a
+            // `size="small"` input never looks flatter than the one next to it.
+            Input: { controlHeight, borderRadius: radius, borderRadiusLG: radius, borderRadiusSM: radius },
+            InputNumber: { controlHeight, borderRadius: radius, borderRadiusLG: radius, borderRadiusSM: radius },
+            // Select's borderRadiusSM also drives its dropdown item radius, so it
+            // stays on the smaller step; only the selector box follows the setting.
+            Select: { controlHeight, borderRadius: radius, borderRadiusLG: radius },
+            DatePicker: { controlHeight, borderRadius: radius, borderRadiusLG: radius, borderRadiusSM: radius },
             Menu: {
-              itemBorderRadius: appUiSettings.borderRadius,
-              subMenuItemBorderRadius: Math.max(0, appUiSettings.borderRadius - 2),
+              itemBorderRadius: radius,
+              subMenuItemBorderRadius: Math.max(0, radius - 2),
             },
             Table: {
               borderColor: appUiSettings.surfaceBorderColor,
@@ -237,7 +254,7 @@ export function App() {
               headerColor: appUiSettings.titleColor
             },
             Tag: {
-              borderRadiusSM: Math.max(6, appUiSettings.borderRadius - 4),
+              borderRadiusSM: radiusSM,
             },
           },
         }}

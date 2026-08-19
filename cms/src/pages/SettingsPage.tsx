@@ -2,12 +2,11 @@ import {
   AlignCenterOutlined,
   AlignLeftOutlined,
   AlignRightOutlined,
-  ArrowDownOutlined,
-  ArrowUpOutlined,
   BoldOutlined,
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
+  HolderOutlined,
   ItalicOutlined,
   KeyOutlined,
   LinkOutlined,
@@ -21,6 +20,22 @@ import {
   UnorderedListOutlined,
 } from "@ant-design/icons"
 import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  type DragEndEvent,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import {
   Button,
   Card,
   Checkbox,
@@ -28,7 +43,6 @@ import {
   Form,
   Input,
   Modal,
-  Popconfirm,
   Select,
   Space,
   Switch,
@@ -43,7 +57,7 @@ import {
   message,
 } from "antd"
 import type { ColumnsType } from "antd/es/table"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { buildGroupedModuleOptions, resolveEnabledModules } from "../company-types"
@@ -693,6 +707,8 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     () => [...actionOptions].sort((left, right) => (actionOrders[left.key] ?? Number.MAX_SAFE_INTEGER) - (actionOrders[right.key] ?? Number.MAX_SAFE_INTEGER)),
     [actionOptions, actionOrders],
   )
+  const actionDndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
+  const actionTableComponents = useMemo(() => ({ body: { row: SortableSettingsRow } }), [])
   const templatePresets = useMemo(
     () => TEMPLATE_PRESETS.filter((preset) => preset.entityType === entityType),
     [entityType],
@@ -950,10 +966,12 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     }
   }
 
-  function moveAction(key: string, direction: -1 | 1) {
-    const fromIndex = orderedActionOptions.findIndex((action) => action.key === key)
-    const toIndex = fromIndex + direction
-    if (fromIndex < 0 || toIndex < 0 || toIndex >= orderedActionOptions.length) return
+  function reorderActions(event: DragEndEvent) {
+    const fromKey = String(event.active.id)
+    const toKey = event.over?.id ? String(event.over.id) : ""
+    const fromIndex = orderedActionOptions.findIndex((action) => action.key === fromKey)
+    const toIndex = orderedActionOptions.findIndex((action) => action.key === toKey)
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return
     const next = [...orderedActionOptions]
     const [moved] = next.splice(fromIndex, 1)
     next.splice(toIndex, 0, moved)
@@ -1166,7 +1184,10 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                         children: (
                           <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseActionInherited} source={formatRoleLabel(actionSource)} onReuseChange={(checked) => { setReuseActionInherited(checked); void saveActionView(allowedActions, checked) }}>
                           <Card size="small">
+                            <DndContext collisionDetection={closestCenter} onDragEnd={reorderActions} sensors={actionDndSensors}>
+                              <SortableContext items={orderedActionOptions.map((action) => action.key)} strategy={verticalListSortingStrategy}>
                                 <Table
+                                  components={actionTableComponents}
                                   size="small"
                                   pagination={false}
                                   rowKey="key"
@@ -1177,18 +1198,18 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                                 {
                                   title: "",
                                   key: "sort",
-                                  width: 104,
+                                  width: 60,
                                   fixed: "left",
                                   render: (_, action) => {
                                     const index = orderedActionOptions.findIndex((item) => item.key === action.key)
-                                    return <div className="settings-order-controls">
-                                      <Typography.Text type="secondary">#{index + 1}</Typography.Text>
-                                      <Space size={0}>
-                                        <Button type="text" size="small" icon={<ArrowUpOutlined />} disabled={index === 0} aria-label={`Đưa ${action.label} lên`} onClick={() => moveAction(action.key, -1)} />
-                                        <Button type="text" size="small" icon={<ArrowDownOutlined />} disabled={index === orderedActionOptions.length - 1} aria-label={`Đưa ${action.label} xuống`} onClick={() => moveAction(action.key, 1)} />
-                                      </Space>
-                                    </div>
+                                    return <SettingsDragHandle order={index + 1} />
                                   },
+                                },
+                                {
+                                  title: "Thao tác",
+                                  key: "actions",
+                                  width: 76,
+                                  render: (_, action) => <Tooltip title="Sửa"><Button type="text" icon={<EditOutlined />} aria-label={`Sửa ${action.label}`} onClick={() => setEditingAction({ key: action.key, label: actionLabels[action.key] ?? action.label, enabled: allowedActions.includes(action.key), order: actionOrders[action.key] ?? 0, inline: Boolean(actionInline[action.key]) })} /></Tooltip>,
                                 },
                                 {
                                   title: "Hiển thị",
@@ -1214,18 +1235,10 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                                   width: 120,
                                   render: (key, action) => <Checkbox checked={Boolean(actionInline[String(key)])} disabled aria-label={`Hiện ${action.label} ở row`} />,
                                 },
-                                {
-                                  title: "Thao tác",
-                                  key: "actions",
-                                  width: 76,
-                                  fixed: "right",
-                                  align: "right",
-                                  className: "settings-table-actions-cell",
-                                  onHeaderCell: () => ({ className: "settings-table-actions-header" }),
-                                  render: (_, action) => <Tooltip title="Sửa"><Button type="text" icon={<EditOutlined />} aria-label={`Sửa ${action.label}`} onClick={() => setEditingAction({ key: action.key, label: actionLabels[action.key] ?? action.label, enabled: allowedActions.includes(action.key), order: actionOrders[action.key] ?? 0, inline: Boolean(actionInline[action.key]) })} /></Tooltip>,
-                                },
                               ]}
                                 />
+                              </SortableContext>
+                            </DndContext>
                           </Card>
                           <Modal
                             open={Boolean(editingAction)}
@@ -1406,6 +1419,24 @@ function formatRoleLabel(role: string) {
   return ({ ALL: "Tất cả", ADMIN: "Quản trị viên", STAFF: "Nhân viên", DOCTOR: "Bác sĩ" } as Record<string, string>)[role] || role
 }
 
+type SettingsDragHandleContextValue = Pick<ReturnType<typeof useSortable>, "attributes" | "listeners" | "setActivatorNodeRef">
+const SettingsDragHandleContext = createContext<SettingsDragHandleContextValue | null>(null)
+
+function SortableSettingsRow(props: React.HTMLAttributes<HTMLTableRowElement>) {
+  const rowKey = String((props as React.HTMLAttributes<HTMLTableRowElement> & { "data-row-key"?: string })["data-row-key"] || "")
+  const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ id: rowKey, disabled: !rowKey })
+  return <SettingsDragHandleContext.Provider value={{ attributes, listeners, setActivatorNodeRef }}>
+    <tr {...props} ref={setNodeRef} style={{ ...props.style, transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 10 : props.style?.zIndex }} />
+  </SettingsDragHandleContext.Provider>
+}
+
+function SettingsDragHandle({ order }: { order: number }) {
+  const dragHandle = useContext(SettingsDragHandleContext)
+  return <span className="drag-handle" ref={dragHandle?.setActivatorNodeRef} role="button" tabIndex={0} title="Kéo để đổi thứ tự" {...dragHandle?.attributes} {...dragHandle?.listeners}>
+    <HolderOutlined /> <span className="drag-order">#{order}</span>
+  </span>
+}
+
 function ViewConfigTable({
   dataSource,
   viewType,
@@ -1423,30 +1454,36 @@ function ViewConfigTable({
 }) {
   const [editingField, setEditingField] = useState<FieldLayoutConfig | null>(null)
   const [optionEdit, setOptionEdit] = useState<{ fieldKey: string; index: number; value: string; label: string } | null>(null)
-  const visibleFields = useMemo(() => dataSource.filter((field) => field.visible), [dataSource])
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
+  const tableComponents = useMemo(() => ({ body: { row: SortableSettingsRow } }), [])
+  const handleDragEnd = (event: DragEndEvent) => {
+    const fromKey = String(event.active.id)
+    const toKey = event.over?.id ? String(event.over.id) : ""
+    if (onReorder && fromKey && toKey && fromKey !== toKey) onReorder(viewType, fromKey, toKey)
+  }
   const columns: ColumnsType<FieldLayoutConfig> = [
     {
       title: "",
       key: "sort",
-      width: 104,
+      width: 60,
       fixed: "left",
       render: (_, row) => {
-        const index = visibleFields.findIndex((item) => item.key === row.key)
+        const index = dataSource.findIndex((item) => item.key === row.key)
         if (!onReorder || index < 0) return null
-        return <div className="settings-order-controls">
-          <Typography.Text type="secondary">#{index + 1}</Typography.Text>
-          <Space size={0}>
-            <Button type="text" size="small" icon={<ArrowUpOutlined />} disabled={index === 0} aria-label={`Đưa ${row.label} lên`} onClick={() => onReorder(viewType, row.key, visibleFields[index - 1].key)} />
-            <Button type="text" size="small" icon={<ArrowDownOutlined />} disabled={index === visibleFields.length - 1} aria-label={`Đưa ${row.label} xuống`} onClick={() => onReorder(viewType, row.key, visibleFields[index + 1].key)} />
-          </Space>
-        </div>
+        return <SettingsDragHandle order={index + 1} />
       },
     },
     {
       title: "Hiển thị",
       dataIndex: "visible",
       width: 100,
-      render: (value, row) => <Checkbox checked={Boolean(value)} disabled aria-label={`Hiển thị ${row.label}`} />,
+      render: (value, row) => (
+        <Checkbox
+          checked={Boolean(value)}
+          aria-label={`Hiển thị ${row.label}`}
+          onChange={(event) => onChange(viewType, row.key, { visible: event.target.checked })}
+        />
+      ),
     },
     {
       title: "Mã trường",
@@ -1526,32 +1563,25 @@ function ViewConfigTable({
       )
     }
   }
-  columns.push({
+  columns.splice(1, 0, {
     title: "Thao tác",
     key: "actions",
-    width: 88,
-    fixed: "right",
-    align: "right",
-    className: "settings-table-actions-cell",
-    onHeaderCell: () => ({ className: "settings-table-actions-header" }),
+    width: 64,
     render: (_, row) => (
-      <Space size={0}>
-        <Tooltip title="Sửa">
-          <Button type="text" icon={<EditOutlined />} aria-label={`Sửa ${row.label}`} onClick={() => setEditingField({ ...row })} />
-        </Tooltip>
-        <Popconfirm title={`Xóa “${row.label}” khỏi giao diện này?`} okText="Xóa" cancelText="Hủy" onConfirm={() => onChange(viewType, row.key, { visible: false })}>
-          <Tooltip title="Xóa">
-            <Button type="text" danger icon={<DeleteOutlined />} aria-label={`Xóa ${row.label}`} />
-          </Tooltip>
-        </Popconfirm>
-      </Space>
+      <Tooltip title="Sửa">
+        <Button type="text" icon={<EditOutlined />} aria-label={`Sửa ${row.label}`} onClick={() => setEditingField({ ...row })} />
+      </Tooltip>
     ),
   })
 
   return (
     <>
       <Card className="settings-view-config-table-card" size="small">
-        <Table columns={columns} dataSource={visibleFields} pagination={false} rowKey="key" scroll={{ x: 960 }} size="small" tableLayout="fixed" />
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={dndSensors}>
+          <SortableContext items={dataSource.map((field) => field.key)} strategy={verticalListSortingStrategy}>
+            <Table columns={columns} components={tableComponents} dataSource={dataSource} pagination={false} rowClassName={(row) => row.visible ? "" : "settings-field-row-hidden"} rowKey="key" scroll={{ x: 960 }} size="small" tableLayout="fixed" />
+          </SortableContext>
+        </DndContext>
       </Card>
       <Modal
         open={Boolean(editingField)}
@@ -1671,8 +1701,8 @@ function FieldConfigEditor({
         <Form.Item label="Gợi ý nhập">
           <Input value={field.placeholder} onChange={(event) => update({ placeholder: event.target.value })} placeholder="Gợi ý nhập liệu" />
         </Form.Item>
-        <Form.Item label="Mẫu nhập" extra="Dùng 9 cho chữ số, A cho chữ cái; ví dụ: 9999AAAA hoặc HH-MM.">
-          <Input value={field.inputPattern} onChange={(event) => update({ inputPattern: event.target.value })} placeholder="Ví dụ: 9999AAAA hoặc HH-MM" />
+        <Form.Item label="Mẫu nhập" extra="Cú pháp react-input-mask: 9 = số, a = chữ cái, * = chữ hoặc số. Ví dụ: 9999aaaa, 999-999-9999; dùng HH-MM cho giờ hợp lệ.">
+          <Input value={field.inputPattern} onChange={(event) => update({ inputPattern: event.target.value })} placeholder="Ví dụ: 9999aaaa hoặc HH-MM" />
         </Form.Item>
         <Form.Item label="Giá trị mặc định">
           <Input value={Array.isArray(field.defaultValue) ? field.defaultValue.join(", ") : field.defaultValue === undefined || field.defaultValue === null ? "" : String(field.defaultValue)} onChange={(event) => update({ defaultValue: parseDefaultValue(field.type, event.target.value) })} placeholder="Giá trị mặc định" />

@@ -3196,37 +3196,6 @@ body {
   background: color-mix(in srgb, var(--app-primary) 8%, var(--app-surface)) !important;
 }
 
-/* Cột thao tác của các bảng cấu hình luôn bám mép phải khi cuộn ngang. */
-.settings-table-actions-cell,
-.settings-table-actions-header {
-  background: var(--app-surface) !important;
-  box-shadow: -8px 0 12px -12px rgba(15, 23, 42, 0.55);
-  position: sticky !important;
-  right: 0 !important;
-  z-index: 10;
-}
-
-.settings-table-actions-header {
-  z-index: 11;
-}
-
-.settings-table-actions-cell .ant-space {
-  justify-content: flex-end;
-  width: 100%;
-}
-
-.settings-order-controls {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-  white-space: nowrap;
-  width: 100%;
-}
-
-.settings-order-controls .ant-typography {
-  min-width: 25px;
-  text-align: left;
-}
 
 .ant-input,
 .ant-input-affix-wrapper,
@@ -5979,6 +5948,17 @@ textarea.ant-input {
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(270px, 330px) minmax(0, 1fr);
+}
+
+/* Hidden fields stay listed in the view config table so they can be toggled
+   back on; dim everything except the drag handle and the "Hiển thị" toggle. */
+.settings-field-row-hidden td {
+  opacity: 0.55;
+}
+
+.settings-field-row-hidden td:first-child,
+.settings-field-row-hidden td:nth-child(3) {
+  opacity: 1;
 }
 
 .settings-role-module-tree {

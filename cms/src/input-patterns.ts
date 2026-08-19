@@ -1,22 +1,16 @@
-import IMask from "imask"
-
 export function getInputPatternConfig(pattern?: string) {
   const normalized = String(pattern || "").trim()
   if (!normalized) return undefined
 
   if (normalized === "time-hh-mm" || /^HH[:-]MM$/.test(normalized)) {
-    const separator = normalized === "time-hh-mm" ? ":" : normalized.charAt(2)
-    return {
-      mask: `HH${separator}MM`,
-      blocks: {
-        HH: { mask: IMask.MaskedRange, from: 0, to: 23, maxLength: 2 },
-        MM: { mask: IMask.MaskedRange, from: 0, to: 59, maxLength: 2 },
-      },
-    }
+    return { mask: `99${normalized === "time-hh-mm" ? ":" : normalized.charAt(2)}99` }
   }
 
-  if (!/[9A]/.test(normalized)) return undefined
-  return { mask: normalized.replace(/9/g, "0").replace(/A/g, "a"), blocks: {} }
+  // react-input-mask: 9 = digit, a = letter, * = alphanumeric.
+  // The former uppercase A is normalized for backward compatibility.
+  const mask = normalized.replace(/A/g, "a")
+  if (!/[9a*]/.test(mask)) return undefined
+  return { mask }
 }
 
 export function getInputPatternLabel(pattern?: string) {
@@ -32,11 +26,11 @@ export function isInputPatternComplete(pattern: string | undefined, value: unkno
     if (!match) return false
     return Number(match[1]) <= 23 && Number(match[2]) <= 59
   }
-  if (!/[9A]/.test(normalized)) return true
-  const expression = Array.from(normalized).map((character) => {
+  const expression = Array.from(normalized.replace(/A/g, "a")).map((character) => {
     if (character === "9") return "\\d"
-    if (character === "A") return "[A-Za-z]"
+    if (character === "a") return "\\p{L}"
+    if (character === "*") return "[\\p{L}\\d]"
     return character.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   }).join("")
-  return new RegExp(`^${expression}$`).test(String(value))
+  return new RegExp(`^${expression}$`, "u").test(String(value))
 }

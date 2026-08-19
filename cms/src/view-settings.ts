@@ -427,11 +427,14 @@ export function buildFieldLayoutConfigs(
     })
   })
 
+  // Fields added to the catalog after this view was saved (typically new custom
+  // fields) are not listed in the stored config. They default to visible so a
+  // newly declared field shows up everywhere without re-editing every view.
   catalog.forEach((field) => {
     if (seen.has(field.key)) return
     configs.push({
       ...field,
-      visible: false,
+      visible: true,
       disabled: field.disabled ?? false,
     })
   })

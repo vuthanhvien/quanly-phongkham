@@ -31,7 +31,7 @@ import {
 import { UserOutlined } from "@ant-design/icons"
 import { useEffect, useMemo, useRef, useState } from "react"
 import dayjs from "dayjs"
-import { IMaskInput } from "react-imask"
+import InputMask from "react-input-mask"
 import { api, resolveFileUrl } from "../api"
 import { controlHeightBySize, useAppUi } from "../app-ui"
 import { FileUploadPanel } from "./FileUploadPanel"
@@ -708,15 +708,16 @@ function TimeInput({
   if (!inputPattern) return null
 
   return (
-    <IMaskInput
-      blocks={inputPattern.blocks}
+    <InputMask
       className="ant-input"
       disabled={disabled}
       mask={inputPattern.mask}
       placeholder="HH:MM"
+      maskChar="_"
+      alwaysShowMask
       style={{ width: "100%", height: controlHeightBySize(settings.size), borderRadius: settings.borderRadius }}
       value={value || ""}
-      onAccept={(nextValue) => onChange?.(nextValue)}
+      onChange={(event) => onChange?.(event.target.value)}
     />
   )
 }
@@ -872,7 +873,7 @@ function FieldInput({
         formatter={field.key === "year" ? undefined : formatNumberInput}
         parser={field.key === "year" ? undefined : parseNumberInput}
         placeholder={placeholder}
-        style={{ width: "100%", height: controlHeightBySize(settings.size), borderRadius: settings.borderRadius }}
+        style={{ width: "100%", height: controlHeightBySize(settings.size) }}
         value={value as number | undefined}
         onChange={onChange}
       />
@@ -1008,15 +1009,16 @@ function FieldInput({
   const inputPattern = getInputPatternConfig(field.inputPattern)
   if (inputPattern) {
     return (
-      <IMaskInput
-        blocks={inputPattern.blocks}
+      <InputMask
         className="ant-input"
         disabled={field.disabled}
         mask={inputPattern.mask}
         placeholder={placeholder}
+        maskChar="_"
+        alwaysShowMask
         style={{ width: "100%", height: controlHeightBySize(settings.size), borderRadius: settings.borderRadius }}
         value={String(value ?? "")}
-        onAccept={(nextValue) => onChange?.(nextValue)}
+        onChange={(event) => onChange?.(event.target.value)}
       />
     )
   }

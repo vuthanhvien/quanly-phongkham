@@ -1,169 +1,179 @@
-# CMS Quản Lý Phòng Khám Thiện Chánh
+# GIS Clinic ERP
 
-Ứng dụng quản trị được dựng từ hồ sơ nghiệp vụ `26.0505-GIS.BRD.TCB` (phiên bản trong PDF ngày 08/05/2026), tập trung vào feature và không sao chép hình UI tham khảo.
+Hệ thống ERP đa tenant dành cho phòng khám/thẩm mỹ viện. Dự án quản lý vận hành từ CRM, lịch hẹn và điều trị đến kho, kế toán, nhân sự, landing page và chăm sóc khách hàng.
 
-## Stack
+Mỗi tenant được nhận diện theo **hostname** và có database nghiệp vụ tách biệt. Một database quản trị trung tâm lưu danh sách tenant và tài khoản quản trị nền tảng.
 
-- CMS: React + Refine + Ant Design + Vite
-- Backend: NestJS + TypeORM + JWT
-- Database: MySQL server ben ngoai Docker
-- Runtime: Docker Compose
+## Thành phần hệ thống
 
-## Chạy Bằng Docker
+| Thư mục | Công nghệ | Vai trò |
+| --- | --- | --- |
+| `backend/` | NestJS 11, TypeORM, MySQL, JWT | REST API, xác thực, phân quyền, nghiệp vụ và kết nối tenant database |
+| `cms/` | React 19, Refine, Ant Design, Vite | CMS nội bộ cho nhân viên và quản trị viên tenant |
+| `landing/` | Next.js 15 | Website/landing page công khai, form đăng ký và chatbot |
+| `tenant/` | Next.js 15 | Console nền tảng: tạo, clone, seed và theo dõi tenant |
+| `docker/` | Docker, PM2 | Runtime production chạy bốn ứng dụng trong một container |
+| `docs/` | Markdown | Phạm vi nghiệp vụ, lịch sử công việc và tài liệu schema |
+
+```mermaid
+flowchart LR
+  U[Người dùng] --> CMS[CMS :9999]
+  U --> Landing[Landing :9997]
+  P[Platform admin] --> Tenant[Tenant console :9996]
+  CMS --> API[Backend API :9998/api]
+  Landing --> API
+  Tenant --> API
+  API --> Registry[(Management DB)]
+  API --> DB1[(Tenant A DB)]
+  API --> DB2[(Tenant B DB)]
+```
+
+## Phân hệ chính
+
+- Nền tảng: tài khoản, vai trò động, quyền theo chi nhánh, phòng ban, phòng, thiết bị, danh mục và địa giới hành chính.
+- CRM và chăm sóc khách hàng: khách hàng/bệnh nhân, lead, hoạt động lead, Zalo OA, hội thoại/tin nhắn và ảnh khách hàng.
+- Chuyên môn: nhân sự/bác sĩ, hồ sơ bệnh án, lịch hẹn, lịch làm việc, tư vấn, chỉ định dịch vụ, điều trị và hoa hồng.
+- Kho và mua hàng: nhà cung cấp, sản phẩm/dịch vụ, biến thể, đơn vị, lô tồn kho.
+- Tài chính: hóa đơn, chi phí, kỳ kế toán, hệ thống tài khoản, chứng từ và các báo cáo sổ cái/công nợ/dòng tiền.
+- Nhân sự: hợp đồng, bảo hiểm, chấm công, nghỉ phép, đào tạo, đánh giá và bảng lương.
+- Công việc: dự án, task, thành viên dự án, định nghĩa workflow, phiên chạy và task workflow.
+- Cấu hình mở rộng: custom field, custom table, cấu hình màn hình/form, sinh mã, mẫu in HTML/DOCX/PDF và nhật ký audit.
+- Kênh công khai: landing page, domain, theme, menu, form/submission, file, Google Drive và chatbot.
+
+## Kiến trúc database
+
+### Mô hình tenant
+
+Hệ thống hoạt động theo một trong hai chế độ:
+
+| Chế độ | Biến môi trường | Cách dùng |
+| --- | --- | --- |
+| Một database | `DATABASE_URL` | Phù hợp local/dev hoặc một cơ sở. Mọi request dùng chung database này. |
+| Multi-tenant | `MANAGEMENT_DATABASE_URL`, `TENANTS_JSON` hoặc bảng `tenants` | Backend đọc `Host`/`X-Forwarded-Host`, xác định tenant rồi mở database riêng của tenant đó. |
+
+Database quản trị chỉ có hai bảng: `tenants` (domain, connection string, trạng thái) và `platform_admins` (quản trị viên nền tảng). Chúng không được sao chép sang database tenant.
+
+Mỗi database tenant có khoảng 90 entity TypeORM. Hầu hết record nghiệp vụ kế thừa các cột chung: `id` UUID, `createdAt`, `updatedAt`, `isArchived` và dữ liệu mở rộng `customFields`. Các cột như `customerId`, `branchId`, `staffId` là khóa liên kết nghiệp vụ; không phải tất cả đều được khai báo foreign key vật lý.
+
+```mermaid
+erDiagram
+  branches ||--o{ staff : branchId
+  customers ||--o{ appointments : customerId
+  customers ||--o{ medical_episodes : customerId
+  customers ||--o{ consultations : customerId
+  customers ||--o{ service_orders : customerId
+  service_orders ||--o{ service_order_items : serviceOrderId
+  products ||--o{ product_variants : productId
+  products ||--o{ stock_batches : productId
+  accounting_vouchers ||--o{ accounting_voucher_lines : voucherId
+  projects ||--o{ tasks : projectId
+  workflow_definitions ||--o{ workflow_steps : definitionId
+  workflow_instances ||--o{ workflow_tasks : instanceId
+```
+
+| Nhóm bảng | Ví dụ bảng |
+| --- | --- |
+| Nền tảng | `branches`, `users`, `dynamic_role_definitions`, `branch_permissions`, `departments`, `rooms` |
+| CRM | `customers`, `leads`, `lead_activities`, `zalo_*`, `customer_images` |
+| Khám và điều trị | `staff`, `medical_episodes`, `appointments`, `consultations`, `service_orders`, `treatments` |
+| Kho | `suppliers`, `products`, `product_variants`, `stock_batches` |
+| Kế toán | `invoices`, `expenses`, `accounting_*` |
+| Nhân sự | `attendances`, `leave_*`, `payrolls`, `work_contracts`, `staff_*` |
+| Cấu hình và nội dung | `custom_*`, `view_settings`, `print_templates`, `landing_*`, `files` |
+| Vận hành | `projects`, `tasks`, `workflow_*`, `audit_logs`, `record_drafts`, `admin_chatbot_*` |
+
+Nguồn chuẩn của schema là [entities.ts](/Users/vienvu/Work/erp-clinic/backend/src/entities/entities.ts). Danh mục đầy đủ từng bảng/entity có trong [docs/DATABASE_SCHEMA.md](/Users/vienvu/Work/erp-clinic/docs/DATABASE_SCHEMA.md).
+
+> `TYPEORM_SYNCHRONIZE=true` tiện cho local hoặc tạo tenant mới, nhưng không nên dùng để thay thế migration có kiểm soát trên production.
+
+## Chạy local bằng Docker
+
+### 1. Chuẩn bị cấu hình
 
 ```bash
 cp .env.example .env
-docker compose up --build
 ```
 
-### Chạy development với tự reload
+Điền tối thiểu `DATABASE_URL`, `JWT_SECRET`, `ADMIN_EMAIL` và `ADMIN_PASSWORD` trong `.env`. MySQL có thể chạy ngoài Docker; khi backend chạy trong container và MySQL chạy trên máy host, dùng `host.docker.internal` hoặc IP host phù hợp trong connection string.
+
+### 2. Chạy chế độ development
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-Mã nguồn của Backend, CMS và Landing được mount vào container. Các lệnh dev có
-watch/polling nên thay đổi file sẽ tự reload; truy cập Landing tại cổng `9997`,
-API tại `9998` và CMS tại `9999`.
+| Dịch vụ | URL mặc định |
+| --- | --- |
+| Tenant console | [http://localhost:9996](http://localhost:9996) |
+| Landing | [http://localhost:9997](http://localhost:9997) |
+| API | [http://localhost:9998/api](http://localhost:9998/api) |
+| API Swagger | [http://localhost:9998/api/docs](http://localhost:9998/api/docs) |
+| CMS | [http://localhost:9999](http://localhost:9999) |
 
-- Landing: [http://localhost:9997](http://localhost:9997)
-- API: [http://localhost:9998/api](http://localhost:9998/api)
-- CMS: [http://localhost:9999](http://localhost:9999)
+Source của backend, CMS và landing được mount vào container nên tự reload khi thay đổi. Tenant console hiện chạy từ build image; cần build lại compose nếu sửa mã trong `tenant/`.
 
-Production compose dùng một service/container `gis-clinic`; PM2 chạy ba source code độc lập trong container này: Landing (9997), API (9998), và CMS (9999). Không có gateway/proxy nội bộ.
+### 3. Build/chạy production
 
-Đặt `PUBLIC_API_URL` là URL API mà trình duyệt truy cập được trước khi build. Không dùng `127.0.0.1` nếu người dùng truy cập từ máy khác:
+`PUBLIC_API_URL` phải là URL API mà trình duyệt của người dùng thực sự truy cập được; không dùng `127.0.0.1` khi truy cập từ máy khác.
 
 ```env
-PUBLIC_API_URL=http://YOUR_SERVER_IP:9998/api
-LANDING_PUBLIC_URL=http://YOUR_SERVER_IP:9997
+PUBLIC_API_URL=https://api.example.com/api
+LANDING_PUBLIC_URL=https://www.example.com
 ```
 
-URL này được nhúng vào bundle của Landing và CMS; chạy lại `docker compose up -d --build` sau khi đổi nó.
+```bash
+docker compose up -d --build
+```
 
-### Nhiều domain, mỗi domain một database
+Production chạy một container `gis-clinic`; PM2 khởi động API, CMS, landing và tenant console. Upload được lưu mặc định tại `data/uploads`, log lỗi JSONL tại `data/logs` (có thể đổi qua `UPLOADS_DIR` và `LOGS_DIR`).
 
-Backend hỗ trợ chế độ multi-tenant theo hostname. Tạo một database quản trị riêng, sau đó khai báo tenant ở `.env`; mỗi `domain` được ánh xạ đến đúng một `databaseUrl`:
+## Cấu hình multi-tenant
+
+Tạo một database registry riêng, sau đó khai báo tenant qua biến môi trường (hoặc quản lý chúng bằng tenant console):
 
 ```env
-MANAGEMENT_DATABASE_URL=mysql://registry_user:registry_password@host.docker.internal:3306/clinic_registry
-TENANTS_JSON=[{"domain":"clinic-a.example.com","databaseUrl":"mysql://clinic_a_user:clinic_a_password@host.docker.internal:3306/clinic_a"},{"domain":"clinic-b.example.com","databaseUrl":"mysql://clinic_b_user:clinic_b_password@host.docker.internal:3306/clinic_b"}]
-
-# Dự án hiện dùng TypeORM synchronize để tạo schema tenant mới.
-# Chỉ đặt false khi database đã được provision schema bằng quy trình migration của bạn.
+MANAGEMENT_DATABASE_URL=mysql://registry_user:strong_password@host.docker.internal:3306/clinic_registry
+TENANTS_JSON=[{"domain":"clinic-a.example.com","databaseUrl":"mysql://clinic_user:strong_password@host.docker.internal:3306/clinic_a"}]
+TENANT_DATABASE_SERVER_URL=mysql://provision_user:strong_password@host.docker.internal:3306/mysql
 TYPEORM_SYNCHRONIZE=true
 ```
 
-Khi `TYPEORM_SYNCHRONIZE=true`, lần khởi động đầu tiên sẽ tạo bảng `tenants` trong registry, nhập các dòng từ `TENANTS_JSON`, và tạo schema cho từng database tenant. Backend đọc `Host`/`X-Forwarded-Host` cho mỗi request, chỉ mở database của tenant tương ứng. Token đăng nhập cũng mang `tenantId`, nên token của domain A không thể dùng trên domain B. Khi đã vận hành, có thể quản lý trực tiếp bảng `tenants`; khởi động lại service sau khi đổi `databaseUrl` của tenant để làm mới connection cache.
+`domain` phải khớp hostname request đến API. Vì vậy mỗi tenant cần hostname/API hostname riêng hoặc proxy chuyển tiếp `X-Forwarded-Host` đúng tenant. JWT chứa `tenantId`, nên token của tenant A không dùng được cho tenant B.
 
-`domain` phải là hostname mà request API thực sự đến (ví dụ dùng `/api` cùng domain `clinic-a.example.com`, hoặc dùng một API subdomain riêng cho từng tenant). Một API hostname chung cho mọi tenant sẽ không có thông tin để chọn database.
+## API nổi bật
 
-Nếu `MANAGEMENT_DATABASE_URL` để trống, hệ thống giữ chế độ cũ: một `DATABASE_URL` dùng cho tất cả domain.
+Mọi route bên dưới có prefix `/api`; phần lớn yêu cầu JWT Bearer token.
 
-## Cấu hình database
+| Nhóm | Endpoint tiêu biểu |
+| --- | --- |
+| Auth | `POST /auth/login`, `GET /auth/me`, đổi password/PIN |
+| CRUD nghiệp vụ | `GET/POST/PATCH/DELETE /records/:resource` |
+| Cấu hình | `/settings/custom-fields`, `/settings/views`, `/settings/print-templates`, `/settings/landing-*` |
+| Workflow | `/workflow/definitions`, `/workflow/tasks/my`, approve/reject/cancel instance |
+| Báo cáo | `/reports/accounting/general-ledger`, trial balance, cash flow, công nợ, sổ quỹ/ngân hàng |
+| Khách hàng | `/customer-portal/auth/*`, `/customer-portal/appointments`, invoices |
+| Công khai | `/public/landing-pages/*`, `/public/chatbot/*` |
 
-Cấu hình `DATABASE_URL` trỏ đến MySQL trước khi chạy. Ví dụ:
+Swagger là nguồn tra cứu API chính xác nhất ở `/api/docs` của môi trường đang chạy.
 
-```env
-DATABASE_URL=mysql://clinic_user:strong_password@127.0.0.1:3306/clinic
-```
-
-Tài khoản khởi tạo:
-
-```text
-Email: admin@thienchanh.local
-Password: Admin@123
-```
-
-Thay `JWT_SECRET` và mật khẩu admin trong `.env` trước khi sử dụng ngoài môi trường phát triển.
-
-## Chức Năng MVP
-
-- CRUD các phân hệ: chi nhánh, khách hàng, hồ sơ bệnh án, lịch hẹn, nhà cung cấp, hàng hóa/vật tư, lô tồn kho, liệu trình, phiếu thu/hóa đơn, phiếu chi và hoa hồng.
-- Khách hàng tự phân hạng theo tổng chi; số điện thoại bị che trên danh sách/API thông thường.
-- Lịch hẹn kiểm tra trùng bác sĩ hoặc phòng trong cùng khung giờ.
-- Audit log cho thao tác tạo/sửa/xóa và API xem số điện thoại.
-- Cấu hình động theo từng model:
-  - Thêm `custom field` và lưu giá trị vào `customFields` JSONB.
-  - Chọn field hiển thị trên bảng dữ liệu.
-  - Chọn field xuất hiện trên form nhập liệu.
-  - Tạo mẫu in HTML với placeholder `{{field_key}}`, in từ bản ghi.
-
-## Cấu Trúc
-
-```text
-backend/                 NestJS REST API
-cms/                     Refine CMS
-docker/                  Gateway + PM2 config cho single-container runtime
-docs/FEATURE_SCOPE.md    Phạm vi rút từ PDF
-docs/WORKLOG.md          Đã làm / cần làm tiếp
-docker-compose.yml       Single-container production stack (`gis-clinic`)
-```
-
-## API Chính
-
-```text
-POST   /api/auth/login
-GET    /api/records/:resource
-POST   /api/records/:resource
-PATCH  /api/records/:resource/:id
-DELETE /api/records/:resource/:id
-POST   /api/records/customers/:id/reveal-phone
-GET    /api/settings/custom-fields
-GET    /api/settings/views
-GET    /api/settings/print-templates
-GET    /api/settings/print-templates/:id/render/:recordId
-GET    /api/audit-logs
-```
-
-## Phát Triển Local
-
-Khởi động riêng PostgreSQL trước, sau đó:
+## Kiểm tra và build từng ứng dụng
 
 ```bash
-cd backend && npm install && DATABASE_URL=mysql://clinic_user:strong_password@127.0.0.1:3306/clinic npm run start:dev
-cd cms && npm install && npm run dev
+cd backend && npm run lint && npm run build
+cd cms && npm run lint && npm run build
+cd landing && npm run lint && npm run build
+cd tenant && npm run lint && npm run build
 ```
 
-## Deploy voi MySQL cua Server
+## Tài liệu liên quan
 
-1. Tao database va user MySQL tren server.
-2. Cap quyen cho user do vao database ung dung.
-3. Sua file `.env` tren server:
+- [Phạm vi nghiệp vụ](/Users/vienvu/Work/erp-clinic/docs/FEATURE_SCOPE.md)
+- [Danh mục schema database](/Users/vienvu/Work/erp-clinic/docs/DATABASE_SCHEMA.md)
+- [Nhật ký công việc](/Users/vienvu/Work/erp-clinic/docs/WORKLOG.md)
 
-```env
-DATABASE_URL=mysql://clinic_user:strong_password@127.0.0.1:3306/clinic
-JWT_SECRET=mot-secret-rat-dai
-ADMIN_EMAIL=admin@yourdomain.com
-ADMIN_PASSWORD=mot-mat-khau-manh
-```
+## Lưu ý bảo mật
 
-4. Pull image va restart app:
-
-```bash
-docker compose pull
-docker compose up -d
-```
-
-Neu MySQL chay tren may host cung server Docker, `127.0.0.1` se dung khi app chay native.
-Neu backend chay trong Docker va MySQL chay tren host, hay dung IP that cua host hoac `host.docker.internal` neu server ho tro ten nay.
-
-Chay deploy tu may local:
-
-```bash
-./deploy.sh
-```
-
-Mac dinh script chi build/push image va chay `docker compose pull && docker compose up -d` tren server. File `.env` va `docker-compose.yml` hien co tren server se duoc giu nguyen.
-
-Chi khi can cap nhat ro rang cac file cau hinh, truyen mot hoac ca hai tham so sau:
-
-```bash
-./deploy.sh --upload-env
-./deploy.sh --upload-compose
-./deploy.sh --upload-env --upload-compose
-```
-
-Luu thong tin dang nhap server o trinh quan ly bi mat, khong ghi vao README.
-
-docker compose -f docker-compose.dev.yml up --build -d
+- Không commit `.env`, connection string, OAuth secret hay mật khẩu thật.
+- Thay toàn bộ secret và tài khoản mẫu trước khi deploy.
+- Chỉ bật `TYPEORM_SYNCHRONIZE` khi chấp nhận TypeORM tự thay đổi schema; production nên dùng quy trình migration/backup rõ ràng.
+- URL API được nhúng vào bundle CMS/Landing lúc build; rebuild image sau khi đổi `PUBLIC_API_URL`.
