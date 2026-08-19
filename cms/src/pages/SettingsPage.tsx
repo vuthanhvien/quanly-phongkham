@@ -2,11 +2,12 @@ import {
   AlignCenterOutlined,
   AlignLeftOutlined,
   AlignRightOutlined,
+  ArrowDownOutlined,
+  ArrowUpOutlined,
   BoldOutlined,
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
-  HolderOutlined,
   ItalicOutlined,
   KeyOutlined,
   LinkOutlined,
@@ -19,22 +20,6 @@ import {
   UnderlineOutlined,
   UnorderedListOutlined,
 } from "@ant-design/icons"
-import {
-  closestCenter,
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  type DragEndEvent,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core"
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
 import {
   Button,
   Card,
@@ -58,7 +43,7 @@ import {
   message,
 } from "antd"
 import type { ColumnsType } from "antd/es/table"
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { api } from "../api"
 import { buildGroupedModuleOptions, resolveEnabledModules } from "../company-types"
@@ -105,6 +90,14 @@ export interface TemplateVariableOption {
   key: string
   label: string
   description?: string
+}
+
+interface ActionEditorDraft {
+  key: string
+  label: string
+  enabled: boolean
+  order: number
+  inline: boolean
 }
 
 const DEFAULT_TEMPLATE_HTML = `<style>
@@ -666,6 +659,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   const [actionLabels, setActionLabels] = useState<Record<string, string>>({})
   const [actionOrders, setActionOrders] = useState<Record<string, number>>({})
   const [actionInline, setActionInline] = useState<Record<string, boolean>>({})
+  const [editingAction, setEditingAction] = useState<ActionEditorDraft | null>(null)
   const [reuseInherited, setReuseInherited] = useState<Record<ViewType, boolean>>({ TABLE: false, FORM: false, DETAIL: false })
   const [reuseActionInherited, setReuseActionInherited] = useState(false)
   const [toast, toastContextHolder] = message.useMessage()
@@ -694,6 +688,10 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   const actionOptions = useMemo(
     () => getResourceActionOptions(entityType),
     [entityType],
+  )
+  const orderedActionOptions = useMemo(
+    () => [...actionOptions].sort((left, right) => (actionOrders[left.key] ?? Number.MAX_SAFE_INTEGER) - (actionOrders[right.key] ?? Number.MAX_SAFE_INTEGER)),
+    [actionOptions, actionOrders],
   )
   const templatePresets = useMemo(
     () => TEMPLATE_PRESETS.filter((preset) => preset.entityType === entityType),
@@ -952,6 +950,18 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     }
   }
 
+  function moveAction(key: string, direction: -1 | 1) {
+    const fromIndex = orderedActionOptions.findIndex((action) => action.key === key)
+    const toIndex = fromIndex + direction
+    if (fromIndex < 0 || toIndex < 0 || toIndex >= orderedActionOptions.length) return
+    const next = [...orderedActionOptions]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    const nextOrders = Object.fromEntries(next.map((action, index) => [action.key, index + 1]))
+    setActionOrders(nextOrders)
+    void saveActionView(allowedActions, reuseActionInherited, actionLabels, nextOrders, actionInline)
+  }
+
   async function resetInheritedView() {
     await api.delete(`/settings/views/${entityType}`, {
       params: { role: selectedRole },
@@ -1156,51 +1166,91 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                         children: (
                           <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseActionInherited} source={formatRoleLabel(actionSource)} onReuseChange={(checked) => { setReuseActionInherited(checked); void saveActionView(allowedActions, checked) }}>
                           <Card size="small">
-                            <Table
-                              size="small"
-                              pagination={false}
-                              rowKey="key"
-                              dataSource={actionOptions}
-                              columns={[
+                                <Table
+                                  size="small"
+                                  pagination={false}
+                                  rowKey="key"
+                                  dataSource={orderedActionOptions}
+                                  scroll={{ x: 900 }}
+                                  columns={[
                                 {
-                                  title: <Checkbox checked={allowedActions.length === actionOptions.length} indeterminate={allowedActions.length > 0 && allowedActions.length < actionOptions.length} onChange={(event) => {
-                                    const next = event.target.checked ? actionOptions.map((item) => item.key) : []
-                                    setAllowedActions(next)
-                                    void saveActionView(next, reuseActionInherited)
-                                  }} aria-label="Chọn tất cả action" />,
+                                  title: "",
+                                  key: "sort",
+                                  width: 56,
+                                  fixed: "left",
+                                  render: (_, action) => {
+                                    const index = orderedActionOptions.findIndex((item) => item.key === action.key)
+                                    return <Space size={0}>
+                                      <Typography.Text type="secondary">#{index + 1}</Typography.Text>
+                                      <Button type="text" size="small" icon={<ArrowUpOutlined />} disabled={index === 0} aria-label={`Đưa ${action.label} lên`} onClick={() => moveAction(action.key, -1)} />
+                                      <Button type="text" size="small" icon={<ArrowDownOutlined />} disabled={index === orderedActionOptions.length - 1} aria-label={`Đưa ${action.label} xuống`} onClick={() => moveAction(action.key, 1)} />
+                                    </Space>
+                                  },
+                                },
+                                {
+                                  title: "Hiển thị",
                                   key: "enabled",
-                                  width: 64,
-                                  render: (_, action) => <Checkbox checked={allowedActions.includes(action.key)} onChange={(event) => {
-                                    const next = event.target.checked ? [...allowedActions, action.key] : allowedActions.filter((key) => key !== action.key)
-                                    setAllowedActions(next)
-                                    void saveActionView(next, reuseActionInherited)
-                                  }} aria-label={`Bật ${action.label}`} />,
+                                  width: 100,
+                                  render: (_, action) => <Checkbox checked={allowedActions.includes(action.key)} disabled aria-label={`Hiển thị ${action.label}`} />,
                                 },
                                 { title: "Mã thao tác", dataIndex: "key", width: 180, render: (value) => <Typography.Text strong>{value}</Typography.Text> },
                                 {
                                   title: "Nhãn hiển thị",
                                   dataIndex: "key",
-                                  render: (key, action) => <Input value={actionLabels[String(key)] ?? action.label} onChange={(event) => setActionLabels((current) => ({ ...current, [String(key)]: event.target.value }))} onBlur={() => void saveActionView(allowedActions, reuseActionInherited)} onPressEnter={(event) => event.currentTarget.blur()} />,
+                                  render: (key, action) => actionLabels[String(key)] ?? action.label,
                                 },
                                 {
                                   title: "Thứ tự",
                                   dataIndex: "key",
                                   width: 110,
-                                  render: (key) => <Input inputMode="numeric" value={String(actionOrders[String(key)] ?? "")} onChange={(event) => setActionOrders((current) => ({ ...current, [String(key)]: Number(event.target.value.replace(/\D/g, "")) || 0 }))} onBlur={() => void saveActionView(allowedActions, reuseActionInherited)} onPressEnter={(event) => event.currentTarget.blur()} />,
+                                  render: (key) => actionOrders[String(key)] ?? "",
                                 },
                                 {
                                   title: "Hiện ở row",
                                   dataIndex: "key",
                                   width: 120,
-                                  render: (key, action) => <Checkbox checked={Boolean(actionInline[String(key)])} onChange={(event) => {
-                                    const next = { ...actionInline, [String(key)]: event.target.checked }
-                                    setActionInline(next)
-                                    void saveActionView(allowedActions, reuseActionInherited, actionLabels, actionOrders, next)
-                                  }} aria-label={`Hiện ${action.label} ở row`} />,
+                                  render: (key, action) => <Checkbox checked={Boolean(actionInline[String(key)])} disabled aria-label={`Hiện ${action.label} ở row`} />,
+                                },
+                                {
+                                  title: "Thao tác",
+                                  key: "actions",
+                                  width: 76,
+                                  fixed: "right",
+                                  align: "right",
+                                  className: "settings-table-actions-cell",
+                                  onHeaderCell: () => ({ className: "settings-table-actions-header" }),
+                                  render: (_, action) => <Tooltip title="Sửa"><Button type="text" icon={<EditOutlined />} aria-label={`Sửa ${action.label}`} onClick={() => setEditingAction({ key: action.key, label: actionLabels[action.key] ?? action.label, enabled: allowedActions.includes(action.key), order: actionOrders[action.key] ?? 0, inline: Boolean(actionInline[action.key]) })} /></Tooltip>,
                                 },
                               ]}
-                            />
+                                />
                           </Card>
+                          <Modal
+                            open={Boolean(editingAction)}
+                            title={`Chỉnh sửa thao tác${editingAction ? `: ${editingAction.key}` : ""}`}
+                            okText="Lưu"
+                            cancelText="Hủy"
+                            onCancel={() => setEditingAction(null)}
+                            onOk={() => {
+                              if (!editingAction) return
+                              const nextActions = editingAction.enabled ? Array.from(new Set([...allowedActions, editingAction.key])) : allowedActions.filter((key) => key !== editingAction.key)
+                              const nextLabels = { ...actionLabels, [editingAction.key]: editingAction.label }
+                              const nextOrders = { ...actionOrders, [editingAction.key]: editingAction.order }
+                              const nextInline = { ...actionInline, [editingAction.key]: editingAction.inline }
+                              setAllowedActions(nextActions)
+                              setActionLabels(nextLabels)
+                              setActionOrders(nextOrders)
+                              setActionInline(nextInline)
+                              void saveActionView(nextActions, reuseActionInherited, nextLabels, nextOrders, nextInline)
+                              setEditingAction(null)
+                            }}
+                          >
+                            {editingAction && <Form layout="vertical">
+                              <Form.Item label="Hiển thị"><Checkbox checked={editingAction.enabled} onChange={(event) => setEditingAction((current) => current ? { ...current, enabled: event.target.checked } : current)}>Hiển thị thao tác này</Checkbox></Form.Item>
+                              <Form.Item label="Nhãn hiển thị"><Input value={editingAction.label} onChange={(event) => setEditingAction((current) => current ? { ...current, label: event.target.value } : current)} /></Form.Item>
+                              <Form.Item label="Thứ tự"><Input inputMode="numeric" value={String(editingAction.order)} onChange={(event) => setEditingAction((current) => current ? { ...current, order: Number(event.target.value.replace(/\D/g, "")) || 0 } : current)} /></Form.Item>
+                              <Form.Item><Checkbox checked={editingAction.inline} onChange={(event) => setEditingAction((current) => current ? { ...current, inline: event.target.checked } : current)}>Hiện ở row</Checkbox></Form.Item>
+                            </Form>}
+                          </Modal>
                           </ViewOverridePanel>
                         ),
                       },
@@ -1353,48 +1403,6 @@ function formatRoleLabel(role: string) {
   return ({ ALL: "Tất cả", ADMIN: "Quản trị viên", STAFF: "Nhân viên", DOCTOR: "Bác sĩ" } as Record<string, string>)[role] || role
 }
 
-type RowDragHandleContextValue = Pick<ReturnType<typeof useSortable>, "attributes" | "listeners" | "setActivatorNodeRef">
-const RowDragHandleContext = createContext<RowDragHandleContextValue | null>(null)
-
-function SortableFieldTableRow(props: React.HTMLAttributes<HTMLTableRowElement>) {
-  const rowKey = String((props as React.HTMLAttributes<HTMLTableRowElement> & { "data-row-key"?: string })["data-row-key"] || "")
-  const { attributes, isDragging, listeners, setActivatorNodeRef, setNodeRef, transform, transition } = useSortable({ id: rowKey, disabled: !rowKey })
-  return (
-    <RowDragHandleContext.Provider value={{ attributes, listeners, setActivatorNodeRef }}>
-      <tr
-        {...props}
-        className={`${props.className || ""} ${isDragging ? "drag-row-active" : ""}`.trim()}
-        ref={setNodeRef}
-        style={{
-          ...props.style,
-          position: isDragging ? "relative" : props.style?.position,
-          transform: CSS.Transform.toString(transform),
-          transition,
-          zIndex: isDragging ? 10 : props.style?.zIndex,
-        }}
-      />
-    </RowDragHandleContext.Provider>
-  )
-}
-
-function SortableFieldDragHandle({ order }: { order: number }) {
-  const dragHandle = useContext(RowDragHandleContext)
-  return (
-    <span
-      className="drag-handle"
-      ref={dragHandle?.setActivatorNodeRef}
-      role="button"
-      tabIndex={0}
-      title="Kéo để đổi thứ tự"
-      {...dragHandle?.attributes}
-      {...dragHandle?.listeners}
-    >
-      <HolderOutlined />
-      <span className="drag-order">#{order}</span>
-    </span>
-  )
-}
-
 function ViewConfigTable({
   dataSource,
   viewType,
@@ -1413,35 +1421,21 @@ function ViewConfigTable({
   const [editingField, setEditingField] = useState<FieldLayoutConfig | null>(null)
   const [optionEdit, setOptionEdit] = useState<{ fieldKey: string; index: number; value: string; label: string } | null>(null)
   const visibleFields = useMemo(() => dataSource.filter((field) => field.visible), [dataSource])
-  const dndSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
-  const handleDragEnd = (event: DragEndEvent) => {
-    if (!onReorder) return
-    const fromKey = String(event.active.id)
-    const toKey = event.over?.id ? String(event.over.id) : ""
-    if (!fromKey || !toKey || fromKey === toKey) return
-    onReorder(viewType, fromKey, toKey)
-  }
-  const tableComponents = useMemo(
-    () => ({
-      body: {
-        row: SortableFieldTableRow,
-      },
-    }),
-    [],
-  )
   const columns: ColumnsType<FieldLayoutConfig> = [
     {
       title: "",
       key: "sort",
       width: 56,
       fixed: "left",
-      render: (_, row) =>
-        onReorder ? (
-          <SortableFieldDragHandle order={visibleFields.findIndex((item) => item.key === row.key) + 1} />
-        ) : null,
+      render: (_, row) => {
+        const index = visibleFields.findIndex((item) => item.key === row.key)
+        if (!onReorder || index < 0) return null
+        return <Space size={0}>
+          <Typography.Text type="secondary">#{index + 1}</Typography.Text>
+          <Button type="text" size="small" icon={<ArrowUpOutlined />} disabled={index === 0} aria-label={`Đưa ${row.label} lên`} onClick={() => onReorder(viewType, row.key, visibleFields[index - 1].key)} />
+          <Button type="text" size="small" icon={<ArrowDownOutlined />} disabled={index === visibleFields.length - 1} aria-label={`Đưa ${row.label} xuống`} onClick={() => onReorder(viewType, row.key, visibleFields[index + 1].key)} />
+        </Space>
+      },
     },
     {
       title: "Trường",
@@ -1538,6 +1532,9 @@ function ViewConfigTable({
     key: "actions",
     width: 88,
     fixed: "right",
+    align: "right",
+    className: "settings-table-actions-cell",
+    onHeaderCell: () => ({ className: "settings-table-actions-header" }),
     render: (_, row) => (
       <Space size={0}>
         <Tooltip title="Sửa">
@@ -1554,11 +1551,9 @@ function ViewConfigTable({
 
   return (
     <>
-      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={dndSensors}>
-        <SortableContext items={visibleFields.map((item) => item.key)} strategy={verticalListSortingStrategy}>
-          <Table columns={columns} components={tableComponents} dataSource={visibleFields} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" />
-        </SortableContext>
-      </DndContext>
+      <Card className="settings-view-config-table-card" size="small">
+        <Table columns={columns} dataSource={visibleFields} pagination={false} rowKey="key" scroll={{ x: 1100 }} size="small" />
+      </Card>
       <Modal
         open={Boolean(editingField)}
         title={`Chỉnh sửa field${editingField ? `: ${editingField.label}` : ""}`}

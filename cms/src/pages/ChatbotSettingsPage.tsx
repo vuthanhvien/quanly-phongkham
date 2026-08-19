@@ -7,6 +7,7 @@ import {
   Form,
   Input,
   Select,
+  Spin,
   Space,
   Switch,
   Tabs,
@@ -125,7 +126,7 @@ export function ChatbotSettingsPage() {
         </div>
       </div>
 
-      <Card className="glass-card" loading={loading}>
+      <Spin spinning={loading}>
         {/* <Alert
           icon={<RobotOutlined />}
           showIcon
@@ -137,7 +138,7 @@ export function ChatbotSettingsPage() {
 
         <Form form={form} layout="vertical" onFinish={save}>
           <Tabs
-            className="list-crud-tabs"
+            className="record-status-tabs chatbot-settings-tabs"
             activeKey={activeTab}
             items={[
               { key: 'landing', label: 'Chatbot Landing' },
@@ -378,7 +379,7 @@ export function ChatbotSettingsPage() {
 
           {activeTab === 'history' && <ChatbotHistoryPage embedded />}
         </Form>
-      </Card>
+      </Spin>
     </>
   )
 }

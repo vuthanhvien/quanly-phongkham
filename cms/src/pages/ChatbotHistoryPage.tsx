@@ -53,6 +53,22 @@ export function ChatbotHistoryPage({ embedded = false }: { embedded?: boolean })
     }
   }
 
+  const conversationsTable = (
+    <Table<ConversationSummary>
+      columns={[
+        { title: 'Người dùng', dataIndex: 'userName', key: 'userName', width: 220, render: (value) => <Typography.Text strong>{value}</Typography.Text> },
+        { title: 'Chủ đề', dataIndex: 'title', key: 'title', render: (value) => value || 'Hội thoại GIS AI' },
+        { title: 'Tin nhắn gần nhất', dataIndex: 'latestMessage', key: 'latestMessage', ellipsis: true, render: (value) => <Typography.Text>{value}</Typography.Text> },
+        { title: 'Cập nhật', dataIndex: 'updatedAt', key: 'updatedAt', width: 180, render: (value) => value ? new Date(value).toLocaleString('vi-VN') : '—' },
+        { title: '', key: 'action', width: 110, render: (_, item) => <Button icon={<MessageOutlined />} onClick={() => void openConversation(item)} size="small">Xem chat</Button> },
+      ]}
+      dataSource={items}
+      loading={loading}
+      pagination={{ pageSize: 20 }}
+      rowKey="id"
+    />
+  )
+
   return (
     <>
       {!embedded && <div className="page-header">
@@ -62,21 +78,12 @@ export function ChatbotHistoryPage({ embedded = false }: { embedded?: boolean })
         <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>Tải lại</Button>
       </div>}
 
-      <Card className="glass-card" title={embedded ? 'Hội thoại của nhân viên với GIS AI' : undefined} extra={embedded ? <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>Tải lại</Button> : undefined}>
-        <Table<ConversationSummary>
-          columns={[
-            { title: 'Người dùng', dataIndex: 'userName', key: 'userName', width: 220, render: (value) => <Typography.Text strong>{value}</Typography.Text> },
-            { title: 'Chủ đề', dataIndex: 'title', key: 'title', render: (value) => value || 'Hội thoại GIS AI' },
-            { title: 'Tin nhắn gần nhất', dataIndex: 'latestMessage', key: 'latestMessage', ellipsis: true, render: (value) => <Typography.Text>{value}</Typography.Text> },
-            { title: 'Cập nhật', dataIndex: 'updatedAt', key: 'updatedAt', width: 180, render: (value) => value ? new Date(value).toLocaleString('vi-VN') : '—' },
-            { title: '', key: 'action', width: 110, render: (_, item) => <Button icon={<MessageOutlined />} onClick={() => void openConversation(item)} size="small">Xem chat</Button> },
-          ]}
-          dataSource={items}
-          loading={loading}
-          pagination={{ pageSize: 20 }}
-          rowKey="id"
-        />
-      </Card>
+      {embedded ? (
+        <div className="chatbot-history-embedded">
+          <div className="chatbot-history-embedded-actions"><Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>Tải lại</Button></div>
+          {conversationsTable}
+        </div>
+      ) : <Card className="glass-card">{conversationsTable}</Card>}
 
       <Drawer destroyOnClose onClose={() => setSelected(undefined)} open={Boolean(selected)} title={selected ? `GIS AI · ${selected.userName}` : 'GIS AI'} width={560}>
         <div className="giscat-history-messages">

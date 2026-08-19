@@ -3190,6 +3190,25 @@ body {
   background: color-mix(in srgb, var(--app-primary) 8%, var(--app-surface)) !important;
 }
 
+/* Cột thao tác của các bảng cấu hình luôn bám mép phải khi cuộn ngang. */
+.settings-table-actions-cell.ant-table-cell-fix-right,
+.settings-table-actions-header.ant-table-cell-fix-right {
+  background: var(--app-surface) !important;
+  box-shadow: -8px 0 12px -12px rgba(15, 23, 42, 0.55);
+  position: sticky !important;
+  right: 0 !important;
+  z-index: 3;
+}
+
+.settings-table-actions-header.ant-table-cell-fix-right {
+  z-index: 4;
+}
+
+.settings-table-actions-cell .ant-space {
+  justify-content: flex-end;
+  width: 100%;
+}
+
 .ant-input,
 .ant-input-affix-wrapper,
 .ant-input-number,
