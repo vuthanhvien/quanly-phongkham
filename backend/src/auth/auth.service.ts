@@ -109,6 +109,7 @@ export class AuthService {
       roleMain,
       branchId: user.branchId,
       staffId: staff?.id || user.staffId,
+      hasPin: Boolean(user.pinHash),
       disabledModules,
       actionPermissions,
       screenPermissions,
@@ -143,6 +144,18 @@ export class AuthService {
     user.passwordHash = await hash(newPassword, 10);
     await this.users.save(user);
     return { message: 'Đổi mật khẩu thành công' };
+  }
+
+  async changePin(userId: string, currentPassword: string, pin: string) {
+    if (!/^\d{6}$/.test(pin)) throw new BadRequestException('Mã PIN phải gồm đúng 6 chữ số');
+    const user = await this.users.findOne({ where: { id: userId, isActive: true } });
+    if (!user) throw new UnauthorizedException('Tài khoản không còn hoạt động');
+    if (!(await compare(currentPassword, user.passwordHash))) {
+      throw new BadRequestException('Mật khẩu hiện tại không đúng');
+    }
+    user.pinHash = await hash(pin, 10);
+    await this.users.save(user);
+    return { message: 'Đã cập nhật mã PIN' };
   }
 
   private async resolveActionPermissions(role?: string, mainRole?: string) {

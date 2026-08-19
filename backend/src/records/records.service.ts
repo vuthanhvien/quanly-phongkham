@@ -80,7 +80,7 @@ import { WorkflowService } from '../workflow/workflow.service';
 
 const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print'];
 const PROTECTED_ADMIN_EMAIL = 'admin@admin.com';
-const SYSTEM_ADMIN_USERNAME = 'admin-system';
+const SYSTEM_ADMIN_USERNAMES = new Set(['admin', 'admin-system']);
 const DEFAULT_KANBAN_COLUMNS = [
   { key: 'todo', name: 'Cần làm', color: 'default', allowedToKeys: ['in_progress'] },
   { key: 'in_progress', name: 'Đang làm', color: 'blue', allowedToKeys: ['todo', 'review'] },
@@ -768,7 +768,10 @@ export class RecordsService {
         where: includeArchived ? {} : { isArchived },
         order: { [sortField]: orderDirection },
       });
-      return { data: rows.map((row) => this.protect(resource, row, request)), total };
+      return {
+        data: await Promise.all(rows.map((row) => this.protectPasswordFields(resource, this.protect(resource, row, request) as ConfigurableEntity, user))),
+        total,
+      };
     }
     const normalizedFilters = { ...filters };
     delete normalizedFilters.branchIds;
@@ -855,7 +858,10 @@ export class RecordsService {
     if (resource === 'projects') {
       hydrated = await this.attachProjectMembersForList(hydrated as Project[]) as unknown as ConfigurableEntity[];
     }
-    return { data: hydrated.map((row) => this.protect(resource, row, request)), total };
+    return {
+      data: await Promise.all(hydrated.map((row) => this.protectPasswordFields(resource, this.protect(resource, row, request) as ConfigurableEntity, user))),
+      total,
+    };
   }
 
   async findRaw (resource: string, id: string, include?: string, request?: RequestContext) {
@@ -987,20 +993,23 @@ export class RecordsService {
   async find (resource: string, id: string, user?: AuthUser, request?: RequestContext, include?: string) {
     const record = await this.findRaw(resource, id, include, request);
     await this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
-    return { data: await this.protectDetailFields(resource, this.protect(resource, record, request) as ConfigurableEntity, user) };
+    return { data: await this.protectPasswordFields(resource, this.protect(resource, record, request) as ConfigurableEntity, user) };
   }
 
-  async revealField (resource: string, id: string, fieldKey: string, password: string, user: AuthUser) {
+  async revealField (resource: string, id: string, fieldKey: string, pin: string, user: AuthUser) {
     const key = fieldKey.trim();
-    if (!key || !password) throw new BadRequestException('Vui lòng nhập mật khẩu');
+    if (!key || !/^\d{6}$/.test(pin)) throw new BadRequestException('Vui lòng nhập mã PIN gồm 6 chữ số');
     const record = await this.findRaw(resource, id);
     await this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
     if (!(await this.isPasswordProtectedDetailField(resource, key, user))) {
       throw new ForbiddenException('Trường này không yêu cầu xác thực để xem');
     }
     const account = await this.users.findOne({ where: { id: user.id, isActive: true } });
-    if (!account || !(await compare(password, account.passwordHash))) {
-      throw new ForbiddenException('Mật khẩu không đúng');
+    if (!account?.pinHash) {
+      throw new ForbiddenException('Tài khoản chưa thiết lập mã PIN. Vui lòng thiết lập mã PIN trong Hồ sơ.');
+    }
+    if (!(await compare(pin, account.pinHash))) {
+      throw new ForbiddenException('Mã PIN không đúng');
     }
     const value = (record as Record<string, unknown>)[key] ?? ((record as Record<string, any>).customFields || {})[key];
     await this.audit(user, 'REVEAL_FIELD', resource, id, { fieldKey: key });
@@ -1029,7 +1038,7 @@ export class RecordsService {
         name: config.main.sheetName,
         resource: config.main.resource,
         columns: config.main.columns,
-        rows: await this.mapBundleExportRows(config.main, mainRows, mainCodeById, request),
+        rows: await this.mapBundleExportRows(config.main, mainRows, mainCodeById, request, user),
       },
     ];
 
@@ -1041,7 +1050,7 @@ export class RecordsService {
         name: sheetConfig.sheetName,
         resource: sheetConfig.resource,
         columns: sheetConfig.columns,
-        rows: await this.mapBundleExportRows(sheetConfig, relatedRows, mainCodeById, request),
+        rows: await this.mapBundleExportRows(sheetConfig, relatedRows, mainCodeById, request, user),
       });
     }
 
@@ -1149,7 +1158,7 @@ export class RecordsService {
     await this.workflowService.startForRecord(resource, record, user);
     await this.audit(user, 'CREATE', resource, record.id, { submitted: payload, saved: normalized });
     const hydrated = await this.findRaw(resource, record.id);
-    return { data: this.protect(resource, hydrated) };
+    return { data: await this.protectPasswordFields(resource, this.protect(resource, hydrated) as ConfigurableEntity, user) };
   }
 
   async createStaffAccount(staffId: string, payload: { email?: string; username?: string; password?: string; role?: string; branchId?: string }, user: AuthUser) {
@@ -1218,7 +1227,6 @@ export class RecordsService {
 
   async update (resource: string, id: string, payload: Record<string, unknown>, user: AuthUser) {
     const previous = await this.findStored(resource, id);
-    this.assertRecordIsNotProtected(resource, previous);
     this.assertSystemAdminIdentity(resource, previous, payload);
     await this.assertProtectedAdminAssignment(resource, { ...previous, ...payload });
     const previousCustomFields = await this.loadCustomFieldsMap(resource, [id]);
@@ -1260,13 +1268,13 @@ export class RecordsService {
     await this.workflowService.startForRecord(resource, record, user);
     await this.audit(user, 'UPDATE', resource, id, { before: previous, submitted: payload, changes: normalized });
     const hydrated = await this.findRaw(resource, record.id);
-    return { data: this.protect(resource, hydrated) };
+    return { data: await this.protectPasswordFields(resource, this.protect(resource, hydrated) as ConfigurableEntity, user) };
   }
 
   async remove (resource: string, id: string, user: AuthUser) {
     const record = await this.findStored(resource, id);
     this.assertRecordIsNotProtected(resource, record);
-    if (resource === 'user-accounts' && String((record as unknown as User).username || '').toLowerCase() === SYSTEM_ADMIN_USERNAME) {
+    if (resource === 'user-accounts' && this.isSystemAdminAccount(record as User)) {
       throw new ForbiddenException('Không thể xóa tài khoản admin-system');
     }
     await this.assertProtectedAdminAssignment(resource, record);
@@ -1499,8 +1507,10 @@ export class RecordsService {
     rows: Array<Record<string, unknown>>,
     parentCodeById: Map<string, string>,
     request?: RequestContext,
+    user?: AuthUser,
   ) {
     const relatedValueCache = new Map<string, string>();
+    const protectedKeys = new Set(await this.passwordProtectedDetailFieldKeys(sheetConfig.resource, user));
     const customValuesByRecord = sheetConfig.customFields?.length
       ? await this.loadCustomFieldsMap(sheetConfig.resource, rows.map((row) => String(row.id || '')).filter(Boolean))
       : new Map<string, Record<string, unknown>>();
@@ -1514,6 +1524,10 @@ export class RecordsService {
           }
           if (sheetConfig.parentField && sheetConfig.parentCodeColumn && column === sheetConfig.parentCodeColumn) {
             exported[column] = parentCodeById.get(String(row[sheetConfig.parentField] || '')) || '';
+            continue;
+          }
+          if (protectedKeys.has(column)) {
+            exported[column] = '••••••';
             continue;
           }
           const isCustomField = sheetConfig.customFields?.some((field) => field.key === column);
@@ -3369,8 +3383,7 @@ export class RecordsService {
     return { data, total };
   }
 
-  private async protectDetailFields (resource: string, record: ConfigurableEntity, user?: AuthUser) {
-    if (!user) return record;
+  private async protectPasswordFields (resource: string, record: ConfigurableEntity, user?: AuthUser) {
     const protectedKeys = await this.passwordProtectedDetailFieldKeys(resource, user);
     if (!protectedKeys.length) return record;
 
@@ -3390,11 +3403,11 @@ export class RecordsService {
     return (await this.passwordProtectedDetailFieldKeys(resource, user)).includes(fieldKey);
   }
 
-  private async passwordProtectedDetailFieldKeys (resource: string, user: AuthUser) {
+  private async passwordProtectedDetailFieldKeys (resource: string, user?: AuthUser) {
     const roleChain = Array.from(new Set([
-      normalizeRole(user.activeRole),
-      normalizeRole(user.roleMain),
-      normalizeRole(user.role),
+      normalizeRole(user?.activeRole),
+      normalizeRole(user?.roleMain),
+      normalizeRole(user?.role),
       'ALL',
     ]));
     const views = await this.viewSettings.find({ where: { entityType: resource, viewType: 'DETAIL' } });
@@ -3413,6 +3426,7 @@ export class RecordsService {
     if (resource === 'user-accounts') {
       const user = { ...(record as unknown as Record<string, unknown>) };
       delete user.passwordHash;
+      delete user.pinHash;
       return user;
     }
     if (resource === 'files') {
@@ -3561,6 +3575,7 @@ export class RecordsService {
     delete value.createdAt;
     delete value.updatedAt;
     delete value.customFields;
+    delete value.pinHash;
     delete value.items;
     if (resource === 'staff') {
       const normalizedType = String(value.type || '').trim().toUpperCase();
@@ -3791,7 +3806,7 @@ export class RecordsService {
       replacedExisting: Boolean(existing),
     });
     const hydrated = await this.findRaw('work-schedules', record.id);
-    return { data: this.protect('work-schedules', hydrated) };
+    return { data: await this.protectPasswordFields('work-schedules', this.protect('work-schedules', hydrated) as ConfigurableEntity, user) };
   }
 
   private buildRecurringWorkScheduleEntries (normalized: Record<string, unknown>) {
@@ -4959,8 +4974,8 @@ export class RecordsService {
   private assertSystemAdminIdentity(resource: string, previous: ConfigurableEntity, payload: Record<string, unknown>) {
     if (resource !== 'user-accounts') return;
     const account = previous as unknown as User;
-    if (String(account.username || '').toLowerCase() !== SYSTEM_ADMIN_USERNAME) return;
-    if (payload.username !== undefined && String(payload.username).trim().toLowerCase() !== SYSTEM_ADMIN_USERNAME) {
+    if (!this.isSystemAdminAccount(account)) return;
+    if (payload.username !== undefined && String(payload.username).trim().toLowerCase() !== String(account.username || '').trim().toLowerCase()) {
       throw new ForbiddenException('Không thể đổi tên đăng nhập của tài khoản admin-system');
     }
     if (payload.role !== undefined && String(payload.role).trim().toUpperCase() !== String(account.role || '').trim().toUpperCase()) {
@@ -4976,6 +4991,10 @@ export class RecordsService {
     if (assignedUser?.email.toLowerCase() === PROTECTED_ADMIN_EMAIL) {
       throw new ForbiddenException('Không thể thay đổi phân quyền của tài khoản Admin hệ thống');
     }
+  }
+
+  private isSystemAdminAccount(account: User) {
+    return SYSTEM_ADMIN_USERNAMES.has(String(account.username || '').trim().toLowerCase());
   }
 
   private assertResourceAccess (user: AuthUser | undefined, resource: string) {

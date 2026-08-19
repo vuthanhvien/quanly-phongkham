@@ -9,7 +9,7 @@ import {
   UserOutlined,
 } from "@ant-design/icons"
 import { useGetIdentity } from "@refinedev/core"
-import { Avatar, Button, Card, Col, Empty, Form, Input, Modal, Row, Space, Tabs, Tag, Typography, message } from "antd"
+import { Alert, Avatar, Button, Card, Col, Empty, Form, Input, Modal, Row, Space, Tabs, Tag, Typography, message } from "antd"
 import type { TabsProps } from "antd"
 import type { ReactNode } from "react"
 import { useEffect, useMemo, useState } from "react"
@@ -24,6 +24,7 @@ type Identity = {
   activeRole?: string
   branchId?: string
   staffId?: string
+  hasPin?: boolean
   branchPermissions?: Array<{
     branchId: string
     roleName?: string
@@ -73,6 +74,12 @@ type ChangePasswordValues = {
   currentPassword: string
   newPassword: string
   confirmPassword: string
+}
+
+type ChangePinValues = {
+  currentPassword: string
+  pin: string
+  confirmPin: string
 }
 
 const SYSTEM_ROLE_LABELS: Record<string, string> = {
@@ -139,12 +146,17 @@ function ProfileInfoItem({
 export function ProfilePage() {
   const { data: identity } = useGetIdentity<Identity>()
   const [passwordForm] = Form.useForm<ChangePasswordValues>()
+  const [pinForm] = Form.useForm<ChangePinValues>()
   const [staff, setStaff] = useState<StaffProfile | null>(null)
   const [branch, setBranch] = useState<BranchProfile | null>(null)
   const [department, setDepartment] = useState<DepartmentProfile | null>(null)
   const [branchMap, setBranchMap] = useState<Record<string, string>>({})
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
+  const [changePinOpen, setChangePinOpen] = useState(false)
+  const [changingPin, setChangingPin] = useState(false)
+  const [pinError, setPinError] = useState("")
+  const [hasPin, setHasPin] = useState(Boolean(identity?.hasPin))
 
   async function changePassword(values: ChangePasswordValues) {
     setChangingPassword(true)
@@ -166,6 +178,28 @@ export function ProfilePage() {
       setChangingPassword(false)
     }
   }
+
+  async function changePin(values: ChangePinValues) {
+    setChangingPin(true)
+    setPinError("")
+    try {
+      await api.post("/auth/change-pin", { currentPassword: values.currentPassword, pin: values.pin })
+      pinForm.resetFields()
+      setHasPin(true)
+      setChangePinOpen(false)
+      void message.success("Đã cập nhật mã PIN")
+    } catch (error) {
+      const responseMessage = (error as { response?: { data?: { message?: unknown } } })?.response?.data?.message
+      const errorMessage = Array.isArray(responseMessage)
+        ? responseMessage.filter(Boolean).join(". ")
+        : typeof responseMessage === "string" ? responseMessage : "Không thể cập nhật mã PIN"
+      setPinError(errorMessage)
+    } finally {
+      setChangingPin(false)
+    }
+  }
+
+  useEffect(() => setHasPin(Boolean(identity?.hasPin)), [identity?.hasPin])
 
   useEffect(() => {
     let active = true
@@ -359,6 +393,9 @@ export function ProfilePage() {
           <Button type="primary" icon={<LockOutlined />} onClick={() => setChangePasswordOpen(true)}>
             Đổi mật khẩu
           </Button>
+          <Button icon={<SafetyCertificateOutlined />} onClick={() => { setPinError(""); setChangePinOpen(true) }}>
+            {hasPin ? "Đổi mã PIN" : "Thiết lập mã PIN"}
+          </Button>
         </div>
       </div>
 
@@ -433,6 +470,32 @@ export function ProfilePage() {
             ]}
           >
             <Input.Password autoComplete="new-password" />
+          </Form.Item>
+        </Form>
+      </Modal>
+      <Modal
+        title={<Space><SafetyCertificateOutlined />{hasPin ? "Đổi mã PIN" : "Thiết lập mã PIN"}</Space>}
+        open={changePinOpen}
+        confirmLoading={changingPin}
+        okText="Lưu mã PIN"
+        cancelText="Hủy"
+        onOk={() => pinForm.submit()}
+        onCancel={() => {
+          pinForm.resetFields()
+          setPinError("")
+          setChangePinOpen(false)
+        }}
+      >
+        <Form form={pinForm} layout="vertical" onFinish={(values) => void changePin(values)}>
+          {pinError && <Alert style={{ marginBottom: 16 }} type="error" showIcon message={pinError} />}
+          <Form.Item name="currentPassword" label="Mật khẩu hiện tại" rules={[{ required: true, message: "Nhập mật khẩu hiện tại để cập nhật mã PIN" }]}>
+            <Input.Password autoComplete="current-password" />
+          </Form.Item>
+          <Form.Item name="pin" label="Mã PIN mới" rules={[{ required: true, message: "Nhập mã PIN" }, { pattern: /^\d{6}$/, message: "Mã PIN phải gồm đúng 6 chữ số" }]}>
+            <Input.Password inputMode="numeric" maxLength={6} autoComplete="new-password" placeholder="••••••" />
+          </Form.Item>
+          <Form.Item name="confirmPin" label="Nhập lại mã PIN" dependencies={["pin"]} rules={[{ required: true, message: "Nhập lại mã PIN" }, ({ getFieldValue }) => ({ validator(_, value) { return !value || getFieldValue("pin") === value ? Promise.resolve() : Promise.reject(new Error("Mã PIN nhập lại không khớp")) } })]}>
+            <Input.Password inputMode="numeric" maxLength={6} autoComplete="new-password" placeholder="••••••" />
           </Form.Item>
         </Form>
       </Modal>

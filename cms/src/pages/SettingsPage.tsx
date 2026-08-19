@@ -72,7 +72,6 @@ import {
   getFieldCatalog,
   getRoleInheritanceChain,
   getRoleOptions,
-  getStoredUserRole,
   hasExactRoleSetting,
   normalizeRole,
   resolveAllowedActions,
@@ -652,7 +651,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const [entityType, setEntityType] = useState(() => searchParams.get("module") || "customers")
-  const [selectedRole, setSelectedRole] = useState(() => normalizeRole(searchParams.get("role") || getStoredUserRole()))
+  const [selectedRole, setSelectedRole] = useState(() => normalizeRole(searchParams.get("role") || DEFAULT_ROLE_SCOPE))
   const [expandedRoleKeys, setExpandedRoleKeys] = useState<string[]>([])
   const [fields, setFields] = useState<CustomField[]>([])
   const [views, setViews] = useState<ViewSettingRecord[]>([])
@@ -785,7 +784,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
 
   useEffect(() => {
     const moduleFromUrl = searchParams.get("module") || "customers"
-    const roleFromUrl = normalizeRole(searchParams.get("role") || getStoredUserRole())
+    const roleFromUrl = normalizeRole(searchParams.get("role") || DEFAULT_ROLE_SCOPE)
 
     setEntityType((current) => current === moduleFromUrl ? current : moduleFromUrl)
     setSelectedRole((current) => current === roleFromUrl ? current : roleFromUrl)
@@ -1320,6 +1319,7 @@ function ViewConfigTable({
 }) {
   const [editingField, setEditingField] = useState<FieldLayoutConfig | null>(null)
   const [optionEdit, setOptionEdit] = useState<{ fieldKey: string; index: number; value: string; label: string } | null>(null)
+  const visibleFields = useMemo(() => dataSource.filter((field) => field.visible), [dataSource])
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -1347,15 +1347,8 @@ function ViewConfigTable({
       fixed: "left",
       render: (_, row) =>
         onReorder ? (
-          <SortableFieldDragHandle order={dataSource.findIndex((item) => item.key === row.key) + 1} />
+          <SortableFieldDragHandle order={visibleFields.findIndex((item) => item.key === row.key) + 1} />
         ) : null,
-    },
-    {
-      title: "Hiển thị",
-      dataIndex: "visible",
-      width: 100,
-      fixed: "left",
-      render: (value, row) => <Checkbox checked={value} onChange={(event) => onChange(viewType, row.key, { visible: event.target.checked })} aria-label={`Hiển thị ${row.label}`} />,
     },
     {
       title: "Trường",
@@ -1428,23 +1421,27 @@ function ViewConfigTable({
   columns.push({
     title: "Thao tác",
     key: "actions",
-    width: 148,
+    width: 88,
     fixed: "right",
-    render: (_, row) => row.visible ? (
+    render: (_, row) => (
       <Space size={0}>
-        <Button type="text" icon={<EditOutlined />} onClick={() => setEditingField({ ...row })}>Sửa</Button>
-        <Popconfirm title={`Ẩn “${row.label}” khỏi giao diện này?`} okText="Ẩn" cancelText="Hủy" onConfirm={() => onChange(viewType, row.key, { visible: false })}>
-          <Button type="text" danger icon={<DeleteOutlined />}>Xóa</Button>
+        <Tooltip title="Sửa">
+          <Button type="text" icon={<EditOutlined />} aria-label={`Sửa ${row.label}`} onClick={() => setEditingField({ ...row })} />
+        </Tooltip>
+        <Popconfirm title={`Xóa “${row.label}” khỏi giao diện này?`} okText="Xóa" cancelText="Hủy" onConfirm={() => onChange(viewType, row.key, { visible: false })}>
+          <Tooltip title="Xóa">
+            <Button type="text" danger icon={<DeleteOutlined />} aria-label={`Xóa ${row.label}`} />
+          </Tooltip>
         </Popconfirm>
       </Space>
-    ) : <Button type="text" onClick={() => onChange(viewType, row.key, { visible: true })}>Khôi phục</Button>,
+    ),
   })
 
   return (
     <>
       <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={dndSensors}>
-        <SortableContext items={dataSource.map((item) => item.key)} strategy={verticalListSortingStrategy}>
-          <Table columns={columns} components={tableComponents} dataSource={dataSource} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" />
+        <SortableContext items={visibleFields.map((item) => item.key)} strategy={verticalListSortingStrategy}>
+          <Table columns={columns} components={tableComponents} dataSource={visibleFields} pagination={false} rowKey="key" scroll={{ x: "max-content" }} size="small" />
         </SortableContext>
       </DndContext>
       <Modal
@@ -1511,6 +1508,9 @@ function FieldConfigEditor({
     <Form layout="vertical">
       <Form.Item label="Trường">
         <Input value={`${field.label} (${field.key})`} disabled />
+      </Form.Item>
+      <Form.Item label="Hiển thị">
+        <Checkbox checked={field.visible} onChange={(event) => update({ visible: event.target.checked })}>Hiển thị field này</Checkbox>
       </Form.Item>
       {viewType === "FORM" && <Form.Item><Checkbox checked={Boolean(field.disabled)} onChange={(event) => update({ disabled: event.target.checked })}>Khóa sửa</Checkbox></Form.Item>}
       {viewType === "DETAIL" && <Form.Item><Checkbox checked={Boolean(field.requiresPasswordToReveal)} onChange={(event) => update({ requiresPasswordToReveal: event.target.checked })}>Yêu cầu nhập mật khẩu để xem giá trị</Checkbox></Form.Item>}

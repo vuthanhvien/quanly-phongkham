@@ -33,10 +33,10 @@ export class RecordsController {
   revealField(
     @Param('resource') resource: string,
     @Param('id') id: string,
-    @Body() payload: { fieldKey?: string; password?: string },
+    @Body() payload: { fieldKey?: string; pin?: string },
     @Request() request: { user: AuthUser },
   ) {
-    return this.records.revealField(resource, id, String(payload.fieldKey || ''), String(payload.password || ''), request.user);
+    return this.records.revealField(resource, id, String(payload.fieldKey || ''), String(payload.pin || ''), request.user);
   }
 
   @Post('records/leads/:id/convert-to-customer')

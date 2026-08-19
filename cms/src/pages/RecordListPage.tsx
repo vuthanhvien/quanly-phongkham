@@ -52,6 +52,7 @@ import { hasActionAccess, hasResourceAccess, isCurrentUserAdmin } from "../acces
 import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
+import { ProtectedFieldRevealModal, type ProtectedFieldRevealTarget } from "../components/ProtectedFieldRevealModal"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
 import { menuIcons } from "../components/Shell"
 import { ProductForm } from "../components/ProductForm"
@@ -64,9 +65,11 @@ import { CMS_DATA_REFRESH_EVENT, type CmsDataRefreshDetail } from "../utils/data
 import * as XLSX from "xlsx"
 import {
   FieldLayoutConfig,
+  buildFieldLayoutConfigs,
   getFieldCatalog,
   getStoredUserRole,
   getVisibleFieldConfigs,
+  resolveViewSetting,
   ViewSettingRecord,
 } from "../view-settings"
 
@@ -107,6 +110,9 @@ export function RecordListPage() {
   const [sortField, setSortField] = useState(() => searchParams.get("sort") || "")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => searchParams.get("order") === "asc" ? "asc" : "desc")
   const [displayFields, setDisplayFields] = useState<FieldLayoutConfig[]>([])
+  const [passwordProtectedFieldKeys, setPasswordProtectedFieldKeys] = useState<Set<string>>(new Set())
+  const [protectedFieldTarget, setProtectedFieldTarget] = useState<ProtectedFieldRevealTarget | null>(null)
+  const [revealedValues, setRevealedValues] = useState<Record<string, unknown>>({})
   const [templates, setTemplates] = useState<
     Array<{ id: string; name: string; templateType?: string; isActive?: boolean }>
   >([])
@@ -369,6 +375,15 @@ export function RecordListPage() {
           getStoredUserRole(),
         )
         setDisplayFields(tableFields)
+        setPasswordProtectedFieldKeys(new Set(
+          buildFieldLayoutConfigs(
+            catalog,
+            resolveViewSetting(views.data.data as ViewSettingRecord[], "DETAIL", getStoredUserRole()),
+            "DETAIL",
+          )
+            .filter((field) => field.requiresPasswordToReveal)
+            .map((field) => field.key),
+        ))
         const savedTabConfig = (views.data.data as ViewSettingRecord[]).find((view) => view.viewType === "TABLE_TABS" && view.role === "ALL")?.config?.tabs
         setTableTabs(Array.isArray(savedTabConfig) ? savedTabConfig.filter(isSavedTableTab) : [])
         setTableTabsLoaded(true)
@@ -471,6 +486,20 @@ export function RecordListPage() {
         sorter: true,
         sortOrder: (sortField === field.key ? (sortOrder === "asc" ? "ascend" : "descend") : undefined) as "ascend" | "descend" | undefined,
         render: (_: unknown, row: Record<string, any>) => {
+          const revealKey = `${row.id}:${field.key}`
+          if (passwordProtectedFieldKeys.has(field.key)) {
+            const hasRevealedValue = Object.prototype.hasOwnProperty.call(revealedValues, revealKey)
+            return hasRevealedValue ? (
+              <RecordValueView compact field={field} fileLookups={fileLookups} lookups={lookups} value={revealedValues[revealKey]} />
+            ) : (
+              <Space size={4}>
+                <span>••••••</span>
+                <Tooltip title="Xem bằng mã PIN">
+                  <Button type="text" size="small" icon={<EyeOutlined />} aria-label={`Xem ${field.label}`} onClick={() => setProtectedFieldTarget({ resource, recordId: String(row.id), fieldKey: field.key, label: field.label })} />
+                </Tooltip>
+              </Space>
+            )
+          }
           if (field.key === "code") {
             const code = resolveRecordFieldValue(row, field)
             return code ? (
@@ -526,7 +555,7 @@ export function RecordListPage() {
         render: (_: unknown, row: Record<string, any>) => {
           const recordId = String(row.id)
           const isUnitRoot = resource === "units" && !row.baseUnitId
-          const isSystemAdminAccount = resource === "user-accounts" && String(row.username || "").toLowerCase() === "admin-system"
+          const isSystemAdminAccount = resource === "user-accounts" && ["admin", "admin-system"].includes(String(row.username || "").trim().toLowerCase())
           const menuItems: any[] = []
           if (hasActionAccess(resource, "view")) menuItems.push({ key: "quick-view", icon: <EyeOutlined />, label: "Xem chi tiết", onClick: () => openDetail(recordId) })
           if (resource === "projects" && recordStatus === "active") menuItems.push({ key: "board", icon: <AppstoreOutlined />, label: "Mở Kanban", onClick: () => navigate(`/projects/${recordId}/board`) })
@@ -567,7 +596,7 @@ export function RecordListPage() {
         },
       },
     ],
-    [advancedFilters, advancedSearch, displayFields, resource, recordStatus, templates, lookups, fileLookups, productCategoryNames, screens.md],
+    [advancedFilters, advancedSearch, displayFields, resource, recordStatus, templates, lookups, fileLookups, productCategoryNames, screens.md, passwordProtectedFieldKeys, revealedValues],
   )
 
   const doctorOptions = useMemo(
@@ -952,6 +981,11 @@ export function RecordListPage() {
           }}
         />
       </Card>
+      <ProtectedFieldRevealModal
+        target={protectedFieldTarget}
+        onClose={() => setProtectedFieldTarget(null)}
+        onRevealed={(target, value) => setRevealedValues((current) => ({ ...current, [`${target.recordId}:${target.fieldKey}`]: value }))}
+      />
       <Modal
         cancelText="Hủy"
         destroyOnHidden

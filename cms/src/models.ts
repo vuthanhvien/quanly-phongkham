@@ -46,7 +46,7 @@ export interface FieldSpec {
   description?: string;
   placeholder?: string;
   inputPattern?: string;
-  /** Requires the current user's password before this value can be revealed in detail view. */
+  /** Requires the current user's 6-digit PIN before this value can be revealed in detail view. */
   requiresPasswordToReveal?: boolean;
   relation?: RelationSpec;
   customTableId?: string;

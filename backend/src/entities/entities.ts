@@ -55,6 +55,9 @@ export class User {
   @Column()
   passwordHash: string;
 
+  @Column({ nullable: true })
+  pinHash?: string;
+
   @Column()
   fullName: string;
 

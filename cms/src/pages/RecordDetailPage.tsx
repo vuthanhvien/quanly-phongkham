@@ -53,6 +53,7 @@ import { RecordValueView } from "../components/RecordValueView"
 import { ServiceOrderForm } from "../components/ServiceOrderForm"
 import { ProductForm } from "../components/ProductForm"
 import { ProjectManagementCard } from "../components/ProjectManagementCard"
+import { ProtectedFieldRevealModal, type ProtectedFieldRevealTarget } from "../components/ProtectedFieldRevealModal"
 import { CustomField, entityLabels, getFieldLabel } from "../models"
 import { FileLookupMap, hasFileField, loadFileLookupMap, loadRelationOptions, LookupMap, resolveRecordFieldValue } from "../relations"
 import {
@@ -144,10 +145,8 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   const [relatedEdit, setRelatedEdit] = useState<RelatedRecordEditState | null>(null)
   const [mainEdit, setMainEdit] = useState<MainRecordEditState | null>(null)
   const [quickCreateBlock, setQuickCreateBlock] = useState<RelatedBlock | null>(null)
-  const [passwordProtectedField, setPasswordProtectedField] = useState<FieldLayoutConfig | null>(null)
-  const [revealPassword, setRevealPassword] = useState("")
+  const [protectedFieldTarget, setProtectedFieldTarget] = useState<ProtectedFieldRevealTarget | null>(null)
   const [revealedValues, setRevealedValues] = useState<Record<string, unknown>>({})
-  const [revealingValue, setRevealingValue] = useState(false)
   const { mutate: deleteRecord } = useDelete()
   const canShowRelatedResource = useCallback((relatedResource: string) =>
     isModuleEnabled(
@@ -169,8 +168,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
       <Space size={8}>
         <span>••••••</span>
         <Button icon={<EyeOutlined />} size="small" onClick={() => {
-          setRevealPassword("")
-          setPasswordProtectedField(field)
+          setProtectedFieldTarget({ resource, recordId: id, fieldKey: field.key, label: field.label })
         }}>
           Xem
         </Button>
@@ -178,45 +176,12 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
     )
   }
 
-  async function revealProtectedField() {
-    if (!passwordProtectedField) return
-    setRevealingValue(true)
-    try {
-      const response = await api.post(`/records/${resource}/${id}/reveal-field`, {
-        fieldKey: passwordProtectedField.key,
-        password: revealPassword,
-      })
-      setRevealedValues((current) => ({ ...current, [passwordProtectedField.key]: response.data.data.value }))
-      setPasswordProtectedField(null)
-      setRevealPassword("")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không thể xác thực mật khẩu")
-    } finally {
-      setRevealingValue(false)
-    }
-  }
-
-  const passwordRevealModal = (
-    <Modal
-      destroyOnHidden
-      maskClosable={false}
-      open={Boolean(passwordProtectedField)}
-      title={`Xem ${passwordProtectedField?.label || "giá trị bảo mật"}`}
-      okText="Xác thực và xem"
-      cancelText="Hủy"
-      confirmLoading={revealingValue}
-      onOk={() => void revealProtectedField()}
-      onCancel={() => {
-        setPasswordProtectedField(null)
-        setRevealPassword("")
-      }}
-    >
-      <Form layout="vertical">
-        <Form.Item label="Mật khẩu hiện tại" required>
-          <Input.Password autoFocus value={revealPassword} onChange={(event) => setRevealPassword(event.target.value)} onPressEnter={() => void revealProtectedField()} />
-        </Form.Item>
-      </Form>
-    </Modal>
+  const protectedFieldRevealModal = (
+    <ProtectedFieldRevealModal
+      target={protectedFieldTarget}
+      onClose={() => setProtectedFieldTarget(null)}
+      onRevealed={(target, value) => setRevealedValues((current) => ({ ...current, [target.fieldKey]: value }))}
+    />
   )
 
   useEffect(() => {
@@ -324,7 +289,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
           </>
         )}
       </Card>
-      {passwordRevealModal}
+      {protectedFieldRevealModal}
       </>
     )
   }
@@ -920,7 +885,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
           )
         )}
       </Modal>
-      {passwordRevealModal}
+      {protectedFieldRevealModal}
     </>
   )
 

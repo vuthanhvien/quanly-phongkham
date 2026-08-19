@@ -308,7 +308,7 @@ export function RecordFormContent({
     const payload = buildPayload(values)
     const done = async (result?: any) => {
       const userId = editing ? id : result?.data?.id
-      if (resource === "user-accounts" && userId) await syncBranchRoles(String(userId), (values.branchRoleAssignments || []) as Array<{ branchId?: string; roleKeys?: string[]; isActive?: boolean }>)
+      if (resource === "user-accounts" && userId && !isSystemAdminAccount) await syncBranchRoles(String(userId), (values.branchRoleAssignments || []) as Array<{ branchId?: string; roleKeys?: string[]; isActive?: boolean }>)
       setSubmitError(null)
       if (notifyOnSuccess) toastSuccess("Đã lưu dữ liệu")
       onSuccess?.()
@@ -404,7 +404,7 @@ export function RecordFormContent({
     [fields, hiddenFieldKeys, isAddressForm, isAppointmentForm, isWorkScheduleForm, resource],
   )
   const isSystemAdminAccount = resource === "user-accounts"
-    && String(recordQuery.result?.data?.username || recordQuery.query?.data?.data?.username || recordQuery.data?.data?.data?.username || "").toLowerCase() === "admin-system"
+    && ["admin", "admin-system"].includes(String(recordQuery.result?.data?.username || recordQuery.query?.data?.data?.username || recordQuery.data?.data?.data?.username || "").trim().toLowerCase())
   const formVisibleFields = useMemo(
     () => visibleFields.map((field) => isSystemAdminAccount && ["username", "role"].includes(field.key)
       ? { ...field, disabled: true }
@@ -526,12 +526,12 @@ export function RecordFormContent({
                 <Typography.Title level={5}>Phân quyền theo chi nhánh</Typography.Title>
                 {items.map(({ key, name }) => (
                   <Space key={key} align="start" style={{ display: "flex", marginBottom: 8 }}>
-                    <Form.Item name={[name, "branchId"]} rules={[{ required: true, message: "Chọn chi nhánh" }]}><Select style={{ minWidth: 210 }} options={branchRoleOptions} placeholder="Chi nhánh" /></Form.Item>
-                    <Form.Item name={[name, "roleKeys"]} rules={[{ required: true, message: "Chọn vai trò" }]}><Select mode="multiple" style={{ minWidth: 280 }} options={systemRoleOptions} placeholder="Vai trò" /></Form.Item>
-                    <Button danger onClick={() => remove(name)}>Bỏ</Button>
+                    <Form.Item name={[name, "branchId"]} rules={[{ required: true, message: "Chọn chi nhánh" }]}><Select disabled={isSystemAdminAccount} style={{ minWidth: 210 }} options={branchRoleOptions} placeholder="Chi nhánh" /></Form.Item>
+                    <Form.Item name={[name, "roleKeys"]} rules={[{ required: true, message: "Chọn vai trò" }]}><Select disabled={isSystemAdminAccount} mode="multiple" style={{ minWidth: 280 }} options={systemRoleOptions} placeholder="Vai trò" /></Form.Item>
+                    <Button danger disabled={isSystemAdminAccount} onClick={() => remove(name)}>Bỏ</Button>
                   </Space>
                 ))}
-                <Button onClick={() => add({ isActive: true, roleKeys: [] })}>+ Thêm chi nhánh / role</Button>
+                <Button disabled={isSystemAdminAccount} onClick={() => add({ isActive: true, roleKeys: [] })}>+ Thêm chi nhánh / role</Button>
               </div>
             )}
           </Form.List>
