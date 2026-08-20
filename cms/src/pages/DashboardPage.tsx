@@ -14,6 +14,7 @@ import { companyTypeDashboardCopy, type CompanyType } from "../company-types"
 import { DashboardMetricGrid } from "../components/dashboard/DashboardMetricGrid"
 import { DashboardOperationsSection } from "../components/dashboard/DashboardOperationsSection"
 import { DashboardStaffSection } from "../components/dashboard/DashboardStaffSection"
+import { CompanyFeed } from "../components/dashboard/CompanyFeed"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { getFieldLabel } from "../models"
 import { hasActionAccess } from "../access"
@@ -265,11 +266,11 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="dashboard-home">
+    <div className="dashboard-home clinical-command-dashboard">
       <header className="dashboard-home-heading">
         <div>
-          <Typography.Text className="eyebrow">Tổng quan</Typography.Text>
-          <Typography.Title level={2}>Hôm nay có gì?</Typography.Title>
+          <Typography.Text className="eyebrow">CỘNG ĐỒNG NỘI BỘ</Typography.Text>
+          <Typography.Title level={2}>Feed công ty</Typography.Title>
         </div>
         <div className="dashboard-today-meta">
           <div className="dashboard-time-card">
@@ -282,25 +283,14 @@ export function DashboardPage() {
           </div>
         </div>
       </header>
-      {staffDashboard ? (
-        <DashboardStaffSection
-          actionLoading={staffActionLoading}
-          canCreateAttendance={hasActionAccess("attendances", "create")}
-          canCreateLeaveRequest={hasActionAccess("leave-requests", "create")}
-          canUpdateAttendance={hasActionAccess("attendances", "update")}
-          data={staffDashboard}
-          onCheckIn={() => void handleCheckIn()}
-          onCheckOut={() => void handleCheckOut()}
-          onOpenLeaveRequest={() => setLeaveDrawerOpen(true)}
-        />
-      ) : null}
-      <DashboardMetricGrid metrics={metrics} />
-      <DashboardOperationsSection
-        operationsTitle={dashboardCopy.operationsTitle}
-        pipeline={pipeline}
-        quickStats={quickStats}
-        quickStatsTitle={dashboardCopy.quickStatsTitle}
-      />
+      <div className="dashboard-feed-layout">
+        <CompanyFeed currentUser={staffDashboard?.staffName || identity?.fullName || identity?.username || "Bạn"} />
+        <aside className="dashboard-widgets">
+          {staffDashboard ? <DashboardStaffSection actionLoading={staffActionLoading} canCreateAttendance={hasActionAccess("attendances", "create")} canCreateLeaveRequest={hasActionAccess("leave-requests", "create")} canUpdateAttendance={hasActionAccess("attendances", "update")} data={staffDashboard} onCheckIn={() => void handleCheckIn()} onCheckOut={() => void handleCheckOut()} onOpenLeaveRequest={() => setLeaveDrawerOpen(true)} /> : null}
+          <DashboardMetricGrid metrics={metrics} />
+          <DashboardOperationsSection operationsTitle={dashboardCopy.operationsTitle} pipeline={pipeline} quickStats={quickStats} quickStatsTitle={dashboardCopy.quickStatsTitle} />
+        </aside>
+      </div>
       <Modal
         className="quick-drawer"
         destroyOnHidden

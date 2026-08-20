@@ -103,7 +103,7 @@ export const appModuleGroups: AppModuleGroup[] = [
 export const appModuleLabels: Record<AppModuleKey, string> = {
   ...entityLabels,
   ...screenLabels,
-  dashboard: "Tổng quan",
+  dashboard: "Feed",
   calendar: "Lịch tổng",
   "landing-pages": "Trang đích",
   "landing-forms": "Biểu mẫu",

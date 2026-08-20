@@ -135,7 +135,7 @@ const menuGroupIcons: Record<AppModuleGroup["key"], React.ReactNode> = {
 }
 
 const moduleNavigation: Record<string, { path: string; label: string; screen?: string }> = {
-  dashboard: { path: "/", label: "Tổng quan" },
+  dashboard: { path: "/", label: "Feed" },
   calendar: { path: "/calendar", label: "Lịch tổng" },
   "landing-pages": { path: "/pages", label: "Trang đích", screen: "settings" },
   "landing-forms": { path: "/forms", label: "Biểu mẫu", screen: "settings" },
@@ -613,7 +613,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 export function resolveBrowserPageTitle(pathname: string) {
   const segments = pathname.split('/').filter(Boolean)
   const root = segments[0] || ''
-  if (!root) return 'Tổng quan'
+  if (!root) return 'Feed'
 
   if (root === 'settings' && segments[1] === 'print-templates') return 'Chỉnh sửa mẫu in'
   if (root === 'projects' && segments[2] === 'board') return 'Bảng công việc dự án'
