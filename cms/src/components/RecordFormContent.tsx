@@ -743,22 +743,21 @@ function TimeInput({
   value?: string
   onChange?: (value: string) => void
 }) {
-  const { settings } = useAppUi()
   const inputPattern = getInputPatternConfig("time-hh-mm")
   if (!inputPattern) return null
 
   return (
     <InputMask
-      className="ant-input"
       disabled={disabled}
       mask={inputPattern.mask}
       placeholder="HH:MM"
       maskChar="_"
       alwaysShowMask
-      style={{ width: "100%", height: controlHeightBySize(settings.size), borderRadius: settings.borderRadius }}
       value={value || ""}
       onChange={(event: ChangeEvent<HTMLInputElement>) => onChange?.(event.target.value)}
-    />
+    >
+      <Input />
+    </InputMask>
   )
 }
 
@@ -1068,16 +1067,16 @@ function FieldInput({
   if (inputPattern) {
     return (
       <InputMask
-        className="ant-input"
         disabled={field.disabled}
         mask={inputPattern.mask}
         placeholder={placeholder}
         maskChar="_"
         alwaysShowMask
-        style={{ width: "100%", height: controlHeightBySize(settings.size), borderRadius: settings.borderRadius }}
         value={String(value ?? "")}
         onChange={(event: ChangeEvent<HTMLInputElement>) => onChange?.(event.target.value)}
-      />
+      >
+        <Input />
+      </InputMask>
     )
   }
   return (
@@ -1126,12 +1125,12 @@ function buildRelationSelectOptions(lookups: LookupMap, lookupKey: string, resou
     if (!meta || !["customers", "leads", "staff"].includes(resource)) {
       return { value, label, searchLabel: String(label) }
     }
-    const primaryText = meta.code || meta.display_title || String(label)
-    const secondaryText = meta.fullName || meta.name || meta.display_title || String(label)
+    const primaryText = meta.fullName || meta.name || meta.display_title || String(label)
+    const secondaryText = ""
     return {
       value,
       label: renderRelationSelectLabel(meta, primaryText, secondaryText),
-      searchLabel: `${primaryText} ${secondaryText}`.trim(),
+      searchLabel: `${meta.code || ""} ${primaryText}`.trim(),
     }
   })
 }
@@ -1147,7 +1146,7 @@ function renderRelationSelectLabel(meta: RelationLookupRecord, primaryText: stri
       />
       <span className="relation-entity-card__copy">
         <strong>{primaryText}</strong>
-        <span>{secondaryText}</span>
+        {secondaryText ? <span>{secondaryText}</span> : null}
       </span>
     </span>
   )
