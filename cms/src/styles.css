@@ -1566,8 +1566,15 @@ body {
   overflow: hidden;
 }
 
-.roles-content-panel > .record-status-tabs {
+.roles-tabs-toolbar {
+  align-items: center;
+  display: flex;
   flex: 0 0 auto;
+  justify-content: space-between;
+}
+
+.roles-tabs-toolbar .record-status-tabs {
+  flex: 1;
 }
 
 .roles-tab-content {

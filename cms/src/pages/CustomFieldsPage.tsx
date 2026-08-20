@@ -77,7 +77,6 @@ export function CustomFieldsPage() {
   const [selectedFieldIds, setSelectedFieldIds] = useState<Key[]>([])
   const [fieldForm] = Form.useForm()
   const currentFieldType = Form.useWatch("dataType", fieldForm)
-  const multiSelectSource = Form.useWatch("multiSelectSource", fieldForm)
   const fieldKeys = useMemo(
     () => new Set(fields.map((field) => field.key)),
     [fields],
@@ -154,7 +153,7 @@ export function CustomFieldsPage() {
   function openCreateField() {
     setEditingField(null)
     fieldForm.resetFields()
-    fieldForm.setFieldsValue({ dataType: "text", multiSelectSource: "manual", options: [], sortOrder: 0, isActive: true })
+    fieldForm.setFieldsValue({ dataType: "text", sortOrder: 0, isActive: true })
     setFieldModal(true)
   }
 
@@ -162,8 +161,6 @@ export function CustomFieldsPage() {
     setEditingField(field)
     fieldForm.setFieldsValue({
       ...field,
-      multiSelectSource: field.dataType === "multi-select" && field.relationResource ? "table" : "manual",
-      options: field.dataType === "multi-select" ? normalizeMultiSelectOptions(field.options) : formatOptionsForInput(field.options),
       tableColumns: field.tableColumns?.map((column) => ({ ...column, options: (column.options || []).join(", ") })),
     })
     setFieldModal(true)
@@ -254,15 +251,14 @@ export function CustomFieldsPage() {
       label: field.label,
       key: field.key,
       dataType: field.dataType,
-      options: (field.options || []).join(", "),
       relationResource: field.relationResource || "",
       sortOrder: field.sortOrder || 0,
       isActive: field.isActive ? "true" : "false",
     }))
     const workbook = XLSX.utils.book_new()
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["label", "key", "dataType", "options", "relationResource", "sortOrder", "isActive"],
-      ...payload.map((field) => [field.label, field.key, field.dataType, field.options, field.relationResource, field.sortOrder, field.isActive]),
+      ["label", "key", "dataType", "relationResource", "sortOrder", "isActive"],
+      ...payload.map((field) => [field.label, field.key, field.dataType, field.relationResource, field.sortOrder, field.isActive]),
     ])
     XLSX.utils.book_append_sheet(workbook, worksheet, "CustomFields")
     XLSX.writeFile(workbook, `${entityType}-custom-fields.xlsx`)
@@ -273,15 +269,14 @@ export function CustomFieldsPage() {
       label: field.label,
       key: field.key,
       dataType: field.dataType,
-      options: Array.isArray(field.options) ? field.options.join(", ") : "",
       relationResource: "",
       sortOrder: field.sortOrder,
       isActive: field.isActive ? "true" : "false",
     }))
     const workbook = XLSX.utils.book_new()
     const worksheet = XLSX.utils.aoa_to_sheet([
-      ["label", "key", "dataType", "options", "relationResource", "sortOrder", "isActive"],
-      ...payload.map((field) => [field.label, field.key, field.dataType, field.options, field.relationResource, field.sortOrder, field.isActive]),
+      ["label", "key", "dataType", "relationResource", "sortOrder", "isActive"],
+      ...payload.map((field) => [field.label, field.key, field.dataType, field.relationResource, field.sortOrder, field.isActive]),
     ])
     XLSX.utils.book_append_sheet(workbook, worksheet, "CustomFields")
     XLSX.writeFile(workbook, `${entityType}-custom-fields-test.xlsx`)
@@ -516,23 +511,16 @@ export function CustomFieldsPage() {
           <Form.Item name="dataType" label="Kiểu" initialValue="text">
             <Select options={CUSTOM_FIELD_TYPES} />
           </Form.Item>
-          {currentFieldType === "select" && (
-            <Form.Item name="options" label="Lựa chọn (ngăn cách dấu phẩy)">
-              <Input />
+          {(currentFieldType === "select" || currentFieldType === "multi-select") && (
+            <Typography.Paragraph type="secondary">
+              Khai báo các lựa chọn tại <a href={`/role-module-settings?module=${entityType}&role=ALL`}>Hiển thị theo role/module</a> (module {entityLabels[entityType] || entityType}, role ALL).
+            </Typography.Paragraph>
+          )}
+          {currentFieldType === "multi-select" && (
+            <Form.Item name="relationResource" label="Table dữ liệu liên kết (tùy chọn)">
+              <Select allowClear options={RELATIVE_RESOURCE_OPTIONS} placeholder="Ví dụ: Khách hàng" />
             </Form.Item>
           )}
-          {currentFieldType === "multi-select" && <>
-            <Form.Item name="multiSelectSource" label="Nguồn lựa chọn" initialValue="manual">
-              <Select options={[{ value: "manual", label: "Nhập tay" }, { value: "table", label: "Chọn table" }]} />
-            </Form.Item>
-            {multiSelectSource === "table" ? (
-              <Form.Item name="relationResource" label="Table dữ liệu" rules={[{ required: true, message: "Chọn table dữ liệu" }]}>
-                <Select options={RELATIVE_RESOURCE_OPTIONS} placeholder="Ví dụ: Khách hàng" />
-              </Form.Item>
-            ) : (
-              <ManualMultiSelectOptions />
-            )}
-          </>}
           {currentFieldType === "relative" && (
             <Form.Item
               name="relationResource"
@@ -670,12 +658,6 @@ export function CustomFieldsPage() {
             { title: "Mã trường", dataIndex: "key" },
             { title: "Kiểu dữ liệu", dataIndex: "dataType" },
             {
-              title: "Lựa chọn",
-              dataIndex: "options",
-              render: (value) =>
-                Array.isArray(value) ? value.join(", ") : value || "-",
-            },
-            {
               title: "Liên kết",
               dataIndex: "relationResource",
               render: (value) => value || "-",
@@ -691,7 +673,6 @@ interface ParsedFieldInput {
   label: string
   key: string
   dataType?: string
-  options?: string[] | string
   relationResource?: string
   sortOrder?: number | string
   isActive?: boolean | string
@@ -702,7 +683,6 @@ interface BatchFieldRow {
   label: string
   key: string
   dataType: string
-  options: string
   relationResource?: string
   sortOrder: number
   isActive: boolean
@@ -714,7 +694,6 @@ function createEmptyBatchRow(index: number): BatchFieldRow {
     label: "",
     key: "",
     dataType: "text",
-    options: "",
     relationResource: undefined,
     sortOrder: index,
     isActive: true,
@@ -727,7 +706,6 @@ function toBatchRow(field: CustomField, index: number): BatchFieldRow {
     label: field.label,
     key: field.key,
     dataType: field.dataType,
-    options: (field.options || []).join(", "),
     relationResource: field.relationResource,
     sortOrder: field.sortOrder || index,
     isActive: field.isActive,
@@ -739,9 +717,8 @@ function normalizeBatchRow(row: BatchFieldRow): ParsedFieldInput {
     label: row.label.trim(),
     key: sanitizeFieldKey(row.key),
     dataType: row.dataType,
-    options: row.options,
     relationResource:
-      row.dataType === "relative" ? row.relationResource : undefined,
+      row.dataType === "relative" || row.dataType === "multi-select" ? row.relationResource : undefined,
     sortOrder: row.sortOrder,
     isActive: row.isActive,
   }
@@ -783,15 +760,13 @@ function normalizeFieldPayload(
     required: false,
     isActive: values.isActive ?? true,
     sortOrder: Number(values.sortOrder || 0),
-    options: values.dataType === "multi-select" && values.multiSelectSource === "manual"
-      ? normalizeMultiSelectOptions(values.options)
-      : values.dataType === "select" && values.options
-        ? normalizeOptions(values.options)
-        : undefined,
+    // Options for list fields belong to the FORM layout at role/module settings.
+    // Always clear the legacy definition-level value when this field is saved.
+    options: null,
     relationResource:
       values.dataType === "file"
         ? "files"
-        : values.dataType === "relative" || (values.dataType === "multi-select" && values.multiSelectSource === "table")
+        : values.dataType === "relative" || values.dataType === "multi-select"
           ? values.relationResource
           : null,
     customTableId: values.dataType === "dynamic-table" ? values.customTableId : undefined,
@@ -825,48 +800,6 @@ function normalizeTableColumns(value: unknown) {
     key: sanitizeFieldKey(String(column?.key || "")), label: String(column?.label || "").trim(), dataType: String(column?.dataType || "text"),
     options: String(column?.options || "").split(",").map((item) => item.trim()).filter(Boolean),
   })).filter((column) => column.key && column.label)
-}
-
-function ManualMultiSelectOptions() {
-  return (
-    <Form.List name="options">
-      {(fields, { add, remove }) => <Form.Item label="Lựa chọn"><Table
-        bordered
-        dataSource={fields}
-        pagination={false}
-        rowKey="key"
-        size="small"
-        columns={[
-          { title: "Key", render: (_, field) => <Form.Item name={[field.name, "value"]} rules={[{ required: true, message: "Nhập key" }]} style={{ margin: 0 }}><Input placeholder="vd: VIP" /></Form.Item> },
-          { title: "Label", render: (_, field) => <Form.Item name={[field.name, "label"]} rules={[{ required: true, message: "Nhập label" }]} style={{ margin: 0 }}><Input placeholder="Ví dụ: Khách VIP" /></Form.Item> },
-          { title: "", width: 64, render: (_, field) => <Button danger size="small" type="text" onClick={() => remove(field.name)}>Xóa</Button> },
-        ]}
-        footer={() => <Button size="small" type="dashed" onClick={() => add({ value: "", label: "" })}>Thêm lựa chọn</Button>}
-      /></Form.Item>}
-    </Form.List>
-  )
-}
-
-function normalizeMultiSelectOptions(value: unknown) {
-  if (!Array.isArray(value)) return []
-  return value.map((option) => typeof option === "string"
-    ? { value: option, label: option }
-    : { value: String(option?.value || "").trim(), label: String(option?.label || "").trim() })
-    .filter((option) => option.value && option.label)
-}
-
-function formatOptionsForInput(options?: Array<string | { value: string; label: string }>) {
-  return (options || []).map((option) => typeof option === "string" ? option : option.value).join(", ")
-}
-
-function normalizeOptions(value: unknown) {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item).trim()).filter(Boolean)
-  }
-  return String(value)
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean)
 }
 
 function parseBatchPayload(text: string): ParsedFieldInput[] {
@@ -915,11 +848,6 @@ function normalizeParsedField(item: Record<string, unknown>): ParsedFieldInput {
     label: String(normalized.label || normalized["nhãn"] || ""),
     key: sanitizeFieldKey(String(normalized.key || "")),
     dataType: String(normalized.datatype || normalized.type || "text"),
-    options: Array.isArray(normalized.options)
-      ? normalized.options.map((value) => String(value))
-      : normalized.options !== undefined
-        ? String(normalized.options)
-        : undefined,
     relationResource: normalized.relationresource || normalized.relation
       ? String(normalized.relationresource || normalized.relation)
       : undefined,
@@ -989,10 +917,9 @@ function buildBatchColumns(
                       ...item,
                       dataType: value,
                       relationResource:
-                        value === "relative"
+                        value === "relative" || value === "multi-select"
                           ? item.relationResource
                           : undefined,
-                      options: value === "select" || value === "multi-select" ? item.options : "",
                     }
                   : item,
               ),
@@ -1002,34 +929,11 @@ function buildBatchColumns(
       ),
     },
     {
-      title: "Lựa chọn",
-      dataIndex: "options",
-      width: 260,
-      render: (_, row) =>
-        row.dataType === "select" || row.dataType === "multi-select" ? (
-          <Input
-            value={row.options}
-            placeholder="A, B, C"
-            onChange={(event) =>
-              setBatchRows((current) =>
-                current.map((item) =>
-                  item.__rowKey === row.__rowKey
-                    ? { ...item, options: event.target.value }
-                    : item,
-                ),
-              )
-            }
-          />
-        ) : (
-          <Typography.Text type="secondary">-</Typography.Text>
-        ),
-    },
-    {
       title: "Liên kết",
       dataIndex: "relationResource",
       width: 220,
       render: (_, row) =>
-        row.dataType === "relative" ? (
+        row.dataType === "relative" || row.dataType === "multi-select" ? (
           <Select
             value={row.relationResource}
             options={RELATIVE_RESOURCE_OPTIONS}
@@ -1110,7 +1014,7 @@ function buildSampleFields(entityType: string, startSortOrder: number) {
   const templates = [
     { suffix: "text", label: "Thông tin bổ sung", dataType: "text" },
     { suffix: "note", label: "Ghi chú nội bộ", dataType: "textarea" },
-    { suffix: "priority", label: "Mức ưu tiên", dataType: "select", options: ["Thấp", "Trung bình", "Cao"] },
+    { suffix: "priority", label: "Mức ưu tiên", dataType: "select" },
     { suffix: "score", label: "Điểm đánh giá", dataType: "number" },
     { suffix: "date", label: "Ngày theo dõi", dataType: "date" },
   ]
@@ -1123,7 +1027,6 @@ function buildSampleFields(entityType: string, startSortOrder: number) {
       key: `${keyPrefix}_${template.suffix}_${number}`,
       label: `Mẫu ${number} - ${template.label}`,
       dataType: template.dataType,
-      options: template.options,
       required: false,
       isActive: true,
       sortOrder: startSortOrder + index,

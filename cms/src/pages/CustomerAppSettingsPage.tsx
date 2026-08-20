@@ -79,7 +79,6 @@ export function CustomerAppSettingsPage() {
       <div className="page-header">
         <div>
           <Typography.Title className="page-title-with-icon" level={3}><MobileOutlined /><span>App khách hàng</span></Typography.Title>
-          <Typography.Text type="secondary">Cấu hình app trong thư mục customer_app: thương hiệu, bố cục, nội dung, menu và các tính năng hiển thị.</Typography.Text>
         </div>
         <Space><Button icon={<ReloadOutlined />} onClick={() => void load()}>Làm mới</Button><Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={() => void form.submit()}>Lưu cấu hình</Button></Space>
       </div>

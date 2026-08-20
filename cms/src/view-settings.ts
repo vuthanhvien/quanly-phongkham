@@ -85,6 +85,8 @@ function getModuleEnabledValue(view: ViewSettingRecord | undefined) {
 
 export interface FieldLayoutConfig extends FieldSpec {
   visible: boolean
+  /** Option values a child role may see; absent means inherit all from ALL. */
+  visibleOptionValues?: string[]
   tab?: string
   disabled?: boolean
   description?: string
@@ -244,7 +246,9 @@ export function getFieldCatalog(resource: string, customFields: CustomField[]) {
           label: field.label,
           type: field.dataType as FieldSpec['type'],
           required: field.required,
-          options: field.options,
+          // List options are presentation configuration, scoped by role/module.
+          // Do not fall back to the legacy custom-field definition value.
+          options: ['select', 'multi-select'].includes(field.dataType) ? undefined : field.options,
           customTableId: field.customTableId,
           tableColumns: field.tableColumns,
           relation:
@@ -371,17 +375,11 @@ export function buildFieldLayoutConfigs(
           ? entry.tab.trim()
           : base.tab,
       required: base.required,
-      options:
-        Array.isArray(entry.options)
-          ? entry.options
-              .map((value: unknown) => {
-                if (typeof value === 'string') return value
-                if (value && typeof value === 'object' && 'value' in value) {
-                  return normalizeSelectOption(value as FieldOption)
-                }
-                return String(value)
-              })
-          : base.options,
+      options: base.options,
+      visibleOptionValues:
+        Array.isArray(entry.visibleOptionValues)
+          ? entry.visibleOptionValues.map(String)
+          : undefined,
       disabled:
         typeof entry.disabled === 'boolean'
           ? entry.disabled
@@ -448,11 +446,12 @@ export function getVisibleFieldConfigs(
   viewType: ViewType,
   role?: string,
 ) {
-  return buildFieldLayoutConfigs(
+  const fields = buildFieldLayoutConfigs(
     catalog,
     resolveViewSetting(views, viewType, role),
     viewType,
-  ).filter((field) => field.visible)
+  )
+  return fields.filter((field) => field.visible)
 }
 
 export function serializeViewConfig(
@@ -471,7 +470,7 @@ export function serializeViewConfig(
     if (field.label?.trim()) next.label = field.label.trim()
     if (field.tab?.trim()) next.tab = field.tab.trim()
     if (typeof field.disabled === 'boolean') next.disabled = field.disabled
-    if (Array.isArray(field.options) && field.options.length > 0) next.options = field.options
+    if (Array.isArray(field.visibleOptionValues)) next.visibleOptionValues = field.visibleOptionValues
     if (field.description?.trim()) next.description = field.description.trim()
     if (field.placeholder?.trim()) next.placeholder = field.placeholder.trim()
     if (field.inputPattern !== undefined) next.inputPattern = field.inputPattern.trim()

@@ -5,7 +5,10 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
 import '../../modules/auth/auth_controller.dart';
 import '../../data/repositories/customer_repository.dart';
+import '../../data/repositories/customer_overview_repository.dart';
+import '../../data/models/customer_overview.dart';
 import '../../routes/app_routes.dart';
+import 'customer_overview_controller.dart';
 import 'profile_controller.dart';
 
 const _tierLabels = {
@@ -22,6 +25,9 @@ class ProfileScreen extends StatelessWidget {
     final controller = Get.isRegistered<ProfileController>()
         ? Get.find<ProfileController>()
         : Get.put(ProfileController(CustomerRepository()));
+    final overview = Get.isRegistered<CustomerOverviewController>()
+        ? Get.find<CustomerOverviewController>()
+        : Get.put(CustomerOverviewController(CustomerOverviewRepository()));
     return Scaffold(
       appBar: AppBar(
         title: const Text('Hồ sơ sức khỏe'),
@@ -49,7 +55,7 @@ class ProfileScreen extends StatelessWidget {
         return RefreshIndicator(
           onRefresh: controller.refreshProfile,
           child: DefaultTabController(
-            length: 2,
+            length: 3,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -70,6 +76,7 @@ class ProfileScreen extends StatelessWidget {
                   code: c.code,
                   tier: _tierLabels[c.tier] ?? c.tier,
                   totalSpent: c.totalSpent ?? 0,
+                  loyaltyPoints: c.loyaltyPoints,
                 ),
                 const SizedBox(height: 16),
                 Card(
@@ -98,16 +105,18 @@ class ProfileScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 const TabBar(
                   tabs: [
-                    Tab(text: 'Hành trình sức khỏe'),
+                    Tab(text: 'Tổng quan'),
+                    Tab(text: 'Hồ sơ khám'),
                     Tab(text: 'Tài khoản'),
                   ],
                 ),
                 const SizedBox(height: 14),
                 SizedBox(
-                  height: 496,
+                  height: 540,
                   child: TabBarView(
                     children: [
                       _HealthJourney(),
+                      _ClinicalRecord(overview: overview),
                       _AccountActions(onLogout: () => _logout(context)),
                     ],
                   ),
@@ -152,9 +161,11 @@ class _ProfileHero extends StatelessWidget {
     required this.code,
     required this.tier,
     required this.totalSpent,
+    required this.loyaltyPoints,
   });
   final String name, code, tier;
   final double totalSpent;
+  final int loyaltyPoints;
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(20),
@@ -221,13 +232,16 @@ class _ProfileHero extends StatelessWidget {
         const SizedBox(height: 20),
         const Divider(color: Color(0x33FFFFFF)),
         const SizedBox(height: 11),
-        const Row(
+        Row(
           children: [
             Expanded(
-              child: _HeroMetric(label: 'HẠNG THÀNH VIÊN', value: 'Silver'),
+              child: _HeroMetric(label: 'HẠNG THÀNH VIÊN', value: tier),
             ),
             Expanded(
-              child: _HeroMetric(label: 'ĐIỂM TÍCH LŨY', value: '1,240 điểm'),
+              child: _HeroMetric(
+                label: 'ĐIỂM TÍCH LŨY',
+                value: '$loyaltyPoints điểm',
+              ),
             ),
           ],
         ),
@@ -272,25 +286,25 @@ class _HealthJourney extends StatelessWidget {
       _JourneyCard(
         icon: AppIcons.chart,
         title: 'Liệu trình của tôi',
-        subtitle: 'Chăm sóc da phục hồi · 2/6 buổi',
+        subtitle: 'Theo dõi tiến độ và lịch chăm sóc',
         accent: AppColors.primaryDark,
       ),
       _JourneyCard(
         icon: AppIcons.healthRecord,
         title: 'Chẩn đoán & hồ sơ khám',
-        subtitle: 'Kết quả khám gần nhất: 05/08/2026',
+        subtitle: 'Chẩn đoán, hình ảnh và chỉ định',
         accent: Color(0xFF0F7A72),
       ),
       _JourneyCard(
         icon: AppIcons.calendar,
         title: 'Lịch khám & lịch chờ',
-        subtitle: '1 lịch sắp tới · 0 lịch chờ',
+        subtitle: 'Quản lý lịch tư vấn, điều trị, tái khám',
         accent: Color(0xFFAD6A11),
       ),
       _JourneyCard(
         icon: AppIcons.invoice,
         title: 'Hóa đơn & đơn hàng',
-        subtitle: 'Xem chi tiết thanh toán và dịch vụ',
+        subtitle: 'Xem chi tiết thanh toán và dịch vụ đã dùng',
         accent: Color(0xFF6F62A5),
       ),
     ],
@@ -330,6 +344,251 @@ class _JourneyCard extends StatelessWidget {
         trailing: const Icon(AppIcons.chevronRight, color: AppColors.textMuted),
       ),
     ),
+  );
+}
+
+class _ClinicalRecord extends StatelessWidget {
+  const _ClinicalRecord({required this.overview});
+  final CustomerOverviewController overview;
+
+  @override
+  Widget build(BuildContext context) => Obx(() {
+    if (overview.isLoading.value && overview.data.value == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final data = overview.data.value;
+    if (data == null) {
+      return Center(
+        child: TextButton.icon(
+          onPressed: overview.load,
+          icon: const Icon(Icons.refresh),
+          label: Text(overview.errorMessage.value ?? 'Tải lại hồ sơ khám'),
+        ),
+      );
+    }
+    return ListView(
+      children: [
+        _RecordHeading(
+          'Liệu trình đang theo dõi',
+          '${data.treatments.length} liệu trình',
+        ),
+        if (data.treatments.isEmpty)
+          const _RecordEmpty('Chưa có liệu trình được ghi nhận'),
+        ...data.treatments.map((item) => _TreatmentTile(treatment: item)),
+        const SizedBox(height: 12),
+        _RecordHeading(
+          'Kết quả thăm khám',
+          '${data.consultations.length} lượt',
+        ),
+        if (data.consultations.isEmpty)
+          const _RecordEmpty('Chưa có kết quả thăm khám'),
+        ...data.consultations
+            .take(3)
+            .map(
+              (item) => _DetailTile(
+                icon: AppIcons.healthRecord,
+                title: item.diagnosis ?? item.summary ?? 'Thăm khám',
+                subtitle: [
+                  item.consultedAt,
+                  item.nextAction,
+                ].whereType<String>().join(' · '),
+                accent: AppColors.info,
+              ),
+            ),
+        const SizedBox(height: 12),
+        _RecordHeading('Hồ sơ bệnh án', '${data.medicalEpisodes.length} hồ sơ'),
+        if (data.medicalEpisodes.isEmpty)
+          const _RecordEmpty('Chưa có hồ sơ bệnh án'),
+        ...data.medicalEpisodes
+            .take(3)
+            .map(
+              (item) => _DetailTile(
+                icon: AppIcons.heartbeat,
+                title: item.serviceName,
+                subtitle: [
+                  item.doctorName,
+                  item.diagnosis,
+                  item.operationDate,
+                ].whereType<String>().join(' · '),
+                accent: AppColors.primaryDark,
+              ),
+            ),
+        const SizedBox(height: 12),
+        _RecordHeading(
+          'Dịch vụ đã sử dụng',
+          '${data.serviceOrders.length} đơn',
+        ),
+        ...data.serviceOrders
+            .take(3)
+            .map(
+              (item) => _DetailTile(
+                icon: AppIcons.invoice,
+                title: item.serviceName,
+                subtitle: [
+                  item.code,
+                  item.orderDate,
+                  item.status,
+                ].whereType<String>().join(' · '),
+                accent: const Color(0xFF6F62A5),
+              ),
+            ),
+        if (data.images.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _RecordHeading('Hình ảnh theo dõi', '${data.images.length} ảnh'),
+          SizedBox(
+            height: 116,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: data.images.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (_, index) =>
+                  _ClinicalImage(image: data.images[index]),
+            ),
+          ),
+        ],
+      ],
+    );
+  });
+}
+
+class _RecordHeading extends StatelessWidget {
+  const _RecordHeading(this.title, this.count);
+  final String title, count;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+          ),
+        ),
+        Text(
+          count,
+          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+        ),
+      ],
+    ),
+  );
+}
+
+class _RecordEmpty extends StatelessWidget {
+  const _RecordEmpty(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Text(
+      text,
+      style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+    ),
+  );
+}
+
+class _TreatmentTile extends StatelessWidget {
+  const _TreatmentTile({required this.treatment});
+  final Treatment treatment;
+  @override
+  Widget build(BuildContext context) {
+    final progress = treatment.totalSessions == 0
+        ? 0.0
+        : treatment.completedSessions / treatment.totalSessions;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(AppIcons.chart, color: AppColors.primaryDark),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    treatment.name,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                Text(
+                  '${treatment.completedSessions}/${treatment.totalSessions}',
+                  style: const TextStyle(
+                    color: AppColors.primaryDark,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            LinearProgressIndicator(
+              value: progress.clamp(0, 1),
+              borderRadius: BorderRadius.circular(9),
+              color: AppColors.primaryDark,
+              backgroundColor: AppColors.primarySoft,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailTile extends StatelessWidget {
+  const _DetailTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.accent,
+  });
+  final IconData icon;
+  final String title, subtitle;
+  final Color accent;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Card(
+      child: ListTile(
+        dense: true,
+        leading: CircleAvatar(
+          backgroundColor: accent.withValues(alpha: .12),
+          child: Icon(icon, color: accent, size: 19),
+        ),
+        title: Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+        ),
+        subtitle: subtitle.isEmpty
+            ? null
+            : Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+      ),
+    ),
+  );
+}
+
+class _ClinicalImage extends StatelessWidget {
+  const _ClinicalImage({required this.image});
+  final CustomerClinicalImage image;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 122,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: image.imageUrl?.isNotEmpty == true
+          ? Image.network(
+              image.imageUrl!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => _fallback(),
+            )
+          : _fallback(),
+    ),
+  );
+  Widget _fallback() => Container(
+    color: AppColors.primarySoft,
+    alignment: Alignment.center,
+    child: const Icon(AppIcons.healthRecord, color: AppColors.primaryDark),
   );
 }
 

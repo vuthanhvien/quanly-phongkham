@@ -73,6 +73,14 @@ export class SettingsController {
     return { data: await this.settings.listViews(entityType, request?.user) };
   }
 
+  @Put('views/bulk')
+  async saveViewsBulk(
+    @Body() payload: { views?: Array<{ entityType: string; viewType: string; config: Record<string, unknown>; role?: string }> },
+    @Request() request?: { user: AuthUser },
+  ) {
+    return { data: await this.settings.saveViewsBulk(payload.views || [], request?.user) };
+  }
+
   @Put('views/:entityType/:viewType')
   async saveView(
     @Param('entityType') entityType: string,

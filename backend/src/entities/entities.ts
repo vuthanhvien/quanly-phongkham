@@ -21,6 +21,10 @@ export abstract class ConfigurableEntity {
 
   @Column({ default: false })
   isArchived: boolean;
+
+  // Người phụ trách dữ liệu. Dùng cho phân quyền theo phạm vi cá nhân.
+  @Column({ nullable: true })
+  picId?: string;
 }
 
 @Entity('branches')
@@ -78,6 +82,9 @@ export class User {
 
   @Column({ default: false })
   isArchived: boolean;
+
+  @Column({ nullable: true })
+  picId?: string;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -332,6 +339,11 @@ export class Customer extends ConfigurableEntity {
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   totalSpent: number;
+
+  // Loyalty is customer data (not a presentation-only value) so it is shared
+  // consistently by the CRM customer detail and customer portal.
+  @Column({ default: 0 })
+  loyaltyPoints: number;
 
   @Column({ nullable: true })
   assignedStaff?: string;

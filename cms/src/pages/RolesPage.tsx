@@ -66,6 +66,22 @@ const ROLE_PERMISSION_ACTIONS = [
   { key: "print", label: "In" },
 ]
 
+const DATA_SCOPE_PERMISSIONS = [
+  { key: "viewAll", label: "Xem tất cả", action: "view" },
+  { key: "viewPersonal", label: "Xem cá nhân", action: "view" },
+  { key: "createAll", label: "Tạo tất cả", action: "create" },
+  { key: "createPersonal", label: "Tạo cá nhân", action: "create" },
+] as const
+
+type DataScopePermission = Record<(typeof DATA_SCOPE_PERMISSIONS)[number]["key"], boolean>
+
+const DEFAULT_DATA_SCOPE_PERMISSION: DataScopePermission = {
+  viewAll: true,
+  viewPersonal: false,
+  createAll: true,
+  createPersonal: false,
+}
+
 export function RolesPage() {
   const { settings } = useAppUi()
   const [roles, setRoles] = useState<DynamicRole[]>([])
@@ -76,6 +92,8 @@ export function RolesPage() {
   const [loading, setLoading] = useState(false)
   const [selectedRoleKey, setSelectedRoleKey] = useState<string | null>(null)
   const [selectedModules, setSelectedModules] = useState<string[]>([])
+  const [dataScopeDraft, setDataScopeDraft] = useState<Record<string, DataScopePermission>>({})
+  const [savingDataScope, setSavingDataScope] = useState(false)
   const [roleContentTab, setRoleContentTab] = useState<"permissions" | "users">("permissions")
   const moduleSaveQueue = useRef(Promise.resolve())
   const actionSaveQueue = useRef(Promise.resolve())
@@ -258,6 +276,10 @@ export function RolesPage() {
     setSelectedModules(roleModules.filter((module) => globallyEnabledModules.includes(module)))
   }, [globallyEnabledModules, selectedRole])
 
+  useEffect(() => {
+    setDataScopeDraft({})
+  }, [selectedRoleKey])
+
   function updateRoleModules(nextModules: string[]) {
     if (!selectedRole) return
     const roleId = selectedRole.id
@@ -279,17 +301,30 @@ export function RolesPage() {
     return Array.isArray(actions) ? actions.map(String) : getResourceActionOptions(module).map((action) => action.key)
   }
 
+  function getDataScopePermission(module: string): DataScopePermission {
+    if (dataScopeDraft[module]) return dataScopeDraft[module]
+    const setting = views.find((view) => view.entityType === module && view.viewType === "ACTION" && view.role === selectedRoleKey)
+    const dataScope = setting?.config?.dataScope
+    if (!dataScope || typeof dataScope !== "object") return DEFAULT_DATA_SCOPE_PERMISSION
+    return {
+      ...DEFAULT_DATA_SCOPE_PERMISSION,
+      ...Object.fromEntries(Object.entries(dataScope as Record<string, unknown>).map(([key, value]) => [key, Boolean(value)])),
+    }
+  }
+
   function updateModuleActions(module: string, nextActions: string[]) {
     if (!selectedRoleKey) return
     const role = selectedRoleKey
     setViews((current) => {
       const remaining = current.filter((view) => !(view.entityType === module && view.viewType === "ACTION" && view.role === role))
-      return [...remaining, { entityType: module, viewType: "ACTION", role, config: { allowedActions: nextActions } }]
+      const existing = current.find((view) => view.entityType === module && view.viewType === "ACTION" && view.role === role)
+      return [...remaining, { entityType: module, viewType: "ACTION", role, config: { ...existing?.config, allowedActions: nextActions } }]
     })
     actionSaveQueue.current = actionSaveQueue.current
       .catch(() => undefined)
       .then(async () => {
-        await api.put(`/settings/views/${module}/ACTION`, { role, config: { allowedActions: nextActions } })
+        const existing = views.find((view) => view.entityType === module && view.viewType === "ACTION" && view.role === role)
+        await api.put(`/settings/views/${module}/ACTION`, { role, config: { ...existing?.config, allowedActions: nextActions } })
       })
       .catch(() => {
         message.error("Không thể lưu quyền thao tác")
@@ -302,6 +337,8 @@ export function RolesPage() {
       module,
       actions: action === "view" && !allowed
         ? []
+        : action === "create" && !allowed
+          ? getAllowedActions(module).filter((key) => key !== "create" && key !== "duplicate")
         : allowed
         ? Array.from(new Set([...getAllowedActions(module), action]))
         : getAllowedActions(module).filter((key) => key !== action),
@@ -310,17 +347,62 @@ export function RolesPage() {
     const role = selectedRoleKey
     setViews((current) => [
       ...current.filter((view) => !nextByModule.some(({ module }) => view.entityType === module && view.viewType === "ACTION" && view.role === role)),
-      ...nextByModule.map(({ module, actions }) => ({ entityType: module, viewType: "ACTION", role, config: { allowedActions: actions } })),
+      ...nextByModule.map(({ module, actions }) => {
+        const existing = views.find((view) => view.entityType === module && view.viewType === "ACTION" && view.role === role)
+        return { entityType: module, viewType: "ACTION", role, config: { ...existing?.config, allowedActions: actions } }
+      }),
     ])
     actionSaveQueue.current = actionSaveQueue.current
       .catch(() => undefined)
       .then(async () => {
-        await Promise.all(nextByModule.map(({ module, actions }) => api.put(`/settings/views/${module}/ACTION`, { role, config: { allowedActions: actions } })))
+        await Promise.all(nextByModule.map(({ module, actions }) => {
+          const existing = views.find((view) => view.entityType === module && view.viewType === "ACTION" && view.role === role)
+          return api.put(`/settings/views/${module}/ACTION`, { role, config: { ...existing?.config, allowedActions: actions } })
+        }))
       })
       .catch(() => {
         message.error("Không thể lưu quyền thao tác")
         void load()
       })
+  }
+
+  function updateDataScope(modules: string[], key: keyof DataScopePermission, checked: boolean) {
+    setDataScopeDraft((current) => ({ ...current, ...Object.fromEntries(modules.map((module) => [
+      module,
+      { ...(current[module] || getDataScopePermission(module)), [key]: checked },
+    ])) }))
+  }
+
+  async function saveDataScope() {
+    if (!selectedRoleKey || Object.keys(dataScopeDraft).length === 0) return
+    const role = selectedRoleKey
+    setSavingDataScope(true)
+    try {
+      await api.put("/settings/views/bulk", { views: Object.entries(dataScopeDraft).map(([module, dataScope]) => {
+        const existing = views.find((view) => view.entityType === module && view.viewType === "ACTION" && view.role === role)
+        return { entityType: module, viewType: "ACTION", role, config: { ...existing?.config, dataScope } }
+      }) })
+      setViews((current) => {
+        const next = current.map((view) => {
+          const dataScope = dataScopeDraft[view.entityType]
+          return view.viewType === "ACTION" && view.role === role && dataScope
+            ? { ...view, config: { ...view.config, dataScope } }
+            : view
+        })
+        Object.entries(dataScopeDraft).forEach(([module, dataScope]) => {
+          if (!next.some((view) => view.entityType === module && view.viewType === "ACTION" && view.role === role)) {
+            next.push({ entityType: module, viewType: "ACTION", role, config: { dataScope } })
+          }
+        })
+        return next
+      })
+      setDataScopeDraft({})
+      message.success("Đã lưu phạm vi dữ liệu")
+    } catch {
+      message.error("Không thể lưu phạm vi dữ liệu")
+    } finally {
+      setSavingDataScope(false)
+    }
   }
 
   // Only users whose account.role matches the selected role's roleMain (ADMIN users can have any role)
@@ -469,15 +551,32 @@ export function RolesPage() {
             </div>
           ) : (
             <>
-              <Tabs
-                activeKey={roleContentTab}
-                className="record-status-tabs"
-                items={[
-                  { key: "permissions", label: "Phân quyền" },
-                  { key: "users", label: `Danh sách user${roleAssignments.length ? ` (${roleAssignments.length})` : ""}` },
-                ]}
-                onChange={(key) => setRoleContentTab(key as "permissions" | "users")}
-              />
+              <div className="roles-tabs-toolbar">
+                <Tabs
+                  activeKey={roleContentTab}
+                  className="record-status-tabs"
+                  items={[
+                    { key: "permissions", label: "Phân quyền" },
+                    { key: "users", label: `Danh sách user${roleAssignments.length ? ` (${roleAssignments.length})` : ""}` },
+                  ]}
+                  onChange={(key) => setRoleContentTab(key as "permissions" | "users")}
+                />
+                {roleContentTab === "permissions" ? (
+                  <Button
+                    type="primary"
+                    className="primary-glow"
+                    disabled={Object.keys(dataScopeDraft).length === 0}
+                    loading={savingDataScope}
+                    onClick={() => void saveDataScope()}
+                  >
+                    Lưu phạm vi dữ liệu
+                  </Button>
+                ) : (
+                  <Button type="primary" className="primary-glow" icon={<UserAddOutlined />} loading={loading} onClick={openCreateAssign}>
+                    Thêm phân quyền
+                  </Button>
+                )}
+              </div>
               {roleContentTab === "permissions" ? <div className="roles-tab-content roles-tab-content--permissions">
                 <div className="role-permission-table">
                   <Table
@@ -485,7 +584,7 @@ export function RolesPage() {
                     pagination={false}
                     rowKey="key"
                     rowClassName={(row) => row.kind === "all" ? "role-permission-all-row" : row.kind === "group" ? "role-permission-parent-row" : "role-permission-child-row"}
-                    scroll={{ x: 960 }}
+                    scroll={{ x: 1340 }}
                     dataSource={permissionRows}
                     columns={[
                       {
@@ -521,17 +620,44 @@ export function RolesPage() {
                         render: (_: unknown, row: { kind: "all" | "group" | "module"; module?: string; modules: string[] }) => {
                           const checkedCount = row.modules.filter((module) => getAllowedActions(module).includes(action.key)).length
                           const checked = checkedCount === row.modules.length
+                          const modulesEnabled = row.modules.every((module) => selectedModules.includes(module))
+                          const viewsAllowed = row.modules.every((module) => getAllowedActions(module).includes("view"))
+                          const createsAllowed = row.modules.every((module) => getAllowedActions(module).includes("create"))
+                          const disabled = !modulesEnabled
+                            || (action.key !== "view" && !viewsAllowed)
+                            || (action.key === "duplicate" && !createsAllowed)
                           return <Checkbox
                             checked={checked}
                             indeterminate={checkedCount > 0 && !checked}
+                            disabled={disabled}
                             onChange={(event) => {
                               if (row.kind === "all" || row.kind === "group") updateGroupAction(row.modules, action.key, event.target.checked)
                               else if (row.module) updateModuleActions(row.module, event.target.checked
                                 ? Array.from(new Set([...getAllowedActions(row.module), action.key]))
                                 : action.key === "view"
                                   ? []
+                                  : action.key === "create"
+                                    ? getAllowedActions(row.module).filter((key) => key !== "create" && key !== "duplicate")
                                   : getAllowedActions(row.module).filter((key) => key !== action.key))
                             }}
+                          />
+                        },
+                      })),
+                      ...DATA_SCOPE_PERMISSIONS.map((scope) => ({
+                        title: scope.label,
+                        key: scope.key,
+                        width: 112,
+                        align: "center" as const,
+                        render: (_: unknown, row: { kind: "all" | "group" | "module"; module?: string; modules: string[] }) => {
+                          const checkedCount = row.modules.filter((module) => getDataScopePermission(module)[scope.key]).length
+                          const checked = checkedCount === row.modules.length
+                          const modulesEnabled = row.modules.every((module) => selectedModules.includes(module))
+                          const actionAllowed = row.modules.every((module) => getAllowedActions(module).includes(scope.action))
+                          return <Checkbox
+                            checked={checked}
+                            indeterminate={checkedCount > 0 && !checked}
+                            disabled={!modulesEnabled || !actionAllowed}
+                            onChange={(event) => updateDataScope(row.modules, scope.key, event.target.checked)}
                           />
                         },
                       })),
@@ -541,11 +667,6 @@ export function RolesPage() {
               </div> : null}
 
               {roleContentTab === "users" ? <div className="roles-tab-content roles-tab-content--users">
-              <Flex justify="flex-end">
-                <Button type="primary" className="primary-glow" icon={<UserAddOutlined />} loading={loading} onClick={openCreateAssign}>
-                  Thêm phân quyền
-                </Button>
-              </Flex>
               <div style={{ flex: 1, overflowY: "auto" }}>
                 {byBranch.size === 0 ? (
                   <div style={{

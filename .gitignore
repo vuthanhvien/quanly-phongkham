@@ -12,6 +12,8 @@ backend/storage/uploads/*
 backend/storage/print-templates/*
 !backend/storage/uploads/.gitignore
 data/
+!customer_app/lib/data/
+!customer_app/lib/data/**
 
 .next
 

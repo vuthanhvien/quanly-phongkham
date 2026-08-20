@@ -45,6 +45,7 @@ import {
   LeaveRequest,
   LeaveType,
   MedicalEpisode,
+  MasterData,
   Payroll,
   PaymentRequest,
   PerformanceReview,
@@ -484,6 +485,7 @@ export class RecordsService {
     @InjectRepository(CodeGenerationSetting) private readonly codeGenerationSettings: Repository<CodeGenerationSetting>,
     @InjectRepository(CustomFieldValue) private readonly customFieldValues: Repository<CustomFieldValue>,
     @InjectRepository(CustomTableRow) private readonly customTableRows: Repository<CustomTableRow>,
+    @InjectRepository(MasterData) private readonly masterData: Repository<MasterData>,
     @InjectRepository(ViewSetting) private readonly viewSettings: Repository<ViewSetting>,
     @InjectRepository(AuditLog) private readonly auditLogs: Repository<AuditLog>,
     @InjectRepository(SystemErrorLog) private readonly systemErrorLogs: Repository<SystemErrorLog>,
@@ -765,8 +767,14 @@ export class RecordsService {
     // The branch directory is global reference data. It must stay available
     // for selectors and administration regardless of the user's branch roles.
     if (resource === 'branches') {
+      const dataScope = await this.resolveDataScope(resource, user);
+      if (!dataScope.viewAll && !dataScope.viewPersonal) {
+        throw new ForbiddenException('Bạn không có quyền xem dữ liệu trong phạm vi này');
+      }
       const [rows, total] = await repository.findAndCount({
-        where: includeArchived ? {} : { isArchived },
+        where: !dataScope.viewAll && dataScope.viewPersonal
+          ? { ...(includeArchived ? {} : { isArchived }), picId: user?.id }
+          : includeArchived ? {} : { isArchived },
         order: { [sortField]: orderDirection },
       });
       return {
@@ -829,6 +837,7 @@ export class RecordsService {
     }
     where = this.applySelectedBranchFilters(resource, where, filters);
     where = this.applyBranchScope(resource, where, user);
+    where = await this.applyDataViewScope(resource, where, user);
     let rows: ConfigurableEntity[];
     let total: number;
     if (resource === 'work-schedules') {
@@ -994,6 +1003,7 @@ export class RecordsService {
   async find (resource: string, id: string, user?: AuthUser, request?: RequestContext, include?: string) {
     const record = await this.findRaw(resource, id, include, request);
     await this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
+    await this.assertDataViewScope(user, resource, record);
     return { data: await this.protectPasswordFields(resource, this.protect(resource, record, request) as ConfigurableEntity, user) };
   }
 
@@ -1002,6 +1012,7 @@ export class RecordsService {
     if (!key || !/^\d{6}$/.test(pin)) throw new BadRequestException('Vui lòng nhập mã PIN gồm 6 chữ số');
     const record = await this.findRaw(resource, id);
     await this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
+    await this.assertDataViewScope(user, resource, record);
     if (!(await this.isPasswordProtectedDetailField(resource, key, user))) {
       throw new ForbiddenException('Trường này không yêu cầu xác thực để xem');
     }
@@ -1126,6 +1137,7 @@ export class RecordsService {
     if (resource === 'files') {
       throw new BadRequestException('Hãy dùng endpoint upload file để tạo tệp mới');
     }
+    payload = await this.applyCreateDataScope(user, resource, payload);
     await this.assertPermission(user, resource, 'create', this.branchIdOf(resource, payload));
     await this.assertProtectedAdminAssignment(resource, payload);
     await this.validateCustomFields(resource, payload, true);
@@ -1228,6 +1240,7 @@ export class RecordsService {
 
   async update (resource: string, id: string, payload: Record<string, unknown>, user: AuthUser) {
     const previous = await this.findStored(resource, id);
+    await this.assertDataViewScope(user, resource, previous);
     this.assertSystemAdminIdentity(resource, previous, payload);
     await this.assertProtectedAdminAssignment(resource, { ...previous, ...payload });
     const previousCustomFields = await this.loadCustomFieldsMap(resource, [id]);
@@ -1274,6 +1287,7 @@ export class RecordsService {
 
   async remove (resource: string, id: string, user: AuthUser) {
     const record = await this.findStored(resource, id);
+    await this.assertDataViewScope(user, resource, record);
     this.assertRecordIsNotProtected(resource, record);
     if (resource === 'user-accounts' && this.isSystemAdminAccount(record as User)) {
       throw new ForbiddenException('Không thể xóa tài khoản admin-system');
@@ -4354,6 +4368,18 @@ export class RecordsService {
 
   private async validateCustomFields (resource: string, payload: Record<string, unknown>, creating: boolean) {
     const fields = await this.fieldDefinitions.find({ where: { entityType: resource, isActive: true } });
+    const optionFields = fields.filter((field) =>
+      ['select', 'multi-select'].includes(field.dataType) && !field.relationResource,
+    );
+    const masterOptions = optionFields.length
+      ? await this.masterData.find({ where: { group: In(optionFields.map((field) => `${resource}.${field.key}`)), isActive: true } })
+      : [];
+    const optionsByKey = new Map(
+      optionFields.map((field) => [
+        field.key,
+        masterOptions.filter((option) => option.group === `${resource}.${field.key}`).map((option) => option.value),
+      ]),
+    );
     const values = (payload.customFields || {}) as Record<string, unknown>;
     for (const field of fields) {
       const value = values[field.key];
@@ -4361,12 +4387,13 @@ export class RecordsService {
         throw new BadRequestException(`Truong tuy bien bat buoc: ${field.label}`);
       }
       if (this.isEmptyCustomFieldValue(value)) continue;
+      const options = optionsByKey.get(field.key);
       const valueItems = Array.isArray(value) ? value : [value];
       const valid =
         field.dataType === 'number' ? !Number.isNaN(Number(value)) :
           field.dataType === 'boolean' ? typeof value === 'boolean' :
-            field.dataType === 'select' ? !field.options || this.customFieldOptionValues(field.options).includes(String(value)) :
-              field.dataType === 'multi-select' ? Array.isArray(value) && value.length > 0 && (!field.options || value.every((item) => this.customFieldOptionValues(field.options!).includes(String(item)))) :
+            field.dataType === 'select' ? !options || options.includes(String(value)) :
+              field.dataType === 'multi-select' ? Array.isArray(value) && value.length > 0 && (!options || value.every((item) => options.includes(String(item)))) :
               field.dataType === 'file' ? Boolean(
                 (await this.files.count({ where: { id: In(valueItems.map((item) => String(item))), isActive: true } })) === valueItems.length,
               ) :
@@ -4852,6 +4879,54 @@ export class RecordsService {
     }
 
     return RESOURCE_ACTIONS[resource] || DEFAULT_RESOURCE_ACTIONS;
+  }
+
+  private async resolveDataScope (resource: string, user?: AuthUser) {
+    const defaults = { viewAll: true, viewPersonal: false, createAll: true, createPersonal: false };
+    if (!user) return defaults;
+    const roleChain = buildRoleChain(user.activeRole || user.role, user.roleMain || user.role);
+    const views = await this.viewSettings.find({ where: { entityType: resource } });
+    for (const inheritedRole of roleChain) {
+      const inheritedViews = views.filter((view) => normalizeRole(view.role) === inheritedRole);
+      const scope = inheritedViews
+        .map((view) => view.config?.dataScope)
+        .find((value) => value && typeof value === 'object');
+      if (scope && typeof scope === 'object') {
+        return { ...defaults, ...(scope as Record<string, boolean>) };
+      }
+    }
+    return defaults;
+  }
+
+  private async applyDataViewScope (
+    resource: string,
+    where: FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[],
+    user?: AuthUser,
+  ) {
+    const scope = await this.resolveDataScope(resource, user);
+    if (scope.viewAll) return where;
+    if (scope.viewPersonal && user?.id) {
+      return this.mergeWhere(where, { picId: user.id } as FindOptionsWhere<ConfigurableEntity>);
+    }
+    throw new ForbiddenException('Bạn không có quyền xem dữ liệu trong phạm vi này');
+  }
+
+  private async assertDataViewScope (user: AuthUser | undefined, resource: string, record: Record<string, unknown>) {
+    const scope = await this.resolveDataScope(resource, user);
+    if (scope.viewAll) return;
+    if (scope.viewPersonal && user?.id && String(record.picId || '') === user.id) return;
+    throw new ForbiddenException('Bạn không có quyền truy cập dữ liệu này');
+  }
+
+  private async applyCreateDataScope (user: AuthUser, resource: string, payload: Record<string, unknown>) {
+    const scope = await this.resolveDataScope(resource, user);
+    if (scope.createAll) {
+      return { ...payload, picId: payload.picId || user.id };
+    }
+    if (scope.createPersonal) {
+      return { ...payload, picId: user.id };
+    }
+    throw new ForbiddenException('Bạn không có quyền tạo dữ liệu trong phạm vi này');
   }
 
   private allowedBranches (user: AuthUser | undefined) {

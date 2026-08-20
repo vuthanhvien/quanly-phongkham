@@ -53,6 +53,8 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             const _ClinicHero(),
+            const SizedBox(height: 14),
+            const _TrustStrip(),
             const _ConfiguredBlocks(),
             const SizedBox(height: 28),
             _SectionTitle(
@@ -143,55 +145,74 @@ class _ClinicHero extends StatelessWidget {
       final logoUrl = config.config['logoUrl'] as String? ?? '';
       final layout = config.config['layout'] as Map?;
       final showLogo = layout?['showLogo'] != false;
-      return Container(
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF2A303E), Color(0xFF4A3850)],
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xE82A303E), Color(0xE84A3850)],
+            ),
           ),
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (showLogo && logoUrl.isNotEmpty) ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.network(logoUrl, height: 36, fit: BoxFit.contain),
-              ),
-              const SizedBox(height: 12),
-            ],
-            Text(
-              businessName.isEmpty
-                  ? 'YOUR WELLNESS,\nOUR DEVOTION.'
-                  : businessName,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                height: 1.08,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -.5,
-              ),
-            ),
-            const SizedBox(height: 13),
-            const Text(
-              'Chăm sóc tận tâm • Kết quả bền vững',
-              style: TextStyle(color: Color(0xFFE6DDE4), fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            FilledButton.tonal(
-              onPressed: () => Get.toNamed(AppRoutes.bookingCreate),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.title,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 11,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Opacity(
+                  opacity: .18,
+                  child: Image.network(
+                    'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1100&q=80',
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
-              child: const Text('Đặt lịch tư vấn'),
-            ),
-          ],
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (showLogo && logoUrl.isNotEmpty) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        logoUrl,
+                        height: 36,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  Text(
+                    businessName.isEmpty
+                        ? 'YOUR WELLNESS,\nOUR DEVOTION.'
+                        : businessName,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      height: 1.08,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.5,
+                    ),
+                  ),
+                  const SizedBox(height: 13),
+                  const Text(
+                    'Chăm sóc tận tâm • Kết quả bền vững',
+                    style: TextStyle(color: Color(0xFFE6DDE4), fontSize: 13),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton.tonal(
+                    onPressed: () => Get.toNamed(AppRoutes.bookingCreate),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.title,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 11,
+                      ),
+                    ),
+                    child: const Text('Đặt lịch tư vấn'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       );
     });
@@ -299,37 +320,57 @@ class _ServiceCard extends StatelessWidget {
     child: Card(
       child: Padding(
         padding: const EdgeInsets.all(15),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            Container(
-              width: 34,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.primarySoft,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                service.icon,
-                style: const TextStyle(
-                  color: AppColors.primaryDark,
-                  fontSize: 20,
+            Positioned(
+              right: -18,
+              bottom: -18,
+              child: Opacity(
+                opacity: .16,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(60),
+                  child: Image.network(
+                    service.imageUrl,
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
             ),
-            const Spacer(),
-            Text(
-              service.name,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              service.description,
-              style: const TextStyle(
-                fontSize: 11.5,
-                color: AppColors.textMuted,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    service.icon,
+                    style: const TextStyle(
+                      color: AppColors.primaryDark,
+                      fontSize: 20,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  service.name,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  service.description,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -350,14 +391,25 @@ class _DoctorCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
+            SizedBox(
               height: 72,
-              decoration: BoxDecoration(
-                color: Color(doctor.color),
+              child: ClipRRect(
                 borderRadius: BorderRadius.circular(13),
+                child: Image.network(
+                  doctor.imageUrl,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  errorBuilder: (_, _, _) => Container(
+                    color: Color(doctor.color),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      AppIcons.person,
+                      color: Colors.white,
+                      size: 42,
+                    ),
+                  ),
+                ),
               ),
-              alignment: Alignment.center,
-              child: const Icon(AppIcons.person, color: Colors.white, size: 42),
             ),
             const SizedBox(height: 10),
             Text(
@@ -397,14 +449,23 @@ class _PostCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       child: Row(
         children: [
-          Container(
+          SizedBox(
             width: 72,
             height: 72,
-            decoration: BoxDecoration(
-              color: AppColors.primarySoft,
+            child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                post.imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => Container(
+                  color: AppColors.primarySoft,
+                  child: const Icon(
+                    AppIcons.sparkle,
+                    color: AppColors.primaryDark,
+                  ),
+                ),
+              ),
             ),
-            child: const Icon(AppIcons.sparkle, color: AppColors.primaryDark),
           ),
           const SizedBox(width: 13),
           Expanded(
@@ -443,6 +504,61 @@ class _PostCard extends StatelessWidget {
         ],
       ),
     ),
+  );
+}
+
+class _TrustStrip extends StatelessWidget {
+  const _TrustStrip();
+  @override
+  Widget build(BuildContext context) => const Row(
+    children: [
+      Expanded(
+        child: _TrustItem(
+          icon: AppIcons.shield,
+          value: '10+ năm',
+          label: 'kinh nghiệm',
+        ),
+      ),
+      Expanded(
+        child: _TrustItem(
+          icon: AppIcons.doctor,
+          value: '20+ bác sĩ',
+          label: 'chuyên môn',
+        ),
+      ),
+      Expanded(
+        child: _TrustItem(
+          icon: AppIcons.heartbeat,
+          value: '5.000+',
+          label: 'khách hàng',
+        ),
+      ),
+    ],
+  );
+}
+
+class _TrustItem extends StatelessWidget {
+  const _TrustItem({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+  final IconData icon;
+  final String value, label;
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Icon(icon, color: AppColors.primaryDark, size: 20),
+      const SizedBox(height: 4),
+      Text(
+        value,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+      ),
+      Text(
+        label,
+        style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+      ),
+    ],
   );
 }
 

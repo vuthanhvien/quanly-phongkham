@@ -662,6 +662,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   const [selectedRole, setSelectedRole] = useState(() => normalizeRole(searchParams.get("role") || DEFAULT_ROLE_SCOPE))
   const [expandedRoleKeys, setExpandedRoleKeys] = useState<string[]>([])
   const [fields, setFields] = useState<CustomField[]>([])
+  const [masterOptionMap, setMasterOptionMap] = useState<Map<string, SelectOption[]>>(new Map())
   const [views, setViews] = useState<ViewSettingRecord[]>([])
   const [moduleViews, setModuleViews] = useState<ViewSettingRecord[]>([])
   const [tableConfig, setTableConfig] = useState<FieldLayoutConfig[]>([])
@@ -876,11 +877,11 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
       ),
     )
     setFormConfig(
-      buildFieldLayoutConfigs(
+      applyMasterDataOptions(buildFieldLayoutConfigs(
         fieldCatalog,
         resolveViewSetting(views, "FORM", selectedRole, dynamicRoles),
         "FORM",
-      ),
+      ), masterOptionMap),
     )
     setDetailConfig(
       buildFieldLayoutConfigs(
@@ -895,7 +896,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
       DETAIL: selectedRole !== DEFAULT_ROLE_SCOPE && !hasExactRoleSetting(views, "DETAIL", selectedRole),
     })
     setReuseActionInherited(selectedRole !== DEFAULT_ROLE_SCOPE && !views.some((view) => normalizeRole(view.role) === selectedRole && (view.viewType === "ACTION" || (view.viewType === "TABLE" && Array.isArray(view.config?.allowedActions)))))
-  }, [actionOptions, dynamicRoles, entityType, fieldCatalog, selectedRole, views])
+  }, [actionOptions, dynamicRoles, entityType, fieldCatalog, masterOptionMap, selectedRole, views])
 
   // Phiên đăng nhập lưu quyền để các màn hình danh sách đọc nhanh. Đồng bộ lại
   // ngay khi đang cấu hình chính role hiện tại, tránh phải đăng xuất/đăng nhập.
@@ -929,7 +930,20 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
       api.get("/settings/print-templates", { params: { entityType } }),
       api.get("/settings/dynamic-roles"),
     ])
-    setFields(fieldResponse.data.data)
+    const customFields = fieldResponse.data.data as CustomField[]
+    const listFields = getFieldCatalog(entityType, customFields)
+      .filter((field) => ['select', 'multi-select'].includes(field.type || '') && !field.relation)
+    const masterOptions = await Promise.all(
+      listFields
+        .map(async (field) => {
+          const response = await api.get('/master-data', { params: { group: `${entityType}.${field.key}` } })
+          return [field.key, (response.data.data || [])
+            .filter((item: Record<string, unknown>) => item.isActive !== false)
+            .map((item: Record<string, unknown>) => ({ value: String(item.value), label: String(item.name) }))] as const
+        }),
+    )
+    setMasterOptionMap(new Map(masterOptions))
+    setFields(customFields)
     setViews(viewResponse.data.data)
     setModuleViews(moduleViewResponse.data.data)
     setTemplates(templateResponse.data.data)
@@ -941,9 +955,12 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
       if (reused) {
         await api.delete(`/settings/views/${entityType}`, { params: { role: selectedRole, viewType } })
       } else {
+        const configToSave = selectedRole === DEFAULT_ROLE_SCOPE
+          ? config
+          : config.map(({ options: _options, ...field }) => field)
         await api.put(`/settings/views/${entityType}/${viewType}`, {
           role: selectedRole,
-          config: serializeViewConfig(viewType, config, true, undefined, viewType === "TABLE"),
+          config: serializeViewConfig(viewType, configToSave, true, undefined, viewType === "TABLE"),
         })
       }
     } catch (error) {
@@ -1278,7 +1295,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                       {
                         key: "FORM",
                         label: <span className="settings-view-tab-label">Form nhập liệu {reuseInherited.FORM && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.FORM, dynamicRoles)}`}><LinkOutlined /></Tooltip>}</span>,
-                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.FORM} source={formatRoleLabel(viewSources.FORM, dynamicRoles)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, FORM: checked })); void saveFieldView("FORM", formConfig, checked) }}><ViewConfigTable dataSource={formConfig} viewType="FORM" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
+                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.FORM} source={formatRoleLabel(viewSources.FORM, dynamicRoles)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, FORM: checked })); void saveFieldView("FORM", formConfig, checked) }}><ViewConfigTable dataSource={formConfig} viewType="FORM" allowListOptions={selectedRole === DEFAULT_ROLE_SCOPE} allowOptionVisibility={selectedRole !== DEFAULT_ROLE_SCOPE} optionSource={masterOptionMap} module={entityType} onMasterOptionsChange={(key, options) => setMasterOptionMap((current) => new Map(current).set(key, options))} onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
                       },
                       {
                         key: "DETAIL",
@@ -1441,11 +1458,21 @@ function SettingsDragHandle({ order }: { order: number }) {
 function ViewConfigTable({
   dataSource,
   viewType,
+  allowListOptions = false,
+  allowOptionVisibility = false,
+  optionSource,
+  module,
+  onMasterOptionsChange,
   onChange,
   onReorder,
 }: {
   dataSource: FieldLayoutConfig[]
   viewType: ViewType
+  allowListOptions?: boolean
+  allowOptionVisibility?: boolean
+  optionSource?: Map<string, SelectOption[]>
+  module?: string
+  onMasterOptionsChange?: (key: string, options: SelectOption[]) => void
   onChange: (
     viewType: ViewType,
     key: string,
@@ -1598,7 +1625,7 @@ function ViewConfigTable({
           setEditingField(null)
         }}
       >
-        {editingField && <FieldConfigEditor field={editingField} viewType={viewType} availableTabs={Array.from(new Set(dataSource.map((item) => item.tab?.trim()).filter((tab): tab is string => Boolean(tab))))} onChange={setEditingField} onEditOption={setOptionEdit} />}
+        {editingField && <FieldConfigEditor field={editingField} viewType={viewType} allowListOptions={allowListOptions} allowOptionVisibility={allowOptionVisibility} availableOptions={optionSource?.get(editingField.key) || []} masterDataGroup={module ? `${module}.${editingField.key}` : undefined} onMasterOptionsChange={onMasterOptionsChange} availableTabs={Array.from(new Set(dataSource.map((item) => item.tab?.trim()).filter((tab): tab is string => Boolean(tab))))} onChange={setEditingField} onEditOption={setOptionEdit} />}
       </Modal>
       <Modal
         open={Boolean(optionEdit)}
@@ -1625,12 +1652,22 @@ function ViewConfigTable({
 function FieldConfigEditor({
   field,
   viewType,
+  allowListOptions,
+  allowOptionVisibility,
+  availableOptions,
+  masterDataGroup,
+  onMasterOptionsChange,
   availableTabs,
   onChange,
   onEditOption,
 }: {
   field: FieldLayoutConfig
   viewType: ViewType
+  allowListOptions: boolean
+  allowOptionVisibility: boolean
+  availableOptions: SelectOption[]
+  masterDataGroup?: string
+  onMasterOptionsChange?: (key: string, options: SelectOption[]) => void
   availableTabs: string[]
   onChange: (field: FieldLayoutConfig) => void
   onEditOption: (option: { fieldKey: string; index: number; value: string; label: string }) => void
@@ -1708,21 +1745,91 @@ function FieldConfigEditor({
         <Form.Item label="Giá trị mặc định">
           <Input value={Array.isArray(field.defaultValue) ? field.defaultValue.join(", ") : field.defaultValue === undefined || field.defaultValue === null ? "" : String(field.defaultValue)} onChange={(event) => update({ defaultValue: parseDefaultValue(field.type, event.target.value) })} placeholder="Giá trị mặc định" />
         </Form.Item>
-        {(field.type === "select" || field.type === "multi-select") && <Form.Item label="Lựa chọn">
-          <div className="settings-options-editor">
-            {editableOptions.length === 0 ? <Typography.Text type="secondary">Chưa có option</Typography.Text> : editableOptions.map((option, index) => (
-              <div className="settings-option-row" key={`${field.key}-${index}`}>
-                <div className="settings-option-summary"><strong>{option.label}</strong>{option.label !== option.value && <span>{option.value}</span>}</div>
-                <Button type="text" icon={<EditOutlined />} onClick={() => onEditOption({ fieldKey: field.key, index, value: option.value, label: option.label })} />
-                <Button type="text" danger icon={<DeleteOutlined />} onClick={() => update({ options: removeSelectOptionAt(field.options, index) })} />
-              </div>
-            ))}
-            <Button size="small" icon={<PlusOutlined />} onClick={() => update({ options: appendSelectOption(field.options) })}>Thêm option</Button>
-          </div>
+        {allowOptionVisibility && (field.type === "select" || field.type === "multi-select") && <Form.Item label="Lựa chọn hiển thị">
+          <Checkbox.Group
+            options={availableOptions.map((option) => {
+              const normalized = normalizeSelectOption(option)
+              return { value: normalized.value, label: normalized.label }
+            })}
+            value={field.visibleOptionValues || availableOptions.map((option) => normalizeSelectOption(option).value)}
+            onChange={(values) => update({ visibleOptionValues: values.map(String) })}
+          />
         </Form.Item>}
+        {!allowListOptions && !allowOptionVisibility && (field.type === "select" || field.type === "multi-select") && <Typography.Paragraph type="secondary">
+          Lựa chọn của field dạng danh sách được khai báo chung tại role ALL.
+        </Typography.Paragraph>}
+        {allowListOptions && (field.type === "select" || field.type === "multi-select") && masterDataGroup && <MasterDataOptionsEditor group={masterDataGroup} fieldKey={field.key} onChange={onMasterOptionsChange} />}
       </>}
     </Form>
   )
+}
+
+type MasterDataOption = { id: string; value: string; label: string }
+
+function MasterDataOptionsEditor({
+  group,
+  fieldKey,
+  onChange,
+}: {
+  group: string
+  fieldKey: string
+  onChange?: (key: string, options: SelectOption[]) => void
+}) {
+  const [rows, setRows] = useState<MasterDataOption[]>([])
+  const [editing, setEditing] = useState<MasterDataOption | null>(null)
+  const [form] = Form.useForm<Pick<MasterDataOption, "value" | "label">>()
+
+  const load = useCallback(async () => {
+    const response = await api.get("/master-data", { params: { group } })
+    const next = (response.data.data || [])
+      .filter((item: Record<string, unknown>) => item.isActive !== false)
+      .map((item: Record<string, unknown>) => ({ id: String(item.id), value: String(item.value), label: String(item.name) }))
+    setRows(next)
+    onChange?.(fieldKey, next.map((option: MasterDataOption) => ({ value: option.value, label: option.label })))
+  }, [fieldKey, group, onChange])
+
+  useEffect(() => { void load() }, [load])
+
+  async function save(values: Pick<MasterDataOption, "value" | "label">) {
+    if (editing?.id) {
+      await api.patch(`/master-data/${editing.id}`, { value: values.value.trim(), name: values.label.trim() })
+    } else {
+      await api.post("/master-data", { group, value: values.value.trim(), name: values.label.trim(), isActive: true, sortOrder: rows.length })
+    }
+    setEditing(null)
+    form.resetFields()
+    await load()
+  }
+
+  async function remove(id: string) {
+    await api.delete(`/master-data/${id}`)
+    await load()
+  }
+
+  return <Form.Item label="Lựa chọn">
+    <div className="settings-options-editor">
+      {rows.length === 0 ? <Typography.Text type="secondary">Chưa có option</Typography.Text> : rows.map((option) => (
+        <div className="settings-option-row" key={option.id}>
+          <div className="settings-option-summary"><strong>{option.label}</strong>{option.label !== option.value && <span>{option.value}</span>}</div>
+          <Button type="text" icon={<EditOutlined />} onClick={() => { setEditing(option); form.setFieldsValue(option) }} />
+          <Button type="text" danger icon={<DeleteOutlined />} onClick={() => void remove(option.id)} />
+        </div>
+      ))}
+      <Button size="small" icon={<PlusOutlined />} onClick={() => { setEditing({ id: "", value: "", label: "" }); form.resetFields() }}>Thêm option</Button>
+    </div>
+    <Modal
+      open={editing !== null}
+      title={editing?.id ? "Sửa option" : "Thêm option"}
+      okText="Lưu"
+      onCancel={() => { setEditing(null); form.resetFields() }}
+      onOk={() => void form.submit()}
+    >
+      <Form form={form} layout="vertical" onFinish={(values) => void save(values)}>
+        <Form.Item name="value" label="Giá trị" rules={[{ required: true, message: "Nhập giá trị" }]}><Input /></Form.Item>
+        <Form.Item name="label" label="Nhãn hiển thị" rules={[{ required: true, message: "Nhập nhãn" }]}><Input /></Form.Item>
+      </Form>
+    </Modal>
+  </Form.Item>
 }
 
 function parseDefaultValue(type: FieldLayoutConfig["type"], value: string) {
@@ -1735,4 +1842,18 @@ function parseDefaultValue(type: FieldLayoutConfig["type"], value: string) {
       .filter(Boolean)
   }
   return value
+}
+
+function applyMasterDataOptions(
+  fields: FieldLayoutConfig[],
+  optionsByField: Map<string, SelectOption[]>,
+) {
+  return fields.map((field) => {
+    const options = optionsByField.get(field.key)
+    if (!options) return field
+    const visibleOptions = Array.isArray(field.visibleOptionValues)
+      ? options.filter((option) => field.visibleOptionValues!.includes(normalizeSelectOption(option).value))
+      : options
+    return { ...field, options: visibleOptions }
+  })
 }

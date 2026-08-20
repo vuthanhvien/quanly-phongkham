@@ -4,6 +4,7 @@ import 'package:get_storage/get_storage.dart';
 
 import 'package:customer_app/app.dart';
 import 'package:customer_app/core/session/session_controller.dart';
+import 'package:customer_app/core/config/customer_app_config_controller.dart';
 
 void main() {
   testWidgets('App boots to phone entry screen when logged out', (
@@ -11,6 +12,7 @@ void main() {
   ) async {
     GetStorage.init();
     Get.put(SessionController(), permanent: true);
+    Get.put(CustomerAppConfigController(), permanent: true);
 
     await tester.pumpWidget(const CustomerApp());
     await tester.pumpAndSettle();

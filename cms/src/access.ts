@@ -47,6 +47,7 @@ export function hasScreenAccess(screen: string) {
 export function hasActionAccess(resource: string, action: string) {
   const user = readStoredUser()
   if (!user) return true
+  if ((user.disabledModules || []).includes(resource)) return false
   const allowedActions = user?.actionPermissions?.[resource]
   if (!Array.isArray(allowedActions)) return true
   return allowedActions.includes(action)

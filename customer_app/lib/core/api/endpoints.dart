@@ -5,6 +5,7 @@ class Endpoints {
   static const otpVerify = '/customer-portal/auth/otp/verify';
 
   static const me = '/customer-portal/me';
+  static const customerOverview = '/customer-portal/me/overview';
   static const appointments = '/customer-portal/appointments';
   static String appointment(String id) => '/customer-portal/appointments/$id';
   static String cancelAppointment(String id) =>

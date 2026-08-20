@@ -634,6 +634,9 @@ export class SettingsService {
     if (payload.dataType === 'file') {
       payload.relationResource = 'files';
     }
+    if (payload.dataType === 'select' || payload.dataType === 'multi-select') {
+      payload.options = null as unknown as CustomFieldDefinition['options'];
+    }
     if (payload.dataType === 'dynamic-table') {
       if (!payload.customTableId || !await this.customTables.exists({ where: { id: payload.customTableId, isActive: true, isArchived: false } })) {
         throw new BadRequestException('Chọn bảng dữ liệu động hợp lệ');
@@ -656,6 +659,9 @@ export class SettingsService {
     }
     if (next.dataType === 'file') {
       next.relationResource = 'files';
+    }
+    if (next.dataType === 'select' || next.dataType === 'multi-select') {
+      next.options = null as unknown as CustomFieldDefinition['options'];
     }
     if (next.dataType === 'dynamic-table') {
       if (!next.customTableId || !await this.customTables.exists({ where: { id: next.customTableId, isActive: true, isArchived: false } })) {
@@ -804,6 +810,35 @@ export class SettingsService {
     setting.role = normalizedRole;
     setting.config = config;
     return this.views.save(setting);
+  }
+
+  async saveViewsBulk(
+    payload: Array<{ entityType: string; viewType: string; config: Record<string, unknown>; role?: string }>,
+    user?: AuthUser,
+  ) {
+    this.assertSettingsAccess(user);
+    if (payload.length === 0) return [];
+    if (payload.length > 500) throw new BadRequestException('Chỉ có thể lưu tối đa 500 cấu hình mỗi lần');
+
+    return this.views.manager.transaction(async (manager) => {
+      const repository = manager.getRepository(ViewSetting);
+      const saved: ViewSetting[] = [];
+      for (const item of payload) {
+        const entityType = String(item.entityType || '').trim();
+        const viewType = String(item.viewType || '').trim();
+        if (!entityType || !viewType || !item.config || typeof item.config !== 'object') {
+          throw new BadRequestException('Cấu hình view không hợp lệ');
+        }
+        const role = normalizeRole(item.role);
+        let setting = await repository.findOne({ where: { entityType, viewType, role } });
+        if (!setting) setting = repository.create({ entityType, viewType, role, config: item.config });
+        setting.role = role;
+        setting.config = item.config;
+        setting.isArchived = false;
+        saved.push(await repository.save(setting));
+      }
+      return saved;
+    });
   }
 
   async deleteViews(entityType: string, role?: string, viewType?: string, user?: AuthUser) {

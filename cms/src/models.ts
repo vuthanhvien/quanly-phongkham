@@ -584,7 +584,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'idCardNumber', label: 'Số CCCD/CMND', width: '33', tableWidth: 160 },
     { key: 'idCardIssuedDate', label: 'Ngày cấp', type: 'date', width: '33', tableWidth: 140 },
     { key: 'idCardIssuedPlace', label: 'Nơi cấp', width: '66', tableWidth: 200 },
-    { key: 'address', label: 'Địa chỉ thường trú', type: 'textarea', width: '100', tableWidth: 300 },
+    { key: 'address', label: 'Địa chỉ thường trú', width: '100', tableWidth: 300 },
     { key: 'avatarUrl', label: 'Avatar', type: 'image', width: '33', tableWidth: 88 },
     // Liên hệ khẩn cấp
     { key: 'emergencyContactName', label: 'Liên hệ khẩn — Họ tên', width: '33', tableWidth: 180 },
@@ -629,8 +629,10 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'email', label: 'Email', width: '50', tableWidth: 220 },
     { key: 'gender', label: 'Giới tính', type: 'select', options: [{ value: 'NAM', label: 'Nam' }, { value: 'NỮ', label: 'Nữ' }, { value: 'KHÁC', label: 'Khác' }], width: '33', tableWidth: 120 },
     { key: 'idNumber', label: 'CCCD', width: '50', tableWidth: 180 },
+    { key: 'address', label: 'Địa chỉ thường trú', type: 'textarea', width: '100', tableWidth: 300 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'CONSULTING', label: 'Đang tư vấn' }, { value: 'WAITING_SURGERY', label: 'Chờ phẫu thuật' }, { value: 'IN_TREATMENT', label: 'Đang điều trị' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'INACTIVE', label: 'Ngừng hoạt động' }], width: '33', tableWidth: 160 },
     { key: 'totalSpent', label: 'Tổng chi tiêu', type: 'number', width: '33', tableWidth: 160 },
+    { key: 'loyaltyPoints', label: 'Điểm tích lũy', type: 'number', width: '33', tableWidth: 150 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
   ],
   leads: [

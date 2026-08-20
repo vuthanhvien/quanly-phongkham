@@ -15,7 +15,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsDateString, IsIn, IsOptional, IsString } from 'class-validator';
 import { In, LessThan, MoreThan, Repository } from 'typeorm';
 import { Public } from '../common/auth';
-import { Appointment, Branch, Customer, Invoice, Staff, User } from '../entities/entities';
+import {
+  Appointment, Branch, Consultation, Customer, CustomerImage, Invoice,
+  MedicalEpisode, ServiceOrder, Staff, Treatment, User,
+} from '../entities/entities';
 import { CustomerAuthUser } from './customer-auth';
 import { CustomerJwtAuthGuard } from './customer-jwt-auth.guard';
 
@@ -67,9 +70,9 @@ class CreateAppointmentDto {
 }
 
 function safeCustomer(customer: Customer) {
-  const { id, code, fullName, avatarUrl, phone, email, gender, idNumber, address, addressLine, tier, status, totalSpent } =
+  const { id, code, fullName, avatarUrl, phone, email, gender, idNumber, address, addressLine, tier, status, totalSpent, loyaltyPoints } =
     customer;
-  return { id, code, fullName, avatarUrl, phone, email, gender, idNumber, address, addressLine, tier, status, totalSpent };
+  return { id, code, fullName, avatarUrl, phone, email, gender, idNumber, address, addressLine, tier, status, totalSpent, loyaltyPoints };
 }
 
 @Controller('customer-portal')
@@ -83,6 +86,11 @@ export class CustomerPortalController {
     @InjectRepository(Branch) private readonly branches: Repository<Branch>,
     @InjectRepository(Staff) private readonly staff: Repository<Staff>,
     @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(MedicalEpisode) private readonly medicalEpisodes: Repository<MedicalEpisode>,
+    @InjectRepository(Consultation) private readonly consultations: Repository<Consultation>,
+    @InjectRepository(Treatment) private readonly treatments: Repository<Treatment>,
+    @InjectRepository(ServiceOrder) private readonly serviceOrders: Repository<ServiceOrder>,
+    @InjectRepository(CustomerImage) private readonly customerImages: Repository<CustomerImage>,
   ) {}
 
   @Get('me')
@@ -99,6 +107,30 @@ export class CustomerPortalController {
     }
     await this.customers.save(customer);
     return { data: safeCustomer(customer) };
+  }
+
+  /**
+   * The customer-facing counterpart to the CMS customer detail tabs.  Every
+   * query is scoped from the JWT customer id; the app never supplies an id.
+   */
+  @Get('me/overview')
+  async overview(@Request() request: { customer: CustomerAuthUser }) {
+    const customerId = request.customer.customerId;
+    const [customer, medicalEpisodes, consultations, treatments, serviceOrders, images, invoices] = await Promise.all([
+      this.requireOwnCustomer(customerId),
+      this.medicalEpisodes.find({ where: { customerId }, order: { operationDate: 'DESC', createdAt: 'DESC' } }),
+      this.consultations.find({ where: { customerId }, order: { consultedAt: 'DESC' } }),
+      this.treatments.find({ where: { customerId }, order: { updatedAt: 'DESC' } }),
+      this.serviceOrders.find({ where: { customerId }, order: { orderDate: 'DESC' } }),
+      this.customerImages.find({ where: { customerId }, order: { capturedAt: 'DESC', createdAt: 'DESC' } }),
+      this.invoices.find({ where: { customerId }, order: { createdAt: 'DESC' }, take: 10 }),
+    ]);
+    return {
+      data: {
+        customer: safeCustomer(customer), medicalEpisodes, consultations,
+        treatments, serviceOrders, images, invoices,
+      },
+    };
   }
 
   @Get('appointments')

@@ -153,13 +153,28 @@ export function RecordFormContent({
           "FORM",
           getStoredUserRole(),
         )
-        const masterFields = nextFields.filter((field) => Array.isArray(field.options) && field.options.length > 0)
+        const customFieldKeys = new Set(customFields.map((field: CustomField) => field.key))
+        const masterFields = nextFields.filter((field: FieldSpec) =>
+          !field.relation && (
+            (Array.isArray(field.options) && field.options.length > 0) ||
+            (customFieldKeys.has(field.key) && (field.type === "select" || field.type === "multi-select"))
+          ),
+        )
         const masterOptions = await Promise.all(masterFields.map(async (field) => {
           const response = await api.get("/master-data", { params: { group: `${resource}.${field.key}` } })
           return [field.key, (response.data.data || []).filter((item: Record<string, unknown>) => item.isActive !== false).map((item: Record<string, unknown>) => ({ value: String(item.value), label: String(item.name) }))] as const
         }))
         const masterOptionMap = new Map(masterOptions)
-        const fieldsWithMasterData = nextFields.map((field) => masterOptionMap.has(field.key) ? { ...field, options: masterOptionMap.get(field.key) } : field)
+        const fieldsWithMasterData = nextFields.map((field) => {
+          const options = masterOptionMap.get(field.key)
+          if (!options) return field
+          return {
+            ...field,
+            options: Array.isArray(field.visibleOptionValues)
+              ? options.filter((option: { value: string }) => field.visibleOptionValues!.includes(option.value))
+              : options,
+          }
+        })
         const fieldsWithLeaveTypes = resource === "leave-requests" || resource === "leave-allocations"
           ? fieldsWithMasterData.map((field) => field.key === "leaveType" || field.key === "leaveTypeCode" ? { ...field, options: leaveTypeOptions } : field)
           : fieldsWithMasterData
