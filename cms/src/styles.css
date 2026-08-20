@@ -1550,11 +1550,30 @@ body {
   text-align: center;
 }
 
+.record-form-mask-input {
+  width: 100%;
+}
+
 .role-permission-table {
   border: 1px solid var(--app-line);
   border-radius: var(--app-radius);
   min-width: 0;
   overflow: auto;
+}
+
+.roles-workspace {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - 84px);
+  min-height: 0;
+}
+
+.roles-list-panel {
+  height: 100%;
+}
+
+.roles-list-panel > .ant-card-body {
+  flex: 1;
 }
 
 .roles-content-panel {
@@ -1685,6 +1704,10 @@ body {
 
 .record-status-tabs > .ant-tabs-nav {
   margin-bottom: 0 !important;
+}
+
+.custom-fields-tabs > .ant-tabs-nav {
+  margin-bottom: 14px !important;
 }
 
 .record-status-tabs > .ant-tabs-nav::before {
@@ -2732,6 +2755,10 @@ body {
   display: grid;
   gap: 8px;
   min-width: 280px;
+}
+
+.custom-fields-actions-menu .ant-btn {
+  font-weight: 400 !important;
 }
 
 .settings-option-row {
@@ -4592,7 +4619,7 @@ textarea.ant-input {
   --fc-today-bg-color: color-mix(in srgb, var(--app-primary) 8%, transparent);
   --fc-event-border-color: transparent;
   --fc-now-indicator-color: var(--app-primary);
-  height: max(720px, calc(100vh - 230px));
+  height: max(720px, calc(100vh - 178px));
 }
 
 .coordination-calendar .fc {
@@ -6110,7 +6137,7 @@ textarea.ant-input {
 }
 
 .settings-role-module-tree .ant-card-body {
-  max-height: calc(100vh - 185px);
+  max-height: calc(100vh - 95px);
   overflow: auto;
   padding: 8px 10px !important;
 }
@@ -6145,7 +6172,7 @@ textarea.ant-input {
 }
 
 .custom-fields-module-tree .ant-card-body {
-  max-height: calc(100vh - 185px);
+  max-height: calc(100vh - 95px);
   overflow: auto;
   padding: 8px 10px !important;
 }

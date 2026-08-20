@@ -1607,7 +1607,7 @@ function ViewConfigTable({
       <Card className="settings-view-config-table-card" size="small">
         <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd} sensors={dndSensors}>
           <SortableContext items={dataSource.map((field) => field.key)} strategy={verticalListSortingStrategy}>
-            <Table columns={columns} components={tableComponents} dataSource={dataSource} pagination={false} rowClassName={(row) => row.visible ? "" : "settings-field-row-hidden"} rowKey="key" scroll={{ x: 960 }} size="small" tableLayout="fixed" />
+            <Table columns={columns} components={tableComponents} dataSource={dataSource} pagination={false} rowClassName={(row) => row.visible ? "" : "settings-field-row-hidden"} rowKey="key" scroll={{ x: 960, y: "calc(100vh - 310px)" }} size="small" tableLayout="fixed" />
           </SortableContext>
         </DndContext>
       </Card>

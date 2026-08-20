@@ -748,6 +748,7 @@ function TimeInput({
 
   return (
     <InputMask
+      className="ant-input record-form-mask-input"
       disabled={disabled}
       mask={inputPattern.mask}
       placeholder="HH:MM"
@@ -755,9 +756,7 @@ function TimeInput({
       alwaysShowMask
       value={value || ""}
       onChange={(event: ChangeEvent<HTMLInputElement>) => onChange?.(event.target.value)}
-    >
-      <Input />
-    </InputMask>
+    />
   )
 }
 
@@ -1067,6 +1066,7 @@ function FieldInput({
   if (inputPattern) {
     return (
       <InputMask
+        className="ant-input record-form-mask-input"
         disabled={field.disabled}
         mask={inputPattern.mask}
         placeholder={placeholder}
@@ -1074,9 +1074,7 @@ function FieldInput({
         alwaysShowMask
         value={String(value ?? "")}
         onChange={(event: ChangeEvent<HTMLInputElement>) => onChange?.(event.target.value)}
-      >
-        <Input />
-      </InputMask>
+      />
     )
   }
   return (

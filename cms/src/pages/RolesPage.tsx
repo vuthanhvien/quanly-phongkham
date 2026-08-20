@@ -450,11 +450,11 @@ export function RolesPage() {
         <Typography.Title level={3} style={{ margin: 0 }}>Vai trò & Phân quyền</Typography.Title>
       </div>
 
-      <div style={{ display: "flex", gap: 16, height: "calc(100vh - 120px)", minHeight: 0 }}>
+      <div className="roles-workspace">
 
         {/* ── Left: role list ───────────────────────── */}
         <Card
-          className="glass-card"
+          className="glass-card roles-list-panel"
           style={{ width: 280, flexShrink: 0, display: "flex", flexDirection: "column" }}
           bodyStyle={{ display: "flex", flexDirection: "column", gap: 12, minHeight: 0, height: "100%" }}
         >
@@ -584,7 +584,7 @@ export function RolesPage() {
                     pagination={false}
                     rowKey="key"
                     rowClassName={(row) => row.kind === "all" ? "role-permission-all-row" : row.kind === "group" ? "role-permission-parent-row" : "role-permission-child-row"}
-                    scroll={{ x: 1340 }}
+                    scroll={{ x: 1340, y: "calc(100vh - 205px)" }}
                     dataSource={permissionRows}
                     columns={[
                       {

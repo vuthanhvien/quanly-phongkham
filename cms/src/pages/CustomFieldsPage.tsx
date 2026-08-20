@@ -365,7 +365,7 @@ export function CustomFieldsPage() {
           </Button>
           <Dropdown
             dropdownRender={() => (
-              <Card size="small" styles={{ body: { display: "grid", gap: 4, minWidth: 190 } }}>
+              <Card className="custom-fields-actions-menu" size="small" styles={{ body: { display: "grid", gap: 4, minWidth: 190 } }}>
                 <Button icon={<UploadOutlined />} style={{ justifyContent: "flex-start", textAlign: "left" }} type="text" onClick={() => openBatch("create")}>Thêm nhiều trường</Button>
                 <Button icon={<UploadOutlined />} style={{ justifyContent: "flex-start", textAlign: "left" }} type="text" onClick={() => openBatch("upsert")}>Cập nhật nhiều trường</Button>
                 <Button icon={<DownloadOutlined />} style={{ justifyContent: "flex-start", textAlign: "left" }} type="text" onClick={exportFields}>Xuất cấu hình</Button>
@@ -396,6 +396,7 @@ export function CustomFieldsPage() {
         <div className="custom-fields-content">
           <Tabs
             activeKey={activeTab}
+            className="record-status-tabs custom-fields-tabs"
             items={[
               { key: "fields", label: "Trường tuỳ biến" },
               { key: "settings", label: "Cài đặt mã" },
