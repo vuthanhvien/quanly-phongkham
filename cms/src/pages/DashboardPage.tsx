@@ -1,9 +1,6 @@
 import {
-  CloudOutlined,
   ExperimentOutlined,
-  EnvironmentOutlined,
   LineChartOutlined,
-  ThunderboltOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
 } from "@ant-design/icons"
@@ -84,13 +81,6 @@ type LeaveBalance = {
   remainingDays: number | null
 }
 
-type WeatherSnapshot = {
-  temperature?: number
-  apparentTemperature?: number
-  weatherCode?: number
-  label: string
-}
-
 export function DashboardPage() {
   const screens = Grid.useBreakpoint()
   const { data: identity } = useGetIdentity<Identity>()
@@ -103,56 +93,13 @@ export function DashboardPage() {
   const [leaveDrawerOpen, setLeaveDrawerOpen] = useState(false)
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([])
   const [leaveBalanceLoading, setLeaveBalanceLoading] = useState(false)
-  const [weather, setWeather] = useState<WeatherSnapshot | null>(null)
-  const [weatherLoading, setWeatherLoading] = useState(false)
   const [now, setNow] = useState(() => dayjs())
   const companyType = settings.companyType || "clinic"
   const dashboardCopy = companyTypeDashboardCopy[companyType]
 
-  async function loadCurrentWeather() {
-    if (!("geolocation" in navigator)) return
-    setWeatherLoading(true)
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: false,
-          maximumAge: 30 * 60 * 1000,
-          timeout: 8000,
-        })
-      })
-      const { latitude, longitude } = position.coords
-      const response = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(latitude)}&longitude=${encodeURIComponent(longitude)}&current=temperature_2m,apparent_temperature,weather_code&timezone=auto`,
-      )
-      if (!response.ok) throw new Error(`Weather API ${response.status}`)
-      const payload = await response.json() as {
-        current?: {
-          temperature_2m?: number
-          apparent_temperature?: number
-          weather_code?: number
-        }
-      }
-      const current = payload.current || {}
-      setWeather({
-        temperature: typeof current.temperature_2m === "number" ? current.temperature_2m : undefined,
-        apparentTemperature: typeof current.apparent_temperature === "number" ? current.apparent_temperature : undefined,
-        weatherCode: typeof current.weather_code === "number" ? current.weather_code : undefined,
-        label: weatherCodeLabel(current.weather_code),
-      })
-    } catch {
-      setWeather(null)
-    } finally {
-      setWeatherLoading(false)
-    }
-  }
-
   useEffect(() => {
     void loadDashboard()
   }, [companyType, identity?.staffId, identity?.branchId, identity?.fullName, identity?.username, identity?.email])
-
-  useEffect(() => {
-    void loadCurrentWeather()
-  }, [])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(dayjs()), 1000)
@@ -329,23 +276,6 @@ export function DashboardPage() {
             <Typography.Text type="secondary">Bây giờ</Typography.Text>
             <Typography.Text strong>{now.format("HH:mm:ss")}</Typography.Text>
           </div>
-          <div className="dashboard-weather-card">
-            <div className="dashboard-weather-icon" aria-hidden="true">
-              {weatherIcon(weather?.weatherCode)}
-            </div>
-            <div className="dashboard-weather-card-content">
-              <Typography.Text strong>
-                {weatherLoading ? "Đang lấy..." : weather?.temperature !== undefined ? `${Math.round(weather.temperature)}°C` : "--°C"}
-              </Typography.Text>
-              <Typography.Text type="secondary">{weather?.label || "Theo vị trí"}</Typography.Text>
-              {weather?.apparentTemperature !== undefined ? (
-                <Typography.Text className="dashboard-weather-chip" type="secondary">
-                  <EnvironmentOutlined />
-                  <span>Cảm giác {Math.round(weather.apparentTemperature)}°C</span>
-                </Typography.Text>
-              ) : null}
-            </div>
-          </div>
           <div className="dashboard-date-chip">
             <Typography.Text type="secondary">{now.format("dddd")}</Typography.Text>
             <Typography.Text strong>{now.format("DD [tháng] MM, YYYY")}</Typography.Text>
@@ -417,28 +347,6 @@ export function DashboardPage() {
       </Modal>
     </div>
   )
-}
-
-function weatherCodeLabel(code?: number) {
-  if (code === undefined) return "Vị trí hiện tại"
-  if (code === 0) return "Trời quang"
-  if ([1, 2, 3].includes(code)) return "Có mây"
-  if ([45, 48].includes(code)) return "Có sương"
-  if ([51, 53, 55, 56, 57].includes(code)) return "Mưa phùn"
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "Có mưa"
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return "Có tuyết"
-  if ([95, 96, 99].includes(code)) return "Dông"
-  return "Thời tiết hiện tại"
-}
-
-function weatherIcon(code?: number) {
-  if (code === 0) return <span>☀️</span>
-  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(Number(code))) return <span>🌧️</span>
-  if ([95, 96, 99].includes(Number(code))) return <ThunderboltOutlined />
-  if ([45, 48].includes(Number(code))) return <span>🌫️</span>
-  if ([71, 73, 75, 77, 85, 86].includes(Number(code))) return <span>❄️</span>
-  if ([1, 2, 3].includes(Number(code))) return <CloudOutlined />
-  return <CloudOutlined />
 }
 
 async function loadStaffDashboard(identity: Identity): Promise<StaffDashboardData | null> {
