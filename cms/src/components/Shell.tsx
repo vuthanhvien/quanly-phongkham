@@ -431,9 +431,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
           : null,
         canAccessScreen("settings")
           ? {
-              key: "/locations",
+              key: "/master-data",
               icon: <AppstoreOutlined />,
-              label: <Link to="/locations">Master Data</Link>,
+              label: <Link to="/master-data">Master Data</Link>,
             }
           : null,
         canAccessScreen("audit-logs")
@@ -480,6 +480,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     location.pathname.startsWith("/custom-fields") ||
     location.pathname.startsWith("/custom-tables") ||
     location.pathname.startsWith("/print-templates") ||
+    location.pathname.startsWith("/master-data") ||
     location.pathname.startsWith("/locations") ||
     location.pathname.startsWith("/audit-logs")
       ? "system-tools"
@@ -626,7 +627,8 @@ export function resolveBrowserPageTitle(pathname: string) {
     'zalo-inbox': 'Hộp thư Zalo',
     'custom-fields': 'Trường tuỳ biến',
     'custom-tables': 'Bảng dữ liệu động',
-    locations: 'Địa chỉ',
+    locations: 'Master Data',
+    'master-data': 'Master Data',
     'role-module-settings': 'Hiển thị theo role/module',
     'print-templates': 'Mẫu in',
     settings: 'Cấu hình động',

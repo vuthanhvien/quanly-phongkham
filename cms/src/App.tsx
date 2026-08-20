@@ -299,7 +299,8 @@ export function App() {
                 <Route path="/custom-tables" element={<Navigate to="/custom-tables/data" replace />} />
                 <Route path="/custom-tables/data" element={<CustomTableDataPage />} />
                 <Route path="/custom-tables/:id/data" element={<CustomTableDataPage />} />
-                <Route path="/locations" element={<LocationsPage />} />
+                <Route path="/master-data" element={<LocationsPage />} />
+                <Route path="/locations" element={<Navigate to="/master-data" replace />} />
                 <Route path="/role-module-settings" element={<SettingsPage section="roles" />} />
                 <Route path="/print-templates" element={<SettingsPage section="print" />} />
                 <Route path="/settings" element={<Navigate to="/role-module-settings" replace />} />

@@ -1,6 +1,7 @@
 import { DatabaseOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Card, Form, Input, Layout, Modal, Popconfirm, Space, Table, Typography, message } from 'antd'
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { baseFields, normalizeSelectOption } from '../models'
 
@@ -38,7 +39,14 @@ function getFieldLabel(group: string) {
 }
 
 export function LocationsPage() {
-  const [group, setGroup] = useState(MODULES[0].group)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const groupFromUrl = () => {
+    const module = searchParams.get('module')
+    const field = searchParams.get('field')
+    if (!module) return MODULES[0].group
+    return field ? `${module}.${field}` : module
+  }
+  const [group, setGroup] = useState(groupFromUrl)
   const [modules, setModules] = useState(MODULES)
   const [rows, setRows] = useState<MasterData[]>([])
   const [loading, setLoading] = useState(false)
@@ -55,7 +63,16 @@ export function LocationsPage() {
   }, [])
 
   const load = async () => { setLoading(true); try { const response = await api.get('/master-data', { params: { group } }); setRows(response.data.data || []) } finally { setLoading(false) } }
+  const selectGroup = (nextGroup: string) => {
+    const [module, field] = nextGroup.split('.')
+    setGroup(nextGroup)
+    setSearchParams(field ? { module, field } : { module })
+  }
   useEffect(() => { void load() }, [group])
+  useEffect(() => {
+    const nextGroup = groupFromUrl()
+    if (nextGroup !== group) setGroup(nextGroup)
+  }, [searchParams])
   useEffect(() => {
     const seedAndLoadGroups = async () => {
       const items = Object.entries(baseFields).flatMap(([resource, fields]) => fields.flatMap((field) => {
@@ -84,7 +101,7 @@ export function LocationsPage() {
       <Layout.Sider className="master-data-nav" theme="light" width={280}>
         {moduleGroups.map((model) => <div key={model.label} className="master-data-nav-group">
           <Typography.Text className="master-data-nav-group-title">{model.label}</Typography.Text>
-          {model.items.map((item) => <Button key={item.group} block className={group === item.group ? 'active' : ''} type="text" onClick={() => setGroup(item.group)}>{getFieldLabel(item.group)}</Button>)}
+          {model.items.map((item) => <Button key={item.group} block className={group === item.group ? 'active' : ''} type="text" onClick={() => selectGroup(item.group)}>{getFieldLabel(item.group)}</Button>)}
         </div>)}
       </Layout.Sider>
       <Layout.Content className="master-data-content">
