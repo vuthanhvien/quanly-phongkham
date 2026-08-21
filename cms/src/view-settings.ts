@@ -88,6 +88,10 @@ export interface FieldLayoutConfig extends FieldSpec {
   /** Option values a child role may see; absent means inherit all from ALL. */
   visibleOptionValues?: string[]
   tab?: string
+  /** A presentation-only heading inserted between form/detail fields. */
+  layoutType?: 'title'
+  titleSize?: 'sm' | 'md' | 'lg'
+  titleColor?: string
   disabled?: boolean
   description?: string
   placeholder?: string
@@ -358,6 +362,22 @@ export function buildFieldLayoutConfigs(
       return
     }
 
+    if (entry.layoutType === 'title') {
+      seen.add(entry.key)
+      configs.push({
+        key: entry.key,
+        label: typeof entry.label === 'string' && entry.label.trim() ? entry.label.trim() : 'Tiêu đề',
+        layoutType: 'title',
+        tab: typeof entry.tab === 'string' && entry.tab.trim() ? entry.tab.trim() : undefined,
+        titleSize: entry.titleSize === 'sm' || entry.titleSize === 'lg' ? entry.titleSize : 'md',
+        titleColor: typeof entry.titleColor === 'string' ? entry.titleColor : undefined,
+        description: typeof entry.description === 'string' ? entry.description : undefined,
+        visible: typeof entry.visible === 'boolean' ? entry.visible : true,
+        width: '100',
+      })
+      return
+    }
+
     if (resource && isFieldHiddenForResource(resource, entry.key)) {
       return
     }
@@ -467,6 +487,17 @@ export function serializeViewConfig(
       visible: field.visible,
     }
 
+    if (field.layoutType === 'title') {
+      next.layoutType = 'title'
+      next.label = field.label?.trim() || 'Tiêu đề'
+      next.width = '100'
+      if (field.tab?.trim()) next.tab = field.tab.trim()
+      if (field.titleSize) next.titleSize = field.titleSize
+      if (field.titleColor?.trim()) next.titleColor = field.titleColor.trim()
+      if (field.description?.trim()) next.description = field.description.trim()
+      return next
+    }
+
     if (field.label?.trim()) next.label = field.label.trim()
     if (field.tab?.trim()) next.tab = field.tab.trim()
     if (typeof field.disabled === 'boolean') next.disabled = field.disabled
@@ -490,4 +521,23 @@ export function serializeViewConfig(
 
   const config = viewType === 'TABLE' ? { columns: items } : { fields: items }
   return includeModuleSettings ? { ...config, moduleEnabled, allowedActions } : config
+}
+
+export interface FieldTabGroup {
+  key: string
+  tab?: string
+  fields: FieldLayoutConfig[]
+}
+
+export function groupFieldsByTab(fields: FieldLayoutConfig[]): FieldTabGroup[] {
+  const groups = new Map<string, FieldTabGroup>()
+
+  fields.forEach((field) => {
+    const tab = field.tab?.trim()
+    const key = tab ? `tab-${tab}` : '__general'
+    const group = groups.get(key) || { key, tab, fields: [] }
+    group.fields.push(field)
+    groups.set(key, group)
+  })
+  return Array.from(groups.values())
 }

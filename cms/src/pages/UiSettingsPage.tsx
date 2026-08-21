@@ -250,8 +250,8 @@ function ColorInput({ value, onChange, placeholder }: { value?: string; onChange
           height: 38,
           border: '1px solid var(--app-line)',
           borderRadius: '10px',
-          padding: 4,
-          background: 'var(--app-surface)',
+          padding: 0,
+          background: 'transparent',
           cursor: 'pointer',
         }}
       />

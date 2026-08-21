@@ -101,19 +101,7 @@ function applyDefaultTabs(fieldsByResource: Record<string, FieldSpec[]>) {
   return Object.fromEntries(
     Object.entries(fieldsByResource).map(([resource, fields]) => [
       resource,
-      [
-        ...fields,
-        // Every record model carries this ownership key through ConfigurableEntity.
-        // Keep it in the shared catalogue so forms persist it as a base field,
-        // rather than silently placing it in customFields.
-        ...(fields.some((field) => field.key === 'picId') ? [] : [{
-          key: 'picId',
-          label: 'Người phụ trách (PIC)',
-          tab: 'Phân quyền',
-          width: '50' as const,
-          tableWidth: 220,
-        }]),
-      ].map((field) => ({ ...field, tab: field.tab || defaultFieldTabs[resource]?.[field.key] })),
+      fields.map((field) => ({ ...field, tab: field.tab || defaultFieldTabs[resource]?.[field.key] })),
     ]),
   ) as Record<string, FieldSpec[]>;
 }
@@ -441,6 +429,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'publishedAt', label: 'Ngày đăng', type: 'date', width: '33', tableWidth: 140 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'DRAFT', label: 'Nháp' }, { value: 'PUBLISHED', label: 'Đã đăng' }], defaultValue: 'DRAFT', width: '33', tableWidth: 130 },
     { key: 'isFeatured', label: 'Nổi bật', type: 'select', options: [{ value: 'false', label: 'Không' }, { value: 'true', label: 'Có' }], defaultValue: 'false', width: '33', tableWidth: 120 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   news: [
     { key: 'title', label: 'Tiêu đề', required: true, width: '66', tableWidth: 260 },
@@ -454,12 +443,14 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'publishedAt', label: 'Ngày đăng', type: 'date', width: '33', tableWidth: 140 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'DRAFT', label: 'Nháp' }, { value: 'PUBLISHED', label: 'Đã đăng' }], defaultValue: 'DRAFT', width: '33', tableWidth: 130 },
     { key: 'isFeatured', label: 'Nổi bật', type: 'select', options: [{ value: 'false', label: 'Không' }, { value: 'true', label: 'Có' }], defaultValue: 'false', width: '33', tableWidth: 120 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   branches: [
     { key: 'slug', label: 'Mã URL', required: true, width: '33', tableWidth: 140 },
     { key: 'name', label: 'Tên chi nhánh', required: true, width: '66', tableWidth: 220 },
     { key: 'address', label: 'Địa chỉ', width: '100', tableWidth: 300 },
     { key: 'phone', label: 'Điện thoại', width: '50', tableWidth: 170 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'accounting-periods': [
     { key: 'code', label: 'Mã kỳ', required: true, width: '25', tableWidth: 140 },
@@ -469,6 +460,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'OPEN', label: 'Đang mở' }, { value: 'CLOSED', label: 'Đã khóa' }], width: '25', tableWidth: 130 },
     { key: 'isYearEnd', label: 'Kỳ cuối năm', width: '25', tableWidth: 120 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 300 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'accounting-chart-accounts': [
     { key: 'accountNumber', label: 'Số tài khoản', required: true, width: '25', tableWidth: 140 },
@@ -483,6 +475,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'cashFlowGroup', label: 'Nhóm dòng tiền', type: 'select', options: [{ value: 'OPERATING', label: 'Kinh doanh' }, { value: 'INVESTING', label: 'Đầu tư' }, { value: 'FINANCING', label: 'Tài chính' }], width: '33', tableWidth: 150 },
     { key: 'legalReference', label: 'Căn cứ pháp lý', width: '66', tableWidth: 240 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'accounting-fiscal-settings': [
     { key: 'accountingFramework', label: 'Chế độ kế toán', required: true, width: '50', tableWidth: 220 },
@@ -498,6 +491,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'revenueAccountNumber', label: 'TK doanh thu mặc định', width: '33', tableWidth: 200 },
     { key: 'expenseAccountNumber', label: 'TK chi phí mặc định', width: '33', tableWidth: 200 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'accounting-cash-flow-mappings': [
     { key: 'code', label: 'Mã dòng tiền', required: true, width: '25', tableWidth: 140 },
@@ -509,6 +503,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'sortOrder', label: 'Thứ tự', type: 'number', width: '25', tableWidth: 100 },
     { key: 'isActive', label: 'Hoạt động', width: '25', tableWidth: 110 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'accounting-vouchers': [
     { key: 'code', label: 'Mã chứng từ', required: true, width: '25', tableWidth: 150 },
@@ -527,6 +522,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'postedAt', label: 'Thời điểm ghi sổ', type: 'datetime', disabled: true, width: '33', tableWidth: 190 },
     { key: 'postedById', label: 'Người ghi sổ', disabled: true, width: '33', tableWidth: 180 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'accounting-voucher-lines': [
     { key: 'voucherId', label: 'Chứng từ', required: true, width: '50', tableWidth: 220 },
@@ -541,6 +537,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'referenceNumber', label: 'Số tham chiếu', width: '33', tableWidth: 170 },
     { key: 'lineDescription', label: 'Diễn giải dòng', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'file-folders': [
     { key: 'code', label: 'Mã thư mục', required: true, width: '33', tableWidth: 160 },
@@ -548,6 +545,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'parentId', label: 'Thư mục cha', width: '66', tableWidth: 220 },
     { key: 'description', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'isActive', label: 'Hoạt động', width: '33', tableWidth: 120 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   files: [
     { key: 'folderId', label: 'Thư mục', required: true, width: '50', tableWidth: 220 },
@@ -559,24 +557,28 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'sizeBytes', label: 'Dung lượng', type: 'number', disabled: true, width: '33', tableWidth: 140 },
     { key: 'publicUrl', label: 'Đường dẫn file', disabled: true, width: '100', tableWidth: 340 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   departments: [
     { key: 'code', label: 'Mã phòng ban', required: true, width: '33', tableWidth: 140 },
     { key: 'name', label: 'Tên phòng ban', required: true, width: '66', tableWidth: 220 },
     { key: 'managerStaffId', label: 'Trưởng bộ phận', width: '50', tableWidth: 220 },
     { key: 'description', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   rooms: [
     { key: 'code', label: 'Mã phòng', required: true, width: '33', tableWidth: 140 },
     { key: 'name', label: 'Tên phòng', required: true, width: '66', tableWidth: 220 },
     { key: 'branchId', label: 'Chi nhánh', width: '50', tableWidth: 190 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   equipments: [
     { key: 'code', label: 'Mã máy', required: true, width: '33', tableWidth: 140 },
     { key: 'name', label: 'Tên máy móc', required: true, width: '66', tableWidth: 220 },
     { key: 'branchId', label: 'Chi nhánh', width: '50', tableWidth: 190 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   staff: [
     { key: 'code', label: 'Mã nhân viên', required: true, width: '33', tableWidth: 140 },
@@ -612,16 +614,19 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'taxCode', label: 'Mã số thuế cá nhân (MST)', width: '50', tableWidth: 200 },
     { key: 'dependants', label: 'Số người phụ thuộc (giảm trừ thuế)', type: 'number', width: '50', tableWidth: 220 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'branch-permissions': [
     { key: 'userId', label: 'Tài khoản', required: true, width: '66', tableWidth: 240 },
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 200 },
     { key: 'roleKeys', label: 'Các role tại chi nhánh', type: 'multi-select', required: true, width: '66', tableWidth: 260 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'branch-role-assignments': [
     { key: 'userId', label: 'Tài khoản', required: true, width: '66', tableWidth: 240 },
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 200 },
     { key: 'roleKeys', label: 'Các role tại chi nhánh', type: 'multi-select', required: true, width: '66', tableWidth: 260 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'user-accounts': [
     { key: 'username', label: 'Username', required: true, width: '50', tableWidth: 180 },
@@ -633,6 +638,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'staffId', label: 'Nhân viên', width: '50', tableWidth: 220 },
     { key: 'email', label: 'Email đăng nhập (không bắt buộc)', width: '66', tableWidth: 240 },
     { key: 'branchRoleSummary', label: 'Phân quyền chi nhánh', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   customers: [
     { key: 'code', label: 'Mã KH', required: true, width: '33', tableWidth: 130 },
@@ -647,6 +653,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'totalSpent', label: 'Tổng chi tiêu', type: 'number', width: '33', tableWidth: 160 },
     { key: 'loyaltyPoints', label: 'Điểm tích lũy', type: 'number', width: '33', tableWidth: 150 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   leads: [
     { key: 'code', label: 'Mã khách tiềm năng', required: true, width: '33', tableWidth: 130 },
@@ -659,6 +666,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'assignedStaffId', label: 'Nhân viên phụ trách', width: '50', tableWidth: 220 },
     { key: 'convertedCustomerId', label: 'Khách hàng đã chuyển đổi', disabled: true, width: '66', tableWidth: 240 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'lead-activities': [
     { key: 'leadId', label: 'Khách tiềm năng', required: true, width: '50', tableWidth: 220 },
@@ -668,6 +676,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'ownerStaffId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'OPEN', label: 'Đang mở' }, { value: 'DONE', label: 'Hoàn thành' }, { value: 'CANCELLED', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'content', label: 'Nội dung', type: 'textarea', required: true, width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   suppliers: [
     { key: 'code', label: 'Mã NCC', required: true, width: '33', tableWidth: 130 },
@@ -677,6 +686,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'email', label: 'Email', width: '50', tableWidth: 220 },
     { key: 'debtLimit', label: 'Hạn nợ', type: 'number', width: '33', tableWidth: 150 },
     { key: 'paymentTermDays', label: 'Tuổi nợ (ngày)', type: 'number', width: '33', tableWidth: 150 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   products: [
     { key: 'code', label: 'Mã SP', required: true, width: '33', tableWidth: 130 },
@@ -687,11 +697,13 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'baseUnitId', label: 'Đơn vị cơ sở', required: true, width: '33', tableWidth: 160 },
     { key: 'sellingPrice', label: 'Giá bán', type: 'number', width: '33', tableWidth: 150 },
     { key: 'minStockLevel', label: 'Tồn tối thiểu', type: 'number', width: '33', tableWidth: 150 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   units: [
     { key: 'name', label: 'Tên đơn vị', required: true, width: '50', tableWidth: 220 },
     { key: 'baseUnitId', label: 'Đơn vị cơ sở', width: '25', tableWidth: 180 },
     { key: 'conversionFactor', label: 'Tỷ lệ quy đổi', type: 'number', required: true, defaultValue: 1, width: '25', tableWidth: 160 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'medical-episodes': [
     { key: 'customerId', label: 'Khách hàng', required: true, width: '50', tableWidth: 220 },
@@ -703,6 +715,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'allergyWarning', label: 'Cảnh báo dị ứng', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'diagnosis', label: 'Chẩn đoán', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'operationDate', label: 'Ngày thực hiện', type: 'date', width: '33', tableWidth: 150 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   appointments: [
     { key: 'customerId', label: 'Khách hàng', required: true, width: '50', tableWidth: 220 },
@@ -715,6 +728,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'equipmentId', label: 'Máy móc', width: '50', tableWidth: 220 },
     { key: 'picStaffId', label: 'PIC', width: '50', tableWidth: 220 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'SCHEDULED', label: 'Đã đặt lịch' }, { value: 'WAITING', label: 'Đang chờ' }, { value: 'IN_PROGRESS', label: 'Đang thực hiện' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'NO_SHOW', label: 'Không đến' }], width: '33', tableWidth: 140 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'staff-rewards': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -727,6 +741,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'description', label: 'Nội dung', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'staff-trainings': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -740,6 +755,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'planned', label: 'Dự kiến' }, { value: 'in_progress', label: 'Đang học' }, { value: 'completed', label: 'Hoàn thành' }, { value: 'cancelled', label: 'Hủy' }], width: '33', tableWidth: 140 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'performance-reviews': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -754,6 +770,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'goals', label: 'Mục tiêu kỳ tới', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'position-histories': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -766,6 +783,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'reason', label: 'Lý do / Quyết định', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'work-contracts': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -780,6 +798,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'draft', label: 'Nháp' }, { value: 'active', label: 'Đang hiệu lực' }, { value: 'expired', label: 'Hết hạn' }, { value: 'terminated', label: 'Đã chấm dứt' }], width: '33', tableWidth: 150 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'staff-insurances': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -793,6 +812,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'isActive', label: 'Đang đóng', width: '25', tableWidth: 110 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   attendances: [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -803,6 +823,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'present', label: 'Có mặt' }, { value: 'absent', label: 'Vắng' }, { value: 'late', label: 'Đi trễ' }, { value: 'half_day', label: 'Nửa ngày' }, { value: 'holiday', label: 'Nghỉ lễ' }], required: true, width: '33', tableWidth: 140 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'leave-requests': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -815,6 +836,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'reason', label: 'Lý do', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'approvedById', label: 'Người duyệt', width: '50', tableWidth: 220 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'leave-types': [
     { key: 'code', label: 'Mã loại nghỉ', required: true, width: '33', tableWidth: 160 },
@@ -824,6 +846,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'isPaid', label: 'Hưởng lương', type: 'select', options: [{ value: 'true', label: 'Có' }, { value: 'false', label: 'Không' }], defaultValue: 'true', width: '33', tableWidth: 140 },
     { key: 'isActive', label: 'Đang áp dụng', type: 'select', options: [{ value: 'true', label: 'Có' }, { value: 'false', label: 'Không' }], defaultValue: 'true', width: '33', tableWidth: 150 },
     { key: 'description', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'leave-allocations': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -833,6 +856,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'carriedOverDays', label: 'Ngày chuyển sang', type: 'number', width: '33', tableWidth: 170 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   projects: [
     { key: 'code', label: 'Mã dự án', required: true, width: '33', tableWidth: 150 },
@@ -844,6 +868,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'endDate', label: 'Kết thúc', type: 'date', width: '33', tableWidth: 140 },
     { key: 'description', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   tasks: [
     { key: 'projectId', label: 'Dự án', required: true, width: '50', tableWidth: 220 },
@@ -855,6 +880,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'sortOrder', label: 'Thứ tự', type: 'number', width: '25', tableWidth: 100 },
     { key: 'description', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'attendance-adjustment-requests': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -867,6 +893,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'reason', label: 'Lý do', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'approvedById', label: 'Người duyệt', width: '50', tableWidth: 220 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'business-trip-requests': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -879,6 +906,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'purpose', label: 'Mục đích', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'approvedById', label: 'Người duyệt', width: '50', tableWidth: 220 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'payment-requests': [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -893,6 +921,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'description', label: 'Diễn giải', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'approvedById', label: 'Người duyệt', width: '50', tableWidth: 220 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'workflow-definitions': [
     { key: 'code', label: 'Mã flow', required: true, width: '33', tableWidth: 180 },
@@ -904,6 +933,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
       { value: 'payment-requests', label: 'Đơn xin thanh toán' },
     ], required: true, width: '50', tableWidth: 220 },
     { key: 'description', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'workflow-steps': [
     { key: 'definitionId', label: 'Luồng duyệt', required: true, width: '50', tableWidth: 240 },
@@ -923,6 +953,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'boardX', label: 'Board X', type: 'number', width: '25', tableWidth: 100 },
     { key: 'boardY', label: 'Board Y', type: 'number', width: '25', tableWidth: 100 },
     { key: 'isActive', label: 'Đang dùng', width: '25', tableWidth: 120 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'workflow-instances': [
     { key: 'definitionId', label: 'Luồng duyệt', width: '50', tableWidth: 240 },
@@ -931,6 +962,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'requesterStaffId', label: 'Nhân viên tạo', width: '50', tableWidth: 220 },
     { key: 'currentStepOrder', label: 'Bước hiện tại', type: 'number', width: '25', tableWidth: 120 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'pending', label: 'Chờ duyệt' }, { value: 'approved', label: 'Đã duyệt' }, { value: 'rejected', label: 'Từ chối' }, { value: 'cancelled', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'workflow-tasks': [
     { key: 'instanceId', label: 'Workflow', width: '50', tableWidth: 240 },
@@ -940,6 +972,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'assigneeUserId', label: 'User duyệt', width: '50', tableWidth: 220 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'pending', label: 'Chờ duyệt' }, { value: 'approved', label: 'Đã duyệt' }, { value: 'rejected', label: 'Từ chối' }, { value: 'cancelled', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'workflow-actions': [
     { key: 'instanceId', label: 'Workflow', width: '50', tableWidth: 240 },
@@ -948,6 +981,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'actorStaffId', label: 'Người thao tác', width: '50', tableWidth: 220 },
     { key: 'actorUserId', label: 'User thao tác', width: '50', tableWidth: 220 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   payrolls: [
     { key: 'staffId', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -971,6 +1005,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'expenseAccountNumber', label: 'TK chi phí', width: '33', tableWidth: 150 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'work-schedules': [
     { key: 'staffId', label: 'Nhân sự', required: true, width: '50', tableWidth: 220 },
@@ -984,6 +1019,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'PLANNED', label: 'Dự kiến' }, { value: 'CONFIRMED', label: 'Đã xác nhận' }, { value: 'OFF', label: 'Nghỉ' }], width: '33', tableWidth: 140 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   consultations: [
     { key: 'customerId', label: 'Khách hàng', required: true, width: '50', tableWidth: 220 },
@@ -995,6 +1031,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'summary', label: 'Mô tả', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'diagnosis', label: 'Chẩn đoán', type: 'textarea', width: '100', tableWidth: 320 },
     { key: 'nextAction', label: 'Hướng xử lý tiếp', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'service-orders': [
     { key: 'code', label: 'Mã đơn', required: true, width: '33', tableWidth: 130 },
@@ -1008,6 +1045,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'performerStaffId', label: 'Nhân sự thực hiện', width: '50', tableWidth: 220 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'DRAFT', label: 'Nháp' }, { value: 'CONFIRMED', label: 'Đã xác nhận' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'CANCELLED', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'note', label: 'Ghi chú', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'customer-images': [
     { key: 'customerId', label: 'Khách hàng', required: true, width: '50', tableWidth: 220 },
@@ -1018,6 +1056,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'files', label: 'Tệp đính kèm', type: 'file', width: '100', tableWidth: 260 },
     { key: 'capturedAt', label: 'Thời gian chụp', type: 'datetime', width: '50', tableWidth: 190 },
     { key: 'diagnosisNote', label: 'Ghi chú / chẩn đoán', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   'stock-batches': [
     { key: 'productId', label: 'Sản phẩm', required: true, width: '50', tableWidth: 220 },
@@ -1027,6 +1066,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'expiryDate', label: 'Hạn dùng', type: 'date', width: '33', tableWidth: 150 },
     { key: 'remainingQuantity', label: 'Tồn còn lại', type: 'number', required: true, width: '33', tableWidth: 150 },
     { key: 'unit', label: 'Đơn vị', width: '33', tableWidth: 120 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   treatments: [
     { key: 'customerId', label: 'Khách hàng', required: true, width: '50', tableWidth: 220 },
@@ -1036,6 +1076,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'completedSessions', label: 'Đã hoàn thành', type: 'number', width: '33', tableWidth: 150 },
     { key: 'intervalDays', label: 'Khoảng cách ngày', type: 'number', width: '33', tableWidth: 150 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'ACTIVE', label: 'Đang hoạt động' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'CANCELLED', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   invoices: [
     { key: 'code', label: 'Mã phiếu thu', required: true, width: '33', tableWidth: 130 },
@@ -1050,6 +1091,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'paymentAccountNumber', label: 'TK thanh toán', width: '33', tableWidth: 150 },
     { key: 'revenueAccountNumber', label: 'TK doanh thu', width: '33', tableWidth: 150 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'UNPAID', label: 'Chưa thanh toán' }, { value: 'PARTIAL', label: 'Thanh toán một phần' }, { value: 'PAID', label: 'Đã thanh toán' }], width: '33', tableWidth: 140 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   expenses: [
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
@@ -1065,6 +1107,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'paymentMethod', label: 'Hình thức chi', type: 'select', options: [{ value: 'CASH', label: 'Tiền mặt' }, { value: 'TRANSFER', label: 'Chuyển khoản' }, { value: 'CARD', label: 'Thẻ' }], width: '33', tableWidth: 150 },
     { key: 'paymentAccountNumber', label: 'TK thanh toán', width: '33', tableWidth: 150 },
     { key: 'expenseAccountNumber', label: 'TK chi phí', width: '33', tableWidth: 150 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   commissions: [
     { key: 'staffName', label: 'Nhân viên', required: true, width: '50', tableWidth: 220 },
@@ -1073,6 +1116,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'amount', label: 'Hoa hồng', type: 'number', required: true, width: '33', tableWidth: 150 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'PENDING', label: 'Chờ xử lý' }, { value: 'PAID', label: 'Đã thanh toán' }], width: '33', tableWidth: 140 },
     { key: 'files', label: 'Tài liệu đính kèm', type: 'file', width: '100', tableWidth: 260 },
+    { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
 };
 

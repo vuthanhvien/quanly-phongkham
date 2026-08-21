@@ -49,6 +49,7 @@ import { buildFolderPathMap, buildFolderTree, FolderTreeNode, normalizeFileFolde
 import { VietnamAddressFields } from './VietnamAddressFields'
 import {
   getFieldCatalog,
+  groupFieldsByTab,
   getStoredUserRole,
   getVisibleFieldConfigs,
   FieldLayoutConfig,
@@ -64,6 +65,10 @@ interface RecordFormContentProps {
   onCancel?: () => void
   onSuccess?: () => void
   notifyOnSuccess?: boolean
+  /** Renders the create form without allowing records or related data to be created. */
+  preview?: boolean
+  /** Optional role used by the settings preview to resolve the same inherited layout. */
+  viewRole?: string
 }
 
 type RecordDraft = {
@@ -92,6 +97,8 @@ export function RecordFormContent({
   onCancel,
   onSuccess,
   notifyOnSuccess = true,
+  preview = false,
+  viewRole,
 }: RecordFormContentProps) {
   const editing = Boolean(id)
   const [form] = Form.useForm()
@@ -151,7 +158,7 @@ export function RecordFormContent({
           getFieldCatalog(resource, customFields),
           viewResponse.data.data as ViewSettingRecord[],
           "FORM",
-          getStoredUserRole(),
+          viewRole || getStoredUserRole(),
         )
         const customFieldKeys = new Set(customFields.map((field: CustomField) => field.key))
         const masterFields = nextFields.filter((field: FieldSpec) =>
@@ -182,7 +189,7 @@ export function RecordFormContent({
         return loadRelationOptions(fieldsWithLeaveTypes)
       })
       .then(setLookups)
-  }, [relationReloadKey, resource])
+  }, [relationReloadKey, resource, viewRole])
 
   useEffect(() => {
     if (resource !== "user-accounts") return
@@ -464,6 +471,11 @@ export function RecordFormContent({
   const renderFieldGrid = (tabFields: FieldLayoutConfig[], includeSpecialFields: boolean) => (
     <Row gutter={[16, 0]}>
       {tabFields.map((field) => {
+        if (field.layoutType === "title") {
+          const titleSize = ({ sm: 16, md: 20, lg: 24 } as const)[field.titleSize || "md"]
+          return <Col key={field.key} span={24}><Typography.Title level={4} style={{ margin: "8px 0 0", color: field.titleColor, fontSize: titleSize }}>{field.label}</Typography.Title>{field.description ? <Typography.Text type="secondary">{field.description}</Typography.Text> : null}</Col>
+        }
+
         // `address` is represented by the province/ward/address-line controls.
         // Keep its configured slot so the special control follows the saved form order.
         if (isAddressForm && field.key === "address") {
@@ -493,7 +505,7 @@ export function RecordFormContent({
                 field={field}
                 lookups={lookups}
                 resource={resource}
-                onCreateRelation={setQuickCreateRelationResource}
+                onCreateRelation={preview ? undefined : setQuickCreateRelationResource}
               />
             </Form.Item>
           </Col>
@@ -515,7 +527,9 @@ export function RecordFormContent({
         className={`record-form${compact ? " record-form--compact" : ""}`}
         form={form}
         layout="vertical"
+        disabled={preview}
         onKeyDownCapture={(event) => {
+          if (preview) return
           if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
             event.preventDefault()
             form.submit()
@@ -524,8 +538,8 @@ export function RecordFormContent({
         onValuesChange={() => {
           if (submitError) setSubmitError(null)
         }}
-        onFinish={submit}
-        onFinishFailed={showValidationError}
+        onFinish={(values) => { if (!preview) submit(values) }}
+        onFinishFailed={preview ? undefined : showValidationError}
       >
         {usesTabs ? (
           <Tabs
@@ -538,7 +552,7 @@ export function RecordFormContent({
             onChange={setActiveTab}
           />
         ) : renderFieldGrid(formVisibleFields, true)}
-        {resource === "user-accounts" ? (
+        {!preview && resource === "user-accounts" ? (
           <Form.List name="branchRoleAssignments">
             {(items, { add, remove }) => (
               <div style={{ marginBottom: 16 }}>
@@ -555,7 +569,7 @@ export function RecordFormContent({
             )}
           </Form.List>
         ) : null}
-        {submitError ? (
+        {!preview && submitError ? (
           <Alert
             closable
             message={submitError}
@@ -565,7 +579,7 @@ export function RecordFormContent({
             onClose={() => setSubmitError(null)}
           />
         ) : null}
-        <div className="record-form-actions">
+        {!preview && <div className="record-form-actions">
           <Space>
             {!editing ? <Button loading={draftBusy} onClick={() => void saveDraft()}>Lưu nháp</Button> : null}
             {!editing ? <Button onClick={() => void openDrafts()}>Bản nháp{drafts.length ? ` (${drafts.length})` : ""}</Button> : null}
@@ -574,9 +588,9 @@ export function RecordFormContent({
           <Button className="primary-glow" htmlType="submit" title="Ctrl/⌘ + Enter" type="primary">
             Lưu
           </Button>
-        </div>
+        </div>}
       </Form>
-      {!editing ? (
+      {!preview && !editing ? (
         <Modal footer={null} onCancel={() => setDraftsOpen(false)} open={draftsOpen} title={`Bản nháp ${entityLabels[resource] || resource}`}>
           <List
             dataSource={drafts}
@@ -598,7 +612,7 @@ export function RecordFormContent({
           />
         </Modal>
       ) : null}
-      <Modal
+      {!preview && <Modal
         destroyOnHidden
         footer={null}
         open={Boolean(quickCreateRelationResource)}
@@ -618,21 +632,9 @@ export function RecordFormContent({
             }}
           />
         ) : null}
-      </Modal>
+      </Modal>}
     </>
   )
-}
-
-function groupFieldsByTab(fields: FieldLayoutConfig[]) {
-  const groups = new Map<string, { key: string; tab?: string; fields: FieldLayoutConfig[] }>()
-  fields.forEach((field) => {
-    const tab = field.tab?.trim()
-    const key = tab ? `tab-${tab}` : "__general"
-    const group = groups.get(key) || { key, tab, fields: [] }
-    group.fields.push(field)
-    groups.set(key, group)
-  })
-  return Array.from(groups.values())
 }
 
 function WorkSchedulePeriodFields() {

@@ -19,6 +19,11 @@ export const companyTypeLabels = Object.fromEntries(
 
 export const appModuleGroups: AppModuleGroup[] = [
   {
+    key: "internal",
+    label: "Không gian nội bộ",
+    modules: ["company-feed"],
+  },
+  {
     key: "front-office",
     label: "Lễ tân & CRM",
     modules: ["appointments", "customers", "zalo-inbox", "leads", "lead-activities"],
@@ -104,6 +109,7 @@ export const appModuleLabels: Record<AppModuleKey, string> = {
   ...entityLabels,
   ...screenLabels,
   dashboard: "Feed",
+  "company-feed": "Feed nội bộ",
   calendar: "Lịch tổng",
   "landing-pages": "Trang đích",
   "landing-forms": "Biểu mẫu",
@@ -504,7 +510,7 @@ export function resolveEnabledModules(
   if (hasCustomModuleSelection) return normalized
   // Customer app management is a shared User site capability for every
   // industry preset, including tenants created before this module existed.
-  return Array.from(new Set([...companyTypeModulePresets[companyType], "customer-app"]))
+  return Array.from(new Set([...companyTypeModulePresets[companyType], "customer-app", "company-feed"]))
 }
 
 export function isModuleEnabled(moduleKey: string, enabledModules: unknown, companyType: CompanyType, hasCustomModuleSelection = false) {

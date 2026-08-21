@@ -59,6 +59,7 @@ import { FileLookupMap, hasFileField, loadFileLookupMap, loadRelationOptions, Lo
 import {
   FieldLayoutConfig,
   getFieldCatalog,
+  groupFieldsByTab,
   getStoredUserRole,
   getVisibleFieldConfigs,
   ViewSettingRecord,
@@ -247,13 +248,15 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   }
 
   if (embedded) {
-    const detailTabs = groupDetailFieldsByTab(fields).map((group) => ({
+    const detailTabs = groupFieldsByTab(fields).map((group) => ({
       key: group.key,
       label: group.tab || "Thông tin",
       children: (
         <div className="detail-grid">
           <Row gutter={[16, 16]}>
-            {group.fields.map((field) => (
+            {group.fields.map((field) => field.layoutType === "title" ? (
+              <Col key={field.key} span={24}><Typography.Title level={4} style={{ margin: "8px 0 0", color: field.titleColor, fontSize: ({ sm: 16, md: 20, lg: 24 } as const)[field.titleSize || "md"] }}>{field.label}</Typography.Title>{field.description ? <Typography.Text type="secondary">{field.description}</Typography.Text> : null}</Col>
+            ) : (
               <Col key={field.key} xs={24} md={detailWidthToSpan(field.width)}>
                 <div className="detail-item">
                   <div className="detail-item-label">
@@ -474,13 +477,15 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                 }]
               : []
 
-            const infoTabs = groupDetailFieldsByTab(fields).map((group) => ({
+            const infoTabs = groupFieldsByTab(fields).map((group) => ({
               key: group.key,
               label: group.tab || "Thông tin",
               children: (
                 <div className="detail-grid">
                   <Row gutter={[16, 16]}>
-                    {group.fields.map((field) => (
+                    {group.fields.map((field) => field.layoutType === "title" ? (
+                      <Col key={field.key} span={24}><Typography.Title level={4} style={{ margin: "8px 0 0", color: field.titleColor, fontSize: ({ sm: 16, md: 20, lg: 24 } as const)[field.titleSize || "md"] }}>{field.label}</Typography.Title>{field.description ? <Typography.Text type="secondary">{field.description}</Typography.Text> : null}</Col>
+                    ) : (
                       <Col key={field.key} xs={24} md={detailWidthToSpan(field.width)}>
                         <div className="detail-item">
                           <div className="detail-item-label">
@@ -721,7 +726,9 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
         {relatedDetail && (
           <div className="detail-grid">
             <Row gutter={[16, 16]}>
-              {relatedDetail.block.detailFields.map((field) => (
+              {relatedDetail.block.detailFields.map((field) => field.layoutType === "title" ? (
+                <Col key={field.key} span={24}><Typography.Title level={4} style={{ margin: "8px 0 0", color: field.titleColor, fontSize: ({ sm: 16, md: 20, lg: 24 } as const)[field.titleSize || "md"] }}>{field.label}</Typography.Title>{field.description ? <Typography.Text type="secondary">{field.description}</Typography.Text> : null}</Col>
+              ) : (
                 <Col key={field.key} xs={24} md={detailWidthToSpan(field.width)}>
                   <div className="detail-item">
                     <div className="detail-item-label">
@@ -934,18 +941,6 @@ function detailWidthToSpan(width?: FieldLayoutConfig["width"]) {
     default:
       return 24
   }
-}
-
-function groupDetailFieldsByTab(fields: FieldLayoutConfig[]) {
-  const groups = new Map<string, { key: string; tab?: string; fields: FieldLayoutConfig[] }>()
-  fields.forEach((field) => {
-    const tab = field.tab?.trim()
-    const key = tab ? `__field-tab-${tab}` : "__info"
-    const group = groups.get(key) || { key, tab, fields: [] }
-    group.fields.push(field)
-    groups.set(key, group)
-  })
-  return Array.from(groups.values())
 }
 
 async function loadRelated(
