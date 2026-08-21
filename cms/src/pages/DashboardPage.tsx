@@ -17,7 +17,7 @@ import { DashboardStaffSection } from "../components/dashboard/DashboardStaffSec
 import { CompanyFeed } from "../components/dashboard/CompanyFeed"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { getFieldLabel } from "../models"
-import { hasActionAccess } from "../access"
+import { hasActionAccess, hasResourceAccess } from "../access"
 import type {
   DashboardMetric,
   DashboardPipeline,
@@ -263,7 +263,7 @@ export function DashboardPage() {
   return (
     <div className="dashboard-home clinical-command-dashboard">
       <div className="dashboard-feed-layout">
-        <CompanyFeed currentUser={staffDashboard?.staffName || identity?.fullName || identity?.username || "Bạn"} currentUserId={identity?.id} />
+        {hasResourceAccess("company-feed") ? <CompanyFeed currentUser={staffDashboard?.staffName || identity?.fullName || identity?.username || "Bạn"} currentUserId={identity?.id} /> : null}
         <aside className="dashboard-widgets">
           {staffDashboard ? <DashboardStaffSection actionLoading={staffActionLoading} canCreateAttendance={hasActionAccess("attendances", "create")} canCreateLeaveRequest={hasActionAccess("leave-requests", "create")} canUpdateAttendance={hasActionAccess("attendances", "update")} data={staffDashboard} onCheckIn={() => void handleCheckIn()} onCheckOut={() => void handleCheckOut()} onOpenLeaveRequest={() => setLeaveDrawerOpen(true)} /> : null}
           <DashboardMetricGrid metrics={metrics} />

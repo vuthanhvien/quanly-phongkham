@@ -306,7 +306,7 @@ export function LandingThemeEditor() {
                     height: 32,
                     border: "1px solid #d9d9d9",
                     cursor: "pointer",
-                    padding: 2,
+                    padding: 0,
                     borderRadius: "6px 0 0 6px",
                     background: "white",
                   }}

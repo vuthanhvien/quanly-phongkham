@@ -60,6 +60,7 @@ import type { ColumnsType } from "antd/es/table"
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { api } from "../api"
+import { RecordFormContent } from "../components/RecordFormContent"
 import { appModuleLabels, buildGroupedModuleOptions, resolveEnabledModules } from "../company-types"
 import { useAppUi } from "../app-ui"
 import { getInputPatternLabel } from "../input-patterns"
@@ -70,6 +71,7 @@ import {
   DEFAULT_ROLE_SCOPE,
   FieldLayoutConfig,
   getFieldCatalog,
+  groupFieldsByTab,
   getRoleInheritanceChain,
   getRoleOptions,
   hasExactRoleSetting,
@@ -112,6 +114,16 @@ interface ActionEditorDraft {
   enabled: boolean
   order: number
   inline: boolean
+}
+
+interface TitleEditorDraft {
+  viewType: Extract<ViewType, "FORM" | "DETAIL">
+  key?: string
+  label: string
+  tab?: string
+  titleSize: NonNullable<FieldLayoutConfig["titleSize"]>
+  titleColor?: string
+  description?: string
 }
 
 const DEFAULT_TEMPLATE_HTML = `<style>
@@ -668,6 +680,9 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
   const [tableConfig, setTableConfig] = useState<FieldLayoutConfig[]>([])
   const [formConfig, setFormConfig] = useState<FieldLayoutConfig[]>([])
   const [detailConfig, setDetailConfig] = useState<FieldLayoutConfig[]>([])
+  const [previewViewType, setPreviewViewType] = useState<Extract<ViewType, "FORM" | "DETAIL"> | null>(null)
+  const [titleDraft, setTitleDraft] = useState<TitleEditorDraft | null>(null)
+  const [isNewTitleTab, setIsNewTitleTab] = useState(false)
   const [templates, setTemplates] = useState<Template[]>([])
   const [dynamicRoles, setDynamicRoles] = useState<DynamicRole[]>([])
   const [allowedActions, setAllowedActions] = useState<string[]>([])
@@ -1101,6 +1116,44 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     void saveFieldView(viewType, next, reuseInherited[viewType])
   }, [detailConfig, entityType, formConfig, reuseInherited, selectedRole, tableConfig])
 
+  function openTitleEditor(viewType: Extract<ViewType, "FORM" | "DETAIL">, field?: FieldLayoutConfig) {
+    setTitleDraft({ viewType, key: field?.key, label: field?.label || "Tiêu đề mới", tab: field?.tab, titleSize: field?.titleSize || "md", titleColor: field?.titleColor, description: field?.description })
+    setIsNewTitleTab(false)
+  }
+
+  function saveTitleConfig() {
+    if (!titleDraft) return
+    const { viewType } = titleDraft
+    const current = viewType === "FORM" ? formConfig : detailConfig
+    const title: FieldLayoutConfig = {
+      key: titleDraft.key || `__layout_title_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      label: titleDraft.label.trim() || "Tiêu đề",
+      tab: titleDraft.tab?.trim() || undefined,
+      layoutType: "title",
+      titleSize: titleDraft.titleSize,
+      titleColor: titleDraft.titleColor,
+      description: titleDraft.description,
+      visible: true,
+      width: "100",
+    }
+    const next = titleDraft.key ? current.map((field) => field.key === titleDraft.key ? title : field) : [...current, title]
+    if (viewType === "FORM") setFormConfig(next)
+    else setDetailConfig(next)
+    void saveFieldView(viewType, next, reuseInherited[viewType])
+    setTitleDraft(null)
+    setIsNewTitleTab(false)
+  }
+
+  const titleAvailableTabs = useMemo(() => Array.from(new Set((titleDraft?.viewType === "FORM" ? formConfig : detailConfig).map((field) => field.tab?.trim()).filter((tab): tab is string => Boolean(tab)))), [detailConfig, formConfig, titleDraft?.viewType])
+
+  function removeTitleConfig(viewType: Extract<ViewType, "FORM" | "DETAIL">, key: string) {
+    const current = viewType === "FORM" ? formConfig : detailConfig
+    const next = current.filter((field) => field.key !== key)
+    if (viewType === "FORM") setFormConfig(next)
+    else setDetailConfig(next)
+    void saveFieldView(viewType, next, reuseInherited[viewType])
+  }
+
   const reorderConfig = useCallback((
     viewType: ViewType,
     fromKey: string,
@@ -1295,12 +1348,12 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
                       {
                         key: "FORM",
                         label: <span className="settings-view-tab-label">Form nhập liệu {reuseInherited.FORM && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.FORM, dynamicRoles)}`}><LinkOutlined /></Tooltip>}</span>,
-                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.FORM} source={formatRoleLabel(viewSources.FORM, dynamicRoles)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, FORM: checked })); void saveFieldView("FORM", formConfig, checked) }}><ViewConfigTable dataSource={formConfig} viewType="FORM" allowListOptions={selectedRole === DEFAULT_ROLE_SCOPE} allowOptionVisibility={selectedRole !== DEFAULT_ROLE_SCOPE} optionSource={masterOptionMap} module={entityType} onMasterOptionsChange={(key, options) => setMasterOptionMap((current) => new Map(current).set(key, options))} onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
+                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.FORM} source={formatRoleLabel(viewSources.FORM, dynamicRoles)} extra={<Space size={8}><Button size="small" onClick={() => setPreviewViewType("FORM")}>Xem trước</Button><Button icon={<PlusOutlined />} size="small" onClick={() => openTitleEditor("FORM")}>Thêm tiêu đề</Button></Space>} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, FORM: checked })); void saveFieldView("FORM", formConfig, checked) }}><ViewConfigTable dataSource={formConfig} viewType="FORM" allowListOptions={selectedRole === DEFAULT_ROLE_SCOPE} allowOptionVisibility={selectedRole !== DEFAULT_ROLE_SCOPE} optionSource={masterOptionMap} module={entityType} onMasterOptionsChange={(key, options) => setMasterOptionMap((current) => new Map(current).set(key, options))} onChange={updateConfig} onEditTitle={openTitleEditor} onRemoveTitle={removeTitleConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
                       },
                       {
                         key: "DETAIL",
                         label: <span className="settings-view-tab-label">Thông tin chi tiết {reuseInherited.DETAIL && <Tooltip title={`Đang kế thừa từ ${formatRoleLabel(viewSources.DETAIL, dynamicRoles)}`}><LinkOutlined /></Tooltip>}</span>,
-                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.DETAIL} source={formatRoleLabel(viewSources.DETAIL, dynamicRoles)} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, DETAIL: checked })); void saveFieldView("DETAIL", detailConfig, checked) }}><ViewConfigTable dataSource={detailConfig} viewType="DETAIL" onChange={updateConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
+                        children: <ViewOverridePanel canReuse={selectedRole !== DEFAULT_ROLE_SCOPE} reused={reuseInherited.DETAIL} source={formatRoleLabel(viewSources.DETAIL, dynamicRoles)} extra={<Space size={8}><Button size="small" onClick={() => setPreviewViewType("DETAIL")}>Xem trước</Button><Button icon={<PlusOutlined />} size="small" onClick={() => openTitleEditor("DETAIL")}>Thêm tiêu đề</Button></Space>} onReuseChange={(checked) => { setReuseInherited((current) => ({ ...current, DETAIL: checked })); void saveFieldView("DETAIL", detailConfig, checked) }}><ViewConfigTable dataSource={detailConfig} viewType="DETAIL" onChange={updateConfig} onEditTitle={openTitleEditor} onRemoveTitle={removeTitleConfig} onReorder={reorderConfig} /></ViewOverridePanel>,
                       },
                     ]}
                   />
@@ -1403,6 +1456,24 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
           <Button className="primary-glow" htmlType="submit" type="primary">{docxTemplateTarget ? `Thay file ${uploadedTemplateType}` : `Lưu mẫu ${uploadedTemplateType}`}</Button>
         </Form>
       </Modal>
+      <Modal footer={previewViewType === "FORM" ? null : <Button type="primary" onClick={() => setPreviewViewType(null)}>Đóng</Button>} open={Boolean(previewViewType)} title={`Xem trước ${previewViewType === "FORM" ? "form nhập liệu" : "thông tin chi tiết"}`} width={960} onCancel={() => setPreviewViewType(null)}>
+        {previewViewType === "FORM" ? <RecordFormContent compact preview resource={entityType} viewRole={selectedRole} onCancel={() => setPreviewViewType(null)} /> : <ViewConfigPreview fields={detailConfig} viewType="DETAIL" />}
+      </Modal>
+      <Modal open={Boolean(titleDraft)} title={titleDraft?.key ? "Sửa tiêu đề" : "Thêm tiêu đề"} footer={<Space><Button onClick={() => { setTitleDraft(null); setIsNewTitleTab(false) }}>Hủy</Button>{titleDraft?.key ? <Button danger onClick={() => { removeTitleConfig(titleDraft.viewType, titleDraft.key!); setTitleDraft(null); setIsNewTitleTab(false) }}>Xóa</Button> : null}<Button type="primary" onClick={saveTitleConfig}>Lưu</Button></Space>} onCancel={() => { setTitleDraft(null); setIsNewTitleTab(false) }}>
+        {titleDraft && <Form layout="vertical">
+          <Form.Item label="Nội dung tiêu đề" required><Input autoFocus value={titleDraft.label} onChange={(event) => setTitleDraft((current) => current ? { ...current, label: event.target.value } : current)} /></Form.Item>
+          <Form.Item label="Tab">
+            <Select value={isNewTitleTab ? "__new__" : titleDraft.tab || "__none__"} options={[{ value: "__none__", label: "Không có" }, { value: "__new__", label: "Mới" }, ...titleAvailableTabs.map((tab) => ({ value: tab, label: tab }))]} onChange={(value) => {
+              if (value === "__new__") { setIsNewTitleTab(true); setTitleDraft((current) => current ? { ...current, tab: undefined } : current) }
+              else { setIsNewTitleTab(false); setTitleDraft((current) => current ? { ...current, tab: value === "__none__" ? undefined : value } : current) }
+            }} />
+            {isNewTitleTab ? <Input autoFocus style={{ marginTop: 8 }} value={titleDraft.tab} placeholder="Nhập tên tab mới" onChange={(event) => setTitleDraft((current) => current ? { ...current, tab: event.target.value } : current)} /> : null}
+          </Form.Item>
+          <Form.Item label="Cỡ chữ"><Select value={titleDraft.titleSize} options={[{ value: "sm", label: "Nhỏ" }, { value: "md", label: "Vừa" }, { value: "lg", label: "Lớn" }]} onChange={(titleSize) => setTitleDraft((current) => current ? { ...current, titleSize } : current)} /></Form.Item>
+          <Form.Item label="Màu chữ"><Input type="color" value={titleDraft.titleColor || "#1f2937"} onChange={(event) => setTitleDraft((current) => current ? { ...current, titleColor: event.target.value } : current)} /></Form.Item>
+          <Form.Item label="Mô tả"><Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} value={titleDraft.description} onChange={(event) => setTitleDraft((current) => current ? { ...current, description: event.target.value } : current)} /></Form.Item>
+        </Form>}
+      </Modal>
     </>
   )
 }
@@ -1411,20 +1482,25 @@ function ViewOverridePanel({
   canReuse,
   reused,
   source,
+  extra,
   onReuseChange,
   children,
 }: {
   canReuse: boolean
   reused: boolean
   source: string
+  extra?: React.ReactNode
   onReuseChange: (checked: boolean) => void
   children: React.ReactNode
 }) {
   return (
     <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      <Checkbox disabled={!canReuse} checked={reused} onChange={(event) => onReuseChange(event.target.checked)}>
-        Dùng lại cấu hình từ <strong>{source}</strong>
-      </Checkbox>
+      <Space size={8}>
+        <Checkbox disabled={!canReuse} checked={reused} onChange={(event) => onReuseChange(event.target.checked)}>
+          Dùng lại cấu hình từ <strong>{source}</strong>
+        </Checkbox>
+        {extra}
+      </Space>
       {reused ? (
         <Typography.Text type="secondary">Đang kế thừa cấu hình của {source}. Bỏ chọn để tạo cấu hình riêng cho role hiện tại.</Typography.Text>
       ) : children}
@@ -1463,7 +1539,9 @@ function ViewConfigTable({
   optionSource,
   module,
   onMasterOptionsChange,
+  onEditTitle,
   onChange,
+  onRemoveTitle,
   onReorder,
 }: {
   dataSource: FieldLayoutConfig[]
@@ -1473,11 +1551,13 @@ function ViewConfigTable({
   optionSource?: Map<string, SelectOption[]>
   module?: string
   onMasterOptionsChange?: (key: string, options: SelectOption[]) => void
+  onEditTitle?: (viewType: Extract<ViewType, "FORM" | "DETAIL">, field: FieldLayoutConfig) => void
   onChange: (
     viewType: ViewType,
     key: string,
     patch: Partial<FieldLayoutConfig>,
   ) => void
+  onRemoveTitle?: (viewType: Extract<ViewType, "FORM" | "DETAIL">, key: string) => void
   onReorder?: (viewType: ViewType, fromKey: string, toKey: string) => void
 }) {
   const [editingField, setEditingField] = useState<FieldLayoutConfig | null>(null)
@@ -1517,13 +1597,13 @@ function ViewConfigTable({
       title: "Mã trường",
       dataIndex: "key",
       width: 160,
-      render: (value) => <Typography.Text strong>{value}</Typography.Text>,
+      render: (value, row) => <Typography.Text strong>{row.layoutType === "title" ? "TITLE" : value}</Typography.Text>,
     },
     {
       title: "Loại",
       dataIndex: "type",
       width: 120,
-      render: (value) => value || "text",
+      render: (value, row) => row.layoutType === "title" ? "Tiêu đề" : value || "text",
     },
     {
       title: "Nhãn hiển thị",
@@ -1551,7 +1631,7 @@ function ViewConfigTable({
         title: "Thẻ",
         dataIndex: "tab",
         width: 160,
-        render: (value) => value || "",
+        render: (value, row) => row.layoutType === "title" ? "" : value || "",
       },
       {
         title: "Kích thước",
@@ -1595,7 +1675,9 @@ function ViewConfigTable({
     title: "Thao tác",
     key: "actions",
     width: 64,
-    render: (_, row) => (
+    render: (_, row) => row.layoutType === "title" ? (
+      <Tooltip title="Sửa tiêu đề"><Button type="text" icon={<EditOutlined />} aria-label={`Sửa tiêu đề ${row.label}`} onClick={() => { if (viewType !== "TABLE") onEditTitle?.(viewType, row) }} /></Tooltip>
+    ) : (
       <Tooltip title="Sửa">
         <Button type="text" icon={<EditOutlined />} aria-label={`Sửa ${row.label}`} onClick={() => setEditingField({ ...row })} />
       </Tooltip>
@@ -1647,6 +1729,27 @@ function ViewConfigTable({
       </Modal>
     </>
   )
+}
+
+function ViewConfigPreview({ fields, viewType }: { fields: FieldLayoutConfig[]; viewType: Extract<ViewType, "FORM" | "DETAIL"> }) {
+  const groups = groupFieldsByTab(fields.filter((field) => field.visible))
+  const usesTabs = groups.length > 1 || Boolean(groups[0]?.tab)
+  const content = (group: { fields: FieldLayoutConfig[] }) => (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(12, minmax(0, 1fr))", gap: 16 }}>
+      {group.fields.map((field) => {
+        if (field.layoutType === "title") return <div key={field.key} style={{ gridColumn: "span 12" }}><Typography.Title level={4} style={{ margin: "8px 0 0", color: field.titleColor, fontSize: ({ sm: 16, md: 20, lg: 24 } as const)[field.titleSize || "md"] }}>{field.label}</Typography.Title>{field.description ? <Typography.Text type="secondary">{field.description}</Typography.Text> : null}</div>
+        const width = ({ "25": 3, "33": 4, "50": 6, "66": 8, "75": 9, "100": 12 } as const)[field.width || "100"]
+        return <div key={field.key} style={{ gridColumn: `span ${width}`, minWidth: 0 }}>
+          {viewType === "FORM" ? <Form.Item label={field.label} style={{ marginBottom: 0 }}>
+            {field.type === "textarea" ? <Input.TextArea disabled placeholder={field.placeholder} /> : field.type === "select" || field.type === "multi-select" ? <Select disabled placeholder={field.placeholder || "Chọn giá trị"} /> : <Input disabled placeholder={field.placeholder} />}
+          </Form.Item> : <div className="detail-item"><div className="detail-item-label">{field.label}</div><div className="detail-item-content"><Typography.Text type="secondary">Dữ liệu mẫu</Typography.Text></div></div>}
+        </div>
+      })}
+    </div>
+  )
+
+  if (!groups.length) return <Typography.Text type="secondary">Chưa có field hiển thị.</Typography.Text>
+  return usesTabs ? <Tabs items={groups.map((group) => ({ key: group.key, label: group.tab || "Thông tin chung", children: content(group) }))} /> : content(groups[0])
 }
 
 function FieldConfigEditor({
@@ -1706,7 +1809,7 @@ function FieldConfigEditor({
           }} placeholder="Ví dụ 180" />
         </Form.Item>
       ) : <>
-        <Form.Item label="Thẻ">
+        <Form.Item label="Tiêu đề tab">
           <Select
             value={isNewTab ? "__new__" : field.tab || "__none__"}
             onChange={(value) => {

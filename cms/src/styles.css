@@ -3199,6 +3199,15 @@ body {
   background: #fffdf6;
 }
 
+.feed-tinymce-editor { min-width: 0; width: 100%; }
+.feed-tinymce-editor .tox-tinymce { border: 1px solid var(--app-line); border-radius: 12px; overflow: hidden; }
+.feed-tinymce-editor .tox-edit-area iframe { background: #fff; }
+.feed-rich-content { line-height: 1.6; overflow-wrap: anywhere; }
+.feed-rich-content > *:first-child { margin-top: 0; }
+.feed-rich-content > *:last-child { margin-bottom: 0; }
+.feed-rich-content blockquote { border-left: 3px solid var(--app-line); color: var(--app-text-soft); margin: 12px 0; padding-left: 12px; }
+.feed-rich-content a { color: var(--app-primary); text-decoration: underline; }
+
 .template-preset-grid {
   display: grid;
   gap: 12px;
@@ -6439,6 +6448,16 @@ textarea.ant-input {
 .clinical-command-dashboard .staff-home-hero-card::before { background: transparent; border: 1px solid color-mix(in srgb, var(--app-button-success-text) 28%, transparent); border-radius: 50%; right: -54px; top: -122px; transform: none; width: 260px; }
 .clinical-command-dashboard .staff-home-primary-status { background: color-mix(in srgb, var(--app-button-success-text) 10%, transparent); border-color: color-mix(in srgb, var(--app-button-success-text) 20%, transparent); border-left: 3px solid var(--app-button-success-text); }
 .clinical-command-dashboard .staff-home-sidecard { background: color-mix(in srgb, var(--app-button-success-text) 8%, transparent); border-color: color-mix(in srgb, var(--app-button-success-text) 18%, transparent); }
+
+/* Native color inputs should show the selected color edge-to-edge. */
+input[type="color"],
+.ant-input[type="color"] {
+  padding: 0;
+  overflow: hidden;
+}
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"]::-webkit-color-swatch { border: 0; border-radius: inherit; }
+input[type="color"]::-moz-color-swatch { border: 0; border-radius: inherit; }
 
 @media (max-width: 767px) {
   .clinical-command-dashboard .dashboard-home-heading { padding: 17px; }
