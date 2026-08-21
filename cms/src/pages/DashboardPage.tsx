@@ -40,6 +40,7 @@ async function fetchListSafe<T>(resource: string, pageSize = 10000) {
 }
 
 type Identity = {
+  id?: string
   staffId?: string
   branchId?: string
   fullName?: string
@@ -94,18 +95,12 @@ export function DashboardPage() {
   const [leaveDrawerOpen, setLeaveDrawerOpen] = useState(false)
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([])
   const [leaveBalanceLoading, setLeaveBalanceLoading] = useState(false)
-  const [now, setNow] = useState(() => dayjs())
   const companyType = settings.companyType || "clinic"
   const dashboardCopy = companyTypeDashboardCopy[companyType]
 
   useEffect(() => {
     void loadDashboard()
   }, [companyType, identity?.staffId, identity?.branchId, identity?.fullName, identity?.username, identity?.email])
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(dayjs()), 1000)
-    return () => window.clearInterval(timer)
-  }, [])
 
   useEffect(() => {
     if (!leaveDrawerOpen || !identity?.staffId) return
@@ -267,24 +262,8 @@ export function DashboardPage() {
 
   return (
     <div className="dashboard-home clinical-command-dashboard">
-      <header className="dashboard-home-heading">
-        <div>
-          <Typography.Text className="eyebrow">CỘNG ĐỒNG NỘI BỘ</Typography.Text>
-          <Typography.Title level={2}>Feed công ty</Typography.Title>
-        </div>
-        <div className="dashboard-today-meta">
-          <div className="dashboard-time-card">
-            <Typography.Text type="secondary">Bây giờ</Typography.Text>
-            <Typography.Text strong>{now.format("HH:mm:ss")}</Typography.Text>
-          </div>
-          <div className="dashboard-date-chip">
-            <Typography.Text type="secondary">{now.format("dddd")}</Typography.Text>
-            <Typography.Text strong>{now.format("DD [tháng] MM, YYYY")}</Typography.Text>
-          </div>
-        </div>
-      </header>
       <div className="dashboard-feed-layout">
-        <CompanyFeed currentUser={staffDashboard?.staffName || identity?.fullName || identity?.username || "Bạn"} />
+        <CompanyFeed currentUser={staffDashboard?.staffName || identity?.fullName || identity?.username || "Bạn"} currentUserId={identity?.id} />
         <aside className="dashboard-widgets">
           {staffDashboard ? <DashboardStaffSection actionLoading={staffActionLoading} canCreateAttendance={hasActionAccess("attendances", "create")} canCreateLeaveRequest={hasActionAccess("leave-requests", "create")} canUpdateAttendance={hasActionAccess("attendances", "update")} data={staffDashboard} onCheckIn={() => void handleCheckIn()} onCheckOut={() => void handleCheckOut()} onOpenLeaveRequest={() => setLeaveDrawerOpen(true)} /> : null}
           <DashboardMetricGrid metrics={metrics} />
@@ -462,12 +441,12 @@ function buildMetrics(
       trend: `${customerRows.filter((item) => isSameDay(item.createdAt, today)).length} mới hôm nay`,
     },
     {
-      title: "Khách tiềm năng đang xử lý",
+      title: "Lead",
       value: openLeads.length,
-      suffix: "khách tiềm năng",
+      suffix: "lead",
       icon: <LineChartOutlined />,
       tone: "gold",
-      trend: `${leadRows.filter((item) => item.status === "NEW").length} khách tiềm năng mới`,
+      trend: `${leadRows.filter((item) => item.status === "NEW").length} lead mới`,
     },
     {
       title: "Liệu trình active",

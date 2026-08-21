@@ -22,7 +22,7 @@ export abstract class ConfigurableEntity {
   @Column({ default: false })
   isArchived: boolean;
 
-  // Người phụ trách dữ liệu. Dùng cho phân quyền theo phạm vi cá nhân.
+  // Employee/Staff ID của người phụ trách dữ liệu, dùng cho phân quyền phạm vi cá nhân.
   @Column({ nullable: true })
   picId?: string;
 }
@@ -1134,6 +1134,55 @@ export class ContentNews extends ConfigurableEntity {
 
   @Column({ default: false })
   isFeatured: boolean;
+}
+
+@Entity('company_feed_posts')
+export class CompanyFeedPost {
+  @PrimaryGeneratedColumn('uuid') id: string;
+  @Column('text', { nullable: true }) content?: string;
+  @Column({ default: 'company' }) audience: 'company' | 'department' | 'branch';
+  @Column({ type: 'simple-json', nullable: true }) departmentIds?: string[];
+  @Column({ type: 'simple-json', nullable: true }) branchIds?: string[];
+  @Column({ type: 'simple-json', nullable: true }) imageUrls?: string[];
+  @Column() authorId: string;
+  @Column() authorName: string;
+  @Column({ nullable: true }) authorAvatarUrl?: string;
+  @Column({ default: false }) isArchived: boolean;
+  @CreateDateColumn() createdAt: Date;
+  @UpdateDateColumn() updatedAt: Date;
+}
+
+@Entity('company_feed_comments')
+export class CompanyFeedComment {
+  @PrimaryGeneratedColumn('uuid') id: string;
+  @Column() postId: string;
+  @Column({ nullable: true }) parentId?: string;
+  @Column('text') content: string;
+  @Column() authorId: string;
+  @Column() authorName: string;
+  @Column({ nullable: true }) authorAvatarUrl?: string;
+  @Column({ nullable: true }) replyToName?: string;
+  @Column({ default: false }) isArchived: boolean;
+  @CreateDateColumn() createdAt: Date;
+  @UpdateDateColumn() updatedAt: Date;
+}
+
+@Entity('company_feed_comment_likes')
+@Index(['commentId', 'userId'], { unique: true })
+export class CompanyFeedCommentLike {
+  @PrimaryGeneratedColumn('uuid') id: string;
+  @Column() commentId: string;
+  @Column() userId: string;
+  @CreateDateColumn() createdAt: Date;
+}
+
+@Entity('company_feed_likes')
+@Index(['postId', 'userId'], { unique: true })
+export class CompanyFeedLike {
+  @PrimaryGeneratedColumn('uuid') id: string;
+  @Column() postId: string;
+  @Column() userId: string;
+  @CreateDateColumn() createdAt: Date;
 }
 
 @Entity('stock_batches')
@@ -3245,6 +3294,10 @@ export const ENTITIES = [
   CustomFieldValue,
   ContentPost,
   ContentNews,
+  CompanyFeedPost,
+  CompanyFeedComment,
+  CompanyFeedLike,
+  CompanyFeedCommentLike,
   ViewSetting,
   PrintTemplate,
   LandingPage,

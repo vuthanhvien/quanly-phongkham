@@ -101,7 +101,19 @@ function applyDefaultTabs(fieldsByResource: Record<string, FieldSpec[]>) {
   return Object.fromEntries(
     Object.entries(fieldsByResource).map(([resource, fields]) => [
       resource,
-      fields.map((field) => ({ ...field, tab: field.tab || defaultFieldTabs[resource]?.[field.key] })),
+      [
+        ...fields,
+        // Every record model carries this ownership key through ConfigurableEntity.
+        // Keep it in the shared catalogue so forms persist it as a base field,
+        // rather than silently placing it in customFields.
+        ...(fields.some((field) => field.key === 'picId') ? [] : [{
+          key: 'picId',
+          label: 'Người phụ trách (PIC)',
+          tab: 'Phân quyền',
+          width: '50' as const,
+          tableWidth: 220,
+        }]),
+      ].map((field) => ({ ...field, tab: field.tab || defaultFieldTabs[resource]?.[field.key] })),
     ]),
   ) as Record<string, FieldSpec[]>;
 }
@@ -394,6 +406,7 @@ export const relationFields: Record<string, RelationSpec> = {
   doctorStaffId: { resource: 'staff', labelFields: ['code', 'fullName'], params: { type: 'DOCTOR' }, lookupKey: 'staff-doctor' },
   picStaffId: { resource: 'staff', labelFields: ['code', 'fullName'], params: { type: 'STAFF' }, lookupKey: 'staff-staff' },
   performerStaffId: { resource: 'staff', labelFields: ['code', 'fullName'] },
+  picId: { resource: 'staff', labelFields: ['code', 'fullName'] },
   userId: { resource: 'user-accounts', labelFields: ['email'] },
   convertedCustomerId: { resource: 'customers', labelFields: ['code', 'fullName'] },
   approvedById: { resource: 'staff', labelFields: ['code', 'fullName'] },

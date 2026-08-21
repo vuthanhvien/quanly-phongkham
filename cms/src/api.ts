@@ -100,7 +100,7 @@ api.interceptors.request.use((config) => {
   // DELETE endpoints in the CMS are soft-archive operations in most modules,
   // but some screens do not own a local confirmation dialog. Keep this guard
   // at the HTTP boundary so none of them can execute accidentally.
-  if ((config.method || '').toLowerCase() === 'delete' && typeof window !== 'undefined') {
+  if ((config.method || '').toLowerCase() === 'delete' && typeof window !== 'undefined' && config.headers?.['X-Delete-Confirmed'] !== 'true') {
     const confirmed = window.confirm('Bạn có chắc muốn xóa hoặc lưu trữ mục này không?')
     if (!confirmed) throw new axios.CanceledError('Delete cancelled by user', undefined, config)
   }

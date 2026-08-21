@@ -238,35 +238,146 @@ class _StaffShellState extends State<StaffShell> {
       Appointments(onProfile: profile),
       const WorkSchedule(),
     ];
-    return Scaffold(
-      body: SafeArea(child: pages[tab]),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: tab,
-        onDestinationSelected: (v) => setState(() => tab = v),
-        indicatorColor: const Color(0xFFBDEBFA),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Tổng quan',
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final desktop = constraints.maxWidth >= 1024;
+        final selectedPage = desktop && tab == 0
+            ? DesktopDashboard(
+                checkedIn: checkedIn,
+                onCheckIn: () => setState(() => checkedIn++),
+                onProfile: profile,
+              )
+            : pages[tab];
+        final content = desktop
+            ? Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1160),
+                  child: selectedPage,
+                ),
+              )
+            : selectedPage;
+        if (!desktop) {
+          return Scaffold(
+            body: SafeArea(child: content),
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: tab,
+              onDestinationSelected: (v) => setState(() => tab = v),
+              indicatorColor: const Color(0xFFBDEBFA),
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home),
+                  label: 'Tổng quan',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.add_box_outlined),
+                  selectedIcon: Icon(Icons.add_box),
+                  label: 'Check-in',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.calendar_month_outlined),
+                  selectedIcon: Icon(Icons.calendar_month),
+                  label: 'Lịch hẹn',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.badge_outlined),
+                  selectedIcon: Icon(Icons.badge),
+                  label: 'Ca làm',
+                ),
+              ],
+            ),
+          );
+        }
+        return Scaffold(
+          body: SafeArea(
+            child: Row(
+              children: [
+                NavigationRail(
+                  selectedIndex: tab,
+                  onDestinationSelected: (v) => setState(() => tab = v),
+                  backgroundColor: navy,
+                  indicatorColor: const Color(0xFF31BCE0),
+                  selectedIconTheme: const IconThemeData(color: navy),
+                  selectedLabelTextStyle: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  unselectedIconTheme: const IconThemeData(
+                    color: Color(0xFFB7CADB),
+                  ),
+                  unselectedLabelTextStyle: const TextStyle(
+                    color: Color(0xFFB7CADB),
+                  ),
+                  leading: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 18, 14, 28),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: blue,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.add,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Staff App',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  trailing: const Padding(
+                    padding: EdgeInsets.only(bottom: 16),
+                    child: CircleAvatar(
+                      backgroundColor: Color(0xFFDFF1F8),
+                      foregroundColor: blue,
+                      child: Text(
+                        'MA',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                  labelType: NavigationRailLabelType.all,
+                  destinations: const [
+                    NavigationRailDestination(
+                      icon: Icon(Icons.home_outlined),
+                      selectedIcon: Icon(Icons.home),
+                      label: Text('Tổng quan'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.add_box_outlined),
+                      selectedIcon: Icon(Icons.add_box),
+                      label: Text('Check-in'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.calendar_month_outlined),
+                      selectedIcon: Icon(Icons.calendar_month),
+                      label: Text('Lịch hẹn'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.badge_outlined),
+                      selectedIcon: Icon(Icons.badge),
+                      label: Text('Ca làm'),
+                    ),
+                  ],
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: content),
+              ],
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.add_box_outlined),
-            selectedIcon: Icon(Icons.add_box),
-            label: 'Check-in',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: 'Lịch hẹn',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.badge_outlined),
-            selectedIcon: Icon(Icons.badge),
-            label: 'Ca làm',
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -352,6 +463,219 @@ class Dashboard extends StatelessWidget {
       ...patients
           .take(3)
           .map((p) => AppointmentCard(patient: p, onTap: () => onProfile(p))),
+    ],
+  );
+}
+
+class DesktopDashboard extends StatelessWidget {
+  const DesktopDashboard({
+    super.key,
+    required this.checkedIn,
+    required this.onCheckIn,
+    required this.onProfile,
+  });
+  final int checkedIn;
+  final VoidCallback onCheckIn;
+  final ValueChanged<Patient> onProfile;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.all(36),
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Ca trực',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: navy,
+                ),
+              ),
+              SizedBox(height: 5),
+              Text(
+                'Thứ Ba · 20 tháng 8 · Phòng khám 01',
+                style: TextStyle(color: Color(0xFF66839A)),
+              ),
+            ],
+          ),
+          OutlinedButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.file_download_outlined),
+            label: const Text('Xuất báo cáo'),
+          ),
+        ],
+      ),
+      const SizedBox(height: 28),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 7,
+            child: Column(
+              children: [
+                CheckInHero(checkedIn: checkedIn, onCheckIn: onCheckIn),
+                const SizedBox(height: 16),
+                const Row(
+                  children: [
+                    Expanded(
+                      child: Metric(
+                        label: 'Lịch hẹn',
+                        value: '69%',
+                        hint: 'đã hoàn thành',
+                        ring: true,
+                      ),
+                    ),
+                    SizedBox(width: 14),
+                    Expanded(
+                      child: Metric(
+                        label: 'Chờ xử lý',
+                        value: '06',
+                        hint: 'hồ sơ cần gọi',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 26),
+                const SectionHeader('Dòng lịch hẹn', 'Mở lịch đầy đủ'),
+                const SizedBox(height: 10),
+                ...patients.map(
+                  (p) => AppointmentCard(patient: p, onTap: () => onProfile(p)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+          Expanded(flex: 4, child: _DesktopSidePanel(checkedIn: checkedIn)),
+        ],
+      ),
+    ],
+  );
+}
+
+class _DesktopSidePanel extends StatelessWidget {
+  const _DesktopSidePanel({required this.checkedIn});
+  final int checkedIn;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: navy,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'CA HIỆN TẠI',
+              style: TextStyle(
+                color: Color(0xFFBDEBFA),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            SizedBox(height: 7),
+            Text(
+              '08:00 — 17:00',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 23,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(height: 5),
+            Text(
+              'Quầy tiếp đón · Phòng khám 01',
+              style: TextStyle(color: Color(0xFFB7CADB), fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tổng quan ca',
+              style: TextStyle(
+                color: navy,
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+              ),
+            ),
+            const SizedBox(height: 18),
+            _ProgressLine(
+              label: 'Đã check-in',
+              value: '$checkedIn / 26',
+              progress: checkedIn / 26,
+            ),
+            const SizedBox(height: 16),
+            const _ProgressLine(
+              label: 'Đã khám',
+              value: '12 / 26',
+              progress: 12 / 26,
+            ),
+            const SizedBox(height: 16),
+            const _ProgressLine(label: 'Đúng giờ', value: '92%', progress: .92),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+class _ProgressLine extends StatelessWidget {
+  const _ProgressLine({
+    required this.label,
+    required this.value,
+    required this.progress,
+  });
+  final String label, value;
+  final double progress;
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Color(0xFF66839A), fontSize: 12),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: navy,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 7),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: LinearProgressIndicator(
+          value: progress,
+          minHeight: 8,
+          color: const Color(0xFF1AA5C8),
+          backgroundColor: const Color(0xFFE0EDF4),
+        ),
+      ),
     ],
   );
 }

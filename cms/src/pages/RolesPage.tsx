@@ -57,10 +57,7 @@ const ROLE_MAIN_LABEL: Record<string, string> = {
 }
 
 const ROLE_PERMISSION_ACTIONS = [
-  { key: "view", label: "Xem" },
-  { key: "create", label: "Thêm" },
   { key: "update", label: "Sửa" },
-  { key: "delete", label: "Xoá" },
   { key: "clone", label: "Clone" },
   { key: "duplicate", label: "Duplicate" },
   { key: "print", label: "In" },
@@ -68,9 +65,12 @@ const ROLE_PERMISSION_ACTIONS = [
 
 const DATA_SCOPE_PERMISSIONS = [
   { key: "viewAll", label: "Xem tất cả", action: "view" },
-  { key: "viewPersonal", label: "Xem cá nhân", action: "view" },
   { key: "createAll", label: "Tạo tất cả", action: "create" },
+  { key: "deleteAll", label: "Xoá tất cả", action: "delete" },
+  // Keep the three personal scopes together at the end of the matrix.
+  { key: "viewPersonal", label: "Xem cá nhân", action: "view" },
   { key: "createPersonal", label: "Tạo cá nhân", action: "create" },
+  { key: "deletePersonal", label: "Xoá cá nhân", action: "delete" },
 ] as const
 
 type DataScopePermission = Record<(typeof DATA_SCOPE_PERMISSIONS)[number]["key"], boolean>
@@ -80,6 +80,8 @@ const DEFAULT_DATA_SCOPE_PERMISSION: DataScopePermission = {
   viewPersonal: false,
   createAll: true,
   createPersonal: false,
+  deleteAll: true,
+  deletePersonal: false,
 }
 
 export function RolesPage() {
@@ -367,10 +369,29 @@ export function RolesPage() {
   }
 
   function updateDataScope(modules: string[], key: keyof DataScopePermission, checked: boolean) {
-    setDataScopeDraft((current) => ({ ...current, ...Object.fromEntries(modules.map((module) => [
-      module,
-      { ...(current[module] || getDataScopePermission(module)), [key]: checked },
-    ])) }))
+    setDataScopeDraft((current) => ({ ...current, ...Object.fromEntries(modules.map((module) => {
+      const next = { ...(current[module] || getDataScopePermission(module)), [key]: checked }
+      // These choices describe mutually exclusive scopes. Without this, a
+      // checked “cá nhân” alongside “tất cả” would still grant all-record access.
+      if (checked && key === "viewAll") next.viewPersonal = false
+      if (checked && key === "viewPersonal") next.viewAll = false
+      if (checked && key === "createAll") next.createPersonal = false
+      if (checked && key === "createPersonal") next.createAll = false
+      if (checked && key === "deleteAll") next.deletePersonal = false
+      if (checked && key === "deletePersonal") next.deleteAll = false
+      return [module, next]
+    })) }))
+  }
+
+  function getScopeAllowedActions(module: string, dataScope: DataScopePermission) {
+    const scopeActions = [
+      ...(dataScope.viewAll || dataScope.viewPersonal ? ["view"] : []),
+      ...(dataScope.createAll || dataScope.createPersonal ? ["create"] : []),
+      ...(dataScope.deleteAll || dataScope.deletePersonal ? ["delete"] : []),
+    ]
+    const retained = getAllowedActions(module).filter((action) => !["view", "create", "delete"].includes(action))
+    if (!scopeActions.includes("create")) return [...retained.filter((action) => action !== "duplicate"), ...scopeActions]
+    return Array.from(new Set([...retained, ...scopeActions]))
   }
 
   async function saveDataScope() {
@@ -380,18 +401,18 @@ export function RolesPage() {
     try {
       await api.put("/settings/views/bulk", { views: Object.entries(dataScopeDraft).map(([module, dataScope]) => {
         const existing = views.find((view) => view.entityType === module && view.viewType === "ACTION" && view.role === role)
-        return { entityType: module, viewType: "ACTION", role, config: { ...existing?.config, dataScope } }
+        return { entityType: module, viewType: "ACTION", role, config: { ...existing?.config, dataScope, allowedActions: getScopeAllowedActions(module, dataScope) } }
       }) })
       setViews((current) => {
         const next = current.map((view) => {
           const dataScope = dataScopeDraft[view.entityType]
           return view.viewType === "ACTION" && view.role === role && dataScope
-            ? { ...view, config: { ...view.config, dataScope } }
+            ? { ...view, config: { ...view.config, dataScope, allowedActions: getScopeAllowedActions(view.entityType, dataScope) } }
             : view
         })
         Object.entries(dataScopeDraft).forEach(([module, dataScope]) => {
           if (!next.some((view) => view.entityType === module && view.viewType === "ACTION" && view.role === role)) {
-            next.push({ entityType: module, viewType: "ACTION", role, config: { dataScope } })
+            next.push({ entityType: module, viewType: "ACTION", role, config: { dataScope, allowedActions: getScopeAllowedActions(module, dataScope) } })
           }
         })
         return next
@@ -652,11 +673,10 @@ export function RolesPage() {
                           const checkedCount = row.modules.filter((module) => getDataScopePermission(module)[scope.key]).length
                           const checked = checkedCount === row.modules.length
                           const modulesEnabled = row.modules.every((module) => selectedModules.includes(module))
-                          const actionAllowed = row.modules.every((module) => getAllowedActions(module).includes(scope.action))
                           return <Checkbox
                             checked={checked}
                             indeterminate={checkedCount > 0 && !checked}
-                            disabled={!modulesEnabled || !actionAllowed}
+                            disabled={!modulesEnabled}
                             onChange={(event) => updateDataScope(row.modules, scope.key, event.target.checked)}
                           />
                         },

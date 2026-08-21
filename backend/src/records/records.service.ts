@@ -334,6 +334,7 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   performerStaffId: 'staff',
   approvedById: 'staff',
   reviewerId: 'staff',
+  picId: 'staff',
   customerId: 'customers',
   convertedCustomerId: 'customers',
   leadId: 'leads',
@@ -773,7 +774,7 @@ export class RecordsService {
       }
       const [rows, total] = await repository.findAndCount({
         where: !dataScope.viewAll && dataScope.viewPersonal
-          ? { ...(includeArchived ? {} : { isArchived }), picId: user?.id }
+          ? { ...(includeArchived ? {} : { isArchived }), picId: user?.staffId }
           : includeArchived ? {} : { isArchived },
         order: { [sortField]: orderDirection },
       });
@@ -1288,6 +1289,7 @@ export class RecordsService {
   async remove (resource: string, id: string, user: AuthUser) {
     const record = await this.findStored(resource, id);
     await this.assertDataViewScope(user, resource, record);
+    await this.assertDataDeleteScope(user, resource, record);
     this.assertRecordIsNotProtected(resource, record);
     if (resource === 'user-accounts' && this.isSystemAdminAccount(record as User)) {
       throw new ForbiddenException('Không thể xóa tài khoản admin-system');
@@ -1488,7 +1490,8 @@ export class RecordsService {
   }
 
   private async listBundleRows (resource: string, user?: AuthUser) {
-    const where = this.applyBranchScope(resource, {}, user) as FindOptionsWhere<ConfigurableEntity>;
+    let where = this.applyBranchScope(resource, {}, user) as FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[];
+    where = await this.applyDataViewScope(resource, where, user);
     return this.repository(resource).find({
       where,
       order: { createdAt: 'ASC' },
@@ -1498,11 +1501,12 @@ export class RecordsService {
 
   private async listRelatedBundleRows (sheetConfig: ImportBundleSheetConfig, parentIds: string[], user?: AuthUser) {
     if (parentIds.length === 0 || !sheetConfig.parentField) return [];
-    const scopedWhere = this.applyBranchScope(
+    let scopedWhere = this.applyBranchScope(
       sheetConfig.resource,
       { [sheetConfig.parentField]: In(parentIds) } as FindOptionsWhere<ConfigurableEntity>,
       user,
-    ) as FindOptionsWhere<ConfigurableEntity>;
+    ) as FindOptionsWhere<ConfigurableEntity> | FindOptionsWhere<ConfigurableEntity>[];
+    scopedWhere = await this.applyDataViewScope(sheetConfig.resource, scopedWhere, user);
     return this.repository(sheetConfig.resource).find({
       where: scopedWhere,
       order: { createdAt: 'ASC' },
@@ -4882,7 +4886,7 @@ export class RecordsService {
   }
 
   private async resolveDataScope (resource: string, user?: AuthUser) {
-    const defaults = { viewAll: true, viewPersonal: false, createAll: true, createPersonal: false };
+    const defaults = { viewAll: true, viewPersonal: false, createAll: true, createPersonal: false, deleteAll: true, deletePersonal: false };
     if (!user) return defaults;
     const roleChain = buildRoleChain(user.activeRole || user.role, user.roleMain || user.role);
     const views = await this.viewSettings.find({ where: { entityType: resource } });
@@ -4892,7 +4896,22 @@ export class RecordsService {
         .map((view) => view.config?.dataScope)
         .find((value) => value && typeof value === 'object');
       if (scope && typeof scope === 'object') {
-        return { ...defaults, ...(scope as Record<string, boolean>) };
+        const configured = scope as Record<string, boolean>;
+        // Accept older role settings that only saved the “cá nhân” flag.
+        // A personal scope must not inherit the permissive “tất cả” default.
+        return {
+          ...defaults,
+          ...configured,
+          viewAll: typeof configured.viewAll === 'boolean'
+            ? configured.viewAll
+            : configured.viewPersonal ? false : defaults.viewAll,
+          createAll: typeof configured.createAll === 'boolean'
+            ? configured.createAll
+            : configured.createPersonal ? false : defaults.createAll,
+          deleteAll: typeof configured.deleteAll === 'boolean'
+            ? configured.deleteAll
+            : configured.deletePersonal ? false : defaults.deleteAll,
+        };
       }
     }
     return defaults;
@@ -4905,8 +4924,9 @@ export class RecordsService {
   ) {
     const scope = await this.resolveDataScope(resource, user);
     if (scope.viewAll) return where;
-    if (scope.viewPersonal && user?.id) {
-      return this.mergeWhere(where, { picId: user.id } as FindOptionsWhere<ConfigurableEntity>);
+    const picIds = this.personalPicIds(user);
+    if (scope.viewPersonal && picIds.length) {
+      return this.mergeWhere(where, { picId: In(picIds) } as FindOptionsWhere<ConfigurableEntity>);
     }
     throw new ForbiddenException('Bạn không có quyền xem dữ liệu trong phạm vi này');
   }
@@ -4914,19 +4934,39 @@ export class RecordsService {
   private async assertDataViewScope (user: AuthUser | undefined, resource: string, record: Record<string, unknown>) {
     const scope = await this.resolveDataScope(resource, user);
     if (scope.viewAll) return;
-    if (scope.viewPersonal && user?.id && String(record.picId || '') === user.id) return;
+    if (scope.viewPersonal && this.personalPicIds(user).includes(String(record.picId || ''))) return;
     throw new ForbiddenException('Bạn không có quyền truy cập dữ liệu này');
   }
 
   private async applyCreateDataScope (user: AuthUser, resource: string, payload: Record<string, unknown>) {
     const scope = await this.resolveDataScope(resource, user);
+    const picId = this.currentEmployeePicId(user);
+    if (!picId) throw new ForbiddenException('Tài khoản chưa liên kết với nhân viên để xác định PIC');
     if (scope.createAll) {
-      return { ...payload, picId: payload.picId || user.id };
+      return { ...payload, picId: payload.picId || picId };
     }
     if (scope.createPersonal) {
-      return { ...payload, picId: user.id };
+      return { ...payload, picId };
     }
     throw new ForbiddenException('Bạn không có quyền tạo dữ liệu trong phạm vi này');
+  }
+
+  private async assertDataDeleteScope (user: AuthUser | undefined, resource: string, record: Record<string, unknown>) {
+    const scope = await this.resolveDataScope(resource, user);
+    if (scope.deleteAll) return;
+    if (this.personalPicIds(user).includes(String(record.picId || ''))) return;
+    throw new ForbiddenException(scope.deletePersonal
+      ? 'Role hiện tại chỉ được xoá dữ liệu do chính mình phụ trách'
+      : 'Bạn không có quyền xoá dữ liệu trong phạm vi này');
+  }
+
+  private personalPicIds (user?: AuthUser) {
+    const picId = this.currentEmployeePicId(user);
+    return picId ? [picId] : [];
+  }
+
+  private currentEmployeePicId (user?: AuthUser) {
+    return user?.staffId ? String(user.staffId) : undefined;
   }
 
   private allowedBranches (user: AuthUser | undefined) {
