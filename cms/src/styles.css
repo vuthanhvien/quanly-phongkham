@@ -2443,6 +2443,14 @@ body {
   row-gap: 4px;
 }
 
+/* Keep photo fields compact in record details so a single avatar cannot
+   increase its grid row and throw the neighbouring fields out of alignment. */
+.detail-item-content .record-avatar {
+  width: 40px !important;
+  height: 40px !important;
+  line-height: 40px !important;
+}
+
 .detail-item-label {
   color: var(--app-text-soft);
   font-size: 11px;

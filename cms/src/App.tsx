@@ -274,7 +274,7 @@ export function App() {
       >
         <AntdApp>
           <ToastBridge />
-          <Refine dataProvider={dataProvider} authProvider={authProvider} routerProvider={routerProvider} resources={resources}>
+          <Refine dataProvider={dataProvider} authProvider={authProvider} routerProvider={routerProvider} resources={resources} options={{ syncWithLocation: true }}>
           <BrowserPageTitle />
           <Routes>
             <Route path="/login" element={<LoginPage />} />

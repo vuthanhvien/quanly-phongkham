@@ -171,7 +171,7 @@ export const authProvider: AuthProvider = {
 
 export const dataProvider: DataProvider = {
   getApiUrl: () => API_URL,
-  getList: async ({ resource, pagination, filters }) => {
+  getList: async ({ resource, pagination, filters, sorters }) => {
     const current = (pagination as { current?: number })?.current || 1;
     const pageSize = (pagination as { pageSize?: number })?.pageSize || 20;
     const logicalFilters = (filters || []).filter(isLogicalFilter);
@@ -187,12 +187,15 @@ export const dataProvider: DataProvider = {
         )
         .map((filter) => [filter.field, filter.value]),
     );
+    const activeSorter = sorters?.[0];
     const response = await api.get(`/records/${resource}`, {
       params: {
         page: current,
         pageSize,
         include: '*',
         search: search && 'value' in search ? search.value : undefined,
+        sort: activeSorter?.field,
+        order: activeSorter?.order,
         ...requestFilters,
       },
     });
