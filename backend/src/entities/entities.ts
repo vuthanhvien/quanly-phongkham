@@ -1147,6 +1147,7 @@ export class CompanyFeedPost {
   @Column() authorId: string;
   @Column() authorName: string;
   @Column({ nullable: true }) authorAvatarUrl?: string;
+  @Column('simple-json', { nullable: true }) linkPreview?: { url: string; title: string; description?: string; imageUrl?: string; hostname?: string };
   @Column({ default: false }) isArchived: boolean;
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;

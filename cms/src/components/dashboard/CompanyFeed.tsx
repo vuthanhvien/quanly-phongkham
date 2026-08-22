@@ -13,12 +13,13 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { api, resolveFileUrl } from "../../api"
 import { hasActionAccess } from "../../access"
-import { FeedTinyMceEditor } from "../PrintTinyMceEditor"
+import { FeedMarkdownEditor } from "../FeedMarkdownEditor"
 
 type Audience = "company" | "department" | "branch"
 type FeedFilter = "all" | Audience
 type Comment = { id: string; authorId: string; authorName: string; authorAvatarUrl?: string; content: string; createdAt: string; replyToName?: string; likes?: number; liked?: boolean; replies?: Comment[] }
-type FeedPost = { id: string; authorId: string; authorName: string; authorAvatarUrl?: string; audience: Audience; departmentIds?: string[]; branchIds?: string[]; createdAt: string; content?: string; imageUrls?: string[]; likes: number; liked?: boolean; comments: Comment[] }
+type LinkPreview = { url: string; title: string; description?: string; imageUrl?: string; hostname?: string }
+type FeedPost = { id: string; authorId: string; authorName: string; authorAvatarUrl?: string; audience: Audience; departmentIds?: string[]; branchIds?: string[]; createdAt: string; content?: string; imageUrls?: string[]; linkPreview?: LinkPreview; likes: number; liked?: boolean; comments: Comment[] }
 
 const audienceLabels: Record<Audience, string> = { company: "Toàn công ty", department: "Phòng ban", branch: "Chi nhánh" }
 const feedFilterItems: Array<{ key: FeedFilter; label: string }> = [
@@ -42,19 +43,51 @@ export function CompanyFeed({ currentUser = "Bạn", currentUserId }: { currentU
   const [branches, setBranches] = useState<Array<{ value: string; label: string }>>([])
   const [departmentIds, setDepartmentIds] = useState<string[]>([])
   const [branchIds, setBranchIds] = useState<string[]>([])
+  const [linkPreview, setLinkPreview] = useState<LinkPreview | undefined>()
 
   const imageUrls = useMemo(() => files.map((file) => file.thumbUrl || (file.originFileObj ? URL.createObjectURL(file.originFileObj) : "")).filter(Boolean), [files])
 
-  useEffect(() => { void loadFeed(); }, [feedFilter])
-  useEffect(() => { void Promise.all([api.get('/records/departments', { params: { pageSize: 500 } }), api.get('/records/branches', { params: { pageSize: 500 } })]).then(([dept, branch]) => { setDepartments((dept.data.data || []).map((item: any) => ({ value: item.id, label: item.name || item.code }))); setBranches((branch.data.data || []).map((item: any) => ({ value: item.id, label: item.name || item.slug }))) }).catch(() => undefined) }, [])
+  useEffect(() => {
+    let disposed = false
+    let retryTimer: number | undefined
 
-  async function loadFeed() { try { const response = await api.get('/feed', { params: feedFilter === "all" ? undefined : { audience: feedFilter } }); setPosts(response.data.data || []) } catch { message.error('Không thể tải Feed') } }
+    void loadFeed(true).then((loaded) => {
+      if (!loaded && !disposed) retryTimer = window.setTimeout(() => void loadFeed(), 1200)
+    })
+
+    return () => {
+      disposed = true
+      if (retryTimer) window.clearTimeout(retryTimer)
+    }
+  }, [feedFilter])
+  useEffect(() => { void Promise.all([api.get('/records/departments', { params: { pageSize: 500 } }), api.get('/records/branches', { params: { pageSize: 500 } })]).then(([dept, branch]) => { setDepartments((dept.data.data || []).map((item: any) => ({ value: item.id, label: item.name || item.code }))); setBranches((branch.data.data || []).map((item: any) => ({ value: item.id, label: item.name || item.slug }))) }).catch(() => undefined) }, [])
+  useEffect(() => {
+    const url = firstFeedUrl(content)
+    if (!url) { setLinkPreview(undefined); return }
+    let disposed = false
+    const timer = window.setTimeout(() => {
+      void api.get('/feed/link-preview', { params: { url } }).then((response) => { if (!disposed) setLinkPreview(response.data.data) }).catch(() => { if (!disposed) setLinkPreview(undefined) })
+    }, 500)
+    return () => { disposed = true; window.clearTimeout(timer) }
+  }, [content])
+
+  async function loadFeed(silent = false) {
+    try {
+      const response = await api.get('/feed', { params: feedFilter === "all" ? undefined : { audience: feedFilter } })
+      setPosts(response.data.data || [])
+      return true
+    } catch {
+      if (!silent) message.error('Không thể tải Feed')
+      return false
+    }
+  }
   async function publish() {
     if (!canCreate) return message.error("Bạn không có quyền đăng bài lên Feed")
     if (!content.trim() && imageUrls.length === 0) return
+    if (content.length > 5000) return message.warning("Nội dung bài viết tối đa 5.000 ký tự")
     if (audience === 'department' && !departmentIds.length) return message.warning('Chọn ít nhất một phòng ban')
     if (audience === 'branch' && !branchIds.length) return message.warning('Chọn ít nhất một chi nhánh')
-    try { const formData = new FormData(); files.forEach((file) => file.originFileObj && formData.append('files', file.originFileObj)); const upload = files.length ? await api.post('/feed/images', formData) : null; await api.post('/feed', { content: content.trim(), audience, departmentIds, branchIds, imageUrls: upload?.data?.data || [] }); setContent(""); setFiles([]); setDepartmentIds([]); setBranchIds([]); await loadFeed(); message.success("Bài viết đã được đăng lên Feed") } catch { message.error('Không thể đăng bài') }
+    try { const formData = new FormData(); files.forEach((file) => file.originFileObj && formData.append('files', file.originFileObj)); const upload = files.length ? await api.post('/feed/images', formData) : null; await api.post('/feed', { content: content.trim(), audience, departmentIds, branchIds, imageUrls: upload?.data?.data || [], linkPreview }); setContent(""); setFiles([]); setLinkPreview(undefined); setDepartmentIds([]); setBranchIds([]); await loadFeed(); message.success("Bài viết đã được đăng lên Feed") } catch { message.error('Không thể đăng bài') }
   }
 
   async function toggleLike(id: string) {
@@ -84,9 +117,10 @@ export function CompanyFeed({ currentUser = "Bạn", currentUserId }: { currentU
 
   return <section className="company-feed">
     <Card className="feed-composer" bordered={false}>
-      <div className="feed-composer__main"><Avatar className="feed-avatar feed-avatar--self">{currentUser.slice(0, 2).toUpperCase()}</Avatar><FeedTinyMceEditor value={content} onChange={setContent} /></div>
+      <div className="feed-composer__main"><Avatar className="feed-avatar feed-avatar--self">{currentUser.slice(0, 2).toUpperCase()}</Avatar><FeedMarkdownEditor disabled={!canCreate} value={content} onChange={setContent} /></div>
+      {linkPreview ? <FeedLinkPreview preview={linkPreview} /> : null}
       {files.length ? <FeedGallery className="feed-image-preview" images={imageUrls} /> : null}
-      <div className="feed-composer__actions"><Space wrap><Upload accept="image/*" beforeUpload={() => false} disabled={!canCreate} fileList={files} maxCount={30} multiple showUploadList={false} onChange={({ fileList }) => setFiles(fileList)}><Button disabled={!canCreate} icon={<PictureOutlined />} type="text">Ảnh / album</Button></Upload><Select disabled={!canCreate} className="feed-audience" value={audience} options={(Object.keys(audienceLabels) as Audience[]).map((value) => ({ value, label: audienceLabels[value] }))} onChange={(value) => { setAudience(value); setDepartmentIds([]); setBranchIds([]) }} />{audience === 'department' ? <Select disabled={!canCreate} className="feed-scope-select" mode="multiple" placeholder="Chọn phòng ban" options={departments} value={departmentIds} onChange={setDepartmentIds} /> : null}{audience === 'branch' ? <Select disabled={!canCreate} className="feed-scope-select" mode="multiple" placeholder="Chọn chi nhánh" options={branches} value={branchIds} onChange={setBranchIds} /> : null}</Space><Button disabled={!canCreate || (!content.trim() && !files.length)} icon={<SendOutlined />} type="primary" onClick={() => void publish()}>Đăng bài</Button></div>
+      <div className="feed-composer__actions"><Space wrap><Upload accept="image/*" beforeUpload={() => false} disabled={!canCreate} fileList={files} maxCount={30} multiple showUploadList={false} onChange={({ fileList }) => setFiles(fileList)}><Button disabled={!canCreate} icon={<PictureOutlined />} type="text">Ảnh / album</Button></Upload><Select disabled={!canCreate} className="feed-audience" value={audience} options={(Object.keys(audienceLabels) as Audience[]).map((value) => ({ value, label: audienceLabels[value] }))} onChange={(value) => { setAudience(value); setDepartmentIds([]); setBranchIds([]) }} />{audience === 'department' ? <Select disabled={!canCreate} className="feed-scope-select" mode="multiple" placeholder="Chọn phòng ban" options={departments} value={departmentIds} onChange={setDepartmentIds} /> : null}{audience === 'branch' ? <Select disabled={!canCreate} className="feed-scope-select" mode="multiple" placeholder="Chọn chi nhánh" options={branches} value={branchIds} onChange={setBranchIds} /> : null}</Space><Button disabled={!canCreate || content.length > 5000 || (!content.trim() && !files.length)} icon={<SendOutlined />} type="primary" onClick={() => void publish()}>Đăng bài</Button></div>
     </Card>
     <Tabs
       className="feed-filter-tabs"
@@ -98,7 +132,8 @@ export function CompanyFeed({ currentUser = "Bạn", currentUserId }: { currentU
     <div className="feed-stream">
       {posts.map((post) => <Card className="feed-post" key={post.id} bordered={false}>
         <div className="feed-post__head"><Avatar className="feed-avatar" src={post.authorAvatarUrl ? resolveFileUrl(post.authorAvatarUrl) : undefined}>{post.authorName.slice(0, 2).toUpperCase()}</Avatar><div><Typography.Text strong>{post.authorName}</Typography.Text><Typography.Text className="feed-post__meta">{new Date(post.createdAt).toLocaleString('vi-VN')} · <Tag>{audienceLabels[post.audience]}</Tag></Typography.Text></div>{post.authorId === currentUserId && canDelete ? <Popconfirm title="Xóa bài viết này?" okText="Xóa" cancelText="Hủy" onConfirm={() => void removePost(post.id)}><Button className="feed-delete" danger size="small" type="text">Xóa</Button></Popconfirm> : null}</div>
-        {post.content ? <div className="feed-post__text feed-rich-content"><FeedContent content={post.content} /></div> : null}
+        {post.content ? <FeedPostContent content={post.content} /> : null}
+        {post.linkPreview ? <FeedLinkPreview preview={post.linkPreview} /> : null}
         {post.imageUrls?.length ? <FeedGallery className="feed-album" images={post.imageUrls.map((src) => src.startsWith('/') ? resolveFileUrl(src) : src)} /> : null}
         <div className="feed-post__counts"><span>{post.likes ? `${post.likes} lượt thích` : "Hãy là người đầu tiên thích"}</span><span>{post.comments.length ? `${post.comments.length} bình luận` : ""}</span></div>
         <div className="feed-post__actions"><Button disabled={!canCreate} icon={post.liked ? <LikeFilled /> : <LikeOutlined />} type="text" className={post.liked ? "is-liked" : ""} onClick={() => toggleLike(post.id)}>Thích</Button><Button disabled={!canCreate} icon={<CommentOutlined />} type="text" onClick={() => openComment(post.id)}>Bình luận</Button></div>
@@ -118,29 +153,32 @@ function MarkdownContent({ content }: { content: string }) {
 }
 
 function FeedContent({ content }: { content: string }) {
-  if (!/<\/?[a-z][\s\S]*>/i.test(content)) return <MarkdownContent content={content} />
-  return <div dangerouslySetInnerHTML={{ __html: sanitizeFeedHtml(content) }} />
+  return <MarkdownContent content={content} />
 }
 
-function sanitizeFeedHtml(value: string) {
-  const allowedTags = new Set(["P", "BR", "STRONG", "B", "EM", "I", "U", "S", "H1", "H2", "H3", "UL", "OL", "LI", "BLOCKQUOTE", "A"])
-  const document = new DOMParser().parseFromString(value, "text/html")
-  document.body.querySelectorAll("*").forEach((element) => {
-    if (!allowedTags.has(element.tagName)) {
-      element.replaceWith(...Array.from(element.childNodes))
-      return
-    }
-    const href = element.tagName === "A" ? element.getAttribute("href") || "" : ""
-    Array.from(element.attributes).forEach((attribute) => element.removeAttribute(attribute.name))
-    if (element.tagName === "A") {
-      if (/^(https?:|mailto:|tel:)/i.test(href)) {
-        element.setAttribute("href", href)
-        element.setAttribute("rel", "noopener noreferrer")
-        element.setAttribute("target", "_blank")
-      } else element.removeAttribute("href")
-    }
-  })
-  return document.body.innerHTML
+const FEED_PREVIEW_LENGTH = 700
+
+function FeedPostContent({ content }: { content: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const canCollapse = content.length > FEED_PREVIEW_LENGTH
+
+  return <div className="feed-post__text feed-rich-content">
+    <div className={canCollapse && !expanded ? "feed-post__content feed-post__content--collapsed" : "feed-post__content"}>
+      <FeedContent content={content} />
+    </div>
+    {canCollapse ? <Button className="feed-post__read-more" type="link" onClick={() => setExpanded((value) => !value)}>{expanded ? "Thu gọn" : "Xem thêm"}</Button> : null}
+  </div>
+}
+
+function FeedLinkPreview({ preview }: { preview: LinkPreview }) {
+  return <a className="feed-link-preview" href={preview.url} target="_blank" rel="noopener noreferrer">
+    {preview.imageUrl ? <img alt="" src={preview.imageUrl} /> : null}
+    <span className="feed-link-preview__body"><span className="feed-link-preview__host">{preview.hostname || new URL(preview.url).hostname}</span><strong>{preview.title}</strong>{preview.description ? <span>{preview.description}</span> : null}<small>{preview.url}</small></span>
+  </a>
+}
+
+function firstFeedUrl(value: string) {
+  return value.match(/https?:\/\/[^\s<>\])}"']+/i)?.[0]
 }
 
 function FeedGallery({ images, className }: { images: string[]; className: string }) {

@@ -4,10 +4,12 @@ import { In, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { extname, join } from 'path';
+import { lookup } from 'dns/promises';
 import { AuthUser } from '../common/auth';
 import { CompanyFeedComment, CompanyFeedCommentLike, CompanyFeedLike, CompanyFeedPost, Staff, User } from '../entities/entities';
 
 type Audience = 'company' | 'department' | 'branch';
+type LinkPreview = { url: string; title: string; description?: string; imageUrl?: string; hostname?: string };
 const validAudience = new Set<Audience>(['company', 'department', 'branch']);
 const textIds = (value: unknown) => Array.isArray(value) ? Array.from(new Set(value.map(String).filter(Boolean))) : [];
 const FEED_RESOURCE = 'company-feed';
@@ -50,7 +52,19 @@ export class FeedService {
     if (audience === 'department' && !departmentIds.length) throw new BadRequestException('Chọn ít nhất một phòng ban');
     if (audience === 'branch' && !branchIds.length) throw new BadRequestException('Chọn ít nhất một chi nhánh');
     const account = await this.users.findOneBy({ id: user.id });
-    return { data: await this.posts.save(this.posts.create({ content, audience, departmentIds: audience === 'department' ? departmentIds : [], branchIds: audience === 'branch' ? branchIds : [], imageUrls, authorId: user.id, authorName: user.fullName, authorAvatarUrl: account?.avatarUrl })) };
+    return { data: await this.posts.save(this.posts.create({ content, audience, departmentIds: audience === 'department' ? departmentIds : [], branchIds: audience === 'branch' ? branchIds : [], imageUrls, linkPreview: this.normalizeLinkPreview(input.linkPreview), authorId: user.id, authorName: user.fullName, authorAvatarUrl: account?.avatarUrl })) };
+  }
+
+  async previewLink(value: string, user: AuthUser) {
+    this.assertPermission(user, 'view');
+    const url = await this.safePreviewUrl(value);
+    const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(6000), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ClinicFeedPreview/1.0)' } });
+    if (!response.ok || !response.headers.get('content-type')?.includes('text/html')) throw new BadRequestException('Không thể lấy thông tin liên kết');
+    const html = (await response.text()).slice(0, 750_000);
+    const title = this.htmlMeta(html, ['og:title', 'twitter:title']) || this.htmlTitle(html) || new URL(url).hostname;
+    const description = this.htmlMeta(html, ['og:description', 'twitter:description', 'description']);
+    const imageUrl = this.absoluteUrl(this.htmlMeta(html, ['og:image', 'twitter:image']), url);
+    return { data: { url, title: title.slice(0, 240), description: description?.slice(0, 360), imageUrl, hostname: new URL(url).hostname } satisfies LinkPreview };
   }
 
   async uploadImages(files: any[], user: AuthUser) {
@@ -116,6 +130,13 @@ export class FeedService {
     if (Array.isArray(allowedActions) && !allowedActions.includes(action)) throw new ForbiddenException('Role hiện tại không được thực hiện thao tác này trên Feed');
   }
   private canView(post: CompanyFeedPost, viewer: { departmentId?: string; branchId?: string }) { return post.audience === 'company' || (post.audience === 'department' && !!viewer.departmentId && (post.departmentIds || []).includes(viewer.departmentId)) || (post.audience === 'branch' && !!viewer.branchId && (post.branchIds || []).includes(viewer.branchId)); }
+  private normalizeLinkPreview(value: unknown): LinkPreview | undefined { if (!value || typeof value !== 'object') return undefined; const input = value as Record<string, unknown>; const url = String(input.url || '').trim(); const title = String(input.title || '').trim(); if (!/^https?:\/\//i.test(url) || !title) return undefined; return { url: url.slice(0, 2048), title: title.slice(0, 240), description: String(input.description || '').trim().slice(0, 360) || undefined, imageUrl: /^https?:\/\//i.test(String(input.imageUrl || '')) ? String(input.imageUrl).slice(0, 2048) : undefined, hostname: String(input.hostname || '').trim().slice(0, 255) || undefined }; }
+  private async safePreviewUrl(value: string) { let url: URL; try { url = new URL(value); } catch { throw new BadRequestException('Liên kết không hợp lệ'); } if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || this.isPrivateHost(url.hostname)) throw new BadRequestException('Liên kết không được hỗ trợ'); try { const addresses = await lookup(url.hostname, { all: true }); if (!addresses.length || addresses.some((entry) => this.isPrivateHost(entry.address))) throw new Error('private address'); } catch { throw new BadRequestException('Liên kết không được hỗ trợ'); } return url.toString(); }
+  private isPrivateHost(hostname: string) { const host = hostname.toLowerCase(); return host === 'localhost' || host.endsWith('.local') || host === '::1' || /^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host); }
+  private htmlMeta(html: string, names: string[]) { for (const tag of html.match(/<meta\b[^>]*>/gi) || []) { const key = /(?:property|name)=["']([^"']+)["']/i.exec(tag)?.[1]?.toLowerCase(); const content = /content=["']([^"']+)["']/i.exec(tag)?.[1]; if (key && content && names.includes(key)) return this.decodeHtml(content); } return undefined; }
+  private htmlTitle(html: string) { const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1]; return match ? this.decodeHtml(match.replace(/<[^>]+>/g, '').trim()) : undefined; }
+  private decodeHtml(value: string) { return value.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>'); }
+  private absoluteUrl(value: string | undefined, base: string) { if (!value) return undefined; try { const url = new URL(value, base); return ['http:', 'https:'].includes(url.protocol) ? url.toString() : undefined; } catch { return undefined; } }
   private async requireVisible(postId: string, user: AuthUser) { const post = await this.posts.findOneBy({ id: postId, isArchived: false }); if (!post) throw new NotFoundException('Không tìm thấy bài viết'); if (!this.canView(post, await this.viewerProfile(user))) throw new ForbiddenException('Bạn không có quyền xem bài viết này'); return post; }
   private commentTree(rows: CompanyFeedComment[], likes: Map<string, CompanyFeedCommentLike[]>, userId: string) { const decorate = (row: CompanyFeedComment) => ({ ...row, likes: (likes.get(row.id) || []).length, liked: (likes.get(row.id) || []).some((like) => like.userId === userId) }); const replies = new Map<string, CompanyFeedComment[]>(); rows.filter((row) => row.parentId).forEach((row) => replies.set(row.parentId!, [...(replies.get(row.parentId!) || []), row])); return rows.filter((row) => !row.parentId).map((row) => ({ ...decorate(row), replies: (replies.get(row.id) || []).map(decorate) })); }
 }

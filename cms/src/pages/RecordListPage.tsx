@@ -93,6 +93,11 @@ function isSavedTableTab(value: unknown): value is SavedTableTab {
   return typeof tab.key === "string" && typeof tab.label === "string" && Array.isArray(tab.filters)
 }
 
+function positiveSearchParam(value: string | null, fallback: number) {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
 export function RecordListPage() {
   const screens = Grid.useBreakpoint()
   const { resource = "customers" } = useParams()
@@ -113,8 +118,9 @@ export function RecordListPage() {
   const [tableTabForm] = Form.useForm<SavedTableTab>()
   const tableTabFilters = Form.useWatch("filters", tableTabForm) || []
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(50)
+  const [currentPage, setCurrentPage] = useState(() => positiveSearchParam(searchParams.get("page"), 1))
+  const [pageSize, setPageSize] = useState(() => positiveSearchParam(searchParams.get("pageSize"), 50))
+  const applyingPaginationFromUrl = useRef(false)
   const [sortField, setSortField] = useState(() => searchParams.get("sort") || "")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => searchParams.get("order") === "asc" ? "asc" : "desc")
   const [displayFields, setDisplayFields] = useState<FieldLayoutConfig[]>([])
@@ -178,6 +184,27 @@ export function RecordListPage() {
   const canShowRecordActions = ["view", "update", "delete", "clone", "print", "board", "convert-to-customer", "generate-accounting-voucher", "post", "unpost"]
     .some((action) => hasActionAccess(resource, action))
   const canManageSelectedRecords = hasActionAccess(resource, "delete") || hasActionAccess(resource, "duplicate")
+  useEffect(() => {
+    const pageFromUrl = positiveSearchParam(searchParams.get("page"), 1)
+    const pageSizeFromUrl = positiveSearchParam(searchParams.get("pageSize"), 50)
+    if (pageFromUrl !== currentPage || pageSizeFromUrl !== pageSize) {
+      applyingPaginationFromUrl.current = true
+      setCurrentPage(pageFromUrl)
+      setPageSize(pageSizeFromUrl)
+    }
+  }, [searchParams])
+  useEffect(() => {
+    if (applyingPaginationFromUrl.current) {
+      applyingPaginationFromUrl.current = false
+      return
+    }
+    const nextParams = new URLSearchParams(searchParams)
+    if (currentPage > 1) nextParams.set("page", String(currentPage))
+    else nextParams.delete("page")
+    if (pageSize !== 50) nextParams.set("pageSize", String(pageSize))
+    else nextParams.delete("pageSize")
+    if (nextParams.toString() !== searchParams.toString()) setSearchParams(nextParams, { replace: true })
+  }, [currentPage, pageSize, searchParams, setSearchParams])
   useEffect(() => {
     const onDataRefresh = (event: Event) => {
       const targetResource = (event as CustomEvent<CmsDataRefreshDetail>).detail?.resource

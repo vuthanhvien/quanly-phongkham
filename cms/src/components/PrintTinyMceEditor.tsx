@@ -8,7 +8,6 @@ interface PrintTinyMceEditorProps {
   variables?: TemplateVariableOption[]
   repeatCollections?: Array<{ key: string; label: string }>
   pageWidth?: "A4" | "88mm" | "58mm"
-  variant?: "print" | "feed"
 }
 
 function repeatTableCaption(collection: string) {
@@ -110,40 +109,35 @@ function registerClassNameButton(editor: TinyMceEditor) {
   })
 }
 
-export function PrintTinyMceEditor({ value, onChange, variables = [], repeatCollections = [], pageWidth = "A4", variant = "print" }: PrintTinyMceEditorProps) {
+export function PrintTinyMceEditor({ value, onChange, variables = [], repeatCollections = [], pageWidth = "A4" }: PrintTinyMceEditorProps) {
   const pageWidthValue = pageWidth === "58mm" ? "58mm" : pageWidth === "88mm" ? "88mm" : "210mm"
-  const isFeedEditor = variant === "feed"
   return (
-    <div className={isFeedEditor ? "feed-tinymce-editor" : "print-tinymce-editor"}>
+    <div className="print-tinymce-editor">
       <Editor
-        key={`${variant}-editor-${pageWidth}`}
+        key={`print-editor-${pageWidth}`}
         licenseKey="gpl"
         tinymceScriptSrc="/tinymce/tinymce.min.js"
         value={value || ""}
         onEditorChange={(nextValue) => onChange?.(nextValue)}
         init={{
-          height: isFeedEditor ? 300 : 900,
-          menubar: isFeedEditor ? false : "file edit view insert format tools table help",
-          plugins: isFeedEditor ? "advlist autolink link lists" : "advlist anchor autolink charmap code fullscreen help image insertdatetime link lists media nonbreaking pagebreak preview searchreplace table visualblocks visualchars wordcount",
-          toolbar: isFeedEditor ? "undo redo | blocks | bold italic underline | bullist numlist | link | removeformat" : "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media | table printlayout tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow tableinsertcolbefore tableinsertcolafter tabledeletecol | printvariable printrepeat cssclass | pagebreak charmap | removeformat code preview fullscreen",
+          height: 900,
+          menubar: "file edit view insert format tools table help",
+          plugins: "advlist anchor autolink charmap code fullscreen help image insertdatetime link lists media nonbreaking pagebreak preview searchreplace table visualblocks visualchars wordcount",
+          toolbar: "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media | table printlayout tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow tableinsertcolbefore tableinsertcolafter tabledeletecol | printvariable printrepeat cssclass | pagebreak charmap | removeformat code preview fullscreen",
           toolbar_mode: "wrap",
           branding: false,
           promotion: false,
           resize: true,
           statusbar: true,
-          image_title: !isFeedEditor,
-          automatic_uploads: !isFeedEditor,
+          image_title: true,
+          automatic_uploads: true,
           images_upload_handler: async (blobInfo) => imageAsDataUrl(blobInfo.blob()),
-          table_advtab: !isFeedEditor,
+          table_advtab: true,
           table_sizing_mode: "responsive",
           table_default_attributes: { border: "1" },
           table_default_styles: { "border-collapse": "collapse", width: "100%" },
-          valid_elements: isFeedEditor ? "p,br,strong/b,em/i,u,s,h1,h2,h3,ul,ol,li,blockquote,a[href|target|rel]" : undefined,
-          content_style: isFeedEditor
-            ? "body { box-sizing:border-box; color:#1f2937; font-family:inherit; font-size:14px; line-height:1.6; margin:0; padding:12px; } p:first-child,h1:first-child,h2:first-child,h3:first-child { margin-top:0; } p:last-child,ul:last-child,ol:last-child,blockquote:last-child { margin-bottom:0; } blockquote { border-left:3px solid #d1d5db; color:#4b5563; margin:12px 0; padding-left:12px; }"
-            : `body { --print-page-width:${pageWidthValue}; background:#e9edf1; box-sizing:border-box; color:#111827; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:1.55; margin:0; min-height:calc(100vh - 64px); padding:32px 0; position:relative; } body::before { background:#fff; box-shadow:0 3px 16px rgba(15,23,42,.14); content:""; inset:32px auto 32px 50%; min-height:297mm; position:absolute; transform:translateX(-50%); width:var(--print-page-width); z-index:0; } body > * { box-sizing:border-box; margin-left:auto; margin-right:auto; max-width:var(--print-page-width); padding-left:${pageWidth === "A4" ? "14mm" : "3mm"}; padding-right:${pageWidth === "A4" ? "14mm" : "3mm"}; position:relative; z-index:1; } body > table { margin-left:auto !important; margin-right:auto !important; } table { border-collapse:collapse; width:100%; } td,th { border:1px solid #d1d5db; min-width:1em; padding:8px; vertical-align:top; } th { background:#f3f4f6; } .print-layout-grid td { border:1px dashed #cbd5e1 !important; } .print-repeat-marker { caption-side:top; background:#eef7ef; border:1px solid #b9ddbe; border-bottom:0; border-radius:5px 5px 0 0; color:#296233; font-size:11px; font-weight:600; letter-spacing:.01em; padding:4px 8px; text-align:left; } .text-center { text-align:center; } .text-right { text-align:right; } .no-border td,.no-border th { border:0; } .signature { margin-top:48px; text-align:center; }`,
+          content_style: `body { --print-page-width:${pageWidthValue}; background:#e9edf1; box-sizing:border-box; color:#111827; font-family:Arial,Helvetica,sans-serif; font-size:14px; line-height:1.55; margin:0; min-height:calc(100vh - 64px); padding:32px 0; position:relative; } body::before { background:#fff; box-shadow:0 3px 16px rgba(15,23,42,.14); content:""; inset:32px auto 32px 50%; min-height:297mm; position:absolute; transform:translateX(-50%); width:var(--print-page-width); z-index:0; } body > * { box-sizing:border-box; margin-left:auto; margin-right:auto; max-width:var(--print-page-width); padding-left:${pageWidth === "A4" ? "14mm" : "3mm"}; padding-right:${pageWidth === "A4" ? "14mm" : "3mm"}; position:relative; z-index:1; } body > table { margin-left:auto !important; margin-right:auto !important; } table { border-collapse:collapse; width:100%; } td,th { border:1px solid #d1d5db; min-width:1em; padding:8px; vertical-align:top; } th { background:#f3f4f6; } .print-layout-grid td { border:1px dashed #cbd5e1 !important; } .print-repeat-marker { caption-side:top; background:#eef7ef; border:1px solid #b9ddbe; border-bottom:0; border-radius:5px 5px 0 0; color:#296233; font-size:11px; font-weight:600; letter-spacing:.01em; padding:4px 8px; text-align:left; } .text-center { text-align:center; } .text-right { text-align:right; } .no-border td,.no-border th { border:0; } .signature { margin-top:48px; text-align:center; }`,
           setup: (editor) => {
-            if (isFeedEditor) return
             registerClassNameButton(editor)
             editor.ui.registry.addMenuButton("printvariable", {
               text: "Chèn biến",
@@ -181,8 +175,4 @@ export function PrintTinyMceEditor({ value, onChange, variables = [], repeatColl
       />
     </div>
   )
-}
-
-export function FeedTinyMceEditor({ value, onChange }: Pick<PrintTinyMceEditorProps, "value" | "onChange">) {
-  return <PrintTinyMceEditor value={value} onChange={onChange} variant="feed" />
 }
