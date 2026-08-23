@@ -656,8 +656,10 @@ export class Product extends ConfigurableEntity {
   @Column({ default: 'CONSUMABLE' })
   productType: string;
 
-  @Column({ nullable: true })
-  category?: string;
+  // Keep the existing physical column name for installed tenant databases,
+  // while exposing the relationship consistently as `categoryId` in the API.
+  @Column({ name: 'category', nullable: true })
+  categoryId?: string;
 
   @Column({ nullable: true })
   baseUnitId?: string;

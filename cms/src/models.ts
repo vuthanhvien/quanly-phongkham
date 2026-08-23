@@ -693,7 +693,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'name', label: 'Tên sản phẩm', required: true, width: '66', tableWidth: 240 },
     { key: 'barcode', label: 'Mã vạch', width: '50', tableWidth: 180 },
     { key: 'productType', label: 'Loại', type: 'select', options: [{ value: 'CONSUMABLE', label: 'Vật tư tiêu hao' }, { value: 'REUSABLE', label: 'Thiết bị tái dùng' }, { value: 'RETAIL', label: 'Sản phẩm bán lẻ' }, { value: 'SERVICE', label: 'Dịch vụ' }, { value: 'COMBO', label: 'Combo / Gói dịch vụ' }], width: '33', tableWidth: 150 },
-    { key: 'category', label: 'Ngành / nhóm / loại', type: 'select', width: '50', tableWidth: 180 },
+    { key: 'categoryId', label: 'Ngành / nhóm / loại', type: 'select', width: '50', tableWidth: 180 },
     { key: 'baseUnitId', label: 'Đơn vị cơ sở', required: true, width: '33', tableWidth: 160 },
     { key: 'sellingPrice', label: 'Giá bán', type: 'number', width: '33', tableWidth: 150 },
     { key: 'minStockLevel', label: 'Tồn tối thiểu', type: 'number', width: '33', tableWidth: 150 },

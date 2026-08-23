@@ -1,4 +1,4 @@
-import { useDelete, useTable } from "@refinedev/core"
+import { useDelete, useList } from "@refinedev/core"
 import {
   AppstoreOutlined,
   AuditOutlined,
@@ -93,6 +93,11 @@ function isSavedTableTab(value: unknown): value is SavedTableTab {
   return typeof tab.key === "string" && typeof tab.label === "string" && Array.isArray(tab.filters)
 }
 
+function positiveSearchParam(value: string | null, fallback: number) {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
 export function RecordListPage() {
   const screens = Grid.useBreakpoint()
   const { resource = "customers" } = useParams()
@@ -113,6 +118,11 @@ export function RecordListPage() {
   const [tableTabForm] = Form.useForm<SavedTableTab>()
   const tableTabFilters = Form.useWatch("filters", tableTabForm) || []
   const [detailRefreshKey, setDetailRefreshKey] = useState(0)
+  const [currentPage, setCurrentPage] = useState(() => positiveSearchParam(searchParams.get("page"), 1))
+  const [pageSize, setPageSize] = useState(() => positiveSearchParam(searchParams.get("pageSize"), 50))
+  const applyingPaginationFromUrl = useRef(false)
+  const [sortField, setSortField] = useState(() => searchParams.get("sort") || "")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => searchParams.get("order") === "asc" ? "asc" : "desc")
   const [displayFields, setDisplayFields] = useState<FieldLayoutConfig[]>([])
   const [passwordProtectedFieldKeys, setPasswordProtectedFieldKeys] = useState<Set<string>>(new Set())
   const [protectedFieldTarget, setProtectedFieldTarget] = useState<ProtectedFieldRevealTarget | null>(null)
@@ -147,29 +157,24 @@ export function RecordListPage() {
     ]
     return filters.length > 0 ? JSON.stringify(filters) : ""
   }, [advancedFilters, selectedTableTab])
-  const table = useTable({
+  const query = useList({
     resource,
-    pagination: { pageSize: 50 },
-    filters: {
-      permanent: [
-        { field: "search", operator: "contains" as const, value: search },
-        ...((advancedSearch || selectedTableTab) && advancedFilterPayload ? [{ field: "advanced", operator: "eq" as const, value: advancedFilterPayload }] : []),
-        { field: "isArchived", operator: "eq" as const, value: recordStatus === "archived" },
-        ...(resource === "appointments" && doctorFilter ? [{ field: "doctorStaffId", operator: "eq" as const, value: doctorFilter }] : []),
-      ],
-    },
-    syncWithLocation: true,
-  })
-  const { currentPage, pageSize, setCurrentPage, setPageSize, setSorters } = table
-  const activeSorter = table.sorters[0]
-  const sortField = activeSorter?.field || ""
-  const sortOrder: "asc" | "desc" = activeSorter?.order === "asc" ? "asc" : "desc"
-  const rows = table.result.data
-  const total = table.result.total || 0
-  const loading = table.tableQuery.isLoading
+    pagination: { currentPage, pageSize },
+    filters: [
+      { field: "search", operator: "contains" as const, value: search },
+      ...((advancedSearch || selectedTableTab) && advancedFilterPayload ? [{ field: "advanced", operator: "eq" as const, value: advancedFilterPayload }] : []),
+      { field: "isArchived", operator: "eq" as const, value: recordStatus === "archived" },
+      ...(sortField ? [{ field: "sort", operator: "eq" as const, value: sortField }, { field: "order", operator: "eq" as const, value: sortOrder }] : []),
+      ...(resource === "appointments" && doctorFilter ? [{ field: "doctorStaffId", operator: "eq" as const, value: doctorFilter }] : []),
+    ],
+  }) as any
+  const response = query.query?.data || query.data?.data || query.result
+  const rows = response?.data || []
+  const total = response?.total || 0
+  const loading = query.query?.isLoading || query.isLoading
   const detailId = searchParams.get("detail")
   const { mutate: deleteRecord } = useDelete()
-  const refresh = () => table.tableQuery.refetch()
+  const refresh = () => query.query?.refetch?.() || query.refetch?.()
   const refreshData = () => {
     void refresh()
     if (detailId) setDetailRefreshKey((value) => value + 1)
@@ -180,6 +185,27 @@ export function RecordListPage() {
     .some((action) => hasActionAccess(resource, action))
   const canManageSelectedRecords = hasActionAccess(resource, "delete") || hasActionAccess(resource, "duplicate")
   useEffect(() => {
+    const pageFromUrl = positiveSearchParam(searchParams.get("page"), 1)
+    const pageSizeFromUrl = positiveSearchParam(searchParams.get("pageSize"), 50)
+    if (pageFromUrl !== currentPage || pageSizeFromUrl !== pageSize) {
+      applyingPaginationFromUrl.current = true
+      setCurrentPage(pageFromUrl)
+      setPageSize(pageSizeFromUrl)
+    }
+  }, [searchParams])
+  useEffect(() => {
+    if (applyingPaginationFromUrl.current) {
+      applyingPaginationFromUrl.current = false
+      return
+    }
+    const nextParams = new URLSearchParams(searchParams)
+    if (currentPage > 1) nextParams.set("page", String(currentPage))
+    else nextParams.delete("page")
+    if (pageSize !== 50) nextParams.set("pageSize", String(pageSize))
+    else nextParams.delete("pageSize")
+    if (nextParams.toString() !== searchParams.toString()) setSearchParams(nextParams, { replace: true })
+  }, [currentPage, pageSize, searchParams, setSearchParams])
+  useEffect(() => {
     const onDataRefresh = (event: Event) => {
       const targetResource = (event as CustomEvent<CmsDataRefreshDetail>).detail?.resource
       if (targetResource && targetResource !== resource) return
@@ -187,7 +213,7 @@ export function RecordListPage() {
     }
     window.addEventListener(CMS_DATA_REFRESH_EVENT, onDataRefresh)
     return () => window.removeEventListener(CMS_DATA_REFRESH_EVENT, onDataRefresh)
-  }, [resource, detailId, table.tableQuery])
+  }, [resource, detailId, query])
   const tableRows = useMemo(
     () => resource === "units" ? buildUnitTree(rows as Record<string, any>[]) : rows,
     [resource, rows],
@@ -240,7 +266,24 @@ export function RecordListPage() {
       return
     }
     api.get("/product-categories")
-      .then((response) => setProductCategoryNames(Object.fromEntries((response.data?.data || []).map((row: Record<string, unknown>) => [String(row.id), String(row.name || row.code || row.id)]))))
+      .then((response) => {
+        const categories = (response.data?.data || []) as Array<Record<string, unknown>>
+        const categoriesById = new Map(categories.map((category) => [String(category.id), category]))
+        const getCategoryPath = (category: Record<string, unknown>) => {
+          const names = [String(category.name || category.code || category.id)]
+          const seen = new Set([String(category.id)])
+          let parentId = category.parentId ? String(category.parentId) : ""
+          while (parentId && !seen.has(parentId)) {
+            seen.add(parentId)
+            const parent = categoriesById.get(parentId)
+            if (!parent) break
+            names.unshift(String(parent.name || parent.code || parent.id))
+            parentId = parent.parentId ? String(parent.parentId) : ""
+          }
+          return names.filter(Boolean).join(" / ")
+        }
+        setProductCategoryNames(Object.fromEntries(categories.map((category) => [String(category.id), getCategoryPath(category)])))
+      })
       .catch(() => setProductCategoryNames({}))
   }, [resource])
 
@@ -259,7 +302,10 @@ export function RecordListPage() {
 
   function renderAdvancedFilter(field: FieldLayoutConfig) {
     const current = advancedFilters[field.key] || { operator: defaultAdvancedOperator(field) }
-    const selectOptions = (field.options || []).map(normalizeSelectOption)
+    const isProductCategory = resource === "products" && field.key === "categoryId"
+    const selectOptions = isProductCategory
+      ? Object.entries(productCategoryNames).map(([value, label]) => ({ value, label }))
+      : (field.options || []).map(normalizeSelectOption)
     const isOptionField = (field.type === "select" || field.type === "multi-select") && selectOptions.length > 0
     const isRelation = Boolean(getRelationSpec(field))
 
@@ -383,8 +429,19 @@ export function RecordListPage() {
 
   function updateTableSort(field?: string, order?: "ascend" | "descend" | null) {
     const nextField = field && order ? field : ""
-    setSorters(nextField ? [{ field: nextField, order: order === "ascend" ? "asc" : "desc" }] : [])
+    const nextOrder: "asc" | "desc" = order === "ascend" ? "asc" : "desc"
+    setSortField(nextField)
+    setSortOrder(nextOrder)
     setCurrentPage(1)
+    const nextParams = new URLSearchParams(searchParams)
+    if (!nextField) {
+      nextParams.delete("sort")
+      nextParams.delete("order")
+    } else {
+      nextParams.set("sort", nextField)
+      nextParams.set("order", nextOrder)
+    }
+    setSearchParams(nextParams, { replace: true })
   }
 
   async function saveTableTab(values: SavedTableTab) {
@@ -461,8 +518,11 @@ export function RecordListPage() {
             <Space size={4} wrap>
               {resource === "projects" && field.key === "memberStaffIds"
               ? <ProjectMemberAvatars memberIds={resolveRecordFieldValue(row, field)} lookups={lookups} />
-              : resource === "products" && field.key === "category"
-              ? (productCategoryNames[String(resolveRecordFieldValue(row, field) || "")] || "—")
+              : resource === "products" && field.key === "categoryId"
+              ? (() => {
+                const categoryValue = resolveRecordFieldValue(row, field)
+                return productCategoryNames[String(categoryValue || "")] || String(categoryValue || "—")
+              })()
               : <RecordValueView
               compact
               field={field}
@@ -887,7 +947,10 @@ export function RecordListPage() {
               setPageSize(nextPageSize)
             },
           }}
-          onChange={(_pagination, _filters, sorter) => {
+          onChange={(_pagination, _filters, sorter, extra) => {
+            // Ant Design also fires Table.onChange after a pagination click.
+            // Do not reset the page unless the user actually changed sorting.
+            if (extra.action !== "sort") return
             const currentSorter = Array.isArray(sorter) ? sorter[0] : sorter
             updateTableSort(String(currentSorter?.field || "") || undefined, currentSorter?.order)
           }}
@@ -942,9 +1005,12 @@ export function RecordListPage() {
                 const filter = tableTabFilters[field.name] || {}
                 const selectedField = displayFields.find((item) => item.key === filter.field)
                 const relation = selectedField ? getRelationSpec(selectedField) : undefined
+                const isProductCategory = resource === "products" && selectedField?.key === "categoryId"
                 const isOptionField = Boolean(selectedField && (selectedField.type === "select" || selectedField.type === "multi-select") && selectedField.options?.length)
-                const isListValue = isOptionField || Boolean(relation)
-                const valueOptions = isOptionField
+                const isListValue = isOptionField || Boolean(relation) || isProductCategory
+                const valueOptions = isProductCategory
+                  ? Object.entries(productCategoryNames).map(([value, label]) => ({ value, label }))
+                  : isOptionField
                   ? (selectedField?.options || []).map(normalizeSelectOption)
                   : relation ? Object.entries(lookups[relation.lookupKey || relation.resource] || {}).map(([value, label]) => ({ value, label })) : []
                 const noValueNeeded = ["is_empty", "is_present"].includes(String(filter.operator || ""))

@@ -110,7 +110,7 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
     }
     return categories
       .filter((category) => category.isActive)
-      .map((category) => ({ value: getPath(category), label: getPath(category) }))
+      .map((category) => ({ value: category.id, label: getPath(category) }))
       .sort((left, right) => left.label.localeCompare(right.label, "vi"))
   }, [categories])
   const rows = normalizeBundleItems(bundleItems).map((item, index) => ({ ...item, key: index, index }))
@@ -138,7 +138,7 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
         <Form.Item label="Tên sản phẩm" name="name" rules={[{ required: true, message: "Nhập tên sản phẩm" }]}><Input /></Form.Item>
         <Form.Item label="Mã vạch" name="barcode"><Input /></Form.Item>
         <Form.Item label="Loại" name="productType"><Select options={[{ value: "CONSUMABLE", label: "Vật tư tiêu hao" }, { value: "REUSABLE", label: "Thiết bị tái dùng" }, { value: "RETAIL", label: "Sản phẩm bán lẻ" }, { value: "SERVICE", label: "Dịch vụ" }, { value: "COMBO", label: "Combo / Gói dịch vụ" }]} /></Form.Item>
-        <Form.Item label="Ngành / nhóm / loại" name="category">
+        <Form.Item label="Ngành / nhóm / loại" name="categoryId">
           <Select
             allowClear
             getPopupContainer={() => document.body}

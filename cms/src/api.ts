@@ -172,7 +172,11 @@ export const authProvider: AuthProvider = {
 export const dataProvider: DataProvider = {
   getApiUrl: () => API_URL,
   getList: async ({ resource, pagination, filters, sorters }) => {
-    const current = (pagination as { current?: number })?.current || 1;
+    // Refine's core hooks pass `currentPage`; keep `current` as a fallback
+    // for custom callers using the older Ant Design-shaped pagination object.
+    const current = (pagination as { currentPage?: number; current?: number })?.currentPage
+      || (pagination as { current?: number })?.current
+      || 1;
     const pageSize = (pagination as { pageSize?: number })?.pageSize || 20;
     const logicalFilters = (filters || []).filter(isLogicalFilter);
     const search = logicalFilters.find((filter) => filter.field === 'search');

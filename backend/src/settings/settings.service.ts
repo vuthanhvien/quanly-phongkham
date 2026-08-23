@@ -1010,7 +1010,7 @@ export class SettingsService {
         name,
         productType,
         baseUnitId: unit.baseUnitId ? unitsByName.get('Cái')?.id : unit.id,
-        category: category.id,
+        categoryId: category.id,
         sellingPrice: 0,
         minStockLevel: 0,
       }));

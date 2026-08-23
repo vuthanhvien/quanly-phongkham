@@ -39,6 +39,7 @@ import {
   FileFolder,
   ManagedFile,
   Invoice,
+  ItemCategory,
   Lead,
   LeadActivity,
   LeaveAllocation,
@@ -464,6 +465,7 @@ export class RecordsService {
     @InjectRepository(LeadActivity) private readonly leadActivities: Repository<LeadActivity>,
     @InjectRepository(Supplier) private readonly suppliers: Repository<Supplier>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
+    @InjectRepository(ItemCategory) private readonly itemCategories: Repository<ItemCategory>,
     @InjectRepository(ProductVariant) private readonly productVariants: Repository<ProductVariant>,
     @InjectRepository(Unit) private readonly units: Repository<Unit>,
     @InjectRepository(ServiceOrderItem) private readonly serviceOrderItems: Repository<ServiceOrderItem>,
@@ -858,6 +860,9 @@ export class RecordsService {
       rows = result[0];
       total = result[1];
     }
+    if (resource === 'products') {
+      await this.migrateLegacyProductCategoryIds(rows as Product[]);
+    }
     let hydrated = await this.hydrateCustomFields(resource, rows);
     hydrated = await this.attachRelationObjects(hydrated, include, request);
     if (resource === 'user-accounts') {
@@ -877,6 +882,7 @@ export class RecordsService {
 
   async findRaw (resource: string, id: string, include?: string, request?: RequestContext) {
     const record = await this.findStored(resource, id);
+    if (resource === 'products') await this.migrateLegacyProductCategoryIds([record as Product]);
     let [hydrated] = await this.hydrateCustomFields(resource, [record]);
     [hydrated] = await this.attachRelationObjects([hydrated], include, request);
     if (resource === 'staff') {
@@ -4239,6 +4245,11 @@ export class RecordsService {
     if (resource !== 'user-accounts') {
       const value = await this.normalize(resource, payload, creating);
       if (resource === 'products') {
+        // `categoryId` is the API contract. Accept the old key only while
+        // clients are rolling out, then resolve legacy path text to its ID.
+        if (value.categoryId === undefined && value.category !== undefined) value.categoryId = value.category;
+        delete value.category;
+        await this.normalizeProductCategoryId(value);
         await this.normalizeProductBaseUnit(value);
         await this.normalizeProductBundle(value, String(payload.id || ''));
       }
@@ -4281,6 +4292,71 @@ export class RecordsService {
       throw new BadRequestException('Tên đăng nhập hoặc email tài khoản là bắt buộc');
     }
     return value;
+  }
+
+  private async normalizeProductCategoryId(value: Record<string, unknown>) {
+    if (value.categoryId === undefined || value.categoryId === null || value.categoryId === '') return;
+    const submitted = String(value.categoryId).trim();
+    if (!submitted) {
+      value.categoryId = undefined;
+      return;
+    }
+    const categories = await this.itemCategories.find({ where: { isArchived: false } });
+    const categoryById = new Map(categories.map((category) => [category.id, category]));
+    if (categoryById.has(submitted)) {
+      value.categoryId = submitted;
+      return;
+    }
+    const categoryPath = (category: ItemCategory) => {
+      const names = [category.name];
+      const seen = new Set([category.id]);
+      let parentId = category.parentId;
+      while (parentId && !seen.has(parentId)) {
+        seen.add(parentId);
+        const parent = categoryById.get(parentId);
+        if (!parent) break;
+        names.unshift(parent.name);
+        parentId = parent.parentId;
+      }
+      return names.filter(Boolean).join(' / ');
+    };
+    const matched = categories.find((category) => categoryPath(category) === submitted);
+    if (!matched) throw new BadRequestException('Ngành / nhóm / loại không hợp lệ');
+    value.categoryId = matched.id;
+  }
+
+  /** Convert only the legacy category-path values that are currently read.
+   * This makes deployments safe for existing tenant data without a blocking
+   * full-table migration. New and edited products always write the UUID. */
+  private async migrateLegacyProductCategoryIds(products: Product[]) {
+    const legacyProducts = products.filter((product) => {
+      const value = String(product.categoryId || '').trim();
+      return value.includes(' / ');
+    });
+    if (legacyProducts.length === 0) return;
+    const categories = await this.itemCategories.find({ where: { isArchived: false } });
+    const categoryById = new Map(categories.map((category) => [category.id, category]));
+    const categoryPath = (category: ItemCategory) => {
+      const names = [category.name];
+      const seen = new Set([category.id]);
+      let parentId = category.parentId;
+      while (parentId && !seen.has(parentId)) {
+        seen.add(parentId);
+        const parent = categoryById.get(parentId);
+        if (!parent) break;
+        names.unshift(parent.name);
+        parentId = parent.parentId;
+      }
+      return names.filter(Boolean).join(' / ');
+    };
+    const categoryIdByPath = new Map(categories.map((category) => [categoryPath(category), category.id]));
+    const changed = legacyProducts.filter((product) => {
+      const categoryId = categoryIdByPath.get(String(product.categoryId).trim());
+      if (!categoryId) return false;
+      product.categoryId = categoryId;
+      return true;
+    });
+    if (changed.length > 0) await this.products.save(changed);
   }
 
   private async validateAccountingResource (resource: string, value: Record<string, unknown>, creating: boolean) {
@@ -4941,12 +5017,13 @@ export class RecordsService {
   private async applyCreateDataScope (user: AuthUser, resource: string, payload: Record<string, unknown>) {
     const scope = await this.resolveDataScope(resource, user);
     const picId = this.currentEmployeePicId(user);
-    if (!picId) throw new ForbiddenException('Tài khoản chưa liên kết với nhân viên để xác định PIC');
     if (scope.createAll) {
-      return { ...payload, picId: payload.picId || picId };
+      return { ...payload, picId: payload.picId || picId || undefined };
     }
     if (scope.createPersonal) {
-      return { ...payload, picId };
+      // PIC is optional. Preserve the automatic ownership behaviour when the
+      // account is linked to a staff record, otherwise allow it to stay blank.
+      return picId ? { ...payload, picId } : payload;
     }
     throw new ForbiddenException('Bạn không có quyền tạo dữ liệu trong phạm vi này');
   }
