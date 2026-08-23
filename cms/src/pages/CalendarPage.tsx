@@ -256,8 +256,11 @@ export function CalendarPage() {
     () => filteredEvents.map((event) => ({
       id: event.id,
       title: event.title,
-      start: event.start,
-      end: event.end,
+      // Datetimes from the API are serialized with `Z`. Calendar slots are
+      // clinic wall-clock times, not UTC instants; passing the raw ISO string
+      // makes FullCalendar add the browser offset (06:30 → 13:30 in VN).
+      start: parseClinicDateTime(event.start).format("YYYY-MM-DDTHH:mm"),
+      end: event.end ? parseClinicDateTime(event.end).format("YYYY-MM-DDTHH:mm") : undefined,
       allDay: event.type === "leave",
       backgroundColor: resolveFullCalendarEventColor(event.type),
       borderColor: resolveFullCalendarEventColor(event.type),
@@ -345,6 +348,7 @@ export function CalendarPage() {
                 initialView={calendarMode === "month" ? "dayGridMonth" : calendarMode === "week" ? "timeGridWeek" : "timeGridDay"}
                 initialDate={selectedDate.toDate()}
                 locale={viLocale}
+                timeZone="local"
                 firstDay={1}
                 headerToolbar={false}
                 height="100%"
@@ -618,8 +622,10 @@ export function CalendarPage() {
   }
 
   function handleTimeSelect(selection: DateSelectArg) {
-    const start = dayjs(selection.start)
-    const end = dayjs(selection.end)
+    // FullCalendar's Date values may be normalized to UTC before reaching the
+    // browser. Its slot strings preserve the wall-clock time the user picked.
+    const start = dayjs(selection.startStr)
+    const end = dayjs(selection.endStr)
     setQuickCreateRange({ start, end })
     setQuickCreateResource("appointments")
   }

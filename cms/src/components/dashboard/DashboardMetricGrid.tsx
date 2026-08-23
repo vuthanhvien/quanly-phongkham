@@ -3,7 +3,7 @@ import type { DashboardMetric } from "./types"
 
 export function DashboardMetricGrid({ metrics }: { metrics: DashboardMetric[] }) {
   return (
-    <Row gutter={[16, 16]}>
+    <Row gutter={[8, 8]}>
       {metrics.map((metric) => (
         <Col key={metric.title} xs={24} md={12} xl={6}>
           <Card className={`metric-card metric-${metric.tone}`}>

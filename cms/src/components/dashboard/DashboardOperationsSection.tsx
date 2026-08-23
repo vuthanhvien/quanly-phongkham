@@ -13,7 +13,7 @@ export function DashboardOperationsSection({
   quickStatsTitle?: string
 }) {
   return (
-    <Row gutter={[16, 16]} className="dashboard-grid">
+    <Row gutter={[8, 8]} className="dashboard-grid">
       <Col xs={24} lg={14}>
         <Card
           className="glass-card spacious-card"
