@@ -2059,15 +2059,19 @@ export class RecordsService {
   }
 
   private formatBundleDateValue (resource: string, column: string, value: Date) {
+    // The API contract is clinic time (+07).  Use the process timezone configured
+    // at bootstrap instead of slicing UTC ISO strings, which shifts exported dates.
+    const clinicDate = `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+    const clinicDateTime = `${clinicDate}T${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}:00+07:00`;
     const iso = value.toISOString();
     const dateColumns = new Set([
       'joinedAt', 'dateOfBirth', 'idCardIssuedDate', 'orderDate', 'operationDate', 'workDate', 'date', 'startDate', 'endDate',
       'effectiveDate', 'expiryDate',
     ]);
     const datetimeColumns = new Set(['startTime', 'endTime', 'consultedAt', 'capturedAt', 'scheduledAt']);
-    if (dateColumns.has(column)) return iso.slice(0, 10);
-    if (datetimeColumns.has(column)) return iso.slice(0, 16);
-    if (resource === 'lead-activities' && column === 'scheduledAt') return iso.slice(0, 16);
+    if (dateColumns.has(column)) return clinicDate;
+    if (datetimeColumns.has(column)) return clinicDateTime;
+    if (resource === 'lead-activities' && column === 'scheduledAt') return clinicDateTime;
     return iso;
   }
 
@@ -3278,8 +3282,8 @@ export class RecordsService {
 
   private dateStringFromValue (value: unknown) {
     if (typeof value === 'string') return value.slice(0, 10);
-    if (value instanceof Date) return value.toISOString().slice(0, 10);
-    return new Date().toISOString().slice(0, 10);
+    const date = value instanceof Date ? value : new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
 
   private lastDateOfMonth (year: number, month: number) {

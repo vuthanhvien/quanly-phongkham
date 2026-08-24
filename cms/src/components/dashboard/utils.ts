@@ -1,5 +1,5 @@
 import dayjs from "dayjs"
-import { parseClinicDateTime } from "../../utils/datetime"
+import { clinicNow, parseClinicDateTime } from "../../utils/datetime"
 
 export const EMPTY_LIST = { data: [], total: 0 }
 
@@ -19,7 +19,7 @@ export function parseAmount(value: unknown) {
   return Number.isFinite(numeric) ? numeric : 0
 }
 
-export function isSameDay(value: unknown, selectedDate = dayjs()) {
+export function isSameDay(value: unknown, selectedDate = clinicNow()) {
   if (!value) return false
   const parsed = parseClinicDateTime(value)
   return parsed.isValid() && parsed.isSame(selectedDate, "day")

@@ -3,6 +3,7 @@ import { api } from './api';
 import { FieldSpec, relationFields, RelationSpec } from './models';
 import { formatClinicDateTime, normalizeDateValueForInput } from './utils/datetime';
 import { buildFolderPathMap, normalizeFileFolderRows } from './utils/fileFolders';
+import { getCachedMasterData } from './utils/masterDataCache';
 
 export type LookupMap = Record<string, Record<string, string>>;
 export interface RelationLookupRecord extends Record<string, unknown> {
@@ -126,14 +127,16 @@ export async function loadRelationOptions(fields: Array<string | FieldSpec>, opt
   const entryGroups = await Promise.all(
     uniqueKeys.map(async (key) => {
       const spec = requestSpecs.find((item) => (item.lookupKey || item.resource) === key)!;
-      const response = await api
-        .get(`/records/${spec.resource}`, { params: { pageSize: 500, includeArchived: options?.includeArchived || undefined, ...spec.params } })
-        .catch(() => ({ data: { data: [] } }));
+      const params = { pageSize: 500, includeArchived: options?.includeArchived || undefined, ...spec.params }
+      const isCacheableMaster = spec.resource !== 'files' && spec.resource !== 'file-folders'
+      const responseData = isCacheableMaster
+        ? await getCachedMasterData(`relation:${spec.resource}:${JSON.stringify(params)}`, () => api.get(`/records/${spec.resource}`, { params }).then((response) => response.data).catch(() => ({ data: [] })))
+        : await api.get(`/records/${spec.resource}`, { params }).then((response) => response.data).catch(() => ({ data: [] }))
       if (spec.resource === 'file-folders') {
-        const rows = normalizeFileFolderRows(response.data.data || []);
+        const rows = normalizeFileFolderRows(responseData.data || []);
         return [[key, buildFolderPathMap(rows)]] as const;
       }
-      const rows = response.data.data || []
+      const rows = responseData.data || []
       const byId = Object.fromEntries(
         rows.map((row: Record<string, unknown>) => [
           String(row.id),

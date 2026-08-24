@@ -9,6 +9,9 @@ import { ErrorLogExceptionFilter } from './common/error-log.exception-filter';
 import { TenantContextService } from './tenant/tenant-context.service';
 
 async function bootstrap() {
+  // Clinic schedules are business wall-clock times in Vietnam. Keep the
+  // process aligned with the MySQL connection timezone below.
+  process.env.TZ = 'Asia/Ho_Chi_Minh';
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   const uploadsRoot = join(process.cwd(), 'storage', 'uploads');
   mkdirSync(uploadsRoot, { recursive: true });

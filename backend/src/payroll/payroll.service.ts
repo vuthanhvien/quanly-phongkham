@@ -63,7 +63,8 @@ export class PayrollService {
 
     // --- Hợp đồng đang hiệu lực ---
     const periodStart = `${year}-${String(month).padStart(2, '0')}-01`;
-    const periodEnd = new Date(year, month, 0).toISOString().slice(0, 10);
+    const lastDay = new Date(year, month, 0);
+    const periodEnd = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
 
     const contract = await this.contracts
       .createQueryBuilder('c')

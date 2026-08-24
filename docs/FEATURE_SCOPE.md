@@ -2,7 +2,7 @@
 
 ## Nguồn Yêu Cầu
 
-Tài liệu đọc trực tiếp: `26.0505-GIS.BRD.TCB Ho so nghiep vu THIEN CHANH BEAUTY SALON.pdf`, 20 trang, bản cập nhật phát hành ngày `2026.05.08`. Phạm vi dưới đây chỉ lấy yêu cầu chức năng, bỏ qua hình ảnh/gợi ý UI.
+Tài liệu nghiệp vụ nguồn, 20 trang, bản cập nhật phát hành ngày `2026.05.08`. Phạm vi dưới đây chỉ lấy yêu cầu chức năng, bỏ qua hình ảnh/gợi ý UI.
 
 ## Các Phân Hệ Trong PDF
 

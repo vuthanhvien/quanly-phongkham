@@ -89,6 +89,26 @@ export class FeedService {
     await this.likes.save(this.likes.create({ postId, userId: user.id })); return { data: { liked: true } };
   }
 
+  async listPostLikes(postId: string, user: AuthUser) {
+    this.assertPermission(user, 'view');
+    await this.requireVisible(postId, user);
+    const likes = await this.likes.find({ where: { postId }, order: { createdAt: 'DESC' } });
+    if (!likes.length) return { data: [] };
+    const users = await this.users.find({ where: { id: In(likes.map((like) => like.userId)) } });
+    const usersById = new Map(users.map((account) => [account.id, account]));
+    return {
+      data: likes.map((like) => {
+        const account = usersById.get(like.userId);
+        return {
+          userId: like.userId,
+          fullName: account?.fullName || 'Tài khoản không xác định',
+          avatarUrl: account?.avatarUrl,
+          createdAt: like.createdAt,
+        };
+      }),
+    };
+  }
+
   async toggleCommentLike(commentId: string, user: AuthUser) {
     this.assertPermission(user, 'create');
     const comment = await this.comments.findOneBy({ id: commentId, isArchived: false }); if (!comment) throw new NotFoundException('Không tìm thấy bình luận');

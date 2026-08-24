@@ -6,10 +6,12 @@ import {
   TeamOutlined,
 } from "@ant-design/icons"
 import FullCalendar from "@fullcalendar/react"
+import Timeline, { DateHeader, SidebarHeader, TimelineHeaders } from "react-calendar-timeline"
+import "react-calendar-timeline/style.css"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin from "@fullcalendar/interaction"
-import type { EventResizeDoneArg } from "@fullcalendar/interaction"
+import type { DateClickArg, EventResizeDoneArg } from "@fullcalendar/interaction"
 import viLocale from "@fullcalendar/core/locales/vi"
 import type { DateSelectArg, EventClickArg, EventDropArg } from "@fullcalendar/core"
 import dayjs, { type Dayjs } from "dayjs"
@@ -23,7 +25,7 @@ import { RecordFormContent } from "../components/RecordFormContent"
 import { CustomField, getFieldLabel } from "../models"
 import { loadFileLookupMap, loadRelationOptions, type FileLookupMap, type LookupMap } from "../relations"
 import { formatEventTime } from "../components/dashboard/utils"
-import { buildLocalDateTime, parseClinicDateTime } from "../utils/datetime"
+import { buildLocalDateTime, clinicNow, formatClinicDateTimeForApi, parseClinicDateTime } from "../utils/datetime"
 import { getFieldCatalog, getStoredUserRole, getVisibleFieldConfigs, type FieldLayoutConfig, type ViewSettingRecord } from "../view-settings"
 
 type CalendarMode = "day" | "week" | "month"
@@ -132,7 +134,7 @@ const QUICK_ACTIONS: QuickActionItem[] = [
 ]
 
 const DAY_VIEW_START_HOUR = 6
-const DAY_VIEW_END_HOUR = 22
+const DAY_VIEW_END_HOUR = 21
 const DAY_VIEW_HOUR_COUNT = DAY_VIEW_END_HOUR - DAY_VIEW_START_HOUR
 const DAY_VIEW_MINUTES = DAY_VIEW_HOUR_COUNT * 60
 const DAY_VIEW_MIN_BLOCK_MINUTES = 30
@@ -150,13 +152,14 @@ export function CalendarPage() {
   const navigate = useNavigate()
   const [toast, toastContextHolder] = message.useMessage()
   const [calendarMode, setCalendarMode] = useState<CalendarMode>("week")
-  const [selectedDate, setSelectedDate] = useState(dayjs())
+  const [selectedDate, setSelectedDate] = useState(clinicNow())
   const [calendarSource, setCalendarSource] = useState<CalendarSourceData | null>(null)
   const [lookups, setLookups] = useState<LookupMap>({})
-  const [selectedTypes, setSelectedTypes] = useState<PlannerEventType[]>(["appointment", "schedule"])
   const [doctorFilter, setDoctorFilter] = useState<string | undefined>(undefined)
   const [quickCreateResource, setQuickCreateResource] = useState<QuickCreateResource | null>(null)
   const [quickCreateRange, setQuickCreateRange] = useState<{ start: Dayjs; end: Dayjs } | null>(null)
+  const [quickCreateInitialValues, setQuickCreateInitialValues] = useState<Record<string, unknown> | undefined>()
+  const [quickEdit, setQuickEdit] = useState<{ resource: QuickCreateResource; id: string } | null>(null)
   const [quickDetail, setQuickDetail] = useState<CalendarQuickDetailState | null>(null)
   const [quickDetailLoading, setQuickDetailLoading] = useState(false)
 
@@ -170,7 +173,9 @@ export function CalendarPage() {
       fetchListSafe<Record<string, any>>("work-schedules"),
       fetchListSafe<Record<string, any>>("leave-requests"),
       fetchListSafe<Record<string, any>>("attendances"),
-      fetchListSafe<Record<string, any>>("staff"),
+      // Day timeline renders a row for every active staff member, including
+      // people with no booking on the selected day.
+      fetchListSafe<Record<string, any>>("staff", 2000),
       fetchListSafe<Record<string, any>>("customers"),
       fetchListSafe<Record<string, any>>("rooms"),
       loadRelationOptions(["branchId", "staffId", "customerId", "doctorStaffId", "picStaffId", "roomId", "equipmentId"]).catch(() => ({} as LookupMap)),
@@ -200,22 +205,19 @@ export function CalendarPage() {
     [calendarSource, lookups, scheduleDisplayWindow],
   )
 
-  const filteredEvents = useMemo(
-    () =>
-      events.filter((item) => {
-        if (!selectedTypes.includes(item.type)) return false
-        if (doctorFilter && (item.doctorStaffId || item.staffId) !== doctorFilter) return false
-        return true
-      }),
-    [doctorFilter, events, selectedTypes],
+  // The calendar is a booking navigator. Staffing, leave, and attendance stay
+  // in the selected-day panel so they do not crowd the calendar grid.
+  const calendarEvents = useMemo(
+    () => events.filter((item) => item.type === "appointment" && (!doctorFilter || (item.doctorStaffId || item.staffId) === doctorFilter)),
+    [doctorFilter, events],
   )
 
   const selectedEvents = useMemo(
     () =>
-      filteredEvents
+      events
         .filter((item) => parseClinicDateTime(item.start).isSame(selectedDate, "day"))
         .sort((left, right) => parseClinicDateTime(left.start).valueOf() - parseClinicDateTime(right.start).valueOf()),
-    [filteredEvents, selectedDate],
+    [events, selectedDate],
   )
 
   const countsForSelectedDay = useMemo(() => {
@@ -253,7 +255,7 @@ export function CalendarPage() {
       : selectedDate.format("MM/YYYY")
 
   const fullCalendarEvents = useMemo(
-    () => filteredEvents.map((event) => ({
+    () => calendarEvents.map((event) => ({
       id: event.id,
       title: event.title,
       // Datetimes from the API are serialized with `Z`. Calendar slots are
@@ -268,7 +270,7 @@ export function CalendarPage() {
       editable: (event.type === "appointment" || event.type === "schedule") && !event.isRecurring,
       extendedProps: { plannerEvent: event },
     })),
-    [filteredEvents],
+    [calendarEvents],
   )
 
   function shiftCalendar(offset: number) {
@@ -308,13 +310,6 @@ export function CalendarPage() {
             value={doctorFilter}
             onChange={(value) => setDoctorFilter(value)}
           />
-          <Select
-            className="calendar-planner-types"
-            mode="multiple"
-            options={EVENT_TYPE_OPTIONS}
-            value={selectedTypes}
-            onChange={(value) => setSelectedTypes(value as PlannerEventType[])}
-          />
         </div>
       </div>
 
@@ -337,37 +332,50 @@ export function CalendarPage() {
                 <Button onClick={() => shiftCalendar(-1)}>Trước</Button>
                 <Typography.Text className="calendar-range-label">{calendarRangeLabel}</Typography.Text>
                 <Button onClick={() => shiftCalendar(1)}>Sau</Button>
-                <Button onClick={() => setSelectedDate(dayjs())}>Hôm nay</Button>
+                <Button onClick={() => setSelectedDate(clinicNow())}>Hôm nay</Button>
               </Space>
             )}
           >
             <div className="coordination-calendar">
-              <FullCalendar
-                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                key={`${calendarMode}-${selectedDate.format("YYYY-MM-DD")}`}
-                initialView={calendarMode === "month" ? "dayGridMonth" : calendarMode === "week" ? "timeGridWeek" : "timeGridDay"}
-                initialDate={selectedDate.toDate()}
-                locale={viLocale}
-                timeZone="local"
-                firstDay={1}
-                headerToolbar={false}
-                height="100%"
-                events={fullCalendarEvents}
-                editable
-                selectable
-                selectMirror
-                slotDuration="00:15:00"
-                snapDuration="00:15:00"
-                slotMinTime="06:00:00"
-                slotMaxTime="22:00:00"
-                allDaySlot={calendarMode === "month"}
-                nowIndicator
-                eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
-                select={(arg) => handleTimeSelect(arg)}
-                eventClick={(arg) => handleCalendarEventClick(arg)}
-                eventDrop={(arg) => void handleEventTimeChange(arg)}
-                eventResize={(arg) => void handleEventTimeChange(arg)}
-              />
+              {calendarMode === "day" ? (
+                <StaffDayCalendar
+                  events={calendarEvents}
+                  selectedDate={selectedDate}
+                  staffRows={calendarSource?.staffRows || []}
+                  onEventClick={openQuickEdit}
+                  onEventMove={(event, start, staffId) => void updateAppointmentFromTimeline(event, start, staffId)}
+                  onEventResize={(event, start, end) => void updateAppointmentFromTimeline(event, start, event.doctorStaffId || event.staffId, end)}
+                  onTimeSelect={(staffId, start) => openBookingAtTimelineSlot(staffId, start)}
+                />
+              ) : (
+                <FullCalendar
+                  plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                  key={`${calendarMode}-${selectedDate.format("YYYY-MM-DD")}`}
+                  initialView={calendarMode === "month" ? "dayGridMonth" : "timeGridWeek"}
+                  initialDate={selectedDate.toDate()}
+                  locale={viLocale}
+                  timeZone="local"
+                  firstDay={1}
+                  headerToolbar={false}
+                  height="100%"
+                  events={fullCalendarEvents}
+                  editable
+                  selectable
+                  selectMirror
+                  slotDuration="00:15:00"
+                  snapDuration="00:15:00"
+                  slotMinTime="06:00:00"
+                  slotMaxTime="21:00:00"
+                  allDaySlot={calendarMode === "month"}
+                  nowIndicator
+                  eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
+                  select={(arg) => handleTimeSelect(arg)}
+                  dateClick={(arg) => handleDateClick(arg)}
+                  eventClick={(arg) => handleCalendarEventClick(arg)}
+                  eventDrop={(arg) => void handleEventTimeChange(arg)}
+                  eventResize={(arg) => void handleEventTimeChange(arg)}
+                />
+              )}
             </div>
           </Card>
         </div>
@@ -403,7 +411,11 @@ export function CalendarPage() {
                       key={item.key}
                       className="calendar-quick-action"
                       type="button"
-                      onClick={() => setQuickCreateResource(item.key)}
+                      onClick={() => {
+                        setQuickCreateRange(null)
+                        setQuickCreateInitialValues(buildQuickCreateInitialValues(item.key, selectedDate, null))
+                        setQuickCreateResource(item.key)
+                      }}
                     >
                       <strong>{item.title}</strong>
                       <span>{item.description}</span>
@@ -438,7 +450,7 @@ export function CalendarPage() {
                         <Space size={8} wrap>
                           <Tag color={item.tone}>{EVENT_TYPE_LABEL[item.type]}</Tag>
                           {item.type === "schedule" ? <span>{item.title}</span> : (
-                            <button className="calendar-event-link" type="button" onClick={() => void openQuickDetail(item)}>
+                            <button className="calendar-event-link" type="button" onClick={() => openQuickEdit(item)}>
                               {item.title}
                             </button>
                           )}
@@ -507,22 +519,51 @@ export function CalendarPage() {
         onCancel={() => {
           setQuickCreateResource(null)
           setQuickCreateRange(null)
+          setQuickCreateInitialValues(undefined)
         }}
       >
         {quickCreateResource ? (
           <RecordFormContent
             compact
-            initialValues={buildQuickCreateInitialValues(quickCreateResource, selectedDate, quickCreateRange)}
+            initialValues={quickCreateInitialValues}
             resource={quickCreateResource}
             notifyOnSuccess={false}
             onCancel={() => {
               setQuickCreateResource(null)
               setQuickCreateRange(null)
+              setQuickCreateInitialValues(undefined)
             }}
             onSuccess={() => {
               setQuickCreateResource(null)
               setQuickCreateRange(null)
+              setQuickCreateInitialValues(undefined)
               toast.success("Đã lưu dữ liệu")
+              void loadCalendar()
+            }}
+          />
+        ) : null}
+      </Modal>
+
+      <Modal
+        className="quick-drawer"
+        destroyOnHidden
+        maskClosable={false}
+        open={Boolean(quickEdit)}
+        title={quickEdit ? `Chỉnh sửa ${resolveQuickCreateTitle(quickEdit.resource)}` : "Chỉnh sửa"}
+        width={620}
+        footer={null}
+        onCancel={() => setQuickEdit(null)}
+      >
+        {quickEdit ? (
+          <RecordFormContent
+            compact
+            id={quickEdit.id}
+            resource={quickEdit.resource}
+            notifyOnSuccess={false}
+            onCancel={() => setQuickEdit(null)}
+            onSuccess={() => {
+              setQuickEdit(null)
+              toast.success("Đã cập nhật dữ liệu")
               void loadCalendar()
             }}
           />
@@ -608,6 +649,22 @@ export function CalendarPage() {
         loadRelationOptions(detailFields),
         loadFileLookupMap(),
       ])
+      // A booking can reference a customer that is absent from the current
+      // relation list (for example, an archived customer). Keep the detail
+      // view human-readable instead of falling back to its UUID.
+      if (event.resource === "appointments" && event.customerId && !detailLookups.customers?.[event.customerId]) {
+        const cachedCustomer = calendarSource?.customerRows.find((customer) => String(customer.id) === event.customerId)
+        const customer = cachedCustomer || await api
+          .get(`/records/customers/${event.customerId}`)
+          .then((response) => response.data?.data as Record<string, any> | undefined)
+          .catch(() => undefined)
+        if (customer) {
+          detailLookups.customers = {
+            ...(detailLookups.customers || {}),
+            [event.customerId]: customerDisplayName(customer, event.customerId),
+          }
+        }
+      }
       setQuickDetail({
         resource: event.resource,
         eventId: event.id,
@@ -622,17 +679,76 @@ export function CalendarPage() {
   }
 
   function handleTimeSelect(selection: DateSelectArg) {
-    // FullCalendar's Date values may be normalized to UTC before reaching the
-    // browser. Its slot strings preserve the wall-clock time the user picked.
-    const start = dayjs(selection.startStr)
-    const end = dayjs(selection.endStr)
-    setQuickCreateRange({ start, end })
-    setQuickCreateResource("appointments")
+    // A time-range selection also selects that calendar day. Creation remains
+    // available from the quick actions in the right-hand detail panel.
+    setSelectedDate(parseClinicDateTime(selection.startStr))
+  }
+
+  function handleDateClick(arg: DateClickArg) {
+    setSelectedDate(parseClinicDateTime(arg.dateStr))
   }
 
   function handleCalendarEventClick(arg: EventClickArg) {
     const event = arg.event.extendedProps.plannerEvent as PlannerEvent | undefined
-    if (event) void openQuickDetail(event)
+    if (event) {
+      setSelectedDate(parseClinicDateTime(event.start))
+      openQuickEdit(event)
+    }
+  }
+
+  function openQuickEdit(event: PlannerEvent) {
+    setQuickEdit({ resource: event.resource, id: event.recordId || event.id })
+  }
+
+  async function updateAppointmentFromTimeline(event: PlannerEvent, startTime: number, staffId?: string, endTime?: number) {
+    const start = parseClinicDateTime(startTime)
+    const originalStart = parseClinicDateTime(event.start)
+    const originalEnd = event.end ? parseClinicDateTime(event.end) : originalStart.add(30, "minute")
+    const end = endTime ? parseClinicDateTime(endTime) : start.add(Math.max(15, originalEnd.diff(originalStart, "minute")), "minute")
+    if (!end.isAfter(start)) {
+      toast.error("Thời gian kết thúc phải sau thời gian bắt đầu")
+      return
+    }
+    const assignedStaff = calendarSource?.staffRows.find((staff) => String(staff.id) === staffId)
+    const assignment = staffId === "__unassigned__" || !staffId
+      ? { doctorStaffId: null, picStaffId: null }
+      : String(assignedStaff?.type) === "DOCTOR"
+        ? { doctorStaffId: staffId, picStaffId: null }
+        : { doctorStaffId: null, picStaffId: staffId }
+    const optimisticUpdate = {
+      startTime: formatClinicDateTimeForApi(start),
+      endTime: formatClinicDateTimeForApi(end),
+      ...assignment,
+    }
+    setCalendarSource((current) => current ? {
+      ...current,
+      appointments: current.appointments.map((appointment) =>
+        String(appointment.id) === String(event.recordId || event.id)
+          ? { ...appointment, ...optimisticUpdate }
+          : appointment,
+      ),
+    } : current)
+    try {
+      await api.patch(`/records/appointments/${event.recordId || event.id}`, optimisticUpdate)
+      toast.success("Đã cập nhật booking")
+      void loadCalendar()
+    } catch {
+      toast.error("Không thể cập nhật booking")
+      void loadCalendar()
+    }
+  }
+
+  function openBookingAtTimelineSlot(staffId: string, startTime: number) {
+    const rawStart = parseClinicDateTime(startTime).startOf("minute")
+    const start = rawStart.minute(Math.round(rawStart.minute() / 15) * 15)
+    const end = start.add(30, "minute")
+    const staff = calendarSource?.staffRows.find((item) => String(item.id) === staffId)
+    setQuickCreateRange({ start, end })
+    setQuickCreateInitialValues({
+      ...buildQuickCreateInitialValues("appointments", start, { start, end }),
+      ...(staffId === "__unassigned__" ? {} : String(staff?.type) === "DOCTOR" ? { doctorStaffId: staffId } : { picStaffId: staffId }),
+    })
+    setQuickCreateResource("appointments")
   }
 
   async function handleEventTimeChange(arg: EventDropArg | EventResizeDoneArg) {
@@ -641,11 +757,13 @@ export function CalendarPage() {
       arg.revert()
       return
     }
-    const start = dayjs(arg.event.start)
-    const end = dayjs(arg.event.end || start.add(event.type === "appointment" ? 30 : 60, "minute"))
+    const start = parseClinicDateTime(arg.event.start)
+    const end = arg.event.end
+      ? parseClinicDateTime(arg.event.end)
+      : start.add(event.type === "appointment" ? 30 : 60, "minute")
     const payload = event.type === "appointment"
-      ? { startTime: start.format("YYYY-MM-DDTHH:mm"), endTime: end.format("YYYY-MM-DDTHH:mm") }
-      : { workDate: start.format("YYYY-MM-DD"), startTime: start.format("YYYY-MM-DDTHH:mm"), endTime: end.format("YYYY-MM-DDTHH:mm") }
+      ? { startTime: formatClinicDateTimeForApi(start), endTime: formatClinicDateTimeForApi(end) }
+      : { workDate: start.format("YYYY-MM-DD"), startTime: formatClinicDateTimeForApi(start), endTime: formatClinicDateTimeForApi(end) }
     try {
       await api.patch(`/records/${event.resource}/${event.recordId || event.id}`, payload)
       toast.success("Đã cập nhật thời gian")
@@ -655,6 +773,118 @@ export function CalendarPage() {
       toast.error("Không thể cập nhật thời gian, đã hoàn tác thay đổi")
     }
   }
+}
+
+function StaffDayCalendar({
+  events,
+  selectedDate,
+  staffRows,
+  onEventClick,
+  onEventMove,
+  onEventResize,
+  onTimeSelect,
+}: {
+  events: PlannerEvent[]
+  selectedDate: Dayjs
+  staffRows: Record<string, any>[]
+  onEventClick: (event: PlannerEvent) => void
+  onEventMove: (event: PlannerEvent, start: number, staffId: string) => void
+  onEventResize: (event: PlannerEvent, start: number, end: number) => void
+  onTimeSelect: (staffId: string, start: number) => void
+}) {
+  const dayEvents = events.filter((event) => parseClinicDateTime(event.start).isSame(selectedDate, "day"))
+  const staff = [...staffRows]
+    .filter((item) => item.id)
+    .sort((left, right) => {
+      const typeOrder = String(left.type) === "DOCTOR" ? 0 : 1
+      const otherTypeOrder = String(right.type) === "DOCTOR" ? 0 : 1
+      if (typeOrder !== otherTypeOrder) return typeOrder - otherTypeOrder
+      return staffDayDisplayName(left).localeCompare(staffDayDisplayName(right), "vi")
+    })
+
+  const hasUnassignedBookings = dayEvents.some((event) => !event.doctorStaffId && !event.staffId)
+  const groups = [
+    ...staff.map((item) => ({
+      id: String(item.id),
+      title: (
+        <span className="staff-timeline-person">
+          <Avatar icon={<TeamOutlined />} size={28} src={item.avatarUrl ? resolveFileUrl(String(item.avatarUrl)) : undefined} />
+          <span className="staff-timeline-person__copy"><strong>{staffDayDisplayName(item)}</strong><small>{String(item.type) === "DOCTOR" ? "Bác sĩ" : "Nhân viên"}</small></span>
+        </span>
+      ),
+    })),
+    ...(hasUnassignedBookings ? [{ id: "__unassigned__", title: "Chưa phân công" }] : []),
+  ]
+  const items = dayEvents.map((event) => {
+    const start = parseClinicDateTime(event.start)
+    const end = event.end ? parseClinicDateTime(event.end) : start.add(30, "minute")
+    return {
+      id: event.id,
+      group: String(event.doctorStaffId || event.staffId || "__unassigned__"),
+      title: `${event.customerName || event.title} · ${formatEventTime(event.start, event.end)}`,
+      start_time: start.valueOf(),
+      end_time: end.valueOf(),
+      plannerEvent: event,
+      canResize: "both" as const,
+    }
+  })
+  const dayStart = selectedDate.hour(DAY_VIEW_START_HOUR).minute(0).second(0).millisecond(0).valueOf()
+  const dayEnd = selectedDate.hour(DAY_VIEW_END_HOUR).minute(0).second(0).millisecond(0).valueOf()
+  const eventById = new Map(items.map((item) => [String(item.id), item]))
+
+  return (
+    <div className="staff-day-timeline" aria-label={`Lịch nhân sự ngày ${selectedDate.format("DD/MM/YYYY")}`}>
+      {groups.length > 0 ? (
+        <Timeline
+          canChangeGroup
+          canMove
+          canResize="both"
+          defaultTimeEnd={dayEnd}
+          defaultTimeStart={dayStart}
+          dragSnap={15 * 60 * 1000}
+          groups={groups}
+          itemHeightRatio={0.76}
+          items={items}
+          lineHeight={64}
+          maxZoom={16 * 60 * 60 * 1000}
+          minZoom={16 * 60 * 60 * 1000}
+          sidebarContent="Nhân sự"
+          sidebarWidth={184}
+          stackItems
+          timeSteps={{ second: 0, minute: 15, hour: 1, day: 1, month: 1, year: 1 }}
+          visibleTimeEnd={dayEnd}
+          visibleTimeStart={dayStart}
+          onTimeChange={(_start, _end, updateScrollCanvas) => updateScrollCanvas(dayStart, dayEnd)}
+          onItemClick={(itemId) => {
+            const item = eventById.get(String(itemId))
+            if (item) onEventClick(item.plannerEvent)
+          }}
+          onItemMove={(itemId, start, groupIndex) => {
+            const item = eventById.get(String(itemId))
+            const group = groups[groupIndex]
+            if (item && group) onEventMove(item.plannerEvent, start, String(group.id))
+          }}
+          onItemResize={(itemId, time, edge) => {
+            const item = eventById.get(String(itemId))
+            if (!item) return
+            onEventResize(item.plannerEvent, edge === "left" ? time : item.start_time, edge === "right" ? time : item.end_time)
+          }}
+          onCanvasClick={(groupId, time) => onTimeSelect(String(groupId), time)}
+        >
+          <TimelineHeaders>
+            <SidebarHeader>
+              {({ getRootProps }) => <div {...getRootProps()} className="staff-day-timeline__sidebar-header">Nhân sự</div>}
+            </SidebarHeader>
+            <DateHeader labelFormat={([start]) => start.format("HH:mm")} unit="hour" />
+          </TimelineHeaders>
+        </Timeline>
+      ) : <Empty description="Chưa có nhân sự để hiển thị" image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+    </div>
+  )
+}
+
+function staffDayDisplayName(staff: Record<string, any>) {
+  return String(staff.fullName || staff.display_title || staff.name || staff.code || "Nhân sự")
 }
 
 function DayPlannerTimeline({

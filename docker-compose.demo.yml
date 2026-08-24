@@ -4,6 +4,7 @@ services:
   gis-clinic-demo:
     image: ${DEMO_IMAGE_PREFIX:-${DOCKER_USER:-vienvu}/gis-clinic-demo}:${DEMO_TAG:-demo}
     environment:
+      TZ: Asia/Ho_Chi_Minh
       DATABASE_URL: ${DATABASE_URL}
       MANAGEMENT_DATABASE_URL: ${MANAGEMENT_DATABASE_URL:-}
       TENANTS_JSON: ${TENANTS_JSON:-}

@@ -5,7 +5,7 @@ import {
   PictureOutlined,
   SendOutlined,
 } from "@ant-design/icons"
-import { Avatar, Button, Card, Image, Input, Popconfirm, Select, Space, Tabs, Tag, Typography, Upload, message } from "antd"
+import { Avatar, Button, Card, Image, Input, Modal, Popconfirm, Select, Space, Tabs, Tag, Typography, Upload, message } from "antd"
 import type { UploadFile } from "antd"
 import { useMemo, useState } from "react"
 import { useEffect } from "react"
@@ -13,6 +13,7 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { api, resolveFileUrl } from "../../api"
 import { hasActionAccess } from "../../access"
+import { formatClinicDateTime } from "../../utils/datetime"
 import { FeedMarkdownEditor } from "../FeedMarkdownEditor"
 
 type Audience = "company" | "department" | "branch"
@@ -20,6 +21,7 @@ type FeedFilter = "all" | Audience
 type Comment = { id: string; authorId: string; authorName: string; authorAvatarUrl?: string; content: string; createdAt: string; replyToName?: string; likes?: number; liked?: boolean; replies?: Comment[] }
 type LinkPreview = { url: string; title: string; description?: string; imageUrl?: string; hostname?: string }
 type FeedPost = { id: string; authorId: string; authorName: string; authorAvatarUrl?: string; audience: Audience; departmentIds?: string[]; branchIds?: string[]; createdAt: string; content?: string; imageUrls?: string[]; linkPreview?: LinkPreview; likes: number; liked?: boolean; comments: Comment[] }
+type FeedLike = { userId: string; fullName: string; avatarUrl?: string; createdAt: string }
 
 const audienceLabels: Record<Audience, string> = { company: "Toàn công ty", department: "Phòng ban", branch: "Chi nhánh" }
 const feedFilterItems: Array<{ key: FeedFilter; label: string }> = [
@@ -44,6 +46,9 @@ export function CompanyFeed({ currentUser = "Bạn", currentUserId }: { currentU
   const [departmentIds, setDepartmentIds] = useState<string[]>([])
   const [branchIds, setBranchIds] = useState<string[]>([])
   const [linkPreview, setLinkPreview] = useState<LinkPreview | undefined>()
+  const [likeModal, setLikeModal] = useState<{ postId: string; count: number } | null>(null)
+  const [postLikes, setPostLikes] = useState<FeedLike[]>([])
+  const [likesLoading, setLikesLoading] = useState(false)
 
   const imageUrls = useMemo(() => files.map((file) => file.thumbUrl || (file.originFileObj ? URL.createObjectURL(file.originFileObj) : "")).filter(Boolean), [files])
 
@@ -100,6 +105,21 @@ export function CompanyFeed({ currentUser = "Bạn", currentUserId }: { currentU
     try { await api.post(`/feed/comments/${id}/like`); await loadFeed() } catch { message.error('Không thể cập nhật lượt thích bình luận') }
   }
 
+  async function openLikes(post: FeedPost) {
+    if (!post.likes) return
+    setLikeModal({ postId: post.id, count: post.likes })
+    setPostLikes([])
+    setLikesLoading(true)
+    try {
+      const response = await api.get(`/feed/${post.id}/likes`)
+      setPostLikes(response.data?.data || [])
+    } catch {
+      message.error("Không thể tải danh sách người thích")
+    } finally {
+      setLikesLoading(false)
+    }
+  }
+
   async function addComment(postId: string, parent?: Comment) {
     if (!canCreate) return message.error("Bạn không có quyền bình luận Feed")
     const text = commentText[postId]?.trim()
@@ -135,12 +155,15 @@ export function CompanyFeed({ currentUser = "Bạn", currentUserId }: { currentU
         {post.content ? <FeedPostContent content={post.content} /> : null}
         {post.linkPreview ? <FeedLinkPreview preview={post.linkPreview} /> : null}
         {post.imageUrls?.length ? <FeedGallery className="feed-album" images={post.imageUrls.map((src) => src.startsWith('/') ? resolveFileUrl(src) : src)} /> : null}
-        <div className="feed-post__counts"><span>{post.likes ? `${post.likes} lượt thích` : "Hãy là người đầu tiên thích"}</span><span>{post.comments.length ? `${post.comments.length} bình luận` : ""}</span></div>
+        <div className="feed-post__counts"><button type="button" className="feed-likes-count" disabled={!post.likes} onClick={() => void openLikes(post)}>{post.likes ? `${post.likes} lượt thích` : "Hãy là người đầu tiên thích"}</button><span>{post.comments.length ? `${post.comments.length} bình luận` : ""}</span></div>
         <div className="feed-post__actions"><Button disabled={!canCreate} icon={post.liked ? <LikeFilled /> : <LikeOutlined />} type="text" className={post.liked ? "is-liked" : ""} onClick={() => toggleLike(post.id)}>Thích</Button><Button disabled={!canCreate} icon={<CommentOutlined />} type="text" onClick={() => openComment(post.id)}>Bình luận</Button></div>
         <div className="feed-comments">{post.comments.map((comment) => <div className="feed-comment" key={comment.id}><Avatar size={30} className="feed-avatar" src={comment.authorAvatarUrl ? resolveFileUrl(comment.authorAvatarUrl) : undefined}>{comment.authorName.slice(0, 2).toUpperCase()}</Avatar><div className="feed-comment__body"><div className="feed-comment__bubble"><Typography.Text strong>{comment.authorName}</Typography.Text><div>{comment.content}</div></div><div className="feed-comment__actions"><span>{new Date(comment.createdAt).toLocaleString('vi-VN')}</span><button className={comment.liked ? 'is-liked' : ''} onClick={() => void toggleCommentLike(comment.id)}>{comment.likes ? `${comment.likes} Thích` : 'Thích'}</button><button onClick={() => openComment(post.id, comment.id)}>Phản hồi</button>{comment.authorId === currentUserId ? <button className="feed-delete-link" onClick={() => void removeComment(comment.id)}>Xóa</button> : null}</div>{comment.replies?.map((reply) => <div className="feed-comment feed-comment--reply" key={reply.id}><Avatar size={26} className="feed-avatar">{reply.authorName.slice(0, 2).toUpperCase()}</Avatar><div className="feed-comment__body"><div className="feed-comment__bubble"><Typography.Text strong>{reply.authorName}</Typography.Text><div>{reply.replyToName ? <span className="feed-reply-to">@{reply.replyToName} </span> : null}{reply.content}</div></div><div className="feed-comment__actions"><span>{new Date(reply.createdAt).toLocaleString('vi-VN')}</span><button className={reply.liked ? 'is-liked' : ''} onClick={() => void toggleCommentLike(reply.id)}>{reply.likes ? `${reply.likes} Thích` : 'Thích'}</button><button onClick={() => openComment(post.id, reply.id)}>Phản hồi</button>{reply.authorId === currentUserId ? <button className="feed-delete-link" onClick={() => void removeComment(reply.id)}>Xóa</button> : null}</div></div></div>)}</div></div>)}</div>
         {replyingTo === post.id || replyingTo?.startsWith(`${post.id}:`) ? <div className="feed-comment-box"><Avatar size={30} className="feed-avatar feed-avatar--self">{currentUser.slice(0, 2).toUpperCase()}</Avatar><Input disabled={!canCreate} id={`feed-comment-${post.id}`} placeholder={replyingTo === post.id ? "Viết bình luận..." : `Phản hồi ${findComment(post, replyingTo?.split(':')[1])?.authorName || ''}...`} value={commentText[post.id] || ""} onChange={(event) => setCommentText((items) => ({ ...items, [post.id]: event.target.value }))} onPressEnter={() => void addComment(post.id, replyingTo?.includes(":") ? findComment(post, replyingTo.split(':')[1]) : undefined)} suffix={<SendOutlined onClick={() => void addComment(post.id, replyingTo?.includes(":") ? findComment(post, replyingTo.split(':')[1]) : undefined)} />} /></div> : null}
       </Card>)}
     </div>
+    <Modal open={!!likeModal} title={likeModal ? `${likeModal.count} người đã thích` : "Người đã thích"} footer={null} onCancel={() => setLikeModal(null)}>
+      {likesLoading ? <div className="feed-likes-loading">Đang tải...</div> : <div className="feed-likes-list">{postLikes.map((like) => <div className="feed-like-user" key={like.userId}><Avatar src={like.avatarUrl ? resolveFileUrl(like.avatarUrl) : undefined}>{like.fullName.slice(0, 2).toUpperCase()}</Avatar><div><Typography.Text strong>{like.fullName}</Typography.Text><Typography.Text type="secondary">Đã thích {formatClinicDateTime(like.createdAt)}</Typography.Text></div></div>)}</div>}
+    </Modal>
   </section>
 }
 

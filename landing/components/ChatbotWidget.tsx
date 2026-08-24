@@ -11,7 +11,7 @@ interface ChatMessage {
 
 const WELCOME_MESSAGE: ChatMessage = {
   role: 'assistant',
-  content: 'Xin chào! Tôi là trợ lý của phòng khám Thiện Chánh. Tôi có thể giúp bạn tìm hiểu dịch vụ hoặc đặt lịch hẹn. Bạn cần hỗ trợ gì?',
+  content: 'Xin chào! Tôi là trợ lý của phòng khám. Tôi có thể giúp bạn tìm hiểu dịch vụ hoặc đặt lịch hẹn. Bạn cần hỗ trợ gì?',
 }
 
 export function ChatbotWidget() {
@@ -114,7 +114,7 @@ export function ChatbotWidget() {
               </svg>
             </div>
             <div>
-              <div className="chatbot-header-name">Trợ lý Thiện Chánh</div>
+              <div className="chatbot-header-name">Trợ lý phòng khám</div>
               <div className="chatbot-header-sub">Tư vấn & đặt lịch 24/7</div>
             </div>
             <button className="chatbot-close" onClick={() => setOpen(false)} aria-label="Đóng">

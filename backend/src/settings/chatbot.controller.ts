@@ -156,7 +156,7 @@ export class ChatbotController {
       return false;
     });
 
-    const systemPrompt = config.systemPrompt || 'Bạn là trợ lý tư vấn dịch vụ của phòng khám Thiện Chánh. Hãy trả lời thân thiện, ngắn gọn bằng tiếng Việt. Hỗ trợ khách hàng tìm hiểu dịch vụ và đặt lịch hẹn.';
+    const systemPrompt = config.systemPrompt || 'Bạn là trợ lý tư vấn dịch vụ của phòng khám. Hãy trả lời thân thiện, ngắn gọn bằng tiếng Việt. Hỗ trợ khách hàng tìm hiểu dịch vụ và đặt lịch hẹn.';
 
     const messages: ChatMessage[] = (body.messages || []).filter(
       (msg) => msg.role === 'user' || msg.role === 'assistant',
@@ -635,7 +635,9 @@ QUY TẮC HIỂN THỊ DỮ LIỆU: Tuyệt đối không hiển thị UUID/ID k
       });
 
       const dayAppointments = bookedAppointments.filter((apt) => {
-        const aptDate = apt.startTime?.toISOString().slice(0, 10);
+        const aptDate = apt.startTime
+          ? `${apt.startTime.getFullYear()}-${String(apt.startTime.getMonth() + 1).padStart(2, '0')}-${String(apt.startTime.getDate()).padStart(2, '0')}`
+          : undefined;
         return aptDate === date;
       });
       const staffNames = await this.staffNamesById([

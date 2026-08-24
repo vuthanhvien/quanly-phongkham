@@ -118,7 +118,7 @@ export class ErrorLogExceptionFilter implements ExceptionFilter {
     if (process.env.ERROR_LOG_ENABLED?.toLowerCase() === 'false') return;
 
     const now = new Date();
-    const date = now.toISOString().slice(0, 10);
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const logDirectory = process.env.ERROR_LOG_DIR || join(process.cwd(), 'storage', 'logs');
     const error = exception instanceof Error ? exception : undefined;
     const entry = {

@@ -1323,6 +1323,13 @@ body {
   .feed-link-preview { margin-left: 0; }
 }
 .feed-post__counts { color: var(--app-muted); font-size: 12px; margin-top: 12px; }
+.feed-likes-count { appearance: none; background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; padding: 0; text-align: left; }
+.feed-likes-count:not(:disabled):hover { color: var(--app-primary); text-decoration: underline; }
+.feed-likes-count:disabled { cursor: default; }
+.feed-likes-list { display: grid; gap: 12px; max-height: min(55vh, 420px); overflow: auto; }
+.feed-like-user { align-items: center; display: flex; gap: 10px; }
+.feed-like-user .ant-typography { display: block; }
+.feed-likes-loading { color: var(--app-muted); padding: 16px 0; text-align: center; }
 .feed-post__actions { border-bottom: 1px solid var(--app-line); border-top: 1px solid var(--app-line); margin-top: 8px; padding: 2px 0; }
 .feed-post__actions .ant-btn { flex: 1; justify-content: center; }
 .feed-post__actions .is-liked { color: var(--app-primary); }
@@ -1343,11 +1350,11 @@ body {
 .dashboard-widgets > .ant-row > .ant-col { padding-inline: 0 !important; }
 .dashboard-widgets > .ant-row > .ant-col.ant-col-md-12,
 .dashboard-widgets > .ant-row > .ant-col.ant-col-xl-6 { flex: 0 0 50%; max-width: 50%; }
-.dashboard-widgets > .ant-row { row-gap: 10px !important; }
-.dashboard-widgets .metric-card { height: 130px; min-height: 130px; overflow: hidden; }
-.dashboard-widgets .metric-card .ant-card-body { padding: 13px !important; }
-.dashboard-widgets .metric-icon { height: 34px; width: 34px; }
-.dashboard-widgets .metric-card .ant-statistic-content { font-size: 22px; }
+.dashboard-widgets > .ant-row { row-gap: 8px !important; }
+.dashboard-widgets .metric-card { height: 96px; min-height: 96px; overflow: hidden; }
+.dashboard-widgets .metric-card .ant-card-body { padding: 9px 11px !important; }
+.dashboard-widgets .metric-icon { height: 26px; width: 26px; }
+.dashboard-widgets .metric-card .ant-statistic-content { font-size: 19px; line-height: 1.2; }
 .dashboard-widgets .metric-card .ant-statistic-title { font-size: 12px; }
 .dashboard-widgets .metric-card .ant-statistic-title,
 .dashboard-widgets .metric-card .ant-statistic-content { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1355,9 +1362,20 @@ body {
 .dashboard-widgets .dashboard-grid > .ant-col { width: 100%; }
 .dashboard-widgets .dashboard-grid > .ant-col.ant-col-lg-14,
 .dashboard-widgets .dashboard-grid > .ant-col.ant-col-lg-10 { flex: 0 0 100%; max-width: 100%; }
-.dashboard-widgets .dashboard-grid .ant-card { margin-top: 12px; }
+.dashboard-widgets .dashboard-grid .ant-card { margin-top: 8px; }
 .dashboard-widgets .dashboard-grid .dashboard-mini-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.dashboard-widgets .dashboard-grid .metric-card { min-height: 130px; }
+.dashboard-widgets .dashboard-grid .metric-card { min-height: 96px; }
+.dashboard-widgets .spacious-card .ant-card-head { min-height: 42px; padding: 0 12px; }
+.dashboard-widgets .spacious-card .ant-card-head-title { font-size: 13px; }
+.dashboard-widgets .spacious-card .ant-card-body { padding: 10px 12px !important; }
+.dashboard-widgets .pipeline-list { gap: 0; }
+.dashboard-widgets .pipeline-row { gap: 5px; padding: 8px 0; }
+.dashboard-widgets .pipeline-row .ant-typography { font-size: 13px; }
+.dashboard-widgets .pipeline-row .ant-progress { line-height: 1; }
+.dashboard-widgets .dashboard-mini-grid { gap: 8px; }
+.dashboard-widgets .dashboard-mini-card { gap: 2px; padding: 10px; }
+.dashboard-widgets .dashboard-mini-card h4 { font-size: 18px; line-height: 1.2; }
+.dashboard-widgets .dashboard-mini-card .ant-typography { font-size: 13px; line-height: 1.35; }
 @media (max-width: 1100px) { .dashboard-feed-layout { grid-template-columns: 1fr; } .dashboard-widgets .dashboard-grid > .ant-col { width: auto; } }
 @media (max-width: 620px) { .feed-titlebar { align-items: start; flex-direction: column; gap: 3px; } .feed-composer__actions { align-items: stretch; flex-direction: column; gap: 10px; } .feed-composer__actions > .ant-space { justify-content: space-between; } .dashboard-home-heading { align-items: start; flex-direction: column; gap: 12px; } .dashboard-today-meta { width: 100%; } .dashboard-time-card, .dashboard-date-chip { flex: 1; min-width: 0; } }
 
@@ -4756,7 +4774,7 @@ textarea.ant-input {
 .calendar-planner-layout {
   display: grid;
   gap: 16px;
-  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) 400px;
 }
 
 .calendar-header-controls {
@@ -4778,10 +4796,9 @@ textarea.ant-input {
 }
 
 .calendar-planner-sticky {
+  align-self: start;
   display: grid;
   gap: 16px;
-  position: sticky;
-  top: 82px;
 }
 
 .calendar-planner-filters {
@@ -4841,6 +4858,258 @@ textarea.ant-input {
 
 .coordination-calendar .fc-highlight {
   background: color-mix(in srgb, var(--app-primary) 20%, transparent);
+}
+
+.staff-day-calendar {
+  background: var(--app-surface);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  height: 100%;
+  min-height: 720px;
+  overflow: hidden;
+}
+
+.staff-day-calendar__scroll {
+  height: 100%;
+  overflow: auto;
+}
+
+.staff-day-calendar__grid {
+  --staff-day-label-width: 184px;
+  display: grid;
+  grid-template-columns: var(--staff-day-label-width) minmax(1152px, 1fr);
+  min-width: 1336px;
+}
+
+.staff-day-calendar__corner,
+.staff-day-calendar__hours {
+  background: color-mix(in srgb, var(--app-surface) 96%, var(--app-primary));
+  border-bottom: 1px solid var(--app-line);
+  min-height: 46px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.staff-day-calendar__corner {
+  align-items: center;
+  border-right: 1px solid var(--app-line);
+  color: var(--app-text-soft);
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 14px;
+  left: 0;
+  z-index: 4;
+}
+
+.staff-day-calendar__hours {
+  display: grid;
+  grid-template-columns: repeat(var(--staff-day-hour-count), minmax(72px, 1fr));
+}
+
+.staff-day-calendar__hours span {
+  align-items: center;
+  border-right: 1px solid var(--app-line);
+  color: var(--app-text-soft);
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  justify-content: center;
+}
+
+.staff-day-calendar__row {
+  display: contents;
+}
+
+.staff-day-calendar__person {
+  align-items: center;
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-line);
+  border-right: 1px solid var(--app-line);
+  display: flex;
+  gap: 9px;
+  min-height: 64px;
+  padding: 8px 12px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+.staff-day-calendar__person > div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.staff-day-calendar__person strong,
+.staff-day-calendar__person span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-day-calendar__person strong {
+  color: var(--app-text);
+  font-size: 13px;
+}
+
+.staff-day-calendar__person span {
+  color: var(--app-text-soft);
+  font-size: 11px;
+}
+
+.staff-day-calendar__timeline {
+  background-image: linear-gradient(to right, var(--app-line) 1px, transparent 1px);
+  background-size: calc(100% / var(--staff-day-hour-count)) 100%;
+  border-bottom: 1px solid var(--app-line);
+  display: grid;
+  grid-template-columns: repeat(var(--staff-day-hour-count), minmax(72px, 1fr));
+  min-height: 64px;
+  position: relative;
+}
+
+.staff-day-calendar__hour-cell {
+  border-right: 1px dashed color-mix(in srgb, var(--app-line) 75%, transparent);
+}
+
+.staff-day-calendar__event {
+  background: var(--app-primary);
+  border: 0;
+  border-radius: 6px;
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--app-primary) 25%, transparent);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  gap: 1px;
+  min-width: 34px;
+  overflow: hidden;
+  padding: 6px 8px;
+  position: absolute;
+  text-align: left;
+  top: 8px;
+  z-index: 1;
+}
+
+.staff-day-calendar__event:hover {
+  filter: brightness(0.96);
+}
+
+.staff-day-calendar__event strong,
+.staff-day-calendar__event span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-day-calendar__event strong {
+  font-size: 12px;
+}
+
+.staff-day-calendar__event span {
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.staff-day-timeline {
+  background: var(--app-surface);
+  border: 1px solid var(--app-line);
+  border-radius: var(--app-radius);
+  min-height: 720px;
+  overflow: hidden;
+}
+
+.staff-day-timeline .react-calendar-timeline {
+  border: 0;
+  color: var(--app-text);
+  font-family: inherit;
+}
+
+.staff-day-timeline .rct-header-root,
+.staff-day-timeline .rct-sidebar-header {
+  background: color-mix(in srgb, var(--app-surface) 96%, var(--app-primary));
+  border-color: var(--app-line);
+}
+
+.staff-day-timeline .rct-dateHeader {
+  background: color-mix(in srgb, var(--app-surface) 96%, var(--app-primary));
+  border-color: var(--app-line);
+  color: var(--app-text-soft);
+  font-weight: 700;
+}
+
+.staff-day-timeline__sidebar-header {
+  align-items: center;
+  background: color-mix(in srgb, var(--app-surface) 96%, var(--app-primary));
+  border-bottom: 1px solid var(--app-line);
+  border-right: 1px solid var(--app-line);
+  color: var(--app-text-soft);
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  height: 100%;
+  padding: 0 12px;
+}
+
+.staff-day-timeline .rct-sidebar {
+  border-color: var(--app-line);
+}
+
+.staff-day-timeline .rct-sidebar-row {
+  background: var(--app-surface);
+  border-color: var(--app-line);
+}
+
+.staff-day-timeline .rct-horizontal-lines .rct-hl-even,
+.staff-day-timeline .rct-horizontal-lines .rct-hl-odd,
+.staff-day-timeline .rct-vertical-lines .rct-vl {
+  border-color: var(--app-line);
+}
+
+.staff-day-timeline .rct-item {
+  background: var(--app-primary);
+  border: 0;
+  border-radius: 6px;
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--app-primary) 25%, transparent);
+  color: #fff;
+}
+
+.staff-day-timeline .rct-item:hover {
+  filter: brightness(0.96);
+}
+
+.staff-timeline-person {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+  height: 100%;
+  line-height: normal;
+  padding: 0 10px;
+}
+
+.staff-timeline-person__copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.staff-timeline-person strong,
+.staff-timeline-person small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-timeline-person strong {
+  color: var(--app-text);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.staff-timeline-person small {
+  color: var(--app-text-soft);
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .calendar-summary-grid {

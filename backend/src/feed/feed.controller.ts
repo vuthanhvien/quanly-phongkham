@@ -9,6 +9,7 @@ export class FeedController {
 
   @Get() list(@Query('audience') audience: string | undefined, @Request() request: { user: AuthUser }) { return this.feed.list(request.user, audience); }
   @Get('link-preview') previewLink(@Query('url') url: string, @Request() request: { user: AuthUser }) { return this.feed.previewLink(url, request.user); }
+  @Get(':postId/likes') listPostLikes(@Param('postId') postId: string, @Request() request: { user: AuthUser }) { return this.feed.listPostLikes(postId, request.user); }
   @Post('images') @UseInterceptors(FilesInterceptor('files', 30))
   uploadImages(@UploadedFiles() files: any[], @Request() request: { user: AuthUser }) { return this.feed.uploadImages(files, request.user); }
   @Post() create(@Body() payload: Record<string, unknown>, @Request() request: { user: AuthUser }) { return this.feed.create(payload, request.user); }

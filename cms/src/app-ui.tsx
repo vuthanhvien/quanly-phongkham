@@ -100,7 +100,7 @@ export const defaultAppUiSettings: AppUiSettings = {
   companyType: 'clinic',
   enabledModules: [],
   hasCustomModuleSelection: false,
-  appName: 'Thiện Chánh CMS',
+  appName: 'Clinic CMS',
   appIconUrl: '',
   primaryColor: '#e889ae',
   pageBgColor: '#f5f6fa',

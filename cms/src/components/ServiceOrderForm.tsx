@@ -3,6 +3,7 @@ import { Button, Card, Form, Input, InputNumber, Select, Space, Table, Typograph
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
+import { currentLocalDate } from "../utils/datetime"
 import { getFirstOptionValue } from "../utils/branchDefaults"
 import { getApiErrorMessage } from "../utils/apiError"
 import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
@@ -71,7 +72,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       const defaultItems = normalizeItems(initialValues?.items)
       form.setFieldsValue({
         status: "DRAFT",
-        orderDate: new Date().toISOString().slice(0, 10),
+        orderDate: currentLocalDate(),
         items: defaultItems.length > 0 ? defaultItems : [createEmptyItem()],
         ...(initialValues || {}),
       })

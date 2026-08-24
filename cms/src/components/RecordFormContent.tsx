@@ -39,12 +39,13 @@ import { controlHeightBySize, useAppUi } from "../app-ui"
 import { FileUploadPanel } from "./FileUploadPanel"
 import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
 import { getRelationMetaMap, loadRelationOptions, LookupMap, RelationLookupRecord } from "../relations"
+import { getCachedMasterData } from "../utils/masterDataCache"
 import { getApiErrorMessage } from "../utils/apiError"
 import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
 import { getFirstLookupValue } from "../utils/branchDefaults"
 import { getInputPatternConfig, isInputPatternComplete } from "../input-patterns"
 import { toastError, toastSuccess } from "../toast"
-import { buildLocalDateTime, currentLocalDate, currentLocalDateTime, normalizeDateTimeValueForInput, normalizeDateValueForInput, parseClinicDateTime } from "../utils/datetime"
+import { buildLocalDateTime, currentLocalDate, currentLocalDateTime, formatClinicDateTimeForApi, normalizeDateTimeValueForInput, normalizeDateValueForInput, parseClinicDateTime } from "../utils/datetime"
 import { buildFolderPathMap, buildFolderTree, FolderTreeNode, normalizeFileFolderRows } from "../utils/fileFolders"
 import { VietnamAddressFields } from './VietnamAddressFields'
 import {
@@ -127,16 +128,16 @@ export function RecordFormContent({
 
   useEffect(() => {
     Promise.all([
-      api.get("/settings/custom-fields", { params: { entityType: resource } }),
-      api.get("/settings/views", { params: { entityType: resource } }),
-      api.get("/settings/custom-tables", { params: { includeRows: true } }),
+      getCachedMasterData(`form-config:custom-fields:${resource}`, () => api.get("/settings/custom-fields", { params: { entityType: resource } }).then((response) => response.data)),
+      getCachedMasterData(`form-config:views:${resource}`, () => api.get("/settings/views", { params: { entityType: resource } }).then((response) => response.data)),
+      getCachedMasterData("form-config:custom-tables", () => api.get("/settings/custom-tables", { params: { includeRows: true } }).then((response) => response.data)),
       resource === "leave-requests" || resource === "leave-allocations"
-        ? api.get("/records/leave-types", { params: { pageSize: 100 } })
-        : Promise.resolve({ data: { data: [] } }),
+        ? getCachedMasterData("relation:leave-types", () => api.get("/records/leave-types", { params: { pageSize: 100 } }).then((response) => response.data))
+        : Promise.resolve({ data: [] }),
     ])
       .then(async ([fieldResponse, viewResponse, tableResponse, leaveTypesResponse]) => {
-        const tables = new Map((tableResponse.data.data || []).map((table: Record<string, unknown>) => [String(table.id), table]))
-        const customFields = fieldResponse.data.data.filter(
+        const tables = new Map((tableResponse.data || []).map((table: Record<string, unknown>) => [String(table.id), table]))
+        const customFields = fieldResponse.data.filter(
           (field: CustomField) => field.isActive,
         ).map((field: CustomField) => {
           if (field.dataType !== "dynamic-table") return field
@@ -151,12 +152,12 @@ export function RecordFormContent({
             }),
           }
         })
-        const leaveTypeOptions = (leaveTypesResponse.data.data || [])
+        const leaveTypeOptions = (Array.isArray(leaveTypesResponse.data) ? leaveTypesResponse.data : [])
           .filter((item: Record<string, unknown>) => item.isActive !== false)
           .map((item: Record<string, unknown>) => ({ value: String(item.code), label: String(item.name || item.code) }))
         const nextFields = getVisibleFieldConfigs(
           getFieldCatalog(resource, customFields),
-          viewResponse.data.data as ViewSettingRecord[],
+          viewResponse.data as ViewSettingRecord[],
           "FORM",
           viewRole || getStoredUserRole(),
         )
@@ -168,8 +169,8 @@ export function RecordFormContent({
           ),
         )
         const masterOptions = await Promise.all(masterFields.map(async (field) => {
-          const response = await api.get("/master-data", { params: { group: `${resource}.${field.key}` } })
-          return [field.key, (response.data.data || []).filter((item: Record<string, unknown>) => item.isActive !== false).map((item: Record<string, unknown>) => ({ value: String(item.value), label: String(item.name) }))] as const
+          const rows = await getCachedMasterData(`master-data:${resource}.${field.key}`, () => api.get("/master-data", { params: { group: `${resource}.${field.key}` } }).then((response) => response.data.data || []))
+          return [field.key, rows.filter((item: Record<string, unknown>) => item.isActive !== false).map((item: Record<string, unknown>) => ({ value: String(item.value), label: String(item.name) }))] as const
         }))
         const masterOptionMap = new Map(masterOptions)
         const fieldsWithMasterData = nextFields.map((field) => {
@@ -290,9 +291,9 @@ export function RecordFormContent({
     if (isWorkScheduleForm) {
       applyWorkScheduleEditorValues(mergedValues)
     }
-    const baseKeys = new Set(
-      getFieldCatalog(resource, []).map((field) => field.key),
-    )
+    const fieldCatalog = getFieldCatalog(resource, [])
+    const baseKeys = new Set(fieldCatalog.map((field) => field.key))
+    const datetimeKeys = new Set(fieldCatalog.filter((field) => field.type === "datetime").map((field) => field.key))
     if (isAddressForm) ["countryCode", "provinceCode", "provinceName", "wardCode", "wardName", "addressLine", "address"].forEach((key) => baseKeys.add(key))
     if (isAddressForm) {
       const province = String(mergedValues.provinceName || "").trim()
@@ -305,7 +306,7 @@ export function RecordFormContent({
     }
     const payload: Record<string, unknown> = { customFields: {} }
     Object.entries(mergedValues).forEach(([key, value]) => {
-      if (baseKeys.has(key)) payload[key] = value
+      if (baseKeys.has(key)) payload[key] = datetimeKeys.has(key) ? formatClinicDateTimeForApi(value) : value
       else (payload.customFields as Record<string, unknown>)[key] = value
     })
     return payload
@@ -754,7 +755,7 @@ function TimeInput({
       disabled={disabled}
       mask={inputPattern.mask}
       placeholder="HH:MM"
-      maskChar="_"
+      maskPlaceholder="_"
       alwaysShowMask
       value={value || ""}
       onChange={(event: ChangeEvent<HTMLInputElement>) => onChange?.(event.target.value)}
@@ -803,22 +804,22 @@ function applyAppointmentDateTimeValues(values: Record<string, unknown>) {
   const startText = String(values.appointmentStartTime || "").trim()
   if (!dateText || !startText) return
 
-  const start = dayjs(`${dateText}T${startText}`)
+  const start = parseClinicDateTime(`${dateText}T${startText}`)
   if (!start.isValid()) return
 
   const useCustomEndTime = values.appointmentDurationMinutes === "custom"
   const durationMinutes = Number(values.appointmentDurationMinutes || 60)
   const customEndText = String(values.appointmentEndTime || "").trim()
   let end = useCustomEndTime && customEndText
-    ? dayjs(`${dateText}T${customEndText}`)
+    ? parseClinicDateTime(`${dateText}T${customEndText}`)
     : start.add(durationMinutes > 0 ? durationMinutes : 60, "minute")
 
   if (!end.isValid() || !end.isAfter(start)) {
     end = start.add(durationMinutes > 0 ? durationMinutes : 60, "minute")
   }
 
-  values.startTime = buildLocalDateTime(start, start.hour(), start.minute())
-  values.endTime = buildLocalDateTime(end, end.hour(), end.minute())
+  values.startTime = formatClinicDateTimeForApi(start)
+  values.endTime = formatClinicDateTimeForApi(end)
 
   delete values.appointmentDate
   delete values.appointmentStartTime
@@ -831,8 +832,8 @@ function applyWorkScheduleEditorValues(values: Record<string, unknown>) {
   const scheduleStartTime = String(values.scheduleStartTime || "").trim()
   const scheduleEndTime = String(values.scheduleEndTime || "").trim()
   if (scheduleDate) values.workDate = scheduleDate
-  if (scheduleDate && scheduleStartTime) values.startTime = `${scheduleDate}T${scheduleStartTime}`
-  if (scheduleDate && scheduleEndTime) values.endTime = `${scheduleDate}T${scheduleEndTime}`
+  if (scheduleDate && scheduleStartTime) values.startTime = formatClinicDateTimeForApi(`${scheduleDate}T${scheduleStartTime}`)
+  if (scheduleDate && scheduleEndTime) values.endTime = formatClinicDateTimeForApi(`${scheduleDate}T${scheduleEndTime}`)
 
   values.recurrenceType = "DAILY"
   values.recurrenceInterval = 1
@@ -874,7 +875,7 @@ function ClinicDateInput({
   placeholder?: string
   showTime?: boolean
 }) {
-  const parsedValue = value ? dayjs(value) : null
+  const parsedValue = value ? (showTime ? parseClinicDateTime(value) : dayjs(value)) : null
   return (
     <DatePicker
       allowClear
@@ -884,7 +885,7 @@ function ClinicDateInput({
       showTime={showTime ? { format: "HH:mm" } : undefined}
       style={{ width: "100%" }}
       value={parsedValue?.isValid() ? parsedValue : null}
-      onChange={(date) => onChange?.(date ? date.format(showTime ? "YYYY-MM-DDTHH:mm" : "YYYY-MM-DD") : undefined)}
+      onChange={(date) => onChange?.(date ? (showTime ? formatClinicDateTimeForApi(date) : date.format("YYYY-MM-DD")) : undefined)}
     />
   )
 }
@@ -1072,7 +1073,7 @@ function FieldInput({
         disabled={field.disabled}
         mask={inputPattern.mask}
         placeholder={placeholder}
-        maskChar="_"
+        maskPlaceholder="_"
         alwaysShowMask
         value={String(value ?? "")}
         onChange={(event: ChangeEvent<HTMLInputElement>) => onChange?.(event.target.value)}

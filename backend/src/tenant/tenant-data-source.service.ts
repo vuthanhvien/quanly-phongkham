@@ -22,7 +22,9 @@ function connectionOptions(databaseUrl: string, entities: DataSourceOptions['ent
     // Required for Vietnamese labels/defaults in both the management DB and
     // tenant DBs. This affects new connections; existing databases should
     // still have their default charset migrated to utf8mb4 once.
-    ...(type === 'mysql' ? { charset: 'utf8mb4' } : {}),
+    // Apply UTC+7 to each app connection. This is safer than changing the
+    // MySQL server-global setting when the server can host other databases.
+    ...(type === 'mysql' ? { charset: 'utf8mb4', timezone: '+07:00' } : {}),
   } as DataSourceOptions;
 }
 

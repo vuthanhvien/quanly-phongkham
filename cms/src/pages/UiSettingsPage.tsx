@@ -418,7 +418,7 @@ export function UiSettingsPage() {
                   </Col>
                   <Col md={12} xs={24}>
                     <Form.Item label="Tên app" name="appName" rules={[{ required: true, message: 'Nhập tên app' }]}>
-                      <Input placeholder="Ví dụ: Thiện Chánh CMS" />
+                      <Input placeholder="Ví dụ: CMS của bạn" />
                     </Form.Item>
                   </Col>
                   <Col md={12} xs={24}>

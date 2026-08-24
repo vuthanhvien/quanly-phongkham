@@ -8,6 +8,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import * as XLSX from "xlsx"
 import { api } from "../api"
 import { getApiErrorMessage } from "../utils/apiError"
+import { formatClinicDateTimeForApi, parseClinicDateTime } from "../utils/datetime"
 import { baseFields, CustomField, entityLabels, FieldSpec, relationFields } from "../models"
 import { displayValue, loadRelationOptions, LookupMap } from "../relations"
 import { getFieldCatalog } from "../view-settings"
@@ -722,11 +723,11 @@ function generateFakeFieldValue(
   }
 
   if (field.type === "date") {
-    return faker.date.soon({ days: 30 }).toISOString().slice(0, 10)
+    return parseClinicDateTime(faker.date.soon({ days: 30 })).format("YYYY-MM-DD")
   }
 
   if (field.type === "datetime") {
-    return faker.date.soon({ days: 30 }).toISOString().slice(0, 16)
+    return formatClinicDateTimeForApi(faker.date.soon({ days: 30 })) || ""
   }
 
   if (String(field.type || "") === "boolean") {
@@ -1173,11 +1174,10 @@ function normalizeDateTimeValue(value: unknown) {
   if (!text) return undefined
   const normalized = text.replace(/\//g, "-").replace(" ", "T")
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
-    return normalized.length === 16 ? normalized : normalized.slice(0, 16)
+    return formatClinicDateTimeForApi(normalized)
   }
-  const parsed = new Date(normalized)
-  if (Number.isNaN(parsed.getTime())) return undefined
-  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`
+  const parsed = parseClinicDateTime(normalized)
+  return parsed.isValid() ? formatClinicDateTimeForApi(parsed) : undefined
 }
 
 function pad(value: number) {

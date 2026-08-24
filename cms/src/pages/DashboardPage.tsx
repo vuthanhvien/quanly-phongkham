@@ -18,6 +18,7 @@ import { CompanyFeed } from "../components/dashboard/CompanyFeed"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { getFieldLabel } from "../models"
 import { hasActionAccess, hasResourceAccess } from "../access"
+import { clinicNow, parseClinicDateTime } from "../utils/datetime"
 import type {
   DashboardMetric,
   DashboardPipeline,
@@ -150,7 +151,7 @@ export function DashboardPage() {
       fetchListSafe<Record<string, any>>("payrolls"),
     ])
 
-    const today = dayjs()
+    const today = clinicNow()
     const appointmentRows = appointments.data || []
     const workScheduleRows = workSchedules.data || []
     const customerRows = customers.data || []
@@ -215,7 +216,7 @@ export function DashboardPage() {
     if (!identity?.staffId) return
     setStaffActionLoading("checkin")
     try {
-      const currentTime = dayjs()
+      const currentTime = clinicNow()
       const today = currentTime.format("YYYY-MM-DD")
       const existing = staffDashboard?.todayAttendance?.id
       if (existing) {
@@ -248,7 +249,7 @@ export function DashboardPage() {
     setStaffActionLoading("checkout")
     try {
       await api.patch(`/records/attendances/${staffDashboard.todayAttendance.id}`, {
-        checkOut: dayjs().format("HH:mm"),
+        checkOut: clinicNow().format("HH:mm"),
       })
       message.success("Đã check-out")
       const nextStaffDashboard = await loadStaffDashboard(identity || {})
@@ -300,8 +301,8 @@ export function DashboardPage() {
           initialValues={{
             staffId: identity?.staffId,
             branchId: identity?.branchId,
-            startDate: dayjs().format("YYYY-MM-DD"),
-            endDate: dayjs().format("YYYY-MM-DD"),
+            startDate: clinicNow().format("YYYY-MM-DD"),
+            endDate: clinicNow().format("YYYY-MM-DD"),
             status: "pending",
             leaveType: "annual",
           }}
@@ -320,7 +321,7 @@ export function DashboardPage() {
 
 async function loadStaffDashboard(identity: Identity): Promise<StaffDashboardData | null> {
   if (!identity.staffId) return null
-  const today = dayjs()
+  const today = clinicNow()
   const [staffResponse, departments, branches, workSchedules, attendances, leaveRequests] = await Promise.all([
     api.get(`/records/staff/${identity.staffId}`).catch(() => null),
     fetchListSafe<Record<string, any>>("departments", 500),
@@ -338,10 +339,10 @@ async function loadStaffDashboard(identity: Identity): Promise<StaffDashboardDat
   const ownLeaves = (leaveRequests.data || []).filter((item) => String(item.staffId) === identity.staffId)
   const todayShift = ownSchedules
     .filter((item) => isSameDay(item.workDate || item.startTime, today))
-    .sort((left, right) => dayjs(left.startTime || left.workDate).valueOf() - dayjs(right.startTime || right.workDate).valueOf())[0]
+    .sort((left, right) => parseClinicDateTime(left.startTime || left.workDate).valueOf() - parseClinicDateTime(right.startTime || right.workDate).valueOf())[0]
   const todayAttendance = ownAttendances
     .filter((item) => String(item.date) === today.format("YYYY-MM-DD"))
-    .sort((left, right) => dayjs(right.updatedAt || right.createdAt || right.date).valueOf() - dayjs(left.updatedAt || left.createdAt || left.date).valueOf())[0]
+    .sort((left, right) => parseClinicDateTime(right.updatedAt || right.createdAt || right.date).valueOf() - parseClinicDateTime(left.updatedAt || left.createdAt || left.date).valueOf())[0]
   const latestLeave = [...ownLeaves].sort((left, right) => dayjs(right.startDate).valueOf() - dayjs(left.startDate).valueOf())[0]
 
   return {
@@ -352,7 +353,7 @@ async function loadStaffDashboard(identity: Identity): Promise<StaffDashboardDat
     todayShift: todayShift
       ? {
           label: String(todayShift.shiftLabel || "Ca làm"),
-          time: [todayShift.startTime ? dayjs(todayShift.startTime).format("HH:mm") : undefined, todayShift.endTime ? dayjs(todayShift.endTime).format("HH:mm") : undefined].filter(Boolean).join(" - ") || "Chưa có giờ cụ thể",
+          time: [todayShift.startTime ? parseClinicDateTime(todayShift.startTime).format("HH:mm") : undefined, todayShift.endTime ? parseClinicDateTime(todayShift.endTime).format("HH:mm") : undefined].filter(Boolean).join(" - ") || "Chưa có giờ cụ thể",
           status: getFieldLabel("work-schedules", "status", String(todayShift.status || "PLANNED")),
         }
       : undefined,
