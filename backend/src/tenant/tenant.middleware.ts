@@ -26,7 +26,14 @@ export class TenantMiddleware implements NestMiddleware {
     // tenant database owns the connection.
     // Provisioning runs server-to-server, therefore it has no Origin. Its
     // internal-secret-protected endpoint explicitly supplies the target tenant.
-    const host = callbackDomain || seedDomain || originHost || String(req.headers['x-forwarded-host'] || req.headers.host || '');
+    const forwardedHost = String(req.headers['x-forwarded-host'] || '').trim();
+    const directHost = String(req.headers.host || '').trim();
+    // Local browser checks use localhost and cannot attach the tenant header.
+    // A configured fallback makes those requests resolve the same tenant as the
+    // customer app, without changing production host-based tenant resolution.
+    const isLocalHost = /^(localhost|127\.0\.0\.1|::1)(?::\d+)?$/i.test(directHost);
+    const localTenantDomain = isLocalHost ? String(process.env.DEFAULT_TENANT_DOMAIN || '').trim() : '';
+    const host = callbackDomain || seedDomain || originHost || forwardedHost || localTenantDomain || directHost;
     const tenant = await this.tenants.resolveHost(host);
     this.context.run(tenant, next);
   }

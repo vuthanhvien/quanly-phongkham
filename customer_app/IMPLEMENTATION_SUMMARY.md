@@ -20,7 +20,7 @@ Nội dung bài viết, đội ngũ, dịch vụ, thông tin phòng khám, chat 
 
 - State/routing: GetX.
 - Lưu phiên: GetStorage (access token và hồ sơ khách hàng).
-- API mặc định: `http://localhost:3000/api`; có thể đổi khi build/chạy bằng `--dart-define=API_BASE_URL=...`.
+- API mặc định: `http://localhost:9998/api`; có thể đổi khi build/chạy bằng `--dart-define=API_BASE_URL=...`.
 - Giao diện: Material 3, font Plus Jakarta Sans, bộ màu hồng đồng bộ CMS; có loading, empty state, pull-to-refresh và nhãn trạng thái.
 
 ## UI và luồng đã có

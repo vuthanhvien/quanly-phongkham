@@ -4470,7 +4470,7 @@ export class RecordsService {
     if (resource === 'videos') {
       if (!String(value.slug || '').trim()) throw new BadRequestException('Slug là bắt buộc');
       if (!String(value.title || '').trim()) throw new BadRequestException('Tiêu đề video là bắt buộc');
-      if (!String(value.videoUrl || '').trim()) throw new BadRequestException('Link video là bắt buộc');
+      if (!String(value.videoUrl || '').trim()) throw new BadRequestException('Video là bắt buộc');
     }
 
     if (resource === 'accounting-chart-accounts') {

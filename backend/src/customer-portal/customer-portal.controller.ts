@@ -76,7 +76,6 @@ function safeCustomer(customer: Customer) {
 }
 
 @Controller('customer-portal')
-@Public()
 @UseGuards(CustomerJwtAuthGuard)
 export class CustomerPortalController {
   constructor(
@@ -240,15 +239,17 @@ export class CustomerPortalController {
   }
 
   @Get('branches')
+  @Public()
   async listBranches() {
     const data = await this.branches.find({ where: { isActive: true }, order: { name: 'ASC' } });
     return { data };
   }
 
   @Get('services')
+  @Public()
   async listServices() {
     const data = await this.services.find({
-      where: { status: 'PUBLISHED', isArchived: false },
+      where: { status: 'PUBLISHED' },
       order: { publishedAt: 'DESC', createdAt: 'DESC' },
     });
     return {
@@ -267,9 +268,10 @@ export class CustomerPortalController {
   }
 
   @Get('posts')
+  @Public()
   async listPosts() {
     const data = await this.posts.find({
-      where: { status: 'PUBLISHED', isArchived: false },
+      where: { status: 'PUBLISHED' },
       order: { publishedAt: 'DESC', createdAt: 'DESC' },
       take: 50,
     });
@@ -277,9 +279,10 @@ export class CustomerPortalController {
   }
 
   @Get('news')
+  @Public()
   async listNews() {
     const data = await this.news.find({
-      where: { status: 'PUBLISHED', isArchived: false },
+      where: { status: 'PUBLISHED' },
       order: { publishedAt: 'DESC', createdAt: 'DESC' },
       take: 50,
     });
@@ -287,9 +290,10 @@ export class CustomerPortalController {
   }
 
   @Get('videos')
+  @Public()
   async listVideos() {
     const data = await this.videos.find({
-      where: { status: 'PUBLISHED', isArchived: false },
+      where: { status: 'PUBLISHED' },
       order: { publishedAt: 'DESC', createdAt: 'DESC' },
       take: 50,
     });
@@ -297,9 +301,10 @@ export class CustomerPortalController {
   }
 
   @Get('doctors')
+  @Public()
   async listDoctors() {
     const data = await this.doctors.find({
-      where: { status: 'PUBLISHED', isArchived: false },
+      where: { status: 'PUBLISHED' },
       order: { publishedAt: 'DESC', createdAt: 'DESC' },
     });
     return { data: data.map(({ id, slug, fullName, imageUrl, specialty, experience, excerpt, content }) => ({ id, code: slug, fullName, avatarUrl: imageUrl, position: specialty, experience, excerpt, content })) };

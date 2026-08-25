@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart' hide Response;
 import 'package:get_storage/get_storage.dart';
-import '../../routes/app_routes.dart';
+import '../session/session_controller.dart';
 import '../storage/storage_keys.dart';
 import 'env.dart';
 
@@ -27,10 +27,14 @@ class ApiClient {
         },
         onError: (error, handler) {
           if (error.response?.statusCode == 401) {
-            _storage.remove(StorageKeys.accessToken);
-            _storage.remove(StorageKeys.customerProfile);
-            if (Get.currentRoute != AppRoutes.phoneEntry) {
-              Get.offAllNamed(AppRoutes.phoneEntry);
+            // Expired/invalid customer sessions are cleared in place. Login is
+            // optional for public pages, so a 401 must not interrupt the user
+            // by forcibly navigating away from the current screen.
+            if (Get.isRegistered<SessionController>()) {
+              Get.find<SessionController>().logout();
+            } else {
+              _storage.remove(StorageKeys.accessToken);
+              _storage.remove(StorageKeys.customerProfile);
             }
           }
           handler.next(error);

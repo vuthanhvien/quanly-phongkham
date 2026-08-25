@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/demo/clinic_content.dart';
 import '../../routes/app_routes.dart';
+import '../../widgets/app_page.dart';
 import 'home_controller.dart';
 
 class ContentListScreen extends StatelessWidget {
@@ -22,8 +23,9 @@ class ContentListScreen extends StatelessWidget {
         : isPosts
         ? 'Posts'
         : 'Tin từ phòng khám';
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
+    return AppPage(
+      title: title,
+      onRefresh: home.load,
       body: Obx(() {
         final List<Object> items = isServices
             ? List<Object>.from(home.services)
@@ -33,6 +35,7 @@ class ContentListScreen extends StatelessWidget {
             ? List<Object>.from(home.posts)
             : List<Object>.from(home.news);
         return ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           itemCount: items.length,
           separatorBuilder: (_, _) => const SizedBox(height: 12),

@@ -1005,6 +1005,16 @@ function FieldInput({
       />
     )
   }
+  if (field.type === "video") {
+    return (
+      <VideoUploadInput
+        disabled={field.disabled}
+        onChange={onChange}
+        placeholder={placeholder}
+        value={value}
+      />
+    )
+  }
   if (field.type === "image" || field.key === "imageUrl") {
     return (
       <ImageLibrarySelectInput
@@ -1214,6 +1224,68 @@ interface FileLibraryOption {
   isImage: boolean
   mimeType: string
   extension: string
+}
+
+/** Stores the public URL, rather than an internal file id, so customer apps
+ * can play the uploaded short video without accessing the CMS file library. */
+function VideoUploadInput({
+  value,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  value?: unknown
+  onChange?: (value: unknown) => void
+  disabled?: boolean
+  placeholder?: string
+}) {
+  const screens = Grid.useBreakpoint()
+  const [openUpload, setOpenUpload] = useState(false)
+  const videoUrl = typeof value === "string" ? value : ""
+
+  return (
+    <Space direction="vertical" size={8} style={{ width: "100%" }}>
+      {videoUrl ? (
+        <video
+          controls
+          preload="metadata"
+          src={resolveFileUrl(videoUrl)}
+          style={{ width: "100%", maxHeight: 260, borderRadius: 8, background: "#101828" }}
+        />
+      ) : null}
+      <Space.Compact style={{ width: "100%" }}>
+        <Input disabled placeholder={placeholder} value={videoUrl || undefined} />
+        <Button disabled={disabled} onClick={() => setOpenUpload(true)}>
+          {videoUrl ? "Thay video" : "Upload video"}
+        </Button>
+      </Space.Compact>
+      {videoUrl ? (
+        <Button disabled={disabled} type="link" style={{ width: "fit-content", padding: 0 }} onClick={() => onChange?.(undefined)}>
+          Bỏ video
+        </Button>
+      ) : null}
+      <Modal
+        destroyOnHidden
+        footer={null}
+        maskClosable={false}
+        open={openUpload}
+        title="Upload video ngắn"
+        width={screens.md ? 620 : "calc(100vw - 16px)"}
+        onCancel={() => setOpenUpload(false)}
+      >
+        <FileUploadPanel
+          accept="video/*"
+          multiple={false}
+          onCancel={() => setOpenUpload(false)}
+          onSuccess={(files) => {
+            const uploadedUrl = resolveFileUrl(files[0]?.publicUrl)
+            if (uploadedUrl) onChange?.(uploadedUrl)
+            setOpenUpload(false)
+          }}
+        />
+      </Modal>
+    </Space>
+  )
 }
 
 function FileSelectInput({

@@ -43,11 +43,11 @@ class HomeController extends GetxController {
     isLoadingContent.value = true;
     try {
       final results = await Future.wait([
-        _lookupRepository.services(),
-        _lookupRepository.portalDoctors(),
-        _lookupRepository.posts(),
-        _lookupRepository.news(),
-        _lookupRepository.videos(),
+        _loadOrEmpty(_lookupRepository.services()),
+        _loadOrEmpty(_lookupRepository.portalDoctors()),
+        _loadOrEmpty(_lookupRepository.posts()),
+        _loadOrEmpty(_lookupRepository.news()),
+        _loadOrEmpty(_lookupRepository.videos()),
       ]);
       services.assignAll(results[0] as List<ClinicService>);
       doctors.assignAll(results[1] as List<ClinicDoctor>);
@@ -63,6 +63,17 @@ class HomeController extends GetxController {
       videos.clear();
     } finally {
       isLoadingContent.value = false;
+    }
+  }
+
+  /// Public content sources are independent. A tenant can publish Posts before
+  /// configuring Video/Service/Doctor, so one unavailable source must not hide
+  /// all the other content on Home.
+  Future<List<T>> _loadOrEmpty<T>(Future<List<T>> request) async {
+    try {
+      return await request;
+    } catch (_) {
+      return <T>[];
     }
   }
 

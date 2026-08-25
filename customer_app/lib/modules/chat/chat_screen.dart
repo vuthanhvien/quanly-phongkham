@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../../widgets/app_page.dart';
 
 class ChatScreen extends StatelessWidget {
   const ChatScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Tin nhắn'), centerTitle: true),
+  Widget build(BuildContext context) => AppPage(
+    title: 'Tin nhắn',
+    centerTitle: true,
+    onRefresh: () async {},
     body: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       children: const [
         _Conversation(

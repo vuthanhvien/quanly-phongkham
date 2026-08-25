@@ -1,3 +1,5 @@
+import '../../core/api/env.dart';
+
 class ClinicPost {
   const ClinicPost({
     this.id = '',
@@ -14,7 +16,7 @@ class ClinicPost {
     title: json['title'] as String? ?? '',
     excerpt: json['excerpt'] as String? ?? '',
     readTime: json['publishedAt'] as String? ?? '',
-    imageUrl: json['imageUrl'] as String? ?? '',
+    imageUrl: Env.resolvePublicUrl(json['imageUrl'] as String? ?? ''),
     content: json['content'] as String? ?? '',
   );
   final String id;
@@ -43,7 +45,7 @@ class ClinicDoctor {
     specialty: json['position'] as String? ?? 'Bác sĩ chuyên môn',
     experience: json['experience'] as String? ?? '',
     color: 0xFFE8A7C0,
-    imageUrl: json['avatarUrl'] as String? ?? '',
+    imageUrl: Env.resolvePublicUrl(json['avatarUrl'] as String? ?? ''),
     excerpt: json['excerpt'] as String? ?? '',
     content: json['content'] as String? ?? '',
   );
@@ -72,8 +74,10 @@ class ClinicService {
     name: json['name'] as String? ?? '',
     description: json['excerpt'] as String? ?? 'Dịch vụ chăm sóc',
     icon: '✦',
-    imageUrl: json['imageUrl'] as String? ?? '',
-    price: (json['sellingPrice'] as num?)?.toDouble() ?? 0,
+    imageUrl: Env.resolvePublicUrl(json['imageUrl'] as String? ?? ''),
+    // Decimal database columns are serialized by the API as strings
+    // (for example "2000000.00"), while demo/local data may be numeric.
+    price: _asDouble(json['sellingPrice']),
     content: json['content'] as String? ?? '',
   );
   final String id;
@@ -83,6 +87,11 @@ class ClinicService {
   final String imageUrl;
   final double price;
   final String content;
+}
+
+double _asDouble(dynamic value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '') ?? 0;
 }
 
 class ClinicVideo {
@@ -98,8 +107,8 @@ class ClinicVideo {
     id: json['id'] as String? ?? '',
     title: json['title'] as String? ?? '',
     excerpt: json['excerpt'] as String? ?? '',
-    imageUrl: json['imageUrl'] as String? ?? '',
-    videoUrl: json['videoUrl'] as String? ?? '',
+    imageUrl: Env.resolvePublicUrl(json['imageUrl'] as String? ?? ''),
+    videoUrl: Env.resolvePublicUrl(json['videoUrl'] as String? ?? ''),
   );
 
   final String id;

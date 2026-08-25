@@ -35,7 +35,7 @@ export interface FieldSpec {
   label: string;
   /** Default form/detail tab. A saved view can override this per field. */
   tab?: string;
-  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'checkbox' | 'textarea' | 'html' | 'relative' | 'file' | 'image' | 'images' | 'dynamic-table' | 'table';
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'checkbox' | 'textarea' | 'html' | 'relative' | 'file' | 'video' | 'image' | 'images' | 'dynamic-table' | 'table';
   displayFormat?: 'currency' | 'number' | 'percent' | 'time';
   required?: boolean;
   options?: SelectOption[];
@@ -81,7 +81,7 @@ const defaultFieldTabs: Record<string, Record<string, string>> = {
   },
   videos: {
     title: 'Thông tin chung', slug: 'Thông tin chung', videoUrl: 'Thông tin chung',
-    imageUrl: 'Nội dung', excerpt: 'Nội dung', content: 'Nội dung',
+    imageUrl: 'Thông tin chung', excerpt: 'Thông tin chung',
     publishedAt: 'Xuất bản', status: 'Xuất bản', isFeatured: 'Xuất bản',
   },
   posts: { title: 'Nội dung', slug: 'Nội dung', category: 'Nội dung', imageUrl: 'Nội dung', excerpt: 'Nội dung', content: 'Nội dung', authorName: 'Xuất bản', publishedAt: 'Xuất bản', status: 'Xuất bản', isFeatured: 'Xuất bản' },
@@ -439,10 +439,9 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
   videos: [
     { key: 'title', label: 'Tiêu đề', required: true, width: '66', tableWidth: 260 },
     { key: 'slug', label: 'Slug', required: true, width: '33', tableWidth: 180 },
-    { key: 'videoUrl', label: 'Link video', required: true, width: '100', tableWidth: 320, placeholder: 'YouTube, TikTok hoặc link video công khai' },
+    { key: 'videoUrl', label: 'Video', type: 'video', required: true, width: '100', tableWidth: 320, placeholder: 'Chọn hoặc upload video ngắn' },
     { key: 'imageUrl', label: 'Ảnh thumbnail', type: 'image', width: '50', tableWidth: 180 },
     { key: 'excerpt', label: 'Mô tả ngắn', type: 'textarea', width: '100', tableWidth: 320 },
-    { key: 'content', label: 'Nội dung', type: 'html', width: '100', tableWidth: 420 },
     { key: 'publishedAt', label: 'Ngày đăng', type: 'date', width: '33', tableWidth: 140 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'DRAFT', label: 'Nháp' }, { value: 'PUBLISHED', label: 'Đã đăng' }], defaultValue: 'DRAFT', width: '33', tableWidth: 130 },
     { key: 'isFeatured', label: 'Nổi bật', type: 'checkbox', defaultValue: false, width: '33', tableWidth: 120 },
