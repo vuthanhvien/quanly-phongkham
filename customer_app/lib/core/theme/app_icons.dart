@@ -38,7 +38,7 @@ class AppIcons {
   static const timePicker = PiconsFill.clockUser;
   static const info = PiconsFill.info;
   static const person = PiconsFill.user;
-  static const radio = PiconsFill.circle;
+  static const radio = PiconsRegular.circle;
   static const arrowRight = PiconsFill.arrowRight;
   static const sparkle = PiconsFill.sparkle;
   static const chart = PiconsFill.chartLineUp;

@@ -6,6 +6,8 @@ import { api } from "../api"
 import { getApiErrorMessage } from "../utils/apiError"
 import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
 import { RecordDraftControls } from "./RecordDraftControls"
+import { PrintTinyMceEditor } from "./PrintTinyMceEditor"
+import { ImageLibrarySelectInput } from "./RecordFormContent"
 
 interface ProductFormProps {
   id?: string
@@ -152,7 +154,11 @@ export function ProductForm({ id, compact, initialValues, onCancel, onSuccess }:
         <Form.Item label="Có biến thể" name="hasVariants" valuePropName="checked"><Switch /></Form.Item>
         <Form.Item label="Giá bán gói / SP" name="sellingPrice"><InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} /></Form.Item>
         <Form.Item label="Tồn tối thiểu" name="minStockLevel"><InputNumber formatter={formatNumberInput} min={0} parser={parseNumberInput} style={{ width: "100%" }} /></Form.Item>
+        <Form.Item label="Hình ảnh" name="imageUrl"><ImageLibrarySelectInput /></Form.Item>
+        <Form.Item label="Nổi bật trên app" name="isFeatured" valuePropName="checked"><Switch /></Form.Item>
       </div>
+      <Form.Item label="Thông tin ngắn" name="excerpt"><Input.TextArea rows={3} /></Form.Item>
+      <Form.Item label="Nội dung hiển thị trên app" name="content"><PrintTinyMceEditor /></Form.Item>
       {hasVariants ? <Card className="glass-card service-order-items-card" title="Biến thể / SKU" extra={<Button htmlType="button" icon={<PlusOutlined />} onClick={() => setVariants([...normalizeVariantItems(form.getFieldValue("variants")), { sellingPrice: Number(form.getFieldValue("sellingPrice") || 0), isActive: true }])}>Thêm biến thể</Button>}><Table columns={variantColumns} dataSource={variantRows} pagination={false} rowKey="key" scroll={{ x: 800 }} /></Card> : null}
       {productType === "COMBO" && <Card className="glass-card service-order-items-card" title="Thành phần của combo" extra={<Button htmlType="button" icon={<PlusOutlined />} onClick={() => setBundleItems([...normalizeBundleItems(form.getFieldValue("bundleItems")), { quantity: 1 }])}>Thêm thành phần</Button>}>
         <Typography.Paragraph type="secondary">Khi chọn combo trong đơn, các thành phần này sẽ tự được thêm vào. Giá bán vẫn lấy theo giá của combo.</Typography.Paragraph>

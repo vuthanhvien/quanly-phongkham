@@ -1,44 +1,112 @@
 class ClinicPost {
   const ClinicPost({
+    this.id = '',
     required this.category,
     required this.title,
     required this.excerpt,
     required this.readTime,
     required this.imageUrl,
+    this.content = '',
   });
+  factory ClinicPost.fromJson(Map<String, dynamic> json) => ClinicPost(
+    id: json['id'] as String? ?? '',
+    category: json['category'] as String? ?? 'Tin từ phòng khám',
+    title: json['title'] as String? ?? '',
+    excerpt: json['excerpt'] as String? ?? '',
+    readTime: json['publishedAt'] as String? ?? '',
+    imageUrl: json['imageUrl'] as String? ?? '',
+    content: json['content'] as String? ?? '',
+  );
+  final String id;
   final String category;
   final String title;
   final String excerpt;
   final String readTime;
   final String imageUrl;
+  final String content;
 }
 
 class ClinicDoctor {
   const ClinicDoctor({
+    required this.id,
     required this.name,
     required this.specialty,
     required this.experience,
     required this.color,
     required this.imageUrl,
+    this.excerpt = '',
+    this.content = '',
   });
+  factory ClinicDoctor.fromJson(Map<String, dynamic> json) => ClinicDoctor(
+    id: json['id'] as String? ?? '',
+    name: json['fullName'] as String? ?? '',
+    specialty: json['position'] as String? ?? 'Bác sĩ chuyên môn',
+    experience: json['experience'] as String? ?? '',
+    color: 0xFFE8A7C0,
+    imageUrl: json['avatarUrl'] as String? ?? '',
+    excerpt: json['excerpt'] as String? ?? '',
+    content: json['content'] as String? ?? '',
+  );
+  final String id;
   final String name;
   final String specialty;
   final String experience;
   final int color;
   final String imageUrl;
+  final String excerpt;
+  final String content;
 }
 
 class ClinicService {
   const ClinicService({
+    required this.id,
     required this.name,
     required this.description,
     required this.icon,
     required this.imageUrl,
+    this.price = 0,
+    this.content = '',
   });
+  factory ClinicService.fromJson(Map<String, dynamic> json) => ClinicService(
+    id: json['id'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    description: json['excerpt'] as String? ?? 'Dịch vụ chăm sóc',
+    icon: '✦',
+    imageUrl: json['imageUrl'] as String? ?? '',
+    price: (json['sellingPrice'] as num?)?.toDouble() ?? 0,
+    content: json['content'] as String? ?? '',
+  );
+  final String id;
   final String name;
   final String description;
   final String icon;
   final String imageUrl;
+  final double price;
+  final String content;
+}
+
+class ClinicVideo {
+  const ClinicVideo({
+    required this.id,
+    required this.title,
+    required this.excerpt,
+    required this.imageUrl,
+    required this.videoUrl,
+  });
+
+  factory ClinicVideo.fromJson(Map<String, dynamic> json) => ClinicVideo(
+    id: json['id'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    excerpt: json['excerpt'] as String? ?? '',
+    imageUrl: json['imageUrl'] as String? ?? '',
+    videoUrl: json['videoUrl'] as String? ?? '',
+  );
+
+  final String id;
+  final String title;
+  final String excerpt;
+  final String imageUrl;
+  final String videoUrl;
 }
 
 const clinicPosts = [
@@ -78,6 +146,7 @@ const clinicPosts = [
 
 const clinicDoctors = [
   ClinicDoctor(
+    id: 'demo-doctor-1',
     name: 'BS. Nguyễn Minh Anh',
     specialty: 'Da liễu thẩm mỹ',
     experience: '12 năm kinh nghiệm',
@@ -86,6 +155,7 @@ const clinicDoctors = [
         'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=500&q=80',
   ),
   ClinicDoctor(
+    id: 'demo-doctor-2',
     name: 'BS. Trần Gia Hân',
     specialty: 'Chăm sóc da chuyên sâu',
     experience: '9 năm kinh nghiệm',
@@ -94,6 +164,7 @@ const clinicDoctors = [
         'https://images.unsplash.com/photo-1594824476967-48c8b964273f?auto=format&fit=crop&w=500&q=80',
   ),
   ClinicDoctor(
+    id: 'demo-doctor-3',
     name: 'BS. Lê Khánh Vy',
     specialty: 'Nội khoa',
     experience: '10 năm kinh nghiệm',
@@ -105,6 +176,7 @@ const clinicDoctors = [
 
 const clinicServices = [
   ClinicService(
+    id: 'demo-service-1',
     name: 'Khám & tư vấn',
     description: 'Lộ trình cá nhân hóa',
     icon: '✦',
@@ -112,6 +184,7 @@ const clinicServices = [
         'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=500&q=80',
   ),
   ClinicService(
+    id: 'demo-service-2',
     name: 'Chăm sóc da',
     description: 'Phục hồi & nuôi dưỡng',
     icon: '♡',
@@ -119,6 +192,7 @@ const clinicServices = [
         'https://images.unsplash.com/photo-1612817288484-6f916006741a?auto=format&fit=crop&w=500&q=80',
   ),
   ClinicService(
+    id: 'demo-service-3',
     name: 'Điều trị chuyên sâu',
     description: 'Công nghệ hiện đại',
     icon: '◌',

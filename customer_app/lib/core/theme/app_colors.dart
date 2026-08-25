@@ -11,6 +11,11 @@ class AppColors {
   static const primarySoft = Color(0xFFF6D6E2);
   static const primarySofter = Color(0xFFF3C6D7);
 
+  // A cool counterpoint to the warm pink brand color. Reserved for selected
+  // navigation and secondary emphasis, while primary CTAs remain pink.
+  static const accent = Color(0xFF0F7A72);
+  static const accentSoft = Color(0x1F0F7A72);
+
   static const pageBackground = Color(0xFFF5F6FA);
   static const surface = Color(0xFFFFFFFF);
   static const border = Color(0xFFDBE1EA);
@@ -25,5 +30,5 @@ class AppColors {
   static const warningBg = Color(0x29D7A45B);
   static const error = Color(0xFFC23934);
   static const errorBg = Color(0x24FF7875);
-  static const info = Color(0xFF0F7A72);
+  static const info = accent;
 }

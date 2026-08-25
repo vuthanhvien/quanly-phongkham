@@ -21,6 +21,7 @@ import {
 import { ReactNode, useCallback, useEffect, useState } from "react"
 import dayjs from "dayjs"
 import { Link, useNavigate, useParams } from "react-router-dom"
+import { CmsBackButton } from "../components/CmsBackButton"
 import {
   ArrowLeftOutlined,
   AuditOutlined,
@@ -303,16 +304,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
       {!embedded && (
         <div className="page-header detail-page-header">
           <div className="detail-page-title-wrap">
-            <Link to={`/${resource}`}>
-              <Tooltip title="Quay lại">
-                <Button
-                  aria-label="Quay lại"
-                  className="detail-header-ghost-button"
-                  icon={<ArrowLeftOutlined />}
-                  type="text"
-                />
-              </Tooltip>
-            </Link>
+            <CmsBackButton to={`/${resource}`} />
             <Typography.Title level={3}>
               {detailTitle(resource, record)}
             </Typography.Title>

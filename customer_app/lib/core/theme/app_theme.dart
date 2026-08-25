@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
-const double kAppRadius = 14;
+const double kAppRadius = 10;
 
 class AppTheme {
   AppTheme._();
@@ -29,15 +29,18 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.pageBackground,
-      shadowColor: AppColors.shadowPink.withValues(alpha: 0.24),
+      shadowColor: AppColors.shadowPink.withValues(alpha: 0.10),
       textTheme: textTheme,
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.pageBackground,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
+        leadingWidth: 48,
+        titleSpacing: 0,
         foregroundColor: AppColors.title,
         titleTextStyle: textTheme.titleLarge?.copyWith(
+          fontSize: 21,
           fontWeight: FontWeight.w700,
           color: AppColors.title,
         ),
@@ -45,7 +48,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 4,
-        shadowColor: AppColors.shadowPink.withValues(alpha: 0.22),
+        shadowColor: AppColors.shadowPink.withValues(alpha: 0.055),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(kAppRadius),
@@ -106,10 +109,10 @@ class AppTheme {
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppColors.surface,
-        selectedItemColor: AppColors.primaryDark,
+        selectedItemColor: AppColors.accent,
         unselectedItemColor: AppColors.textMuted,
         type: BottomNavigationBarType.fixed,
-        elevation: 8,
+        elevation: 4,
         showSelectedLabels: false,
         showUnselectedLabels: false,
       ),

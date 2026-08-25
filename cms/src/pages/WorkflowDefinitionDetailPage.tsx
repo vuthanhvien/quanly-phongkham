@@ -1,4 +1,5 @@
 import { ArrowLeftOutlined, BranchesOutlined, DownOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons"
+import { CmsBackButton } from "../components/CmsBackButton"
 import { Button, Card, Checkbox, Col, Dropdown, Form, Input, InputNumber, Modal, Row, Select, Space, Table, Tabs, Tag, Tooltip, Typography, message } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
@@ -382,9 +383,7 @@ export function WorkflowDefinitionDetailPage() {
     <>
       <div className="page-header">
         <Space align="center">
-          <Tooltip title="Quay lại">
-            <Button aria-label="Quay lại" className="detail-header-ghost-button" icon={<ArrowLeftOutlined />} type="text" onClick={() => navigate("/workflow-definitions")} />
-          </Tooltip>
+          <CmsBackButton to="/workflow-definitions" />
           <div>
             <Typography.Title level={3} style={{ margin: 0 }}>Cấu hình workflow</Typography.Title>
           </div>

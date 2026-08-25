@@ -45,6 +45,7 @@ const CUSTOM_FIELD_TYPES = [
   { value: "select", label: "Danh sách chọn (select)" },
   { value: "multi-select", label: "Danh sách chọn nhiều (multi-select)" },
   { value: "textarea", label: "Đoạn văn bản (textarea)" },
+  { value: "html", label: "Nội dung HTML" },
   { value: "relative", label: "Liên kết bản ghi (relative)" },
   { value: "file", label: "Tệp đính kèm (file)" },
   { value: "image", label: "Một hình ảnh (image)" },

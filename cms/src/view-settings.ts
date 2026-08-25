@@ -107,6 +107,7 @@ function resolveDefaultFieldWidth(field: FieldSpec): FieldLayoutConfig['width'] 
 
   if (
     field.type === 'textarea' ||
+    field.type === 'html' ||
     ['address', 'note', 'description', 'content', 'summary', 'diagnosis', 'chiefcomplaint', 'allergywarning', 'nextaction', 'publicurl'].includes(normalizedKey)
   ) {
     return '100'
@@ -143,6 +144,7 @@ function resolveDefaultTableWidth(field: FieldSpec) {
 
   if (
     field.type === 'textarea' ||
+    field.type === 'html' ||
     ['address', 'note', 'description', 'content', 'summary', 'diagnosis', 'chiefcomplaint', 'allergywarning', 'nextaction', 'publicurl'].includes(normalizedKey)
   ) {
     return 320
@@ -248,7 +250,7 @@ export function getFieldCatalog(resource: string, customFields: CustomField[]) {
         (field): FieldSpec => ({
           key: field.key,
           label: field.label,
-          type: field.dataType as FieldSpec['type'],
+          type: field.dataType === 'boolean' ? 'checkbox' : field.dataType as FieldSpec['type'],
           required: field.required,
           // List options are presentation configuration, scoped by role/module.
           // Do not fall back to the legacy custom-field definition value.

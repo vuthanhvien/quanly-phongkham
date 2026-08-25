@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { api } from '../api'
+import { CmsBackButton } from '../components/CmsBackButton'
 import { ModalTitleBar } from '../components/ModalTitleBar'
 
 type Column = { key: string; label: string; dataType: string; required?: boolean; options?: string[] }
@@ -137,7 +138,7 @@ export function CustomTableDataPage() {
           </Upload>
           <Button disabled={!table} icon={<DownloadOutlined />} onClick={exportRows}>Xuất Excel</Button>
           <Button disabled={!table} icon={<PlusOutlined />} type="primary" onClick={openCreate}>Thêm nhanh</Button>
-          <Button onClick={() => navigate('/custom-tables')}>Quay lại</Button>
+          <CmsBackButton to="/custom-tables" />
         </Space>
       </div>
 

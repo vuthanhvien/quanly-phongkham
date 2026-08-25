@@ -18,6 +18,7 @@ class BookingsScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Lịch hẹn của tôi'),
+          centerTitle: true,
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Sắp tới'),

@@ -200,6 +200,17 @@ export function displayValue(field: string | FieldSpec, value: unknown, lookups:
   // Date / datetime formatting
   const fieldType = typeof field === 'string' ? undefined : field.type;
   const fieldKey = typeof field === 'string' ? field : field.key;
+  if (fieldType === 'html') {
+    const preview = String(value)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return preview.length > 140 ? `${preview.slice(0, 140).trimEnd()}…` : preview || '-';
+  }
   if (typeof field !== 'string' && field.displayFormat === 'time') {
     return formatClinicDateTime(value, 'HH:mm');
   }

@@ -25,6 +25,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   PictureOutlined,
+  PlayCircleOutlined,
   ProductOutlined,
   ReadOutlined,
   RobotOutlined,
@@ -67,6 +68,9 @@ export const menuIcons: Record<string, React.ReactNode> = {
   "customer-app": <MobileOutlined />,
   posts: <FileTextOutlined />,
   news: <ReadOutlined />,
+  services: <ProductOutlined />,
+  doctors: <TeamOutlined />,
+  videos: <PlayCircleOutlined />,
   departments: <SolutionOutlined />,
   rooms: <BankOutlined />,
   equipments: <ExperimentOutlined />,
@@ -142,6 +146,9 @@ const moduleNavigation: Record<string, { path: string; label: string; screen?: s
   "landing-domains": { path: "/configs", label: "Tên miền", screen: "settings" },
   "landing-config": { path: "/configs", label: "Cài đặt site", screen: "settings" },
   "customer-app": { path: "/customer-app", label: "App khách hàng", screen: "settings" },
+  services: { path: "/services", label: "Dịch vụ" },
+  doctors: { path: "/doctors", label: "Bác sĩ" },
+  videos: { path: "/videos", label: "Video ngắn" },
   "zalo-inbox": { path: "/zalo-inbox", label: "Hộp thư Zalo", screen: "zalo-inbox" },
   "accounting-reports": { path: "/accounting-reports", label: "Báo cáo kế toán", screen: "accounting-reports" },
 }
@@ -465,7 +472,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     (location.pathname.startsWith("/zalo-inbox")
       ? "front-office"
       : undefined) ||
-    (["/pages", "/forms", "/posts", "/news", "/domains", "/configs", "/customer-app"].some((path) => location.pathname.startsWith(path))
+    (["/pages", "/forms", "/posts", "/news", "/services", "/doctors", "/videos", "/domains", "/configs", "/customer-app"].some((path) => location.pathname.startsWith(path))
       ? "landing"
       : undefined) ||
     (location.pathname === "/roles" || location.pathname === "/role-module-settings"

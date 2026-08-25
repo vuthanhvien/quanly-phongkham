@@ -26,7 +26,7 @@ class BookingCard extends StatelessWidget {
     final start = appointment.startTime;
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),

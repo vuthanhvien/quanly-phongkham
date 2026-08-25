@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
+import '../../routes/app_routes.dart';
 import 'auth_controller.dart';
 
 class OtpVerifyScreen extends StatefulWidget {
@@ -15,7 +16,11 @@ class OtpVerifyScreen extends StatefulWidget {
 class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
   final _codeController = TextEditingController();
   final _controller = Get.find<AuthController>();
-  late final String _phone = Get.arguments as String;
+  late final Map<String, dynamic> _args = Get.arguments is Map
+      ? Map<String, dynamic>.from(Get.arguments as Map)
+      : {'phone': Get.arguments as String};
+  late final String _phone = _args['phone'] as String;
+  late final bool _isRegistration = _args['register'] == true;
 
   @override
   void initState() {
@@ -33,7 +38,15 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(leading: const BackButton(color: AppColors.title)),
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Quay lại đăng nhập',
+          onPressed: () => Get.offNamed(
+            _isRegistration ? AppRoutes.register : AppRoutes.phoneEntry,
+          ),
+          icon: const Icon(AppIcons.chevronLeft, color: AppColors.title),
+        ),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -49,7 +62,9 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Mã 6 số đã được gửi tới số $_phone',
+                _isRegistration
+                    ? 'Xác nhận mã 6 số để hoàn tất tạo tài khoản cho $_phone'
+                    : 'Mã 6 số đã được gửi tới số $_phone',
                 style: const TextStyle(
                   color: AppColors.textMuted,
                   fontSize: 14,
@@ -98,10 +113,15 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                   child: ElevatedButton(
                     onPressed: _controller.isSubmitting.value
                         ? null
-                        : () => _controller.verifyOtp(
-                            _phone,
-                            _codeController.text,
-                          ),
+                        : () => _isRegistration
+                              ? _controller.completePhoneRegistration(
+                                  _phone,
+                                  _codeController.text,
+                                )
+                              : _controller.verifyOtp(
+                                  _phone,
+                                  _codeController.text,
+                                ),
                     child: _controller.isSubmitting.value
                         ? const SizedBox(
                             width: 20,
@@ -111,7 +131,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Xác nhận'),
+                        : Text(_isRegistration ? 'Tạo tài khoản' : 'Xác nhận'),
                   ),
                 ),
               ),
@@ -120,7 +140,12 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                 child: TextButton.icon(
                   onPressed: _controller.isSubmitting.value
                       ? null
-                      : () => _controller.requestOtp(_phone),
+                      : () => _isRegistration
+                            ? _controller.requestPhoneRegistrationOtp(
+                                _controller.registrationName.value ?? '',
+                                _phone,
+                              )
+                            : _controller.requestOtp(_phone),
                   icon: const Icon(AppIcons.chevronLeft, size: 16),
                   label: const Text('Gửi lại mã'),
                 ),

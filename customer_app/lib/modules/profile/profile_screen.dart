@@ -29,103 +29,87 @@ class ProfileScreen extends StatelessWidget {
         ? Get.find<CustomerOverviewController>()
         : Get.put(CustomerOverviewController(CustomerOverviewRepository()));
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Hồ sơ sức khỏe'),
-        actions: [
-          Obx(
-            () => IconButton(
-              tooltip: 'Làm mới hồ sơ',
-              onPressed: controller.isRefreshing.value
-                  ? null
-                  : controller.refreshProfile,
-              icon: controller.isRefreshing.value
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh),
-            ),
-          ),
-        ],
-      ),
-      body: Obx(() {
-        final c = session.customer.value;
-        if (c == null) return const SizedBox.shrink();
-        return RefreshIndicator(
-          onRefresh: controller.refreshProfile,
-          child: DefaultTabController(
-            length: 3,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-              children: [
-                if (controller.errorMessage.value != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      controller.errorMessage.value!,
-                      style: const TextStyle(
-                        color: AppColors.error,
-                        fontSize: 13,
+      appBar: AppBar(title: const Text('Cá nhân'), centerTitle: true),
+      body: SafeArea(
+        top: false,
+        child: Obx(() {
+          final c = session.customer.value;
+          if (c == null) return const SizedBox.shrink();
+          return RefreshIndicator(
+            onRefresh: controller.refreshProfile,
+            child: DefaultTabController(
+              length: 3,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                children: [
+                  if (controller.errorMessage.value != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        controller.errorMessage.value!,
+                        style: const TextStyle(
+                          color: AppColors.error,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
+                  _ProfileHero(
+                    name: c.fullName,
+                    code: c.code,
+                    tier: _tierLabels[c.tier] ?? c.tier,
+                    totalSpent: c.totalSpent ?? 0,
+                    loyaltyPoints: c.loyaltyPoints,
                   ),
-                _ProfileHero(
-                  name: c.fullName,
-                  code: c.code,
-                  tier: _tierLabels[c.tier] ?? c.tier,
-                  totalSpent: c.totalSpent ?? 0,
-                  loyaltyPoints: c.loyaltyPoints,
-                ),
-                const SizedBox(height: 16),
-                Card(
-                  child: Column(
-                    children: [
-                      _InfoTile(
-                        icon: AppIcons.phone,
-                        label: 'Số điện thoại',
-                        value: c.phone,
-                      ),
-                      const Divider(height: 1),
-                      _InfoTile(
-                        icon: AppIcons.edit,
-                        label: 'Email',
-                        value: c.email ?? 'Chưa cập nhật',
-                      ),
-                      const Divider(height: 1),
-                      _InfoTile(
-                        icon: AppIcons.mapPin,
-                        label: 'Địa chỉ',
-                        value: c.addressLine ?? c.address ?? 'Chưa cập nhật',
-                      ),
+                  const SizedBox(height: 16),
+                  Card(
+                    child: Column(
+                      children: [
+                        _InfoTile(
+                          icon: AppIcons.phone,
+                          label: 'Số điện thoại',
+                          value: c.phone,
+                        ),
+                        const Divider(height: 1),
+                        _InfoTile(
+                          icon: AppIcons.edit,
+                          label: 'Email',
+                          value: c.email ?? 'Chưa cập nhật',
+                        ),
+                        const Divider(height: 1),
+                        _InfoTile(
+                          icon: AppIcons.mapPin,
+                          label: 'Địa chỉ',
+                          value: c.addressLine ?? c.address ?? 'Chưa cập nhật',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const TabBar(
+                    tabs: [
+                      Tab(text: 'Tổng quan'),
+                      Tab(text: 'Hồ sơ khám'),
+                      Tab(text: 'Tài khoản'),
                     ],
                   ),
-                ),
-                const SizedBox(height: 24),
-                const TabBar(
-                  tabs: [
-                    Tab(text: 'Tổng quan'),
-                    Tab(text: 'Hồ sơ khám'),
-                    Tab(text: 'Tài khoản'),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  height: 540,
-                  child: TabBarView(
-                    children: [
-                      _HealthJourney(),
-                      _ClinicalRecord(overview: overview),
-                      _AccountActions(onLogout: () => _logout(context)),
-                    ],
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    height: 540,
+                    child: TabBarView(
+                      children: [
+                        _HealthJourney(),
+                        _ClinicalRecord(overview: overview),
+                        _AccountActions(onLogout: () => _logout(context)),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      }),
+          );
+        }),
+      ),
     );
   }
 
@@ -150,7 +134,7 @@ class ProfileScreen extends StatelessWidget {
     if (yes == true) {
       await Get.find<SessionController>().logout();
       if (Get.isRegistered<AuthController>()) Get.delete<AuthController>();
-      Get.offAllNamed(AppRoutes.phoneEntry);
+      Get.offAllNamed(AppRoutes.shell);
     }
   }
 }
@@ -173,7 +157,7 @@ class _ProfileHero extends StatelessWidget {
       gradient: const LinearGradient(
         colors: [Color(0xFF3B3042), Color(0xFF8A4E6A)],
       ),
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(16),
     ),
     child: Column(
       children: [

@@ -27,6 +27,9 @@ import {
   ConfigurableEntity,
   ContentNews,
   ContentPost,
+  ContentService,
+  ContentDoctor,
+  ContentVideo,
   CodeGenerationSetting,
   CustomFieldDefinition,
   CustomFieldValue,
@@ -387,6 +390,9 @@ const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
   'accounting-vouchers': 'code',
   posts: 'slug',
   news: 'slug',
+  services: 'slug',
+  doctors: 'slug',
+  videos: 'slug',
 };
 
 const RESOURCE_IMPORT_KEYS: Record<string, string> = {
@@ -442,6 +448,9 @@ const RESOURCE_IMPORT_KEYS: Record<string, string> = {
   'accounting-voucher-lines': 'id',
   posts: 'slug',
   news: 'slug',
+  services: 'slug',
+  doctors: 'slug',
+  videos: 'slug',
 };
 
 @Injectable()
@@ -484,6 +493,9 @@ export class RecordsService {
     @InjectRepository(Commission) private readonly commissions: Repository<Commission>,
     @InjectRepository(ContentPost) private readonly posts: Repository<ContentPost>,
     @InjectRepository(ContentNews) private readonly news: Repository<ContentNews>,
+    @InjectRepository(ContentService) private readonly services: Repository<ContentService>,
+    @InjectRepository(ContentDoctor) private readonly doctors: Repository<ContentDoctor>,
+    @InjectRepository(ContentVideo) private readonly videos: Repository<ContentVideo>,
     @InjectRepository(CustomFieldDefinition) private readonly fieldDefinitions: Repository<CustomFieldDefinition>,
     @InjectRepository(CodeGenerationSetting) private readonly codeGenerationSettings: Repository<CodeGenerationSetting>,
     @InjectRepository(CustomFieldValue) private readonly customFieldValues: Repository<CustomFieldValue>,
@@ -555,6 +567,9 @@ export class RecordsService {
       commissions: this.commissions,
       posts: this.posts,
       news: this.news,
+      services: this.services,
+      doctors: this.doctors,
+      videos: this.videos,
       'work-contracts': this.workContracts,
       'staff-insurances': this.staffInsurances,
       attendances: this.attendances,
@@ -815,6 +830,9 @@ export class RecordsService {
         files: ['title', 'originalName', 'mimeType', 'extension'],
         posts: ['title', 'slug', 'category', 'excerpt', 'authorName', 'status'],
         news: ['title', 'slug', 'category', 'excerpt', 'sourceName', 'status'],
+        services: ['name', 'slug', 'category', 'excerpt', 'status'],
+        doctors: ['fullName', 'slug', 'specialty', 'excerpt', 'status'],
+        videos: ['title', 'slug', 'excerpt', 'status'],
         'work-schedules': ['shiftLabel', 'status'],
         'leave-requests': ['status', 'reason'],
         'leave-types': ['code', 'name', 'description'],
@@ -1444,6 +1462,9 @@ export class RecordsService {
       leads: 'lead',
       suppliers: 'nhà cung cấp',
       products: 'sản phẩm',
+      services: 'dịch vụ user site',
+      doctors: 'bác sĩ user site',
+      videos: 'video user site',
       units: 'đơn vị tính',
       'leave-types': 'loại nghỉ',
       'leave-allocations': 'cấp phép năm',
@@ -3684,10 +3705,37 @@ export class RecordsService {
       value.isFeatured = value.isFeatured === true || value.isFeatured === 'true' || value.isFeatured === '1';
       if (!['DRAFT', 'PUBLISHED'].includes(String(value.status))) value.status = 'DRAFT';
     }
+    if (resource === 'services' || resource === 'doctors') {
+      value.slug = String(value.slug || '').trim();
+      value.status = String(value.status || 'DRAFT').trim().toUpperCase();
+      value.isFeatured = value.isFeatured === true || value.isFeatured === 'true' || value.isFeatured === '1';
+      if (!['DRAFT', 'PUBLISHED'].includes(String(value.status))) value.status = 'DRAFT';
+      if (resource === 'services') value.price = Number(value.price || 0);
+    }
+    if (resource === 'videos') {
+      value.slug = String(value.slug || '').trim();
+      value.title = String(value.title || '').trim();
+      value.status = String(value.status || 'DRAFT').trim().toUpperCase();
+      value.isFeatured = value.isFeatured === true || value.isFeatured === 'true' || value.isFeatured === '1';
+      if (!['DRAFT', 'PUBLISHED'].includes(String(value.status))) value.status = 'DRAFT';
+    }
+    if (resource === 'products') {
+      value.isFeatured = value.isFeatured === true || value.isFeatured === 'true' || value.isFeatured === '1';
+    }
     if (resource === 'customers') {
       if (typeof value.phone === 'string' && value.phone.includes('*')) {
         delete value.phone;
       }
+      // Accept a plaintext password only on write, hash it immediately, and
+      // never accept a client-supplied hash.
+      delete value.passwordHash;
+      if (typeof value.password === 'string' && value.password) {
+        if (value.password.length < 6) {
+          throw new BadRequestException('Mật khẩu khách hàng cần ít nhất 6 ký tự');
+        }
+        value.passwordHash = await hash(value.password, 10);
+      }
+      delete value.password;
       const spent = Number(value.totalSpent || 0);
       value.tier = spent >= 200_000_000 ? 'DIAMOND' : spent >= 50_000_000 ? 'GOLD' : spent >= 10_000_000 ? 'SILVER' : 'MEMBER';
     }
@@ -4410,6 +4458,19 @@ export class RecordsService {
     if (resource === 'posts' || resource === 'news') {
       if (!String(value.slug || '').trim()) throw new BadRequestException('Slug là bắt buộc');
       if (!String(value.title || '').trim()) throw new BadRequestException('Tiêu đề là bắt buộc');
+    }
+    if (resource === 'services') {
+      if (!String(value.slug || '').trim()) throw new BadRequestException('Slug là bắt buộc');
+      if (!String(value.name || '').trim()) throw new BadRequestException('Tên dịch vụ là bắt buộc');
+    }
+    if (resource === 'doctors') {
+      if (!String(value.slug || '').trim()) throw new BadRequestException('Slug là bắt buộc');
+      if (!String(value.fullName || '').trim()) throw new BadRequestException('Tên bác sĩ là bắt buộc');
+    }
+    if (resource === 'videos') {
+      if (!String(value.slug || '').trim()) throw new BadRequestException('Slug là bắt buộc');
+      if (!String(value.title || '').trim()) throw new BadRequestException('Tiêu đề video là bắt buộc');
+      if (!String(value.videoUrl || '').trim()) throw new BadRequestException('Link video là bắt buộc');
     }
 
     if (resource === 'accounting-chart-accounts') {

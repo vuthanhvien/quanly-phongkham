@@ -1,4 +1,5 @@
 import { ArrowLeftOutlined, PrinterOutlined, SaveOutlined } from "@ant-design/icons"
+import { CmsBackButton } from "../components/CmsBackButton"
 import { Button, Card, Checkbox, Form, Input, Modal, Select, Space, Tooltip, Tree, Typography, message } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
@@ -274,15 +275,7 @@ export function PrintTemplateEditorPage() {
     <Form form={form} layout="vertical" onFinish={saveTemplate}>
       <div className="page-header">
         <Space align="center" size={10}>
-          <Tooltip title="Quay lại">
-            <Button
-              aria-label="Quay lại"
-              className="detail-header-ghost-button"
-              icon={<ArrowLeftOutlined />}
-              type="text"
-              onClick={() => navigate(`/settings?module=${entityType}`)}
-            />
-          </Tooltip>
+          <CmsBackButton to={`/settings?module=${entityType}`} />
           <Typography.Title level={3} style={{ margin: 0 }}>
             {editing ? "Cập nhật mẫu in HTML" : "Thêm mẫu in HTML"}
           </Typography.Title>

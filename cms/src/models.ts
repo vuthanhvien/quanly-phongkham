@@ -35,7 +35,7 @@ export interface FieldSpec {
   label: string;
   /** Default form/detail tab. A saved view can override this per field. */
   tab?: string;
-  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'textarea' | 'relative' | 'file' | 'image' | 'images' | 'dynamic-table' | 'table';
+  type?: 'text' | 'number' | 'date' | 'datetime' | 'select' | 'multi-select' | 'checkbox' | 'textarea' | 'html' | 'relative' | 'file' | 'image' | 'images' | 'dynamic-table' | 'table';
   displayFormat?: 'currency' | 'number' | 'percent' | 'time';
   required?: boolean;
   options?: SelectOption[];
@@ -69,6 +69,21 @@ export interface RelationSpec {
  * settings.
  */
 const defaultFieldTabs: Record<string, Record<string, string>> = {
+  services: {
+    name: 'Thông tin chung', slug: 'Thông tin chung', category: 'Thông tin chung', price: 'Thông tin chung',
+    imageUrl: 'Nội dung', excerpt: 'Nội dung', content: 'Nội dung',
+    publishedAt: 'Xuất bản', status: 'Xuất bản', isFeatured: 'Xuất bản',
+  },
+  doctors: {
+    fullName: 'Thông tin chung', slug: 'Thông tin chung', specialty: 'Thông tin chung', experience: 'Thông tin chung',
+    imageUrl: 'Nội dung', excerpt: 'Nội dung', content: 'Nội dung',
+    publishedAt: 'Xuất bản', status: 'Xuất bản', isFeatured: 'Xuất bản',
+  },
+  videos: {
+    title: 'Thông tin chung', slug: 'Thông tin chung', videoUrl: 'Thông tin chung',
+    imageUrl: 'Nội dung', excerpt: 'Nội dung', content: 'Nội dung',
+    publishedAt: 'Xuất bản', status: 'Xuất bản', isFeatured: 'Xuất bản',
+  },
   posts: { title: 'Nội dung', slug: 'Nội dung', category: 'Nội dung', imageUrl: 'Nội dung', excerpt: 'Nội dung', content: 'Nội dung', authorName: 'Xuất bản', publishedAt: 'Xuất bản', status: 'Xuất bản', isFeatured: 'Xuất bản' },
   news: { title: 'Nội dung', slug: 'Nội dung', category: 'Nội dung', imageUrl: 'Nội dung', excerpt: 'Nội dung', content: 'Nội dung', sourceName: 'Nguồn & xuất bản', sourceUrl: 'Nguồn & xuất bản', publishedAt: 'Nguồn & xuất bản', status: 'Nguồn & xuất bản', isFeatured: 'Nguồn & xuất bản' },
   staff: {
@@ -162,7 +177,7 @@ export interface LandingFormField {
   id: string;
   name: string;
   label: string;
-  type: 'text' | 'textarea' | 'email' | 'tel' | 'number' | 'date' | 'datetime' | 'select';
+  type: 'text' | 'textarea' | 'html' | 'email' | 'tel' | 'number' | 'date' | 'datetime' | 'select';
   placeholder?: string;
   required: boolean;
   span: number;
@@ -298,6 +313,9 @@ export const entityLabels: Record<string, string> = {
   files: 'Thư viện file',
   posts: 'Posts',
   news: 'News',
+  services: 'Dịch vụ',
+  doctors: 'Bác sĩ',
+  videos: 'Video ngắn',
   customers: 'Khách hàng',
   leads: 'Khách tiềm năng',
   'lead-activities': 'Hoạt động khách tiềm năng',
@@ -418,17 +436,52 @@ export const relationFields: Record<string, RelationSpec> = {
 };
 
 const rawBaseFields: Record<string, FieldSpec[]> = {
+  videos: [
+    { key: 'title', label: 'Tiêu đề', required: true, width: '66', tableWidth: 260 },
+    { key: 'slug', label: 'Slug', required: true, width: '33', tableWidth: 180 },
+    { key: 'videoUrl', label: 'Link video', required: true, width: '100', tableWidth: 320, placeholder: 'YouTube, TikTok hoặc link video công khai' },
+    { key: 'imageUrl', label: 'Ảnh thumbnail', type: 'image', width: '50', tableWidth: 180 },
+    { key: 'excerpt', label: 'Mô tả ngắn', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'content', label: 'Nội dung', type: 'html', width: '100', tableWidth: 420 },
+    { key: 'publishedAt', label: 'Ngày đăng', type: 'date', width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'DRAFT', label: 'Nháp' }, { value: 'PUBLISHED', label: 'Đã đăng' }], defaultValue: 'DRAFT', width: '33', tableWidth: 130 },
+    { key: 'isFeatured', label: 'Nổi bật', type: 'checkbox', defaultValue: false, width: '33', tableWidth: 120 },
+  ],
+  services: [
+    { key: 'name', label: 'Tên dịch vụ', required: true, width: '66', tableWidth: 260 },
+    { key: 'slug', label: 'Slug', required: true, width: '33', tableWidth: 180 },
+    { key: 'category', label: 'Danh mục', width: '33', tableWidth: 160 },
+    { key: 'price', label: 'Giá dịch vụ', type: 'number', width: '33', tableWidth: 150 },
+    { key: 'imageUrl', label: 'Ảnh đại diện', type: 'image', width: '66', tableWidth: 180 },
+    { key: 'excerpt', label: 'Mô tả ngắn', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'content', label: 'Nội dung', type: 'html', width: '100', tableWidth: 420 },
+    { key: 'publishedAt', label: 'Ngày đăng', type: 'date', width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'DRAFT', label: 'Nháp' }, { value: 'PUBLISHED', label: 'Đã đăng' }], defaultValue: 'DRAFT', width: '33', tableWidth: 130 },
+    { key: 'isFeatured', label: 'Nổi bật', type: 'checkbox', defaultValue: false, width: '33', tableWidth: 120 },
+  ],
+  doctors: [
+    { key: 'fullName', label: 'Họ và tên', required: true, width: '66', tableWidth: 260 },
+    { key: 'slug', label: 'Slug', required: true, width: '33', tableWidth: 180 },
+    { key: 'specialty', label: 'Chuyên môn', width: '50', tableWidth: 180 },
+    { key: 'experience', label: 'Kinh nghiệm', width: '50', tableWidth: 180 },
+    { key: 'imageUrl', label: 'Ảnh đại diện', type: 'image', width: '66', tableWidth: 180 },
+    { key: 'excerpt', label: 'Mô tả ngắn', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'content', label: 'Nội dung', type: 'html', width: '100', tableWidth: 420 },
+    { key: 'publishedAt', label: 'Ngày đăng', type: 'date', width: '33', tableWidth: 140 },
+    { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'DRAFT', label: 'Nháp' }, { value: 'PUBLISHED', label: 'Đã đăng' }], defaultValue: 'DRAFT', width: '33', tableWidth: 130 },
+    { key: 'isFeatured', label: 'Nổi bật', type: 'checkbox', defaultValue: false, width: '33', tableWidth: 120 },
+  ],
   posts: [
     { key: 'title', label: 'Tiêu đề', required: true, width: '66', tableWidth: 260 },
     { key: 'slug', label: 'Slug', required: true, width: '33', tableWidth: 180 },
     { key: 'category', label: 'Danh mục', width: '33', tableWidth: 160 },
     { key: 'imageUrl', label: 'Ảnh đại diện', type: 'image', width: '66', tableWidth: 180 },
     { key: 'excerpt', label: 'Mô tả ngắn', type: 'textarea', width: '100', tableWidth: 320 },
-    { key: 'content', label: 'Nội dung', type: 'textarea', width: '100', tableWidth: 420 },
+    { key: 'content', label: 'Nội dung', type: 'html', width: '100', tableWidth: 420 },
     { key: 'authorName', label: 'Tác giả', width: '33', tableWidth: 160 },
     { key: 'publishedAt', label: 'Ngày đăng', type: 'date', width: '33', tableWidth: 140 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'DRAFT', label: 'Nháp' }, { value: 'PUBLISHED', label: 'Đã đăng' }], defaultValue: 'DRAFT', width: '33', tableWidth: 130 },
-    { key: 'isFeatured', label: 'Nổi bật', type: 'select', options: [{ value: 'false', label: 'Không' }, { value: 'true', label: 'Có' }], defaultValue: 'false', width: '33', tableWidth: 120 },
+    { key: 'isFeatured', label: 'Nổi bật', type: 'checkbox', defaultValue: false, width: '33', tableWidth: 120 },
     { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   news: [
@@ -437,12 +490,12 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'category', label: 'Danh mục', width: '33', tableWidth: 160 },
     { key: 'imageUrl', label: 'Ảnh đại diện', type: 'image', width: '66', tableWidth: 180 },
     { key: 'excerpt', label: 'Tóm tắt', type: 'textarea', width: '100', tableWidth: 320 },
-    { key: 'content', label: 'Nội dung', type: 'textarea', width: '100', tableWidth: 420 },
+    { key: 'content', label: 'Nội dung', type: 'html', width: '100', tableWidth: 420 },
     { key: 'sourceName', label: 'Nguồn tin', width: '33', tableWidth: 160 },
     { key: 'sourceUrl', label: 'Link nguồn', width: '66', tableWidth: 220 },
     { key: 'publishedAt', label: 'Ngày đăng', type: 'date', width: '33', tableWidth: 140 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'DRAFT', label: 'Nháp' }, { value: 'PUBLISHED', label: 'Đã đăng' }], defaultValue: 'DRAFT', width: '33', tableWidth: 130 },
-    { key: 'isFeatured', label: 'Nổi bật', type: 'select', options: [{ value: 'false', label: 'Không' }, { value: 'true', label: 'Có' }], defaultValue: 'false', width: '33', tableWidth: 120 },
+    { key: 'isFeatured', label: 'Nổi bật', type: 'checkbox', defaultValue: false, width: '33', tableWidth: 120 },
     { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],
   branches: [
@@ -696,6 +749,10 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'categoryId', label: 'Ngành / nhóm / loại', type: 'select', width: '50', tableWidth: 180 },
     { key: 'baseUnitId', label: 'Đơn vị cơ sở', required: true, width: '33', tableWidth: 160 },
     { key: 'sellingPrice', label: 'Giá bán', type: 'number', width: '33', tableWidth: 150 },
+    { key: 'imageUrl', label: 'Hình ảnh', type: 'image', width: '33', tableWidth: 88 },
+    { key: 'excerpt', label: 'Thông tin ngắn', type: 'textarea', width: '100', tableWidth: 320 },
+    { key: 'content', label: 'Nội dung', type: 'html', width: '100', tableWidth: 420 },
+    { key: 'isFeatured', label: 'Nổi bật', type: 'checkbox', defaultValue: false, width: '33', tableWidth: 120 },
     { key: 'minStockLevel', label: 'Tồn tối thiểu', type: 'number', width: '33', tableWidth: 150 },
     { key: 'picId', label: 'Người phụ trách', width: '50', tableWidth: 220 },
   ],

@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/error_utils.dart';
 import '../../data/models/customer.dart';
 import '../../data/repositories/customer_repository.dart';
+import '../../widgets/bottom_sheet_select.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
@@ -60,12 +61,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
           ),
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: _gender,
-            items: const [
-              DropdownMenuItem(value: 'male', child: Text('Nam')),
-              DropdownMenuItem(value: 'female', child: Text('Nữ')),
-              DropdownMenuItem(value: 'other', child: Text('Khác')),
+          BottomSheetSelect<String>(
+            value: _gender,
+            hintText: 'Chọn giới tính',
+            options: const [
+              BottomSheetOption(value: 'male', label: 'Nam'),
+              BottomSheetOption(value: 'female', label: 'Nữ'),
+              BottomSheetOption(value: 'other', label: 'Khác'),
             ],
             onChanged: (value) => setState(() => _gender = value),
           ),

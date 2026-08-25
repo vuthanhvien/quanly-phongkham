@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:table_calendar/table_calendar.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/repositories/appointment_repository.dart';
 import '../../data/repositories/lookup_repository.dart';
 import '../../widgets/loading_view.dart';
+import '../../widgets/bottom_sheet_select.dart';
 import 'booking_create_controller.dart';
 
 const _typeOptions = {
@@ -26,6 +28,7 @@ class _BookingCreateScreenState extends State<BookingCreateScreen> {
   );
   final _noteController = TextEditingController();
   int _step = 0;
+  DateTime _focusedDay = DateTime.now();
   @override
   void dispose() {
     _noteController.dispose();
@@ -36,7 +39,10 @@ class _BookingCreateScreenState extends State<BookingCreateScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Đặt lịch hẹn'),
+      title: Text(
+        _pageTitle,
+        style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
+      ),
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(55),
         child: _StepHeader(step: _step),
@@ -44,32 +50,49 @@ class _BookingCreateScreenState extends State<BookingCreateScreen> {
     ),
     body: Obx(() {
       if (_controller.isLoadingLookups.value) return const LoadingView();
-      return SafeArea(
-        child: Column(
-          children: [
-            Expanded(
+      return Column(
+        children: [
+          Expanded(
+            child: SafeArea(
+              bottom: false,
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 22, 16, 16),
                 children: [_stepBody()],
               ),
             ),
-            if (_controller.errorMessage.value != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: Text(
-                  _controller.errorMessage.value!,
-                  style: const TextStyle(color: AppColors.error, fontSize: 13),
-                ),
+          ),
+          if (_controller.errorMessage.value != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Text(
+                _controller.errorMessage.value!,
+                style: const TextStyle(color: AppColors.error, fontSize: 13),
               ),
-            _BottomActions(
-              step: _step,
-              submitting: _controller.isSubmitting.value,
-              onBack: _back,
-              onNext: _next,
-              onSubmit: _submit,
             ),
-          ],
-        ),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.shadowPink.withValues(alpha: 0.045),
+                  blurRadius: 20,
+                  spreadRadius: -3,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: _BottomActions(
+                step: _step,
+                submitting: _controller.isSubmitting.value,
+                onBack: _back,
+                onNext: _next,
+                onSubmit: _submit,
+              ),
+            ),
+          ),
+        ],
       );
     }),
   );
@@ -82,8 +105,8 @@ class _BookingCreateScreenState extends State<BookingCreateScreen> {
       case 2:
         return _DateTimeStep(
           controller: _controller,
-          pickDate: _pickDate,
-          pickTime: _pickTime,
+          focusedDay: _focusedDay,
+          onFocusedDayChanged: (day) => setState(() => _focusedDay = day),
         );
       default:
         return _ConfirmStep(
@@ -92,6 +115,13 @@ class _BookingCreateScreenState extends State<BookingCreateScreen> {
         );
     }
   }
+
+  String get _pageTitle => switch (_step) {
+    1 => 'Đặt lịch hẹn - Bác sĩ',
+    2 => 'Đặt lịch hẹn - Thời gian',
+    3 => 'Đặt lịch hẹn - Xác nhận',
+    _ => 'Đặt lịch hẹn - Thông tin',
+  };
 
   void _back() => setState(() => _step = _step - 1);
   void _next() {
@@ -103,33 +133,6 @@ class _BookingCreateScreenState extends State<BookingCreateScreen> {
       _controller.errorMessage.value = null;
       _step++;
     });
-  }
-
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final v = await showDatePicker(
-      context: context,
-      initialDate: _controller.selectedDate.value ?? now,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 180)),
-    );
-    if (v != null) _controller.selectedDate.value = v;
-  }
-
-  Future<void> _pickTime() async {
-    final old = _controller.selectedTime.value;
-    final v = await showTimePicker(
-      context: context,
-      initialTime: old == null
-          ? const TimeOfDay(hour: 9, minute: 0)
-          : TimeOfDay(hour: old.inHours, minute: old.inMinutes % 60),
-    );
-    if (v != null) {
-      _controller.selectedTime.value = Duration(
-        hours: v.hour,
-        minutes: v.minute,
-      );
-    }
   }
 
   Future<void> _submit() async {
@@ -187,11 +190,13 @@ class _StepTitle extends StatelessWidget {
           title,
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 23),
         ),
-        const SizedBox(height: 6),
-        Text(
-          subtitle,
-          style: const TextStyle(color: AppColors.textMuted, height: 1.4),
-        ),
+        if (subtitle.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: const TextStyle(color: AppColors.textMuted, height: 1.4),
+          ),
+        ],
       ],
     ),
   );
@@ -204,35 +209,41 @@ class _ServiceBranchStep extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _StepTitle(
-        'Bạn cần hỗ trợ gì?',
-        'Chọn loại lịch hẹn và cơ sở thuận tiện nhất.',
-      ),
       const Text(
         'Loại lịch hẹn',
         style: TextStyle(fontWeight: FontWeight.w700),
       ),
       const SizedBox(height: 10),
-      ..._typeOptions.entries.map(
-        (e) => Padding(
-          padding: const EdgeInsets.only(bottom: 9),
-          child: _SelectTile(
-            title: e.value.$1,
-            subtitle: e.value.$2,
-            selected: controller.selectedType.value == e.key,
-            onTap: () => controller.selectedType.value = e.key,
-          ),
+      Obx(
+        () => Column(
+          children: _typeOptions.entries
+              .map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 9),
+                  child: _SelectTile(
+                    title: e.value.$1,
+                    subtitle: e.value.$2,
+                    selected: controller.selectedType.value == e.key,
+                    onTap: () => controller.selectedType.value = e.key,
+                  ),
+                ),
+              )
+              .toList(),
         ),
       ),
       const SizedBox(height: 16),
       const Text('Chi nhánh', style: TextStyle(fontWeight: FontWeight.w700)),
       const SizedBox(height: 9),
-      DropdownButtonFormField<String>(
-        initialValue: controller.selectedBranchId.value,
-        items: controller.branches
-            .map((b) => DropdownMenuItem(value: b.id, child: Text(b.name)))
+      BottomSheetSelect<String>(
+        value: controller.selectedBranchId.value,
+        hintText: 'Chọn chi nhánh',
+        options: controller.branches
+            .map(
+              (branch) =>
+                  BottomSheetOption(value: branch.id, label: branch.name),
+            )
             .toList(),
-        onChanged: (v) => controller.selectedBranchId.value = v,
+        onChanged: (value) => controller.selectedBranchId.value = value,
       ),
     ],
   );
@@ -245,27 +256,29 @@ class _DoctorStep extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _StepTitle(
-        'Chọn bác sĩ',
-        'Bạn có thể để phòng khám sắp xếp bác sĩ phù hợp.',
-      ),
-      _SelectTile(
-        title: 'Không yêu cầu bác sĩ',
-        subtitle: 'Phòng khám sẽ tư vấn người phù hợp',
-        selected: controller.selectedDoctorId.value == null,
-        onTap: () => controller.selectedDoctorId.value = null,
-      ),
-      const SizedBox(height: 10),
-      ...controller.doctors.map(
-        (d) => Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: _SelectTile(
-            title: d.fullName,
-            subtitle: d.position ?? 'Bác sĩ chuyên môn',
-            selected: controller.selectedDoctorId.value == d.id,
-            onTap: () => controller.selectedDoctorId.value = d.id,
-            avatar: true,
-          ),
+      Obx(
+        () => Column(
+          children: [
+            _SelectTile(
+              title: 'Không yêu cầu bác sĩ',
+              subtitle: 'Phòng khám sẽ tư vấn người phù hợp',
+              selected: controller.selectedDoctorId.value == null,
+              onTap: () => controller.selectedDoctorId.value = null,
+            ),
+            const SizedBox(height: 10),
+            ...controller.doctors.map(
+              (doctor) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _SelectTile(
+                  title: doctor.fullName,
+                  subtitle: doctor.position ?? 'Bác sĩ chuyên môn',
+                  selected: controller.selectedDoctorId.value == doctor.id,
+                  onTap: () => controller.selectedDoctorId.value = doctor.id,
+                  avatar: true,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     ],
@@ -275,71 +288,138 @@ class _DoctorStep extends StatelessWidget {
 class _DateTimeStep extends StatelessWidget {
   const _DateTimeStep({
     required this.controller,
-    required this.pickDate,
-    required this.pickTime,
+    required this.focusedDay,
+    required this.onFocusedDayChanged,
   });
   final BookingCreateController controller;
-  final VoidCallback pickDate, pickTime;
+  final DateTime focusedDay;
+  final ValueChanged<DateTime> onFocusedDayChanged;
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      _StepTitle(
-        'Chọn thời gian',
-        'Chọn ngày giờ bạn mong muốn. Phòng khám sẽ xác nhận lại.',
-      ),
-      const Text('Ngày hẹn', style: TextStyle(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 9),
-      OutlinedButton.icon(
-        onPressed: pickDate,
-        icon: const Icon(AppIcons.calendarPicker),
-        label: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            controller.selectedDate.value == null
-                ? 'Chọn ngày hẹn'
-                : formatDate(controller.selectedDate.value!),
+  Widget build(BuildContext context) => Obx(
+    () => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Ngày hẹn', style: TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 9),
+        Container(
+          padding: const EdgeInsets.fromLTRB(6, 4, 6, 8),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(10),
           ),
-        ),
-      ),
-      const SizedBox(height: 18),
-      const Text('Giờ hẹn', style: TextStyle(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 9),
-      OutlinedButton.icon(
-        onPressed: pickTime,
-        icon: const Icon(AppIcons.timePicker),
-        label: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            controller.selectedTime.value == null
-                ? 'Chọn giờ hẹn'
-                : '${controller.selectedTime.value!.inHours.toString().padLeft(2, '0')}:${(controller.selectedTime.value!.inMinutes % 60).toString().padLeft(2, '0')}',
-          ),
-        ),
-      ),
-      const SizedBox(height: 22),
-      Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.primarySoft,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: const Row(
-          children: [
-            Icon(AppIcons.info, color: AppColors.primaryDark),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Khung giờ hiển thị là yêu cầu mong muốn. Chúng tôi sẽ liên hệ xác nhận lịch chính thức.',
-                style: TextStyle(fontSize: 12.5, height: 1.4),
+          child: TableCalendar<void>(
+            firstDay: DateTime.now(),
+            lastDay: DateTime.now().add(const Duration(days: 180)),
+            focusedDay: focusedDay,
+            calendarFormat: CalendarFormat.month,
+            availableCalendarFormats: const {CalendarFormat.month: 'Tháng'},
+            startingDayOfWeek: StartingDayOfWeek.monday,
+            selectedDayPredicate: (day) =>
+                isSameDay(controller.selectedDate.value, day),
+            enabledDayPredicate: (day) =>
+                !day.isBefore(DateTime.now().subtract(const Duration(days: 1))),
+            headerStyle: const HeaderStyle(
+              titleCentered: true,
+              formatButtonVisible: false,
+              titleTextStyle: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            calendarStyle: CalendarStyle(
+              outsideDaysVisible: false,
+              todayDecoration: BoxDecoration(
+                border: Border.all(color: AppColors.primaryDark),
+                shape: BoxShape.circle,
+              ),
+              selectedDecoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              selectedTextStyle: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
               ),
             ),
-          ],
+            onDaySelected: (selectedDay, newFocusedDay) {
+              controller.selectedDate.value = selectedDay;
+              onFocusedDayChanged(newFocusedDay);
+            },
+            onPageChanged: onFocusedDayChanged,
+          ),
         ),
-      ),
-    ],
+        const SizedBox(height: 18),
+        const Text(
+          'Giờ bắt đầu',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 9),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _startTimeSlots
+              .map(
+                (time) => ChoiceChip(
+                  label: Text(_formatTime(time)),
+                  selected: controller.selectedTime.value == time,
+                  onSelected: (_) => controller.selectedTime.value = time,
+                  selectedColor: AppColors.primarySoft,
+                  side: BorderSide(
+                    color: controller.selectedTime.value == time
+                        ? AppColors.primary
+                        : AppColors.border,
+                  ),
+                  labelStyle: TextStyle(
+                    color: controller.selectedTime.value == time
+                        ? AppColors.primaryDark
+                        : AppColors.title,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 22),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.primarySoft,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Row(
+            children: [
+              Icon(AppIcons.info, color: AppColors.primaryDark),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Khung giờ hiển thị là yêu cầu mong muốn. Chúng tôi sẽ liên hệ xác nhận lịch chính thức.',
+                  style: TextStyle(fontSize: 12.5, height: 1.4),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
   );
 }
+
+const _startTimeSlots = [
+  Duration(hours: 8),
+  Duration(hours: 8, minutes: 30),
+  Duration(hours: 9),
+  Duration(hours: 9, minutes: 30),
+  Duration(hours: 10),
+  Duration(hours: 10, minutes: 30),
+  Duration(hours: 13),
+  Duration(hours: 13, minutes: 30),
+  Duration(hours: 14),
+  Duration(hours: 14, minutes: 30),
+  Duration(hours: 15),
+  Duration(hours: 15, minutes: 30),
+  Duration(hours: 16),
+];
+
+String _formatTime(Duration time) =>
+    '${time.inHours.toString().padLeft(2, '0')}:${(time.inMinutes % 60).toString().padLeft(2, '0')}';
 
 class _ConfirmStep extends StatelessWidget {
   const _ConfirmStep({required this.controller, required this.noteController});
@@ -436,7 +516,7 @@ class _SelectTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
-    borderRadius: BorderRadius.circular(14),
+    borderRadius: BorderRadius.circular(10),
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 160),
       padding: const EdgeInsets.all(14),
@@ -446,7 +526,7 @@ class _SelectTile extends StatelessWidget {
           color: selected ? AppColors.primary : AppColors.border,
           width: selected ? 1.5 : 1,
         ),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
@@ -479,7 +559,7 @@ class _SelectTile extends StatelessWidget {
           ),
           Icon(
             selected ? AppIcons.check : AppIcons.radio,
-            color: selected ? AppColors.primaryDark : AppColors.border,
+            color: AppColors.primaryDark,
           ),
         ],
       ),
@@ -501,22 +581,18 @@ class _BottomActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-    decoration: BoxDecoration(
-      color: AppColors.surface,
-      boxShadow: [
-        BoxShadow(
-          color: AppColors.shadowPink.withValues(alpha: 0.16),
-          blurRadius: 14,
-          offset: const Offset(0, -4),
-        ),
-      ],
-    ),
+    color: AppColors.surface,
     child: Row(
       children: [
         if (step > 0) ...[
-          OutlinedButton(
-            onPressed: submitting ? null : onBack,
-            child: const Text('Quay lại'),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: OutlinedButton(
+              onPressed: submitting ? null : onBack,
+              style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
+              child: const Icon(AppIcons.chevronLeft),
+            ),
           ),
           const SizedBox(width: 10),
         ],

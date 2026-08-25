@@ -18,6 +18,7 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
+          options.headers['X-Forwarded-Host'] = Env.tenantDomain;
           final token = _storage.read<String>(StorageKeys.accessToken);
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';

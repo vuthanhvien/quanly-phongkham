@@ -46,7 +46,7 @@ class InvoicesScreen extends StatelessWidget {
               final invoice = controller.invoices[index];
               return Card(
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(10),
                   onTap: () => Get.toNamed(
                     AppRoutes.invoiceDetail,
                     arguments: invoice.id,

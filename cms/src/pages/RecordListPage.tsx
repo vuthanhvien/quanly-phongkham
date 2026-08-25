@@ -104,6 +104,7 @@ export function RecordListPage() {
   const canManageTableTabs = isCurrentUserAdmin()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const fixedProductType = resource === "products" ? searchParams.get("productType") : null
   const [search, setSearch] = useState("")
   const [advancedSearch, setAdvancedSearch] = useState(false)
   const [advancedFilters, setAdvancedFilters] = useState<Record<string, { operator: string; value?: string | number }>>({})
@@ -166,6 +167,7 @@ export function RecordListPage() {
       { field: "isArchived", operator: "eq" as const, value: recordStatus === "archived" },
       ...(sortField ? [{ field: "sort", operator: "eq" as const, value: sortField }, { field: "order", operator: "eq" as const, value: sortOrder }] : []),
       ...(resource === "appointments" && doctorFilter ? [{ field: "doctorStaffId", operator: "eq" as const, value: doctorFilter }] : []),
+      ...(fixedProductType ? [{ field: "productType", operator: "eq" as const, value: fixedProductType }] : []),
     ],
   }) as any
   const response = query.query?.data || query.data?.data || query.result
@@ -584,12 +586,22 @@ export function RecordListPage() {
             .map((item) => ({ ...item, label: actionPresentation.labels?.[item.actionKey]?.trim() || item.label }))
           const rowMenuItems = orderedMenuItems.filter((item) => item.key !== "quick-view" && (actionPresentation.inline?.[item.actionKey] ?? ["view", "update"].includes(item.actionKey)))
           const overflowMenuItems = orderedMenuItems.filter((item) => !rowMenuItems.includes(item))
+          // Table rows open the detail drawer on click. Explicitly stop the
+          // event from row actions (including the portalled dropdown menu),
+          // so actions such as Duplicate only open their own form.
+          const safeMenuItems = (items: any[]) => items.map((item) => ({
+            ...item,
+            onClick: (event: any) => {
+              event?.domEvent?.stopPropagation()
+              item.onClick?.()
+            },
+          }))
           return <>
-          <span className="record-row-actions-mobile"><Dropdown menu={{ items: orderedMenuItems }} trigger={["click"]}><Button type="text" icon={<MoreOutlined />} aria-label="Thao tác" /></Dropdown></span>
-          <Space className="record-row-actions-desktop" size={2}>
-            {rowMenuItems.map((item) => <Tooltip key={String(item.key)} title={item.label}><Button danger={item.danger} icon={item.icon} type="text" onClick={item.onClick} /></Tooltip>)}
+          <span className="record-row-actions-mobile" onClick={(event) => event.stopPropagation()}><Dropdown menu={{ items: safeMenuItems(orderedMenuItems) }} trigger={["click"]}><Button type="text" icon={<MoreOutlined />} aria-label="Thao tác" /></Dropdown></span>
+          <Space className="record-row-actions-desktop" size={2} onClick={(event) => event.stopPropagation()}>
+            {rowMenuItems.map((item) => <Tooltip key={String(item.key)} title={item.label}><Button danger={item.danger} icon={item.icon} type="text" onClick={(event) => { event.stopPropagation(); item.onClick?.() }} /></Tooltip>)}
             {overflowMenuItems.length > 0 && (
-              <Dropdown menu={{ items: overflowMenuItems }} trigger={["click"]}>
+              <Dropdown menu={{ items: safeMenuItems(overflowMenuItems) }} trigger={["click"]}>
                 <Tooltip title="Thao tác khác">
                   <Button icon={<MoreOutlined />} type="text" aria-label="Thao tác khác" />
                 </Tooltip>
@@ -1230,7 +1242,7 @@ export function RecordListPage() {
           <ServiceOrderForm
             compact
             id={editingId || undefined}
-            initialValues={editingId ? undefined : duplicateValues}
+            initialValues={editingId ? undefined : { ...duplicateValues, ...(fixedProductType ? { productType: fixedProductType } : {}) }}
             onCancel={() => {
               setCreating(false)
               setEditingId(null)

@@ -46,8 +46,8 @@ export const appModuleGroups: AppModuleGroup[] = [
   },
   {
     key: "landing",
-    label: "User site",
-    modules: ["landing-pages", "landing-forms", "posts", "news", "landing-config", "landing-domains", "customer-app"],
+    label: "Nội dung",
+    modules: ["landing-pages", "landing-forms", "posts", "news", "services", "doctors", "videos", "landing-config", "landing-domains", "customer-app"],
   },
   {
     key: "hr",
@@ -116,6 +116,9 @@ export const appModuleLabels: Record<AppModuleKey, string> = {
   "landing-domains": "Tên miền",
   "landing-config": "Cài đặt site",
   "customer-app": "App khách hàng",
+  services: "Dịch vụ",
+  doctors: "Bác sĩ",
+  videos: "Video ngắn",
 }
 
 export const allAppModuleKeys = Array.from(
@@ -507,10 +510,10 @@ export function resolveEnabledModules(
   hasCustomModuleSelection = false,
 ) {
   const normalized = normalizeEnabledModules(enabledModules)
-  if (hasCustomModuleSelection) return normalized
+  if (hasCustomModuleSelection) return Array.from(new Set([...normalized, "services", "doctors", "videos"]))
   // Customer app management is a shared User site capability for every
   // industry preset, including tenants created before this module existed.
-  return Array.from(new Set([...companyTypeModulePresets[companyType], "customer-app", "company-feed"]))
+  return Array.from(new Set([...companyTypeModulePresets[companyType], "customer-app", "company-feed", "services", "doctors", "videos"]))
 }
 
 export function isModuleEnabled(moduleKey: string, enabledModules: unknown, companyType: CompanyType, hasCustomModuleSelection = false) {

@@ -1,4 +1,5 @@
 import { ArrowLeftOutlined, DeleteOutlined, DownloadOutlined, ImportOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons"
+import { CmsBackButton } from "../components/CmsBackButton"
 import { faker } from "@faker-js/faker"
 import { Alert, Button, Card, Dropdown, Select, Space, Table, Tabs, Tag, Typography, Upload, message } from "antd"
 import type { UploadProps } from "antd"
@@ -300,8 +301,12 @@ export function RecordImportPage() {
       return
     }
 
-    const workbook = buildImportWorkbook(importableFields, lookups)
+    const rows = Array.from({ length: testRowCount }, (_, index) =>
+      generateFakeImportRow(resource, importableFields, lookups, index),
+    )
+    const workbook = buildImportWorkbook(importableFields, lookups, rows)
     XLSX.writeFile(workbook, `${resource}-import-template.xlsx`)
+    message.success(`Đã tạo file mẫu với ${testRowCount} dòng dữ liệu`)
   }
 
   async function downloadExportData() {
@@ -393,9 +398,7 @@ export function RecordImportPage() {
     <>
       <div className="page-header">
         <Space size={12}>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/${resource}`)}>
-            Quay lại danh sách
-          </Button>
+          <CmsBackButton to={`/${resource}`} title="Quay lại danh sách" />
           <Typography.Title level={3}>
             Import {entityLabels[resource] || resource}
           </Typography.Title>
@@ -730,9 +733,11 @@ function generateFakeFieldValue(
     return formatClinicDateTimeForApi(faker.date.soon({ days: 30 })) || ""
   }
 
-  if (String(field.type || "") === "boolean") {
+  if (field.type === "checkbox" || String(field.type || "") === "boolean") {
     return index % 2 === 0 ? "true" : "false"
   }
+
+  if (field.type === "html") return `<p>${faker.lorem.sentence()}</p>`
 
   return fakeTextByKey(resource, field.key, index)
 }

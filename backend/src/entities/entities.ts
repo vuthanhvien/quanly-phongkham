@@ -315,6 +315,11 @@ export class Customer extends ConfigurableEntity {
   @Column({ nullable: true })
   email?: string;
 
+  // Separate from staff accounts: this credential only grants access to the
+  // customer portal for the customer record that owns it.
+  @Column({ nullable: true, select: false })
+  passwordHash?: string;
+
   @Column({ nullable: true })
   gender?: string;
 
@@ -675,6 +680,18 @@ export class Product extends ConfigurableEntity {
 
   @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
   sellingPrice: number;
+
+  @Column({ nullable: true })
+  imageUrl?: string;
+
+  @Column({ type: 'text', nullable: true })
+  excerpt?: string;
+
+  @Column({ type: 'text', nullable: true })
+  content?: string;
+
+  @Column({ default: false })
+  isFeatured: boolean;
 
   @Column({ default: false })
   hasVariants: boolean;
@@ -1136,6 +1153,50 @@ export class ContentNews extends ConfigurableEntity {
 
   @Column({ default: false })
   isFeatured: boolean;
+}
+
+/** Public catalog, isolated from internal inventory/Product records. */
+@Entity('content_services')
+export class ContentService extends ConfigurableEntity {
+  @Column({ unique: true }) slug: string;
+  @Column() name: string;
+  @Column({ nullable: true }) category?: string;
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 }) price: number;
+  @Column({ nullable: true }) imageUrl?: string;
+  @Column({ type: 'text', nullable: true }) excerpt?: string;
+  @Column({ type: 'text', nullable: true }) content?: string;
+  @Column({ default: 'DRAFT' }) status: string;
+  @Column({ default: false }) isFeatured: boolean;
+  @Column({ nullable: true }) publishedAt?: string;
+}
+
+/** Public doctor profile, isolated from internal Staff/HR records. */
+@Entity('content_doctors')
+export class ContentDoctor extends ConfigurableEntity {
+  @Column({ unique: true }) slug: string;
+  @Column() fullName: string;
+  @Column({ nullable: true }) specialty?: string;
+  @Column({ nullable: true }) experience?: string;
+  @Column({ nullable: true }) imageUrl?: string;
+  @Column({ type: 'text', nullable: true }) excerpt?: string;
+  @Column({ type: 'text', nullable: true }) content?: string;
+  @Column({ default: 'DRAFT' }) status: string;
+  @Column({ default: false }) isFeatured: boolean;
+  @Column({ nullable: true }) publishedAt?: string;
+}
+
+/** Short-form public video, isolated from internal records and media. */
+@Entity('content_videos')
+export class ContentVideo extends ConfigurableEntity {
+  @Column({ unique: true }) slug: string;
+  @Column() title: string;
+  @Column({ nullable: true }) videoUrl?: string;
+  @Column({ nullable: true }) imageUrl?: string;
+  @Column({ type: 'text', nullable: true }) excerpt?: string;
+  @Column({ type: 'text', nullable: true }) content?: string;
+  @Column({ default: 'DRAFT' }) status: string;
+  @Column({ default: false }) isFeatured: boolean;
+  @Column({ nullable: true }) publishedAt?: string;
 }
 
 @Entity('company_feed_posts')
@@ -3297,6 +3358,9 @@ export const ENTITIES = [
   CustomFieldValue,
   ContentPost,
   ContentNews,
+  ContentService,
+  ContentDoctor,
+  ContentVideo,
   CompanyFeedPost,
   CompanyFeedComment,
   CompanyFeedLike,

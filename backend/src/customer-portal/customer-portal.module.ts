@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { TenantModule, TenantOrmModule } from '../tenant/tenant-orm.module';
-import { Appointment, Branch, Consultation, Customer, CustomerImage, CustomerOtp, Invoice, MedicalEpisode, ServiceOrder, Staff, Treatment, User } from '../entities/entities';
+import { Appointment, Branch, Consultation, ContentDoctor, ContentNews, ContentPost, ContentService, ContentVideo, Customer, CustomerImage, CustomerOtp, Invoice, MedicalEpisode, ServiceOrder, Treatment } from '../entities/entities';
 import { CustomerAuthController } from './customer-auth.controller';
 import { CustomerAuthService } from './customer-auth.service';
 import { CustomerPortalController } from './customer-portal.controller';
@@ -13,7 +13,8 @@ const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '30d') as `${number}${'s' 
 @Module({
   imports: [
     TenantOrmModule.forFeature([
-      Customer, CustomerOtp, Appointment, Invoice, Branch, Staff, User,
+      Customer, CustomerOtp, Appointment, Invoice, Branch,
+      ContentPost, ContentNews, ContentService, ContentDoctor, ContentVideo,
       MedicalEpisode, Consultation, Treatment, ServiceOrder, CustomerImage,
     ]),
     TenantModule,

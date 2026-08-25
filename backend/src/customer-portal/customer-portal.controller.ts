@@ -13,11 +13,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsDateString, IsIn, IsOptional, IsString } from 'class-validator';
-import { In, LessThan, MoreThan, Repository } from 'typeorm';
+import { LessThan, MoreThan, Repository } from 'typeorm';
 import { Public } from '../common/auth';
 import {
   Appointment, Branch, Consultation, Customer, CustomerImage, Invoice,
-  MedicalEpisode, ServiceOrder, Staff, Treatment, User,
+  ContentDoctor, ContentNews, ContentPost, ContentService, ContentVideo, MedicalEpisode, ServiceOrder, Treatment,
 } from '../entities/entities';
 import { CustomerAuthUser } from './customer-auth';
 import { CustomerJwtAuthGuard } from './customer-jwt-auth.guard';
@@ -84,8 +84,11 @@ export class CustomerPortalController {
     @InjectRepository(Appointment) private readonly appointments: Repository<Appointment>,
     @InjectRepository(Invoice) private readonly invoices: Repository<Invoice>,
     @InjectRepository(Branch) private readonly branches: Repository<Branch>,
-    @InjectRepository(Staff) private readonly staff: Repository<Staff>,
-    @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(ContentService) private readonly services: Repository<ContentService>,
+    @InjectRepository(ContentPost) private readonly posts: Repository<ContentPost>,
+    @InjectRepository(ContentNews) private readonly news: Repository<ContentNews>,
+    @InjectRepository(ContentDoctor) private readonly doctors: Repository<ContentDoctor>,
+    @InjectRepository(ContentVideo) private readonly videos: Repository<ContentVideo>,
     @InjectRepository(MedicalEpisode) private readonly medicalEpisodes: Repository<MedicalEpisode>,
     @InjectRepository(Consultation) private readonly consultations: Repository<Consultation>,
     @InjectRepository(Treatment) private readonly treatments: Repository<Treatment>,
@@ -242,14 +245,64 @@ export class CustomerPortalController {
     return { data };
   }
 
+  @Get('services')
+  async listServices() {
+    const data = await this.services.find({
+      where: { status: 'PUBLISHED', isArchived: false },
+      order: { publishedAt: 'DESC', createdAt: 'DESC' },
+    });
+    return {
+      data: data.map(({ id, slug, name, category, price, imageUrl, excerpt, content, isFeatured }) => ({
+        id,
+        code: slug,
+        name,
+        categoryId: category,
+        sellingPrice: price,
+        imageUrl,
+        excerpt,
+        content,
+        isFeatured,
+      })),
+    };
+  }
+
+  @Get('posts')
+  async listPosts() {
+    const data = await this.posts.find({
+      where: { status: 'PUBLISHED', isArchived: false },
+      order: { publishedAt: 'DESC', createdAt: 'DESC' },
+      take: 50,
+    });
+    return { data };
+  }
+
+  @Get('news')
+  async listNews() {
+    const data = await this.news.find({
+      where: { status: 'PUBLISHED', isArchived: false },
+      order: { publishedAt: 'DESC', createdAt: 'DESC' },
+      take: 50,
+    });
+    return { data };
+  }
+
+  @Get('videos')
+  async listVideos() {
+    const data = await this.videos.find({
+      where: { status: 'PUBLISHED', isArchived: false },
+      order: { publishedAt: 'DESC', createdAt: 'DESC' },
+      take: 50,
+    });
+    return { data };
+  }
+
   @Get('doctors')
   async listDoctors() {
-    const doctorUsers = await this.users.find({ where: { role: 'DOCTOR', isActive: true }, select: ['staffId'] });
-    const staffIds = doctorUsers.map((item) => item.staffId).filter((id): id is string => Boolean(id));
-    if (!staffIds.length) return { data: [] };
-
-    const data = await this.staff.find({ where: { id: In(staffIds), status: 'ACTIVE' }, order: { fullName: 'ASC' } });
-    return { data: data.map(({ id, code, fullName, avatarUrl, position }) => ({ id, code, fullName, avatarUrl, position })) };
+    const data = await this.doctors.find({
+      where: { status: 'PUBLISHED', isArchived: false },
+      order: { publishedAt: 'DESC', createdAt: 'DESC' },
+    });
+    return { data: data.map(({ id, slug, fullName, imageUrl, specialty, experience, excerpt, content }) => ({ id, code: slug, fullName, avatarUrl: imageUrl, position: specialty, experience, excerpt, content })) };
   }
 
   private async requireOwnCustomer(customerId: string) {

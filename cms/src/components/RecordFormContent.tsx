@@ -10,6 +10,7 @@ import {
   Alert,
   Avatar,
   Button,
+  Checkbox,
   Empty,
   Form,
   Grid,
@@ -48,6 +49,7 @@ import { toastError, toastSuccess } from "../toast"
 import { buildLocalDateTime, currentLocalDate, currentLocalDateTime, formatClinicDateTimeForApi, normalizeDateTimeValueForInput, normalizeDateValueForInput, parseClinicDateTime } from "../utils/datetime"
 import { buildFolderPathMap, buildFolderTree, FolderTreeNode, normalizeFileFolderRows } from "../utils/fileFolders"
 import { VietnamAddressFields } from './VietnamAddressFields'
+import { PrintTinyMceEditor } from './PrintTinyMceEditor'
 import {
   getFieldCatalog,
   groupFieldsByTab,
@@ -89,6 +91,17 @@ const APPOINTMENT_DURATION_OPTIONS = [
   { value: "custom", label: "Nhập giờ kết thúc" },
 ]
 
+function toSlug(value: unknown) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+}
+
 export function RecordFormContent({
   resource,
   id,
@@ -115,11 +128,13 @@ export function RecordFormContent({
   const [quickCreateRelationResource, setQuickCreateRelationResource] = useState<string | null>(null)
   const [relationReloadKey, setRelationReloadKey] = useState(0)
   const autoFocusedFormKey = useRef<string | null>(null)
+  const slugWasEdited = useRef(false)
   const { mutate: create } = useCreate()
   const { mutate: update } = useUpdate()
   const isAppointmentForm = resource === "appointments"
   const isWorkScheduleForm = resource === "work-schedules"
   const isAddressForm = resource === "customers" || resource === "leads"
+  const slugSourceField = resource === "doctors" ? "fullName" : ["services", "posts", "news", "videos"].includes(resource) ? resource === "services" ? "name" : "title" : undefined
   const recordQuery = useOne({
     resource,
     id: id || "",
@@ -162,11 +177,11 @@ export function RecordFormContent({
           viewRole || getStoredUserRole(),
         )
         const customFieldKeys = new Set(customFields.map((field: CustomField) => field.key))
+        // Static options (for example DRAFT/PUBLISHED) belong to the form
+        // configuration. Only custom select fields are populated from master
+        // data, otherwise an empty master-data group would erase the options.
         const masterFields = nextFields.filter((field: FieldSpec) =>
-          !field.relation && (
-            (Array.isArray(field.options) && field.options.length > 0) ||
-            (customFieldKeys.has(field.key) && (field.type === "select" || field.type === "multi-select"))
-          ),
+          !field.relation && customFieldKeys.has(field.key) && (field.type === "select" || field.type === "multi-select"),
         )
         const masterOptions = await Promise.all(masterFields.map(async (field) => {
           const rows = await getCachedMasterData(`master-data:${resource}.${field.key}`, () => api.get("/master-data", { params: { group: `${resource}.${field.key}` } }).then((response) => response.data.data || []))
@@ -536,8 +551,16 @@ export function RecordFormContent({
             form.submit()
           }
         }}
-        onValuesChange={() => {
+        onValuesChange={(changedValues) => {
           if (submitError) setSubmitError(null)
+          if (editing || !slugSourceField || !fields.some((field) => field.key === "slug")) return
+          if (Object.prototype.hasOwnProperty.call(changedValues, "slug")) {
+            slugWasEdited.current = true
+            return
+          }
+          if (!slugWasEdited.current && Object.prototype.hasOwnProperty.call(changedValues, slugSourceField)) {
+            form.setFieldValue("slug", toSlug(changedValues[slugSourceField]))
+          }
         }}
         onFinish={(values) => { if (!preview) submit(values) }}
         onFinishFailed={preview ? undefined : showValidationError}
@@ -933,6 +956,16 @@ function FieldInput({
         onChange={onChange}
       />
     )
+  if (field.type === "checkbox")
+    return (
+      <Checkbox
+        checked={value === true || value === "true" || value === 1 || value === "1"}
+        disabled={field.disabled}
+        onChange={(event) => onChange?.(event.target.checked)}
+      >
+        {field.description || "Hiển thị nội dung này ở khu vực nổi bật"}
+      </Checkbox>
+    )
   if (field.type === "multi-select")
     return (
       <Select
@@ -1044,6 +1077,13 @@ function FieldInput({
         rows={3}
         value={value as string | undefined}
         onChange={(e) => onChange?.(e.target.value)}
+      />
+    )
+  if (field.type === "html")
+    return (
+      <PrintTinyMceEditor
+        value={value as string | undefined}
+        onChange={(nextValue) => onChange?.(nextValue)}
       />
     )
   if (field.type === "date")
@@ -1584,7 +1624,7 @@ function FolderRelationInput({
   )
 }
 
-function ImageLibrarySelectInput({
+export function ImageLibrarySelectInput({
   value,
   onChange,
   disabled,
@@ -1716,7 +1756,7 @@ function ImageLibrarySelectInput({
   })
 
   return (
-    <Space direction="vertical" size={10} style={{ width: "100%" }}>
+    <Space direction={avatar ? "vertical" : "horizontal"} size={8} style={{ width: "100%" }} align="center">
       {avatar ? (
         <button
           aria-label={selectedValues.length ? "Thay avatar" : "Chọn avatar"}
@@ -1734,16 +1774,16 @@ function ImageLibrarySelectInput({
         </button>
       ) : selectedValues.length ? (
         <Image.PreviewGroup>
-          <Space wrap>
+          <Space size={4}>
             {selectedValues.map((imageUrl) => {
               const selected = selectedOptions.find((option) => option.value === imageUrl)
-              return <Image key={imageUrl} alt={selected?.title || "Hình ảnh đã chọn"} src={imageUrl} style={{ width: multiple ? 92 : "100%", maxHeight: multiple ? 92 : 240, objectFit: "cover", borderRadius: multiple ? "50%" : "var(--app-radius)" }} />
+              return <Image key={imageUrl} alt={selected?.title || "Hình ảnh đã chọn"} src={imageUrl} style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 6 }} />
             })}
           </Space>
         </Image.PreviewGroup>
       ) : null}
       {!avatar ? (
-        <Space.Compact style={{ width: "100%" }}>
+        <Space.Compact style={{ flex: 1, minWidth: 0 }}>
           <Input
             disabled
             placeholder={placeholder}

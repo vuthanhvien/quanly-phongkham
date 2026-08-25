@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:carousel_slider/carousel_slider.dart';
 import 'package:get/get.dart';
 import '../../core/session/session_controller.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_icons.dart';
-import '../../core/config/customer_app_config_controller.dart';
 import '../../data/demo/clinic_content.dart';
 import '../../routes/app_routes.dart';
+import '../../widgets/language_switcher.dart';
 import '../bookings/booking_card.dart';
 import '../shell/shell_controller.dart';
 import 'home_controller.dart';
@@ -21,113 +22,134 @@ class HomeScreen extends StatelessWidget {
       body: RefreshIndicator(
         onRefresh: controller.load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 56, 16, 36),
+          padding: EdgeInsets.zero,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Obx(
-                    () => Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Chào ${session.customer.value?.fullName.split(' ').last ?? 'bạn'}',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w800),
+            _HomeWelcome(session: session),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 36),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _HomeCtaCarousel(isLoggedIn: session.isLoggedIn),
+                  const SizedBox(height: 28),
+                  _SectionTitle(
+                    title: 'Lịch hẹn gần nhất',
+                    action: 'Xem tất cả',
+                    onTap: () => session.isLoggedIn
+                        ? Get.find<ShellController>().changeTab(1)
+                        : Get.toNamed(AppRoutes.phoneEntry),
+                  ),
+                  const SizedBox(height: 10),
+                  Obx(() {
+                    if (!session.isLoggedIn) {
+                      return _EmptyBooking(
+                        onTap: () => Get.toNamed(AppRoutes.phoneEntry),
+                        message: 'Đăng nhập để xem và quản lý lịch hẹn của bạn',
+                      );
+                    }
+                    if (controller.isLoading.value) {
+                      return const _Skeleton(height: 92);
+                    }
+                    final next = controller.nextAppointment.value;
+                    if (next != null) {
+                      return BookingCard(
+                        appointment: next,
+                        onTap: () => Get.toNamed(
+                          AppRoutes.bookingDetail,
+                          arguments: next.id,
                         ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Hôm nay bạn muốn chăm sóc điều gì?',
-                          style: TextStyle(color: AppColors.textMuted),
-                        ),
-                      ],
+                      );
+                    }
+                    return _EmptyBooking(
+                      onTap: () => Get.toNamed(AppRoutes.bookingCreate),
+                    );
+                  }),
+                  const SizedBox(height: 28),
+                  _SectionTitle(
+                    title: 'Dịch vụ nổi bật',
+                    action: 'Khám phá',
+                    onTap: () => Get.toNamed(AppRoutes.services),
+                  ),
+                  const SizedBox(height: 12),
+                  Obx(
+                    () => _ContentSection(
+                      isLoading: controller.isLoadingContent.value,
+                      isEmpty: controller.services.isEmpty,
+                      emptyMessage: 'Chưa có dịch vụ để hiển thị',
+                      child: _ContentCarousel(
+                        height: 160,
+                        viewportFraction: .46,
+                        itemCount: controller.services.length,
+                        itemBuilder: (index) =>
+                            _ServiceCard(service: controller.services[index]),
+                      ),
                     ),
                   ),
-                ),
-                const CircleAvatar(
-                  radius: 22,
-                  backgroundColor: AppColors.primarySoft,
-                  child: Icon(AppIcons.profile, color: AppColors.primaryDark),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            const _ClinicHero(),
-            const SizedBox(height: 14),
-            const _TrustStrip(),
-            const _ConfiguredBlocks(),
-            const SizedBox(height: 28),
-            _SectionTitle(
-              title: 'Lịch hẹn gần nhất',
-              action: 'Xem tất cả',
-              onTap: () => Get.find<ShellController>().changeTab(1),
-            ),
-            const SizedBox(height: 10),
-            Obx(() {
-              if (controller.isLoading.value) {
-                return const _Skeleton(height: 92);
-              }
-              final next = controller.nextAppointment.value;
-              if (next != null) {
-                return BookingCard(
-                  appointment: next,
-                  onTap: () =>
-                      Get.toNamed(AppRoutes.bookingDetail, arguments: next.id),
-                );
-              }
-              return _EmptyBooking(
-                onTap: () => Get.toNamed(AppRoutes.bookingCreate),
-              );
-            }),
-            const SizedBox(height: 28),
-            _SectionTitle(
-              title: 'Dịch vụ nổi bật',
-              action: 'Khám phá',
-              onTap: () {},
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 142,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: clinicServices.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 12),
-                itemBuilder: (_, index) =>
-                    _ServiceCard(service: clinicServices[index]),
+                  const SizedBox(height: 28),
+                  _SectionTitle(
+                    title: 'Đội ngũ bác sĩ',
+                    action: 'Xem tất cả',
+                    onTap: () => Get.toNamed(AppRoutes.doctors),
+                  ),
+                  const SizedBox(height: 12),
+                  Obx(() {
+                    final doctors = controller.doctors.take(5).toList();
+                    return _ContentSection(
+                      isLoading: controller.isLoadingContent.value,
+                      isEmpty: doctors.isEmpty,
+                      emptyMessage: 'Chưa có bác sĩ để hiển thị',
+                      child: _ContentCarousel(
+                        height: 220,
+                        viewportFraction: .5,
+                        itemCount: doctors.length,
+                        itemBuilder: (index) =>
+                            _DoctorCard(doctor: doctors[index]),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 28),
+                  _SectionTitle(
+                    title: 'Posts mới',
+                    action: 'Xem thêm',
+                    onTap: () => Get.toNamed(AppRoutes.posts),
+                  ),
+                  const SizedBox(height: 12),
+                  Obx(
+                    () => Column(
+                      children: controller.posts
+                          .take(3)
+                          .map(
+                            (post) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _PostCard(post: post),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _SectionTitle(
+                    title: 'Tin tức mới',
+                    action: 'Xem thêm',
+                    onTap: () => Get.toNamed(AppRoutes.news),
+                  ),
+                  const SizedBox(height: 12),
+                  Obx(
+                    () => Column(
+                      children: controller.news
+                          .take(3)
+                          .map(
+                            (news) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _PostCard(post: news),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 28),
-            _SectionTitle(
-              title: 'Đội ngũ bác sĩ',
-              action: 'Xem tất cả',
-              onTap: () {},
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 168,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: clinicDoctors.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 12),
-                itemBuilder: (_, index) =>
-                    _DoctorCard(doctor: clinicDoctors[index]),
-              ),
-            ),
-            const SizedBox(height: 28),
-            _SectionTitle(
-              title: 'Mới từ phòng khám',
-              action: 'Xem thêm',
-              onTap: () {},
-            ),
-            const SizedBox(height: 12),
-            ...clinicPosts.map(
-              (post) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _PostCard(post: post),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const _ClinicInfo(),
           ],
         ),
       ),
@@ -135,134 +157,313 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _ClinicHero extends StatelessWidget {
-  const _ClinicHero();
+class _HomeWelcome extends StatelessWidget {
+  const _HomeWelcome({required this.session});
+
+  final SessionController session;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: AppColors.primarySoft,
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+    ),
+    child: SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Row(
+          children: [
+            Expanded(
+              child: Obx(() {
+                final customer = session.customer.value;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Chào ${customer?.fullName.split(' ').last ?? 'bạn'}',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      customer == null
+                          ? 'Khám phá hành trình chăm sóc dành cho bạn'
+                          : 'Cùng ${customer.fullName} chăm sóc sức khỏe mỗi ngày',
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            ),
+            const LanguageSwitcher(),
+            const SizedBox(width: 4),
+            InkWell(
+              onTap: () {
+                if (!session.isLoggedIn) Get.toNamed(AppRoutes.phoneEntry);
+              },
+              borderRadius: BorderRadius.circular(99),
+              child: const CircleAvatar(
+                radius: 23,
+                backgroundColor: Colors.white,
+                child: Icon(AppIcons.profile, color: AppColors.primaryDark),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _HomeCtaCarousel extends StatefulWidget {
+  const _HomeCtaCarousel({required this.isLoggedIn});
+
+  final bool isLoggedIn;
+
+  @override
+  State<_HomeCtaCarousel> createState() => _HomeCtaCarouselState();
+}
+
+class _HomeCtaCarouselState extends State<_HomeCtaCarousel> {
+  var _currentPage = 0;
+
   @override
   Widget build(BuildContext context) {
-    final config = Get.find<CustomerAppConfigController>();
-    return Obx(() {
-      final businessName = config.config['businessName'] as String? ?? '';
-      final logoUrl = config.config['logoUrl'] as String? ?? '';
-      final layout = config.config['layout'] as Map?;
-      final showLogo = layout?['showLogo'] != false;
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          padding: const EdgeInsets.all(22),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xE82A303E), Color(0xE84A3850)],
-            ),
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Opacity(
-                  opacity: .18,
-                  child: Image.network(
-                    'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1100&q=80',
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (showLogo && logoUrl.isNotEmpty) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        logoUrl,
-                        height: 36,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  Text(
-                    businessName.isEmpty
-                        ? 'YOUR WELLNESS,\nOUR DEVOTION.'
-                        : businessName,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      height: 1.08,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -.5,
-                    ),
-                  ),
-                  const SizedBox(height: 13),
-                  const Text(
-                    'Chăm sóc tận tâm • Kết quả bền vững',
-                    style: TextStyle(color: Color(0xFFE6DDE4), fontSize: 13),
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton.tonal(
-                    onPressed: () => Get.toNamed(AppRoutes.bookingCreate),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppColors.title,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 11,
-                      ),
-                    ),
-                    child: const Text('Đặt lịch tư vấn'),
-                  ),
-                ],
-              ),
-            ],
+    final slides = [
+      _CtaSlide(
+        imageUrl:
+            'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1100&q=80',
+        title: 'Đặt lịch tư vấn',
+        description: 'Chọn thời gian phù hợp để đội ngũ phòng khám hỗ trợ bạn.',
+        button: 'Đặt lịch ngay',
+        onTap: () => widget.isLoggedIn
+            ? Get.toNamed(AppRoutes.bookingCreate)
+            : Get.toNamed(AppRoutes.phoneEntry),
+      ),
+      _CtaSlide(
+        imageUrl:
+            'https://images.unsplash.com/photo-1576091160399-112ba8d25d6?auto=format&fit=crop&w=1100&q=80',
+        title: 'Tìm dịch vụ phù hợp',
+        description: 'Khám phá các giải pháp chăm sóc được thiết kế cho bạn.',
+        button: 'Xem dịch vụ',
+        onTap: () => Get.toNamed(AppRoutes.services),
+      ),
+      _CtaSlide(
+        imageUrl:
+            'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=1100&q=80',
+        title: 'Gặp đội ngũ bác sĩ',
+        description: 'Tìm hiểu chuyên môn và người đồng hành cùng bạn.',
+        button: 'Xem bác sĩ',
+        onTap: () => Get.toNamed(AppRoutes.doctors),
+      ),
+    ];
+    return Column(
+      children: [
+        CarouselSlider.builder(
+          itemCount: slides.length,
+          itemBuilder: (_, index, _) => slides[index],
+          options: CarouselOptions(
+            height: 190,
+            viewportFraction: .9,
+            padEnds: false,
+            enableInfiniteScroll: false,
+            onPageChanged: (index, _) => setState(() => _currentPage = index),
           ),
         ),
-      );
-    });
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            slides.length,
+            (index) => AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: index == _currentPage ? 16 : 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: index == _currentPage
+                    ? AppColors.primaryDark
+                    : AppColors.border,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
-class _ConfiguredBlocks extends StatelessWidget {
-  const _ConfiguredBlocks();
+class _ContentCarousel extends StatefulWidget {
+  const _ContentCarousel({
+    required this.height,
+    required this.viewportFraction,
+    required this.itemCount,
+    required this.itemBuilder,
+  });
+
+  final double height;
+  final double viewportFraction;
+  final int itemCount;
+  final Widget Function(int index) itemBuilder;
+
+  @override
+  State<_ContentCarousel> createState() => _ContentCarouselState();
+}
+
+class _ContentSection extends StatelessWidget {
+  const _ContentSection({
+    required this.isLoading,
+    required this.isEmpty,
+    required this.emptyMessage,
+    required this.child,
+  });
+
+  final bool isLoading, isEmpty;
+  final String emptyMessage;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final config = Get.find<CustomerAppConfigController>();
-    return Obx(() {
-      final blocks = config.config['blocks'];
-      if (blocks is! List) return const SizedBox.shrink();
-      final layout = config.config['layout'] as Map?;
-      final maxBlocks = layout?['maxHomeBlocks'] as int? ?? blocks.length;
-      final visible = blocks
-          .whereType<Map>()
-          .where((block) => block['enabled'] != false)
-          .take(maxBlocks)
-          .toList();
-      if (visible.isEmpty) return const SizedBox.shrink();
+    if (isLoading && isEmpty) return const _Skeleton(height: 130);
+    if (isEmpty) {
       return Padding(
-        padding: const EdgeInsets.only(top: 16),
-        child: Column(
-          children: visible
-              .map(
-                (block) => Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    '${block['title'] ?? ''}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primaryDark,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Text(
+          emptyMessage,
+          style: const TextStyle(color: AppColors.textMuted),
         ),
       );
-    });
+    }
+    return child;
   }
+}
+
+class _ContentCarouselState extends State<_ContentCarousel> {
+  var _currentPage = 0;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      SizedBox(
+        height: widget.height - 18,
+        child: CarouselSlider.builder(
+          itemCount: widget.itemCount,
+          itemBuilder: (_, index, _) => Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: widget.itemBuilder(index),
+          ),
+          options: CarouselOptions(
+            height: widget.height - 18,
+            viewportFraction: widget.viewportFraction,
+            padEnds: false,
+            enableInfiniteScroll: false,
+            onPageChanged: (index, _) => setState(() => _currentPage = index),
+          ),
+        ),
+      ),
+      const SizedBox(height: 7),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(
+          widget.itemCount,
+          (index) => AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: index == _currentPage ? 12 : 4,
+            height: 4,
+            decoration: BoxDecoration(
+              color: index == _currentPage
+                  ? AppColors.accent
+                  : AppColors.border,
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _CtaSlide extends StatelessWidget {
+  const _CtaSlide({
+    required this.imageUrl,
+    required this.title,
+    required this.description,
+    required this.button,
+    required this.onTap,
+  });
+
+  final String imageUrl, title, description, button;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(right: 12),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => const ColoredBox(color: AppColors.title),
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0x15000000), Color(0xD91F2430)],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xE6FFFFFF),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                FilledButton(
+                  onPressed: onTap,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.title,
+                  ),
+                  child: Text(button),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _SectionTitle extends StatelessWidget {
@@ -288,8 +489,9 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _EmptyBooking extends StatelessWidget {
-  const _EmptyBooking({required this.onTap});
+  const _EmptyBooking({required this.onTap, this.message});
   final VoidCallback onTap;
+  final String? message;
   @override
   Widget build(BuildContext context) => Card(
     child: Padding(
@@ -298,13 +500,16 @@ class _EmptyBooking extends StatelessWidget {
         children: [
           const Icon(AppIcons.calendar, color: AppColors.primaryDark),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Chưa có lịch hẹn sắp tới',
-              style: TextStyle(fontWeight: FontWeight.w600),
+              message ?? 'Chưa có lịch hẹn sắp tới',
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
-          TextButton(onPressed: onTap, child: const Text('Đặt lịch')),
+          TextButton(
+            onPressed: onTap,
+            child: Text(message == null ? 'Đặt lịch' : 'Đăng nhập'),
+          ),
         ],
       ),
     ),
@@ -318,61 +523,66 @@ class _ServiceCard extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(
     width: 152,
     child: Card(
-      child: Padding(
-        padding: const EdgeInsets.all(15),
-        child: Stack(
-          children: [
-            Positioned(
-              right: -18,
-              bottom: -18,
-              child: Opacity(
-                opacity: .16,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(60),
-                  child: Image.network(
-                    service.imageUrl,
-                    width: 96,
-                    height: 96,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    service.icon,
-                    style: const TextStyle(
-                      color: AppColors.primaryDark,
-                      fontSize: 20,
+      child: InkWell(
+        onTap: () => Get.toNamed(AppRoutes.serviceDetail, arguments: service),
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(15),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -18,
+                bottom: -18,
+                child: Opacity(
+                  opacity: .16,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(60),
+                    child: Image.network(
+                      service.imageUrl,
+                      width: 96,
+                      height: 96,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
                     ),
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  service.name,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  service.description,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: AppColors.textMuted,
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySoft,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      service.icon,
+                      style: const TextStyle(
+                        color: AppColors.primaryDark,
+                        fontSize: 20,
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const Spacer(),
+                  Text(
+                    service.name,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    service.description,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     ),
@@ -384,56 +594,67 @@ class _DoctorCard extends StatelessWidget {
   final ClinicDoctor doctor;
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: 154,
+    width: 170,
     child: Card(
-      child: Padding(
-        padding: const EdgeInsets.all(13),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: 72,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(13),
-                child: Image.network(
-                  doctor.imageUrl,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  errorBuilder: (_, _, _) => Container(
-                    color: Color(doctor.color),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      AppIcons.person,
-                      color: Colors.white,
-                      size: 42,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => Get.toNamed(AppRoutes.doctorDetail, arguments: doctor),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 96,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    doctor.imageUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    errorBuilder: (_, _, _) => Container(
+                      color: Color(doctor.color),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        AppIcons.person,
+                        color: Colors.white,
+                        size: 42,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              doctor.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              doctor.specialty,
-              style: const TextStyle(
-                fontSize: 11.5,
-                color: AppColors.textMuted,
+              const SizedBox(height: 9),
+              Text(
+                doctor.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
               ),
-            ),
-            Text(
-              doctor.experience,
-              style: const TextStyle(
-                fontSize: 10.5,
-                color: AppColors.primaryDark,
+              const SizedBox(height: 2),
+              Text(
+                doctor.specialty,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: AppColors.textMuted,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              if (doctor.experience.isNotEmpty)
+                Text(
+                  doctor.experience,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: AppColors.primaryDark,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     ),
@@ -445,155 +666,68 @@ class _PostCard extends StatelessWidget {
   final ClinicPost post;
   @override
   Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 72,
-            height: 72,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                post.imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  color: AppColors.primarySoft,
-                  child: const Icon(
-                    AppIcons.sparkle,
-                    color: AppColors.primaryDark,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: () => Get.toNamed(AppRoutes.newsDetail, arguments: post),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 72,
+              height: 72,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(
+                  post.imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    color: AppColors.primarySoft,
+                    child: const Icon(
+                      AppIcons.sparkle,
+                      color: AppColors.primaryDark,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  post.category,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primaryDark,
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    post.category,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primaryDark,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  post.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    height: 1.25,
+                  const SizedBox(height: 4),
+                  Text(
+                    post.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  post.readTime,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: AppColors.textMuted,
+                  const SizedBox(height: 4),
+                  Text(
+                    post.readTime,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: AppColors.textMuted,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _TrustStrip extends StatelessWidget {
-  const _TrustStrip();
-  @override
-  Widget build(BuildContext context) => const Row(
-    children: [
-      Expanded(
-        child: _TrustItem(
-          icon: AppIcons.shield,
-          value: '10+ năm',
-          label: 'kinh nghiệm',
+          ],
         ),
       ),
-      Expanded(
-        child: _TrustItem(
-          icon: AppIcons.doctor,
-          value: '20+ bác sĩ',
-          label: 'chuyên môn',
-        ),
-      ),
-      Expanded(
-        child: _TrustItem(
-          icon: AppIcons.heartbeat,
-          value: '5.000+',
-          label: 'khách hàng',
-        ),
-      ),
-    ],
-  );
-}
-
-class _TrustItem extends StatelessWidget {
-  const _TrustItem({
-    required this.icon,
-    required this.value,
-    required this.label,
-  });
-  final IconData icon;
-  final String value, label;
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Icon(icon, color: AppColors.primaryDark, size: 20),
-      const SizedBox(height: 4),
-      Text(
-        value,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-      ),
-      Text(
-        label,
-        style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
-      ),
-    ],
-  );
-}
-
-class _ClinicInfo extends StatelessWidget {
-  const _ClinicInfo();
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: AppColors.primarySofter,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'PHÒNG KHÁM CỦA BẠN',
-          style: TextStyle(
-            color: AppColors.primaryDark,
-            fontSize: 10.5,
-            fontWeight: FontWeight.w800,
-            letterSpacing: .6,
-          ),
-        ),
-        SizedBox(height: 7),
-        Text(
-          'GIS Clinic',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-        ),
-        SizedBox(height: 6),
-        Text(
-          '123 Nguyễn Văn Trỗi, Phú Nhuận, TP. Hồ Chí Minh\n08:00 – 20:00, tất cả các ngày',
-          style: TextStyle(color: AppColors.textMuted, height: 1.45),
-        ),
-      ],
     ),
   );
 }
