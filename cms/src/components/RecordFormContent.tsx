@@ -4,6 +4,7 @@ import {
   FileOutlined,
   FilePdfOutlined,
   FileTextOutlined,
+  InboxOutlined,
   PlusOutlined,
 } from "@ant-design/icons"
 import {
@@ -624,7 +625,7 @@ export function RecordFormContent({
               <List.Item
                 actions={[
                   <Button key="open" size="small" type="primary" onClick={() => restoreDraft(draft)}>Mở</Button>,
-                  <Button danger key="delete" size="small" onClick={() => void removeDraft(draft.id)}>Lưu trữ</Button>,
+                  <Button icon={<InboxOutlined />} key="delete" size="small" onClick={() => void removeDraft(draft.id)}>Lưu trữ</Button>,
                 ]}
               >
                 <List.Item.Meta

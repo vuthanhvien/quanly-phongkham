@@ -65,32 +65,48 @@ export class CategoriesService {
   }
 
   async importBatch(rows: Array<Partial<ItemCategory> & { parentCode?: string }>) {
-    // Pre-load all existing codes → id
-    const existing = await this.repo.find({ select: ['id', 'code'] as (keyof ItemCategory)[] });
+    // Pre-load all existing codes → id. Codes are mandatory in the import
+    // format because child rows refer to their parent by code.
+    const existing = await this.repo.find({
+      where: { isArchived: false },
+      select: ['id', 'code'] as (keyof ItemCategory)[],
+    });
     const codeMap = new Map<string, string>();
     for (const cat of existing) {
       if (cat.code) codeMap.set(cat.code.trim(), cat.id);
     }
 
-    // Process root rows first (no parentCode), then children
-    const sorted = [...rows].sort((a, b) => {
-      const aHas = a.parentCode ? 1 : 0;
-      const bHas = b.parentCode ? 1 : 0;
-      return aHas - bHas;
-    });
-
     const results: Array<ItemCategory & { _action: string }> = [];
     const errors: Array<{ rowIndex: number; code?: string; error: string }> = [];
+    const pending = rows.map((row, index) => ({ row, index }));
 
-    for (let i = 0; i < sorted.length; i++) {
-      const row = sorted[i];
-      try {
+    // A file does not need to be sorted by hierarchy. Keep processing rows
+    // whose parents are known until no further progress can be made.
+    while (pending.length > 0) {
+      let progressed = false;
+      for (let cursor = pending.length - 1; cursor >= 0; cursor--) {
+        const { row, index } = pending[cursor];
+        const code = String(row.code || '').trim();
+        const parentCode = String(row.parentCode || '').trim();
+        if (!code) {
+          errors.push({ rowIndex: index + 1, error: 'Mã danh mục là bắt buộc' });
+          pending.splice(cursor, 1);
+          continue;
+        }
+        if (!String(row.name || '').trim()) {
+          errors.push({ rowIndex: index + 1, code, error: 'Tên danh mục là bắt buộc' });
+          pending.splice(cursor, 1);
+          continue;
+        }
+        if (parentCode && !codeMap.has(parentCode)) continue;
+
+        try {
         let parentId: string | undefined;
         let level = 1;
 
-        if (row.parentCode?.trim()) {
-          const pid = codeMap.get(row.parentCode.trim());
-          if (!pid) throw new Error(`Không tìm thấy danh mục cha với mã "${row.parentCode}"`);
+        if (parentCode) {
+          const pid = codeMap.get(parentCode);
+          if (!pid) throw new Error(`Không tìm thấy danh mục cha với mã "${parentCode}"`);
           const parent = await this.repo.findOne({ where: { id: pid } });
           if (!parent) throw new Error(`Danh mục cha không còn tồn tại`);
           if (parent.level >= 3) throw new Error('Tối đa 3 cấp danh mục');
@@ -100,7 +116,7 @@ export class CategoriesService {
 
         const payload: Partial<ItemCategory> = {
           name: row.name,
-          code: row.code?.trim() || undefined,
+          code,
           description: row.description || undefined,
           sortOrder: row.sortOrder != null ? Number(row.sortOrder) : 0,
           isActive: row.isActive !== false && String(row.isActive) !== '0' && String(row.isActive).toLowerCase() !== 'false',
@@ -108,7 +124,7 @@ export class CategoriesService {
           level,
         };
 
-        const existingId = row.code ? codeMap.get(row.code.trim()) : undefined;
+        const existingId = codeMap.get(code);
         if (existingId) {
           const cat = await this.repo.findOne({ where: { id: existingId } });
           if (cat) {
@@ -123,12 +139,25 @@ export class CategoriesService {
           if (saved.code) codeMap.set(saved.code, saved.id);
           results.push({ ...saved, _action: 'created' });
         }
-      } catch (err) {
-        errors.push({
-          rowIndex: i + 1,
-          code: row.code,
-          error: err instanceof Error ? err.message : 'Lỗi không xác định',
-        });
+          pending.splice(cursor, 1);
+          progressed = true;
+        } catch (err) {
+          errors.push({
+            rowIndex: index + 1,
+            code,
+            error: err instanceof Error ? err.message : 'Lỗi không xác định',
+          });
+          pending.splice(cursor, 1);
+        }
+      }
+
+      if (!progressed) {
+        pending.forEach(({ row, index }) => errors.push({
+          rowIndex: index + 1,
+          code: String(row.code || '').trim() || undefined,
+          error: `Không tìm thấy danh mục cha với mã "${String(row.parentCode || '').trim()}"`,
+        }));
+        break;
       }
     }
 

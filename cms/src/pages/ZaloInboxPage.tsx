@@ -1,8 +1,8 @@
 import {
   CheckCircleOutlined,
-  DeleteOutlined,
   EditOutlined,
   InfoCircleOutlined,
+  InboxOutlined,
   LinkOutlined,
   MessageOutlined,
   PlayCircleOutlined,
@@ -519,9 +519,9 @@ export function ZaloInboxPage() {
                             onConfirm={() => void deleteAccount(account.id)}
                           >
                             <Button
-                              danger
-                              icon={<DeleteOutlined />}
+                              icon={<InboxOutlined />}
                               size="small"
+                              style={{ color: "#1677ff" }}
                               onClick={(event) => event.stopPropagation()}
                             >
                               Lưu trữ

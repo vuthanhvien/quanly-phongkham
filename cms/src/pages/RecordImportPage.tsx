@@ -16,6 +16,14 @@ import { getFieldCatalog } from "../view-settings"
 
 const UNSUPPORTED_RESOURCES = new Set(["files", "service-orders"])
 const BUNDLE_RESOURCES = new Set(["customers", "leads", "staff"])
+const PRODUCT_CATEGORY_FIELDS: FieldSpec[] = [
+  { key: "code", label: "Mã", required: true, tableWidth: 150 },
+  { key: "name", label: "Tên danh mục", required: true, tableWidth: 220 },
+  { key: "parentCode", label: "Mã danh mục cha", tableWidth: 180 },
+  { key: "description", label: "Mô tả", type: "textarea", tableWidth: 260 },
+  { key: "sortOrder", label: "Thứ tự", type: "number", tableWidth: 100 },
+  { key: "isActive", label: "Đang sử dụng", type: "checkbox", tableWidth: 140 },
+]
 
 interface BundleSheetDefinition {
   sheetName: string
@@ -27,33 +35,33 @@ interface BundleSheetDefinition {
 const BUNDLE_IMPORT_CONFIGS: Record<string, { related: BundleSheetDefinition[] }> = {
   customers: {
     related: [
-      { sheetName: "appointments", resource: "appointments", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "type", "startTime", "endTime", "doctorStaffId", "roomId", "equipmentId", "picStaffId", "status", "note"] },
-      { sheetName: "medical-episodes", resource: "medical-episodes", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "serviceName", "doctorName", "status", "chiefComplaint", "allergyWarning", "diagnosis", "operationDate"] },
-      { sheetName: "treatments", resource: "treatments", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "name", "totalSessions", "completedSessions", "intervalDays", "status"] },
-      { sheetName: "consultations", resource: "consultations", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "consultedAt", "consultantStaffId", "doctorStaffId", "status", "summary", "diagnosis", "nextAction"] },
-      { sheetName: "customer-images", resource: "customer-images", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "branchId", "mediaType", "title", "imageUrl", "capturedAt", "diagnosisNote"] },
-      { sheetName: "invoices", resource: "invoices", parentCodeColumn: "customerCode", columns: ["recordId", "customerCode", "code", "branchId", "totalAmount", "paidAmount", "method", "status"] },
+      { sheetName: "appointments", resource: "appointments", parentCodeColumn: "customerCode", columns: ["customerCode", "branchId", "type", "startTime", "endTime", "doctorStaffId", "roomId", "equipmentId", "picStaffId", "status", "note"] },
+      { sheetName: "medical-episodes", resource: "medical-episodes", parentCodeColumn: "customerCode", columns: ["customerCode", "branchId", "serviceName", "doctorName", "status", "chiefComplaint", "allergyWarning", "diagnosis", "operationDate"] },
+      { sheetName: "treatments", resource: "treatments", parentCodeColumn: "customerCode", columns: ["customerCode", "branchId", "name", "totalSessions", "completedSessions", "intervalDays", "status"] },
+      { sheetName: "consultations", resource: "consultations", parentCodeColumn: "customerCode", columns: ["customerCode", "branchId", "consultedAt", "consultantStaffId", "doctorStaffId", "status", "summary", "diagnosis", "nextAction"] },
+      { sheetName: "customer-images", resource: "customer-images", parentCodeColumn: "customerCode", columns: ["customerCode", "branchId", "mediaType", "title", "imageUrl", "capturedAt", "diagnosisNote"] },
+      { sheetName: "invoices", resource: "invoices", parentCodeColumn: "customerCode", columns: ["customerCode", "code", "branchId", "totalAmount", "paidAmount", "method", "status"] },
     ],
   },
   leads: {
     related: [
-      { sheetName: "lead-activities", resource: "lead-activities", parentCodeColumn: "leadCode", columns: ["recordId", "leadCode", "branchId", "activityType", "scheduledAt", "ownerStaffId", "status", "content"] },
+      { sheetName: "lead-activities", resource: "lead-activities", parentCodeColumn: "leadCode", columns: ["leadCode", "branchId", "activityType", "scheduledAt", "ownerStaffId", "status", "content"] },
     ],
   },
   staff: {
     related: [
-      { sheetName: "work-contracts", resource: "work-contracts", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "contractType", "startDate", "endDate", "baseSalary", "position", "workingHoursPerDay", "workingDaysPerMonth", "status", "note"] },
-      { sheetName: "staff-insurances", resource: "staff-insurances", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "insuranceType", "employeeRate", "employerRate", "salaryBase", "startDate", "endDate", "isActive", "note"] },
-      { sheetName: "attendances", resource: "attendances", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "date", "checkIn", "checkOut", "status", "note"] },
-      { sheetName: "leave-requests", resource: "leave-requests", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "startDate", "endDate", "leaveType", "status", "reason", "approvedById"] },
-      { sheetName: "payrolls", resource: "payrolls", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "month", "year", "baseSalary", "workingDays", "actualDays", "overtimeHours", "bonus", "deduction", "netSalary", "status", "note"] },
-      { sheetName: "work-schedules", resource: "work-schedules", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "workDate", "shiftLabel", "startTime", "endTime", "roomId", "status", "note"] },
-      { sheetName: "staff-rewards", resource: "staff-rewards", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "type", "title", "description", "date", "issuedBy", "amount", "note"] },
-      { sheetName: "staff-trainings", resource: "staff-trainings", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "trainingName", "provider", "startDate", "endDate", "certificateNumber", "expiryDate", "status", "note"] },
-      { sheetName: "performance-reviews", resource: "performance-reviews", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "reviewMonth", "reviewYear", "reviewerId", "score", "status", "strengths", "improvements", "goals", "note"] },
-      { sheetName: "position-histories", resource: "position-histories", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "branchId", "fromPosition", "toPosition", "fromDepartmentId", "toDepartmentId", "effectiveDate", "reason", "note"] },
-      { sheetName: "branch-role-assignments", resource: "branch-role-assignments", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "userId", "branchId", "roleName", "roleKeys", "isActive"] },
-      { sheetName: "user-accounts", resource: "user-accounts", parentCodeColumn: "staffCode", columns: ["recordId", "staffCode", "email", "username", "password", "fullName", "role", "branchId"] },
+      { sheetName: "work-contracts", resource: "work-contracts", parentCodeColumn: "staffCode", columns: ["staffCode", "branchId", "contractType", "startDate", "endDate", "baseSalary", "position", "workingHoursPerDay", "workingDaysPerMonth", "status", "note"] },
+      { sheetName: "staff-insurances", resource: "staff-insurances", parentCodeColumn: "staffCode", columns: ["staffCode", "branchId", "insuranceType", "employeeRate", "employerRate", "salaryBase", "startDate", "endDate", "isActive", "note"] },
+      { sheetName: "attendances", resource: "attendances", parentCodeColumn: "staffCode", columns: ["staffCode", "branchId", "date", "checkIn", "checkOut", "status", "note"] },
+      { sheetName: "leave-requests", resource: "leave-requests", parentCodeColumn: "staffCode", columns: ["staffCode", "branchId", "startDate", "endDate", "leaveType", "status", "reason", "approvedById"] },
+      { sheetName: "payrolls", resource: "payrolls", parentCodeColumn: "staffCode", columns: ["staffCode", "branchId", "month", "year", "baseSalary", "workingDays", "actualDays", "overtimeHours", "bonus", "deduction", "netSalary", "status", "note"] },
+      { sheetName: "work-schedules", resource: "work-schedules", parentCodeColumn: "staffCode", columns: ["staffCode", "branchId", "workDate", "shiftLabel", "startTime", "endTime", "roomId", "status", "note"] },
+      { sheetName: "staff-rewards", resource: "staff-rewards", parentCodeColumn: "staffCode", columns: ["staffCode", "branchId", "type", "title", "description", "date", "issuedBy", "amount", "note"] },
+      { sheetName: "staff-trainings", resource: "staff-trainings", parentCodeColumn: "staffCode", columns: ["staffCode", "branchId", "trainingName", "provider", "startDate", "endDate", "certificateNumber", "expiryDate", "status", "note"] },
+      { sheetName: "performance-reviews", resource: "performance-reviews", parentCodeColumn: "staffCode", columns: ["staffCode", "branchId", "reviewMonth", "reviewYear", "reviewerId", "score", "status", "strengths", "improvements", "goals", "note"] },
+      { sheetName: "position-histories", resource: "position-histories", parentCodeColumn: "staffCode", columns: ["staffCode", "branchId", "fromPosition", "toPosition", "fromDepartmentId", "toDepartmentId", "effectiveDate", "reason", "note"] },
+      { sheetName: "branch-role-assignments", resource: "branch-role-assignments", parentCodeColumn: "staffCode", columns: ["staffCode", "userId", "branchId", "roleName", "roleKeys", "isActive"] },
+      { sheetName: "user-accounts", resource: "user-accounts", parentCodeColumn: "staffCode", columns: ["staffCode", "email", "username", "password", "fullName", "role", "branchId"] },
     ],
   },
 }
@@ -67,8 +75,9 @@ interface ImportDraftRow {
   errors: string[]
 }
 
-export function RecordImportPage() {
-  const { resource = "customers" } = useParams()
+export function RecordImportPage({ resource: resourceOverride }: { resource?: string }) {
+  const { resource: routeResource } = useParams()
+  const resource = resourceOverride || routeResource || "customers"
   const navigate = useNavigate()
   const [fields, setFields] = useState<FieldSpec[]>([])
   const [lookups, setLookups] = useState<LookupMap>({})
@@ -79,11 +88,12 @@ export function RecordImportPage() {
   const [saving, setSaving] = useState(false)
   const [testRowCount, setTestRowCount] = useState(1)
 
+  const productCategoryMode = resource === "product-categories"
   const unsupported = UNSUPPORTED_RESOURCES.has(resource)
   const bundleMode = BUNDLE_RESOURCES.has(resource)
   const baseKeySet = useMemo(
-    () => new Set((baseFields[resource] || []).map((field) => field.key)),
-    [resource],
+    () => new Set((productCategoryMode ? PRODUCT_CATEGORY_FIELDS : baseFields[resource] || []).map((field) => field.key)),
+    [resource, productCategoryMode],
   )
   const resolvers = useMemo(() => buildRelationResolvers(lookups), [lookups])
   const importableFields = useMemo(
@@ -108,6 +118,13 @@ export function RecordImportPage() {
       return
     }
 
+    if (productCategoryMode) {
+      setFields(PRODUCT_CATEGORY_FIELDS)
+      setLookups({})
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     Promise.all([
       api.get("/settings/custom-fields", { params: { entityType: resource } }),
@@ -125,7 +142,7 @@ export function RecordImportPage() {
         message.error("Không tải được cấu hình nhập dữ liệu")
       })
       .finally(() => setLoading(false))
-  }, [resource, unsupported])
+  }, [resource, unsupported, productCategoryMode])
 
   const uploadProps: UploadProps = {
     accept: ".xlsx,.xls",
@@ -301,6 +318,17 @@ export function RecordImportPage() {
       return
     }
 
+    if (productCategoryMode) {
+      const workbook = buildImportWorkbook(importableFields, {}, [
+        { code: "DA-LIEU", name: "Da liễu", parentCode: "", description: "Nhóm ngành da liễu", sortOrder: 1, isActive: true },
+        { code: "DIEU-TRI-MUN", name: "Điều trị mụn", parentCode: "DA-LIEU", description: "", sortOrder: 1, isActive: true },
+        { code: "MUN-CAP-DO-1", name: "Mụn cấp độ 1", parentCode: "DIEU-TRI-MUN", description: "", sortOrder: 1, isActive: true },
+      ])
+      XLSX.writeFile(workbook, "product-categories-import-template.xlsx")
+      message.success("Đã tạo file mẫu Ngành / Nhóm / Loại")
+      return
+    }
+
     const rows = Array.from({ length: testRowCount }, (_, index) =>
       generateFakeImportRow(resource, importableFields, lookups, index),
     )
@@ -317,17 +345,57 @@ export function RecordImportPage() {
       return
     }
 
-    if (importableFields.length === 0) {
-      message.warning("Chưa có cấu hình field để tạo file test")
+    if (productCategoryMode) {
+      const response = await api.get("/product-categories")
+      const categories = response.data.data as Array<Record<string, unknown>>
+      const byId = new Map(categories.map((category) => [String(category.id), category]))
+      const rows = categories.map((category) => ({
+        code: category.code || "",
+        name: category.name || "",
+        parentCode: byId.get(String(category.parentId || ""))?.code || "",
+        description: category.description || "",
+        sortOrder: category.sortOrder ?? 0,
+        isActive: Boolean(category.isActive),
+      }))
+      XLSX.writeFile(buildImportWorkbook(importableFields, {}, rows), "product-categories-export.xlsx")
+      message.success(`Đã export ${rows.length} dòng Ngành / Nhóm / Loại`)
       return
     }
 
-    const rows = Array.from({ length: testRowCount }, (_, index) =>
-      generateFakeImportRow(resource, importableFields, lookups, index),
-    )
-    const workbook = buildImportWorkbook(importableFields, lookups, rows)
-    XLSX.writeFile(workbook, `${resource}-import-test.xlsx`)
-    message.success(`Đã export ${testRowCount} dòng data test, bao gồm custom fields`)
+    if (importableFields.length === 0) {
+      message.warning("Chưa có cấu hình field để export")
+      return
+    }
+
+    const sourceRows: Array<Record<string, unknown>> = []
+    let page = 1
+    let total = 0
+    do {
+      const response = await api.get(`/records/${resource}`, { params: { page, pageSize: 500 } })
+      const data = Array.isArray(response.data?.data) ? response.data.data as Array<Record<string, unknown>> : []
+      sourceRows.push(...data)
+      total = Number(response.data?.total || sourceRows.length)
+      page += 1
+      if (data.length === 0) break
+    } while (sourceRows.length < total)
+
+    const categoryValues = new Map<string, string>()
+    if (resource === "products") {
+      const response = await api.get("/product-categories")
+      const categories = Array.isArray(response.data?.data) ? response.data.data as Array<Record<string, unknown>> : []
+      const byId = new Map(categories.map((category) => [String(category.id), category]))
+      categories.forEach((category) => categoryValues.set(
+        String(category.id),
+        String(category.code || "").trim() || categoryPath(category, byId),
+      ))
+    }
+
+    const rows = sourceRows.map((row) => Object.fromEntries(importableFields.map((field) => [
+      field.key,
+      exportFieldValue(field, row, lookups, categoryValues),
+    ])))
+    XLSX.writeFile(buildImportWorkbook(importableFields, lookups, rows), `${resource}-export.xlsx`)
+    message.success(`Đã export ${rows.length} dòng dữ liệu hiện có`)
   }
 
   async function saveRows() {
@@ -365,6 +433,33 @@ export function RecordImportPage() {
     }
 
     setSaving(true)
+    if (productCategoryMode) {
+      try {
+        const response = await api.post("/product-categories/import", {
+          rows: readyRows.map((row) => row.payload),
+        })
+        const errors = response.data?.errors || []
+        const savedCount = Number(response.data?.success || 0)
+        const nextRows = draftRows.map((row) => {
+          const error = errors.find((item: { rowIndex?: number }) => Number(item.rowIndex) === row.__lineNumber - 1)
+          return row.errors.length > 0
+            ? row
+            : error
+              ? { ...row, errors: [String(error.error || "Lưu dữ liệu thất bại")] }
+              : { ...row, __saved: true }
+        })
+        setDraftRows(nextRows)
+        if (savedCount > 0) message.success(`Đã lưu ${savedCount} dòng`)
+        if (errors.length > 0) message.error(`${errors.length} dòng chưa được lưu; vui lòng kiểm tra bảng xem trước`)
+        if (errors.length === 0) setTimeout(() => navigate(`/${resource}`), 400)
+      } catch (error: any) {
+        message.error(getApiErrorMessage(error, "Nhập dữ liệu thất bại"))
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
     let successCount = 0
     const nextRows = [...draftRows]
 
@@ -397,9 +492,9 @@ export function RecordImportPage() {
   return (
     <>
       <div className="page-header">
-        <Space size={12}>
+        <Space align="center" size={12}>
           <CmsBackButton to={`/${resource}`} title="Quay lại danh sách" />
-          <Typography.Title level={3}>
+          <Typography.Title className="record-import-title" level={3}>
             Import {entityLabels[resource] || resource}
           </Typography.Title>
         </Space>
@@ -421,7 +516,7 @@ export function RecordImportPage() {
             menu={{
               items: [
                 { key: "template", icon: <DownloadOutlined />, label: bundleMode ? "Tải data mẫu" : "Tải file mẫu", onClick: () => void downloadTemplate() },
-                { key: "export", icon: <ImportOutlined />, label: bundleMode ? "Xuất dữ liệu hiện có" : "Tải data mẫu + custom fields", onClick: () => void downloadExportData() },
+                { key: "export", icon: <ImportOutlined />, label: "Xuất dữ liệu hiện có", onClick: () => void downloadExportData() },
                 {
                   key: "upload",
                   icon: <UploadOutlined />,
@@ -500,7 +595,9 @@ export function RecordImportPage() {
         {draftRows.length === 0 ? (
           <Alert
             message="Chưa có dữ liệu xem trước"
-            description="Sau khi tải tệp Excel lên, hệ thống sẽ hiển thị bảng xem trước tại đây trước khi lưu."
+            description={productCategoryMode
+              ? 'Dùng cột "parentCode" để xác định cha-con. Mã và tên danh mục là bắt buộc; mỗi cấp tối đa 3 cấp.'
+              : "Sau khi tải tệp Excel lên, hệ thống sẽ hiển thị bảng xem trước tại đây trước khi lưu."}
             showIcon
             type="info"
           />
@@ -569,14 +666,15 @@ function formatBundlePreviewValue(value: unknown) {
 }
 
 function buildFieldGuide(field: FieldSpec, lookups: LookupMap) {
+  if (field.key === "categoryId") return "Nhập mã Ngành / Nhóm / Loại, ví dụ: DV-DIEU-TRI"
   const relation = field.relation || relationFields[field.key]
   if (relation) {
     const samples = Object.entries(lookups[relation.resource] || {})
       .slice(0, 3)
-      .map(([id, label]) => `${label} | ${id}`)
+      .map(([id, label]) => relationExternalValue(lookups, relation.resource, id) || label)
     return samples.length > 0
-      ? `Nhập ID hoặc mã/tên gần đúng. Ví dụ: ${samples.join(" ; ")}`
-      : "Nhập ID hoặc mã/tên đã có trong hệ thống"
+      ? `Nhập mã hoặc tên nghiệp vụ, không dùng ID. Ví dụ: ${samples.join(" ; ")}`
+      : "Nhập mã hoặc tên nghiệp vụ đã có trong hệ thống, không dùng ID"
   }
   if (field.type === "select" || field.type === "multi-select") {
     return field.options?.length
@@ -708,7 +806,8 @@ function generateFakeFieldValue(
   const relation = field.relation || relationFields[field.key]
   if (relation) {
     const ids = Object.keys(lookups[relation.lookupKey || relation.resource] || lookups[relation.resource] || {})
-    return ids[index % ids.length] || ""
+    const id = ids[index % ids.length]
+    return id ? relationExternalValue(lookups, relation.lookupKey || relation.resource, id) : ""
   }
 
   if (field.type === "select") {
@@ -740,6 +839,12 @@ function generateFakeFieldValue(
   if (field.type === "html") return `<p>${faker.lorem.sentence()}</p>`
 
   return fakeTextByKey(resource, field.key, index)
+}
+
+function relationExternalValue(lookups: LookupMap, resource: string, id: string) {
+  const meta = (lookups as unknown as Record<string, Record<string, Record<string, unknown>>>)[`${resource}__meta`]?.[id]
+  if (!meta) return lookups[resource]?.[id] || ""
+  return String(meta.code || meta.slug || meta.accountNumber || meta.email || meta.name || meta.fullName || meta.label || "")
 }
 
 function fakeTextByKey(resource: string, key: string, index: number) {
@@ -843,11 +948,15 @@ function buildRelationResolvers(lookups: LookupMap) {
         // values are record objects, not display labels, so they cannot be
         // tokenized as import aliases.
         if (typeof label !== "string") return
+        const metadata = (lookups as unknown as Record<string, Record<string, Record<string, unknown>>>)[`${resource}__meta`]?.[id]
         const aliases = new Set([
           id,
           label,
           ...label.split(" - "),
           ...label.split(","),
+          ...[metadata?.code, metadata?.slug, metadata?.accountNumber, metadata?.email, metadata?.name, metadata?.fullName]
+            .filter((value): value is string | number => typeof value === "string" || typeof value === "number")
+            .map(String),
         ])
         aliases.forEach((alias) => {
           const token = normalizeToken(alias)
@@ -857,6 +966,38 @@ function buildRelationResolvers(lookups: LookupMap) {
       return [resource, aliasMap]
     }),
   ) as Record<string, Record<string, string>>
+}
+
+function exportFieldValue(
+  field: FieldSpec,
+  row: Record<string, unknown>,
+  lookups: LookupMap,
+  categoryPaths: Map<string, string>,
+) {
+  const value = row[field.key] ?? (row.customFields as Record<string, unknown> | undefined)?.[field.key]
+  if (value === undefined || value === null) return ""
+  if (field.key === "categoryId") return categoryPaths.get(String(value)) || String(value)
+  const relation = field.relation || relationFields[field.key]
+  if (relation) {
+    const lookupResource = relation.lookupKey || relation.resource
+    if (Array.isArray(value)) return value.map((item) => relationExternalValue(lookups, lookupResource, String(item))).join(", ")
+    return relationExternalValue(lookups, lookupResource, String(value))
+  }
+  return value
+}
+
+function categoryPath(category: Record<string, unknown>, byId: Map<string, Record<string, unknown>>) {
+  const names = [String(category.name || "")]
+  const seen = new Set([String(category.id)])
+  let parentId = String(category.parentId || "")
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId)
+    const parent = byId.get(parentId)
+    if (!parent) break
+    names.unshift(String(parent.name || ""))
+    parentId = String(parent.parentId || "")
+  }
+  return names.filter(Boolean).join(" / ")
 }
 
 async function parseImportFile(

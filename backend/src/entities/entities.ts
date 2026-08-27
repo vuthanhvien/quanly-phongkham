@@ -2470,6 +2470,62 @@ export class PerformanceReview extends ConfigurableEntity {
   files?: Array<Record<string, unknown>>;
 }
 
+/** A time-box used to assign, track, and close performance targets. */
+@Entity('kpi_cycles')
+export class KpiCycle extends ConfigurableEntity {
+  @Column() name: string;
+  @Column({ default: 'monthly' }) frequency: string;
+  @Column({ type: 'date' }) startDate: string;
+  @Column({ type: 'date' }) endDate: string;
+  @Column({ default: 'draft' }) status: string; // draft | active | closed
+  @Column({ type: 'text', nullable: true }) note?: string;
+}
+
+/** Reusable, domain-agnostic metric. Optional connector keys never create a module dependency. */
+@Entity('kpi_metrics')
+export class KpiMetric extends ConfigurableEntity {
+  @Column({ unique: true }) code: string;
+  @Column() name: string;
+  @Column({ default: 'number' }) unit: string;
+  @Column({ default: 'higher_is_better' }) direction: string;
+  @Column({ default: 'manual' }) sourceType: string; // manual | import | connector
+  @Column({ nullable: true }) connectorKey?: string;
+  @Column({ nullable: true }) metricKey?: string;
+  @Column({ type: 'text', nullable: true }) description?: string;
+  @Column({ default: true }) isActive: boolean;
+}
+
+@Entity('kpi_assignments')
+@Index(['cycleId', 'assigneeId'])
+export class KpiAssignment extends ConfigurableEntity {
+  @Column() cycleId: string;
+  @Column() metricId: string;
+  /** Reference to the canonical employee profile. */
+  @Column() staffId: string;
+  /** Denormalized for fast KPI reporting and preserving historical display names. */
+  @Column() assigneeId: string;
+  @Column() assigneeName: string;
+  @Column({ nullable: true }) scopeType?: string;
+  @Column({ nullable: true }) scopeId?: string;
+  @Column({ type: 'float' }) targetValue: number;
+  @Column({ type: 'float', default: 0 }) actualValue: number;
+  @Column({ type: 'float', default: 1 }) weight: number;
+  @Column({ type: 'float', default: 0 }) completionPercent: number;
+  @Column({ default: 'active' }) status: string; // active | at_risk | achieved | closed
+  @Column({ type: 'text', nullable: true }) note?: string;
+  @Column({ type: 'simple-json', nullable: true }) sourceSnapshot?: Record<string, unknown>;
+}
+
+@Entity('kpi_checkins')
+@Index(['assignmentId', 'checkinDate'])
+export class KpiCheckin extends ConfigurableEntity {
+  @Column() assignmentId: string;
+  @Column({ type: 'date' }) checkinDate: string;
+  @Column({ type: 'float' }) actualValue: number;
+  @Column({ type: 'text', nullable: true }) comment?: string;
+  @Column({ nullable: true }) checkedInById?: string;
+}
+
 @Entity('position_histories')
 export class PositionHistory extends ConfigurableEntity {
   @Column()
@@ -3386,6 +3442,10 @@ export const ENTITIES = [
   StaffReward,
   StaffTraining,
   PerformanceReview,
+  KpiCycle,
+  KpiMetric,
+  KpiAssignment,
+  KpiCheckin,
   PositionHistory,
   WorkContract,
   StaffInsurance,

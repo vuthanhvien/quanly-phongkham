@@ -1,9 +1,9 @@
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons"
-import { Button, Card, Form, Input, InputNumber, Select, Space, Table, Typography } from "antd"
+import { Button, Card, DatePicker, Form, Input, InputNumber, Select, Space, Table, Typography } from "antd"
 import type { ColumnsType } from "antd/es/table"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../api"
-import { currentLocalDate } from "../utils/datetime"
+import { currentLocalDate, parseClinicDateTime } from "../utils/datetime"
 import { getFirstOptionValue } from "../utils/branchDefaults"
 import { getApiErrorMessage } from "../utils/apiError"
 import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
@@ -72,9 +72,9 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
       const defaultItems = normalizeItems(initialValues?.items)
       form.setFieldsValue({
         status: "DRAFT",
-        orderDate: currentLocalDate(),
         items: defaultItems.length > 0 ? defaultItems : [createEmptyItem()],
         ...(initialValues || {}),
+        orderDate: parseClinicDateTime(initialValues?.orderDate || currentLocalDate()),
       })
       return
     }
@@ -147,6 +147,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
     form.setFieldsValue({
       ...data,
       ...(initialValues || {}),
+      orderDate: parseClinicDateTime(initialValues?.orderDate || data.orderDate),
       items: normalizedItems.length > 0 ? normalizedItems : [createEmptyItem()],
     })
   }
@@ -226,6 +227,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
 
       const payload = {
         ...values,
+        orderDate: parseClinicDateTime(values.orderDate).format("YYYY-MM-DD"),
         totalAmount,
         items: normalizedItems,
       }
@@ -355,7 +357,7 @@ export function ServiceOrderForm({ id, compact, initialValues, onCancel, onSucce
             <Select options={branchOptions} optionFilterProp="label" placeholder="Chọn chi nhánh" showSearch />
           </Form.Item>
           <Form.Item label="Ngày đơn" name="orderDate" rules={[{ required: true, message: "Chọn ngày đơn" }]}>
-            <Input type="date" />
+            <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} />
           </Form.Item>
           <Form.Item label="Nhân sự thực hiện" name="performerStaffId">
             <Select allowClear options={staffOptions} optionFilterProp="label" placeholder="Chọn nhân sự" showSearch />

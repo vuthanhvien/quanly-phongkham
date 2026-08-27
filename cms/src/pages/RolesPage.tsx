@@ -1,6 +1,6 @@
 import {
-  DeleteOutlined,
   EditOutlined,
+  InboxOutlined,
   PlusOutlined,
   UserAddOutlined,
 } from "@ant-design/icons"
@@ -535,7 +535,6 @@ export function RolesPage() {
                       />
                       <Popconfirm
                         title={`Lưu trữ "${role.name}"?`}
-                        okType="danger"
                         okText="Lưu trữ"
                         cancelText="Hủy"
                         onConfirm={() => void deleteRole(role)}
@@ -544,8 +543,8 @@ export function RolesPage() {
                         <Button
                           type="text"
                           size="small"
-                          danger
-                          icon={<DeleteOutlined style={{ fontSize: 12 }} />}
+                          icon={<InboxOutlined style={{ fontSize: 12 }} />}
+                          style={{ color: "#1677ff" }}
                           onClick={(e) => e.stopPropagation()}
                         />
                       </Popconfirm>
@@ -794,7 +793,6 @@ export function RolesPage() {
                                 />
                                 <Popconfirm
                                   title="Lưu trữ phân quyền này?"
-                                  okType="danger"
                                   okText="Lưu trữ"
                                   cancelText="Hủy"
                                   onConfirm={() => void removeRoleFromAssign(assign, { stopPropagation: () => {} } as React.MouseEvent)}
@@ -802,8 +800,8 @@ export function RolesPage() {
                                   <Button
                                     type="text"
                                     size="small"
-                                    danger
-                                    icon={<DeleteOutlined style={{ fontSize: 12 }} />}
+                                    icon={<InboxOutlined style={{ fontSize: 12 }} />}
+                                    style={{ color: "#1677ff" }}
                                   />
                                 </Popconfirm>
                               </Space>

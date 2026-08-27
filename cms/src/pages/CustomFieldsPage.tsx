@@ -4,6 +4,7 @@ import {
   DownloadOutlined,
   EditOutlined,
   ImportOutlined,
+  InboxOutlined,
   MoreOutlined,
   PlusOutlined,
   UploadOutlined,
@@ -179,7 +180,6 @@ export function CustomFieldsPage() {
     Modal.confirm({
       title: `Lưu trữ ${ids.length} trường tuỳ biến?`,
       content: "Các trường đã lưu trữ sẽ không còn hiển thị trên form.",
-      okButtonProps: { danger: true },
       okText: "Lưu trữ",
       cancelText: "Hủy",
       onOk: async () => {
@@ -352,7 +352,7 @@ export function CustomFieldsPage() {
         <Typography.Title level={3}>Trường tuỳ biến</Typography.Title>
         <Space wrap>
           {selectedFieldIds.length > 0 ? (
-            <Button danger icon={<DeleteOutlined />} onClick={archiveSelectedFields}>
+            <Button icon={<InboxOutlined />} style={{ color: "#1677ff" }} onClick={archiveSelectedFields}>
               Lưu trữ đã chọn ({selectedFieldIds.length})
             </Button>
           ) : null}
@@ -445,7 +445,7 @@ export function CustomFieldsPage() {
                     <Button icon={<EditOutlined />} type="text" onClick={() => openEditField(row)} />
                   </Tooltip>
                   <Tooltip title="Lưu trữ">
-                    <Button danger icon={<DeleteOutlined />} type="text" onClick={() => deleteField(row.id)} />
+                    <Button icon={<InboxOutlined />} style={{ color: "#1677ff" }} type="text" onClick={() => deleteField(row.id)} />
                   </Tooltip>
                 </Space>
               ),

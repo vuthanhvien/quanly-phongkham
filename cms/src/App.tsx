@@ -44,6 +44,7 @@ import { WorkflowDefinitionDetailPage } from './pages/WorkflowDefinitionDetailPa
 import { WorkflowTasksPage } from './pages/WorkflowTasksPage';
 import { ZaloInboxPage } from './pages/ZaloInboxPage';
 import { ProjectBoardPage } from './pages/ProjectBoardPage';
+import { KpiDashboardPage } from './pages/KpiDashboardPage';
 import { registerToastApi } from './toast';
 
 const resources = Object.entries(entityLabels).map(([name, label]) => ({
@@ -341,6 +342,7 @@ export function App() {
               </Route>
               <Route element={<StaticResourceGuard resource="product-categories" />}>
                 <Route path="/product-categories" element={<CategoriesPage />} />
+                <Route path="/product-categories/import" element={<RecordImportPage resource="product-categories" />} />
               </Route>
               <Route element={<StaticResourceGuard resource="departments" />}>
                 <Route path="/department" element={<Navigate to="/departments" replace />} />
@@ -350,6 +352,9 @@ export function App() {
               </Route>
               <Route element={<StaticResourceGuard resource="payrolls" />}>
                 <Route path="/payrolls" element={<PayrollsPage />} />
+              </Route>
+              <Route element={<ModuleGuard moduleKey="kpi" />}>
+                <Route path="/kpi" element={<KpiDashboardPage />} />
               </Route>
               <Route element={<StaticResourceGuard resource="workflow-tasks" />}>
                 <Route path="/workflow-tasks" element={<WorkflowTasksPage />} />

@@ -102,15 +102,22 @@ export async function seedTenantDatabase(domain: string) {
   const baseUrl = (process.env.INTERNAL_BACKEND_URL || 'http://backend:9998').replace(/\/$/, '')
   const secret = process.env.PLATFORM_INTERNAL_SEED_SECRET || process.env.PLATFORM_JWT_SECRET || process.env.JWT_SECRET
   if (!secret) throw new Error('PLATFORM_INTERNAL_SEED_SECRET chưa được cấu hình')
-  const response = await fetch(`${baseUrl}/api/internal/tenants/seed`, {
-    method: 'POST',
-    headers: {
-      'x-platform-internal-secret': secret,
-      'x-tenant-domain': domain,
-      // Backend resolves its data source before invoking the internal controller.
-      'x-forwarded-host': domain,
-    },
-  })
+  let response: Response
+  try {
+    response = await fetch(`${baseUrl}/api/internal/tenants/seed`, {
+      method: 'POST',
+      headers: {
+        'x-platform-internal-secret': secret,
+        'x-tenant-domain': domain,
+        // Backend resolves its data source before invoking the internal controller.
+        'x-forwarded-host': domain,
+      },
+      signal: AbortSignal.timeout(30_000),
+    })
+  } catch (error) {
+    const cause = error instanceof Error && error.cause instanceof Error ? ` (${error.cause.message})` : ''
+    throw new Error(`Không thể kết nối Backend nội bộ tại ${baseUrl}. Kiểm tra service backend đã sẵn sàng.${cause}`)
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as { message?: string | string[] }
     const message = Array.isArray(body.message) ? body.message.join(', ') : body.message

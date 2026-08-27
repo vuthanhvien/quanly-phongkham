@@ -696,6 +696,12 @@ body {
   margin: 0 !important;
 }
 
+.record-import-title {
+  font-size: 18px !important;
+  line-height: 24px !important;
+  margin: 0 !important;
+}
+
 .detail-page-header {
   align-items: center;
 }

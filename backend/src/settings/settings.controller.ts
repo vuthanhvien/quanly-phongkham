@@ -4,6 +4,7 @@ import type { Response } from 'express';
 import { AuthUser, Public } from '../common/auth';
 import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CodeGenerationSetting, CustomerAppSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, DynamicRoleDefinition, LandingForm, LandingPage, LandingThemeSetting, PrintTemplate } from '../entities/entities';
 import { SettingsService } from './settings.service';
+import { SeedService } from '../seed/seed.service';
 import { parseGoogleDriveOAuthState } from '../tenant/google-drive-oauth-state';
 
 function escapeHtml(value: string) {
@@ -12,7 +13,10 @@ function escapeHtml(value: string) {
 
 @Controller('settings')
 export class SettingsController {
-  constructor(private readonly settings: SettingsService) {}
+  constructor(
+    private readonly settings: SettingsService,
+    private readonly seed: SeedService,
+  ) {}
 
   @Get('custom-fields')
   async fields(@Query('entityType') entityType?: string, @Request() request?: { user: AuthUser }) {
@@ -199,6 +203,10 @@ export class SettingsController {
   @Public()
   @Get('app-ui')
   async appUi(@Request() request?: { user: AuthUser }) {
+    // The CMS fetches this as its first API request. Use it as the reliable,
+    // tenant-scoped initialization point instead of depending on the platform
+    // console to call a separate internal seed endpoint.
+    await this.seed.ensureDefaultWorkspace();
     return { data: request?.user ? await this.settings.getAppUiSettings(request?.user) : await this.settings.getPublicAppUiSettings() };
   }
 

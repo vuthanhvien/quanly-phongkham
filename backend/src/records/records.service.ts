@@ -160,35 +160,35 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
         resource: 'appointments',
         parentField: 'customerId',
         parentCodeColumn: 'customerCode',
-        columns: ['recordId', 'customerCode', 'branchId', 'type', 'startTime', 'endTime', 'doctorStaffId', 'roomId', 'equipmentId', 'picStaffId', 'status', 'note'],
+        columns: ['customerCode', 'branchId', 'type', 'startTime', 'endTime', 'doctorStaffId', 'roomId', 'equipmentId', 'picStaffId', 'status', 'note'],
       },
       {
         sheetName: 'medical-episodes',
         resource: 'medical-episodes',
         parentField: 'customerId',
         parentCodeColumn: 'customerCode',
-        columns: ['recordId', 'customerCode', 'branchId', 'serviceName', 'doctorName', 'status', 'chiefComplaint', 'allergyWarning', 'diagnosis', 'operationDate'],
+        columns: ['customerCode', 'branchId', 'serviceName', 'doctorName', 'status', 'chiefComplaint', 'allergyWarning', 'diagnosis', 'operationDate'],
       },
       {
         sheetName: 'treatments',
         resource: 'treatments',
         parentField: 'customerId',
         parentCodeColumn: 'customerCode',
-        columns: ['recordId', 'customerCode', 'branchId', 'name', 'totalSessions', 'completedSessions', 'intervalDays', 'status'],
+        columns: ['customerCode', 'branchId', 'name', 'totalSessions', 'completedSessions', 'intervalDays', 'status'],
       },
       {
         sheetName: 'consultations',
         resource: 'consultations',
         parentField: 'customerId',
         parentCodeColumn: 'customerCode',
-        columns: ['recordId', 'customerCode', 'branchId', 'consultedAt', 'consultantStaffId', 'doctorStaffId', 'status', 'summary', 'diagnosis', 'nextAction'],
+        columns: ['customerCode', 'branchId', 'consultedAt', 'consultantStaffId', 'doctorStaffId', 'status', 'summary', 'diagnosis', 'nextAction'],
       },
       {
         sheetName: 'customer-images',
         resource: 'customer-images',
         parentField: 'customerId',
         parentCodeColumn: 'customerCode',
-        columns: ['recordId', 'customerCode', 'branchId', 'mediaType', 'title', 'imageUrl', 'capturedAt', 'diagnosisNote'],
+        columns: ['customerCode', 'branchId', 'mediaType', 'title', 'imageUrl', 'capturedAt', 'diagnosisNote'],
       },
       {
         sheetName: 'invoices',
@@ -196,7 +196,7 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
         parentField: 'customerId',
         parentCodeColumn: 'customerCode',
         matchField: 'code',
-        columns: ['recordId', 'customerCode', 'code', 'branchId', 'totalAmount', 'paidAmount', 'method', 'status'],
+        columns: ['customerCode', 'code', 'branchId', 'totalAmount', 'paidAmount', 'method', 'status'],
       },
     ],
   },
@@ -212,7 +212,7 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
         resource: 'lead-activities',
         parentField: 'leadId',
         parentCodeColumn: 'leadCode',
-        columns: ['recordId', 'leadCode', 'branchId', 'activityType', 'scheduledAt', 'ownerStaffId', 'status', 'content'],
+        columns: ['leadCode', 'branchId', 'activityType', 'scheduledAt', 'ownerStaffId', 'status', 'content'],
       },
     ],
   },
@@ -233,77 +233,77 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
         resource: 'work-contracts',
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
-        columns: ['recordId', 'staffCode', 'branchId', 'contractType', 'startDate', 'endDate', 'baseSalary', 'position', 'workingHoursPerDay', 'workingDaysPerMonth', 'status', 'note'],
+        columns: ['staffCode', 'branchId', 'contractType', 'startDate', 'endDate', 'baseSalary', 'position', 'workingHoursPerDay', 'workingDaysPerMonth', 'status', 'note'],
       },
       {
         sheetName: 'staff-insurances',
         resource: 'staff-insurances',
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
-        columns: ['recordId', 'staffCode', 'branchId', 'insuranceType', 'employeeRate', 'employerRate', 'salaryBase', 'startDate', 'endDate', 'isActive', 'note'],
+        columns: ['staffCode', 'branchId', 'insuranceType', 'employeeRate', 'employerRate', 'salaryBase', 'startDate', 'endDate', 'isActive', 'note'],
       },
       {
         sheetName: 'attendances',
         resource: 'attendances',
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
-        columns: ['recordId', 'staffCode', 'branchId', 'date', 'checkIn', 'checkOut', 'status', 'note'],
+        columns: ['staffCode', 'branchId', 'date', 'checkIn', 'checkOut', 'status', 'note'],
       },
       {
         sheetName: 'leave-requests',
         resource: 'leave-requests',
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
-        columns: ['recordId', 'staffCode', 'branchId', 'startDate', 'endDate', 'leaveType', 'status', 'reason', 'approvedById'],
+        columns: ['staffCode', 'branchId', 'startDate', 'endDate', 'leaveType', 'status', 'reason', 'approvedById'],
       },
       {
         sheetName: 'payrolls',
         resource: 'payrolls',
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
-        columns: ['recordId', 'staffCode', 'branchId', 'month', 'year', 'baseSalary', 'workingDays', 'actualDays', 'overtimeHours', 'bonus', 'deduction', 'netSalary', 'status', 'note'],
+        columns: ['staffCode', 'branchId', 'month', 'year', 'baseSalary', 'workingDays', 'actualDays', 'overtimeHours', 'bonus', 'deduction', 'netSalary', 'status', 'note'],
       },
       {
         sheetName: 'work-schedules',
         resource: 'work-schedules',
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
-        columns: ['recordId', 'staffCode', 'branchId', 'workDate', 'shiftLabel', 'startTime', 'endTime', 'roomId', 'status', 'note'],
+        columns: ['staffCode', 'branchId', 'workDate', 'shiftLabel', 'startTime', 'endTime', 'roomId', 'status', 'note'],
       },
       {
         sheetName: 'staff-rewards',
         resource: 'staff-rewards',
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
-        columns: ['recordId', 'staffCode', 'branchId', 'type', 'title', 'description', 'date', 'issuedBy', 'amount', 'note'],
+        columns: ['staffCode', 'branchId', 'type', 'title', 'description', 'date', 'issuedBy', 'amount', 'note'],
       },
       {
         sheetName: 'staff-trainings',
         resource: 'staff-trainings',
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
-        columns: ['recordId', 'staffCode', 'branchId', 'trainingName', 'provider', 'startDate', 'endDate', 'certificateNumber', 'expiryDate', 'status', 'note'],
+        columns: ['staffCode', 'branchId', 'trainingName', 'provider', 'startDate', 'endDate', 'certificateNumber', 'expiryDate', 'status', 'note'],
       },
       {
         sheetName: 'performance-reviews',
         resource: 'performance-reviews',
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
-        columns: ['recordId', 'staffCode', 'branchId', 'reviewMonth', 'reviewYear', 'reviewerId', 'score', 'status', 'strengths', 'improvements', 'goals', 'note'],
+        columns: ['staffCode', 'branchId', 'reviewMonth', 'reviewYear', 'reviewerId', 'score', 'status', 'strengths', 'improvements', 'goals', 'note'],
       },
       {
         sheetName: 'position-histories',
         resource: 'position-histories',
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
-        columns: ['recordId', 'staffCode', 'branchId', 'fromPosition', 'toPosition', 'fromDepartmentId', 'toDepartmentId', 'effectiveDate', 'reason', 'note'],
+        columns: ['staffCode', 'branchId', 'fromPosition', 'toPosition', 'fromDepartmentId', 'toDepartmentId', 'effectiveDate', 'reason', 'note'],
       },
       {
         sheetName: 'branch-role-assignments',
         resource: 'branch-role-assignments',
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
-        columns: ['recordId', 'staffCode', 'userId', 'branchId', 'roleName', 'roleKeys', 'isActive'],
+        columns: ['staffCode', 'userId', 'branchId', 'roleName', 'roleKeys', 'isActive'],
       },
       {
         sheetName: 'user-accounts',
@@ -311,7 +311,7 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
         parentField: 'staffId',
         parentCodeColumn: 'staffCode',
         matchField: 'email',
-        columns: ['recordId', 'staffCode', 'email', 'username', 'password', 'fullName', 'role', 'branchId'],
+        columns: ['staffCode', 'email', 'username', 'password', 'fullName', 'role', 'branchId'],
       },
     ],
   },
@@ -4357,6 +4357,11 @@ export class RecordsService {
     const categoryById = new Map(categories.map((category) => [category.id, category]));
     if (categoryById.has(submitted)) {
       value.categoryId = submitted;
+      return;
+    }
+    const categoryByCode = categories.find((category) => String(category.code || '').trim() === submitted);
+    if (categoryByCode) {
+      value.categoryId = categoryByCode.id;
       return;
     }
     const categoryPath = (category: ItemCategory) => {

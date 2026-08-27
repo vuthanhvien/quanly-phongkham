@@ -133,6 +133,7 @@ const APP_MODULE_KEYS = [
   'staff-rewards',
   'staff-trainings',
   'performance-reviews',
+  'kpi',
   'position-histories',
   'staff',
   'departments',

@@ -4,7 +4,6 @@ import {
   AuditOutlined,
   CopyOutlined,
   ClearOutlined,
-  DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
   EyeOutlined,
@@ -27,6 +26,7 @@ import {
   Button,
   Card,
   Checkbox,
+  DatePicker,
   Dropdown,
   Form,
   Grid,
@@ -59,6 +59,7 @@ import { CustomField, entityLabels, normalizeSelectOption } from "../models"
 import { RecordDetailPage } from "./RecordDetailPage"
 import { displayValue, FileLookupMap, getRelationMetaMap, getRelationSpec, hasFileField, loadFileLookupMap, loadRelationOptions, LookupMap, resolveRecordFieldValue } from "../relations"
 import { getApiErrorMessage } from "../utils/apiError"
+import { parseClinicDateTime } from "../utils/datetime"
 import { CMS_DATA_REFRESH_EVENT, type CmsDataRefreshDetail } from "../utils/dataRefresh"
 import * as XLSX from "xlsx"
 import {
@@ -334,13 +335,15 @@ export function RecordListPage() {
             onChange={(event) => updateAdvancedFilter(field, { operator: "number", value: event.target.value })}
           />
         ) : field.type === "date" || field.type === "datetime" ? (
-          <Input
+          <DatePicker
+            allowClear
             aria-label={`Lọc ${field.label}`}
             className="advanced-column-value"
+            format={field.type === "datetime" ? "DD/MM/YYYY HH:mm" : "DD/MM/YYYY"}
             size="small"
-            type="date"
-            value={String(current.value || "")}
-            onChange={(event) => updateAdvancedFilter(field, { value: event.target.value })}
+            showTime={field.type === "datetime"}
+            value={current.value ? parseClinicDateTime(current.value) : null}
+            onChange={(value) => updateAdvancedFilter(field, { value: value ? value.format(field.type === "datetime" ? "YYYY-MM-DDTHH:mm" : "YYYY-MM-DD") : "" })}
           />
         ) : (
           <Input
@@ -578,7 +581,7 @@ export function RecordListPage() {
           if (resource === "accounting-vouchers" && row.status !== "POSTED" && hasActionAccess(resource, "post")) menuItems.push({ key: "post", icon: <AuditOutlined />, label: "Ghi sổ", onClick: () => void postAccountingVoucher(recordId) })
           if (resource === "accounting-vouchers" && row.status === "POSTED" && hasActionAccess(resource, "unpost")) menuItems.push({ key: "unpost", icon: <SwapOutlined />, label: "Bỏ ghi sổ", onClick: () => void unpostAccountingVoucher(recordId) })
           if (templates.length > 0 && hasActionAccess(resource, "print")) menuItems.push({ key: "print", icon: <PrinterOutlined />, label: "In biểu mẫu", onClick: () => openPrintTemplatePicker(recordId) })
-          if (recordStatus === "active" && !isSystemAdminAccount && hasActionAccess(resource, "delete")) menuItems.push({ key: "archive", danger: true, icon: <DeleteOutlined />, label: "Lưu trữ", onClick: () => Modal.confirm({ title: "Lưu trữ bản ghi này?", content: "Bản ghi sẽ được chuyển vào tab Lưu trữ.", okText: "Lưu trữ", okButtonProps: { danger: true }, onOk: () => new Promise<void>((resolve) => deleteRecord({ resource, id: row.id }, { onSuccess: () => { message.success("Đã lưu trữ"); refresh(); resolve() }, onError: () => resolve() })) }) })
+          if (recordStatus === "active" && !isSystemAdminAccount && hasActionAccess(resource, "delete")) menuItems.push({ key: "archive", icon: <InboxOutlined />, label: "Lưu trữ", onClick: () => Modal.confirm({ title: "Lưu trữ bản ghi này?", content: "Bản ghi sẽ được chuyển vào tab Lưu trữ.", okText: "Lưu trữ", onOk: () => new Promise<void>((resolve) => deleteRecord({ resource, id: row.id }, { onSuccess: () => { message.success("Đã lưu trữ"); refresh(); resolve() }, onError: () => resolve() })) }) })
           const actionPresentation = getActionPresentation(resource)
           const orderedMenuItems = menuItems
             .map((item, index) => ({ ...item, actionKey: menuActionKey(String(item.key)), originalIndex: index }))
@@ -860,7 +863,7 @@ export function RecordListPage() {
             <Dropdown
               menu={{
                 items: [
-                  ...(hasActionAccess(resource, "delete") ? [{ key: "archive", danger: true, icon: <DeleteOutlined />, label: "Lưu trữ" }] : []),
+                  ...(hasActionAccess(resource, "delete") ? [{ key: "archive", icon: <InboxOutlined />, label: "Lưu trữ" }] : []),
                   { key: "export", icon: <DownloadOutlined />, label: "Xuất Excel" },
                   ...(hasActionAccess(resource, "duplicate") ? [{ key: "clone", icon: <CopyOutlined />, label: "Nhân bản" }] : []),
                   { type: "divider" },
@@ -1083,7 +1086,6 @@ export function RecordListPage() {
       <Modal
         cancelText="Hủy"
         confirmLoading={archivingSelected}
-        okButtonProps={{ danger: true }}
         okText="Lưu trữ"
         open={archiveSelectedOpen}
         title={`Lưu trữ ${selectedRowKeys.length} bản ghi đã chọn?`}

@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
 import { DeepPartial, IsNull, Like, Repository } from 'typeorm';
 import { TenantDataSourceService } from '../tenant/tenant-data-source.service';
+import { TenantContextService } from '../tenant/tenant-context.service';
 import {
   Appointment,
   Branch,
@@ -137,6 +138,8 @@ function boolFlag(index: number, cycle = 2) {
 
 @Injectable()
 export class SeedService implements OnApplicationBootstrap {
+  private readonly defaultWorkspaceSeeds = new Map<string, Promise<boolean>>();
+
   constructor(
     @InjectRepository(Branch) private readonly branches: Repository<Branch>,
     @InjectRepository(User) private readonly users: Repository<User>,
@@ -170,11 +173,27 @@ export class SeedService implements OnApplicationBootstrap {
     @InjectRepository(Commission) private readonly commissions: Repository<Commission>,
     private readonly config: ConfigService,
     private readonly tenants: TenantDataSourceService,
+    private readonly tenantContext: TenantContextService,
   ) {}
 
-  async onApplicationBootstrap() {
+  onApplicationBootstrap() {
+    // Do not hold up HTTP startup while every existing tenant is seeded. With
+    // many tenants (or a slow database), doing this synchronously leaves the
+    // backend process alive but not listening yet, which makes the tenant
+    // console's internal seed request fail with a generic `fetch failed`.
+    void this.seedActiveTenants();
+  }
+
+  private async seedActiveTenants() {
     for (const tenant of await this.tenants.activeTenants()) {
-      await this.tenants.runWithTenant(tenant, () => this.seedTenant());
+      try {
+        await this.tenants.runWithTenant(tenant, () => this.seedTenant());
+      } catch (error) {
+        // A broken legacy tenant must not prevent the API from serving the
+        // remaining tenants. The explicit Run seed action can still report
+        // its error to the platform administrator.
+        console.error(`[seed] Startup seed failed for ${tenant.domain}:`, error);
+      }
     }
   }
 
@@ -184,12 +203,42 @@ export class SeedService implements OnApplicationBootstrap {
     await this.tenants.runWithTenant(tenant, () => this.seedTenant());
   }
 
+  /**
+   * Ensures the minimum workspace exists when a tenant first opens CMS.
+   * It deliberately excludes optional large/demo data and is safe to call on
+   * every app-ui request: once both records exist it does no write at all.
+   */
+  async ensureDefaultWorkspace() {
+    const tenantId = this.tenantContext.require().id;
+    const pending = this.defaultWorkspaceSeeds.get(tenantId);
+    if (pending) return pending;
+
+    const task = this.createDefaultWorkspaceIfMissing().finally(() => {
+      this.defaultWorkspaceSeeds.delete(tenantId);
+    });
+    this.defaultWorkspaceSeeds.set(tenantId, task);
+    return task;
+  }
+
   private async seedTenant() {
     // A provisioned tenant starts with the minimum usable workspace.
     // Teams can then clone a template tenant when they want demo/config data.
     await this.ensureInitialBranch();
     await this.ensureInitialAdmin();
     await this.seedLargeDataIfEnabled();
+  }
+
+  private async createDefaultWorkspaceIfMissing() {
+    const email = this.config.get('ADMIN_EMAIL', 'admin@clinic.test');
+    const [branch, admin] = await Promise.all([
+      this.branches.findOne({ where: { slug: 'main' } }),
+      this.users.findOne({ where: [{ email }, { username: 'admin' }, { username: 'admin-system' }] }),
+    ]);
+    if (branch && admin) return false;
+
+    if (!branch) await this.ensureInitialBranch();
+    if (!admin) await this.ensureInitialAdmin();
+    return true;
   }
 
   private async ensureInitialBranch() {

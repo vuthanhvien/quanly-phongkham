@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined, TableOutlined } from '@ant-design/icons'
+import { EditOutlined, InboxOutlined, PlusOutlined, ReloadOutlined, TableOutlined } from '@ant-design/icons'
 import { Button, Card, Checkbox, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Typography, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -68,7 +68,7 @@ export function CustomTablesPage() {
             render: (_, row: DynamicTable) => <Space size={0}>
               <Button icon={<TableOutlined />} onClick={() => navigate(`/custom-tables/${row.id}/data`)} size="small" type="link">Dữ liệu</Button>
               <Button icon={<EditOutlined />} onClick={() => openEdit(row)} size="small" type="link">Schema</Button>
-              <Popconfirm title="Lưu trữ bảng này?" onConfirm={() => void removeTable(row.id)}><Button aria-label={`Lưu trữ ${row.name}`} danger icon={<DeleteOutlined />} size="small" type="link" /></Popconfirm>
+              <Popconfirm title="Lưu trữ bảng này?" onConfirm={() => void removeTable(row.id)}><Button aria-label={`Lưu trữ ${row.name}`} icon={<InboxOutlined />} size="small" type="link" /></Popconfirm>
             </Space>,
           },
         ]}

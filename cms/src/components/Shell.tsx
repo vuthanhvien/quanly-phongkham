@@ -122,6 +122,7 @@ export const menuIcons: Record<string, React.ReactNode> = {
   'staff-rewards': <GiftOutlined />,
   'staff-trainings': <ExperimentOutlined />,
   'performance-reviews': <LineChartOutlined />,
+  kpi: <FundOutlined />,
   'position-histories': <DeploymentUnitOutlined />,
 }
 
@@ -151,6 +152,7 @@ const moduleNavigation: Record<string, { path: string; label: string; screen?: s
   videos: { path: "/videos", label: "Video ngắn" },
   "zalo-inbox": { path: "/zalo-inbox", label: "Hộp thư Zalo", screen: "zalo-inbox" },
   "accounting-reports": { path: "/accounting-reports", label: "Báo cáo kế toán", screen: "accounting-reports" },
+  kpi: { path: "/kpi", label: "KPI & Hiệu suất" },
 }
 
 const resourceToGroup = Object.fromEntries(

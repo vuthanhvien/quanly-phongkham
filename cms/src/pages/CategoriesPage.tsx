@@ -1,13 +1,11 @@
 import {
-  DeleteOutlined,
-  DownloadOutlined,
   EditOutlined,
+  InboxOutlined,
   PlusCircleOutlined,
   PlusOutlined,
   UploadOutlined,
 } from "@ant-design/icons"
 import {
-  Alert,
   Button,
   Card,
   Form,
@@ -19,12 +17,10 @@ import {
   Table,
   Tag,
   Typography,
-  Upload,
   message,
 } from "antd"
-import type { UploadFile } from "antd"
 import { useEffect, useState } from "react"
-import * as XLSX from "xlsx"
+import { useNavigate } from "react-router-dom"
 import { api } from "../api"
 import { ModalTitleBar } from "../components/ModalTitleBar"
 import { getApiErrorMessage } from "../utils/apiError"
@@ -39,22 +35,6 @@ interface ItemCategory {
   sortOrder: number
   isActive: boolean
   children?: ItemCategory[]
-}
-
-interface ImportRow {
-  code?: string
-  name?: string
-  parentCode?: string
-  description?: string
-  sortOrder?: number
-  isActive?: boolean | string | number
-}
-
-interface ImportResult {
-  success: number
-  failed: number
-  results: Array<ItemCategory & { _action: string }>
-  errors: Array<{ rowIndex: number; code?: string; error: string }>
 }
 
 const LEVEL_LABELS: Record<number, string> = { 1: "Ngành", 2: "Nhóm", 3: "Loại" }
@@ -87,19 +67,13 @@ function buildTree(flat: ItemCategory[]): ItemCategory[] {
 }
 
 export function CategoriesPage() {
+  const navigate = useNavigate()
   const [flat, setFlat] = useState<ItemCategory[]>([])
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<ItemCategory | null>(null)
   const [fullscreenPopup, setFullscreenPopup] = useState<string | null>(null)
   const [form] = Form.useForm()
-
-  // Import state
-  const [importModal, setImportModal] = useState(false)
-  const [importRows, setImportRows] = useState<ImportRow[]>([])
-  const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<ImportResult | null>(null)
-  const [fileList, setFileList] = useState<UploadFile[]>([])
 
   useEffect(() => {
     void load()
@@ -158,66 +132,18 @@ export function CategoriesPage() {
     Modal.confirm({
       title: `Lưu trữ "${cat.name}"?`,
       content: "Không thể xóa nếu còn danh mục con.",
-      okType: "danger",
       okText: "Lưu trữ",
       cancelText: "Hủy",
       onOk: async () => {
         try {
           await api.delete(`/product-categories/${cat.id}`)
-          void message.success("Đã xóa")
+          void message.success("Đã lưu trữ")
           await load()
         } catch (err: unknown) {
           void message.error(getApiErrorMessage(err, "Có lỗi xảy ra"))
         }
       },
     })
-  }
-
-  function downloadTemplate() {
-    const ws = XLSX.utils.aoa_to_sheet([
-      ["code", "name", "parentCode", "description", "sortOrder", "isActive"],
-      ["DA-LIEU", "Da liễu", "", "Nhóm ngành da liễu", "1", "1"],
-      ["DIEU-TRI-MUN", "Điều trị mụn", "DA-LIEU", "Dịch vụ điều trị mụn", "1", "1"],
-      ["CAM-MUN-CAP-DO-1", "Cấm mụn cấp độ 1", "DIEU-TRI-MUN", "", "1", "1"],
-    ])
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "categories")
-    XLSX.writeFile(wb, "categories-template.xlsx")
-  }
-
-  function handleFileUpload(file: File) {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const data = new Uint8Array(e.target?.result as ArrayBuffer)
-      const wb = XLSX.read(data, { type: "array" })
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json<ImportRow>(ws, { defval: "" })
-      setImportRows(rows)
-      setImportResult(null)
-    }
-    reader.readAsArrayBuffer(file)
-    return false
-  }
-
-  async function runImport() {
-    if (!importRows.length) return
-    setImporting(true)
-    try {
-      const res = await api.post("/product-categories/import", { rows: importRows })
-      setImportResult(res.data as ImportResult)
-      await load()
-    } catch (err: unknown) {
-      void message.error(getApiErrorMessage(err, "Nhập dữ liệu thất bại"))
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  function closeImport() {
-    setImportModal(false)
-    setImportRows([])
-    setImportResult(null)
-    setFileList([])
   }
 
   const tree = buildTree(flat)
@@ -285,27 +211,11 @@ export function CategoriesPage() {
           <Button
             type="link"
             size="small"
-            danger
-            icon={<DeleteOutlined />}
+            icon={<InboxOutlined />}
             onClick={() => confirmDelete(row)}
           />
         </Space>
       ),
-    },
-  ]
-
-  const importPreviewColumns = [
-    { title: "Mã", dataIndex: "code", key: "code", width: 120 },
-    { title: "Tên", dataIndex: "name", key: "name" },
-    { title: "Mã danh mục cha", dataIndex: "parentCode", key: "parentCode", width: 120 },
-    { title: "Mô tả", dataIndex: "description", key: "description" },
-    { title: "Thứ tự", dataIndex: "sortOrder", key: "sortOrder", width: 80 },
-    {
-      title: "Đang sử dụng",
-      dataIndex: "isActive",
-      key: "isActive",
-      width: 80,
-      render: (v: unknown) => String(v),
     },
   ]
 
@@ -316,7 +226,7 @@ export function CategoriesPage() {
           <Typography.Title level={3}>Ngành / Nhóm / Loại</Typography.Title>
         </div>
         <Space>
-          <Button icon={<UploadOutlined />} onClick={() => setImportModal(true)}>
+          <Button icon={<UploadOutlined />} onClick={() => navigate("/product-categories/import")}>
             Import
           </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>
@@ -392,134 +302,6 @@ export function CategoriesPage() {
             {editing ? "Cập nhật" : "Thêm danh mục"}
           </Button>
         </Form>
-      </Modal>
-
-      {/* Import modal */}
-      <Modal
-        className={`quick-drawer${fullscreenPopup === "import" ? " quick-drawer-fullscreen" : ""}`}
-        title={
-          <ModalTitleBar
-            fullscreen={fullscreenPopup === "import"}
-            title="Nhập Ngành / Nhóm / Loại"
-            onToggleFullscreen={() => setFullscreenPopup((current) => current === "import" ? null : "import")}
-          />
-        }
-        open={importModal}
-        onCancel={() => {
-          closeImport()
-          setFullscreenPopup((current) => current === "import" ? null : current)
-        }}
-        footer={null}
-        width={fullscreenPopup === "import" ? "calc(100vw - 24px)" : 860}
-      >
-        {!importResult ? (
-          <>
-            <Alert
-              type="info"
-              showIcon
-              style={{ marginBottom: 16 }}
-              message='Dùng cột "parentCode" để xác định cha con'
-              description="File cần có cột: code, name, parentCode (để trống nếu là Ngành gốc), description, sortOrder, isActive (1/0). Nếu code đã tồn tại sẽ cập nhật, chưa có thì tạo mới."
-            />
-            <Space style={{ marginBottom: 16 }}>
-              <Button icon={<DownloadOutlined />} onClick={downloadTemplate}>
-                Tải file mẫu
-              </Button>
-            </Space>
-            <Upload
-              accept=".xlsx,.xls,.csv"
-              fileList={fileList}
-              beforeUpload={(file) => {
-                setFileList([file as UploadFile])
-                handleFileUpload(file)
-                return false
-              }}
-              onRemove={() => {
-                setFileList([])
-                setImportRows([])
-              }}
-              maxCount={1}
-            >
-              <Button icon={<UploadOutlined />}>Chọn file Excel / CSV</Button>
-            </Upload>
-
-            {importRows.length > 0 && (
-              <>
-                <Typography.Text type="secondary" style={{ display: "block", margin: "12px 0 8px" }}>
-                  Đọc được {importRows.length} dòng — xem trước:
-                </Typography.Text>
-                <Table
-                  rowKey={(_, i) => String(i)}
-                  dataSource={importRows.slice(0, 20)}
-                  columns={importPreviewColumns}
-                  pagination={false}
-                  size="small"
-                  scroll={{ x: "max-content", y: 260 }}
-                  style={{ marginBottom: 16 }}
-                />
-                {importRows.length > 20 && (
-                  <Typography.Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
-                    ... và {importRows.length - 20} dòng khác
-                  </Typography.Text>
-                )}
-                <Button
-                  type="primary"
-                  className="primary-glow"
-                  loading={importing}
-                  onClick={runImport}
-                >
-                  Xác nhận import {importRows.length} dòng
-                </Button>
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            <Space style={{ marginBottom: 16 }} size={12}>
-              <Tag color="success" style={{ fontSize: 14, padding: "4px 10px" }}>
-                Thành công: {importResult.success}
-              </Tag>
-              {importResult.failed > 0 && (
-                <Tag color="error" style={{ fontSize: 14, padding: "4px 10px" }}>
-                  Thất bại: {importResult.failed}
-                </Tag>
-              )}
-            </Space>
-
-            {importResult.errors.length > 0 && (
-              <Alert
-                type="error"
-                showIcon
-                style={{ marginBottom: 16 }}
-                message={`${importResult.failed} dòng lỗi`}
-                description={
-                  <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {importResult.errors.map((e, i) => (
-                      <li key={i}>
-                        Dòng {e.rowIndex}{e.code ? ` (code: ${e.code})` : ""}: {e.error}
-                      </li>
-                    ))}
-                  </ul>
-                }
-              />
-            )}
-
-            <Space>
-              <Button type="primary" onClick={closeImport}>
-                Đóng
-              </Button>
-              <Button
-                onClick={() => {
-                  setImportResult(null)
-                  setImportRows([])
-                  setFileList([])
-                }}
-              >
-                Import thêm
-              </Button>
-            </Space>
-          </>
-        )}
       </Modal>
     </>
   )

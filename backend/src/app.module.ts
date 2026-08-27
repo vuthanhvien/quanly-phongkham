@@ -15,6 +15,7 @@ import { TenantMiddleware } from './tenant/tenant.middleware';
 import { TenantModule } from './tenant/tenant-orm.module';
 import { CustomerPortalModule } from './customer-portal/customer-portal.module';
 import { FeedModule } from './feed/feed.module';
+import { KpiModule } from './kpi/kpi.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { FeedModule } from './feed/feed.module';
     WorkflowModule,
     CustomerPortalModule,
     FeedModule,
+    KpiModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })

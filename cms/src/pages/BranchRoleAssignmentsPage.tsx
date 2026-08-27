@@ -1,3 +1,4 @@
+import { InboxOutlined } from "@ant-design/icons"
 import {
   Button,
   Card,
@@ -160,11 +161,7 @@ export function BranchRoleAssignmentsPage() {
                   <Button type="link" onClick={() => openEditAssignment(row)}>
                     Sửa
                   </Button>
-                  <Button
-                    type="link"
-                    danger
-                    onClick={() => deleteAssignment(row.id)}
-                  >
+                  <Button icon={<InboxOutlined />} type="link" onClick={() => deleteAssignment(row.id)}>
                     Lưu trữ
                   </Button>
                 </Space>

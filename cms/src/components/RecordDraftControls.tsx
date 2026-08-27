@@ -1,4 +1,5 @@
 import { Button, List, Modal } from "antd"
+import { InboxOutlined } from "@ant-design/icons"
 import dayjs from "dayjs"
 import { useState } from "react"
 import { api } from "../api"
@@ -72,7 +73,7 @@ export function RecordDraftControls({ resource, getPayload, onRestore }: RecordD
         locale={{ emptyText: "Chưa có bản nháp nào" }}
         renderItem={(draft) => <List.Item actions={[
           <Button key="open" size="small" type="primary" onClick={() => { onRestore(draft.payload); setOpen(false); toastSuccess("Đã mở bản nháp") }}>Mở</Button>,
-          <Button danger key="delete" size="small" onClick={() => void remove(draft.id)}>Lưu trữ</Button>,
+          <Button icon={<InboxOutlined />} key="delete" size="small" onClick={() => void remove(draft.id)}>Lưu trữ</Button>,
         ]}>
           <List.Item.Meta title={draft.title || "Bản nháp chưa đặt tên"} description={`Cập nhật ${dayjs(draft.updatedAt).format("DD/MM/YYYY HH:mm")}`} />
         </List.Item>}

@@ -1,6 +1,6 @@
 import {
-  DeleteOutlined,
   EditOutlined,
+  InboxOutlined,
   PlusCircleOutlined,
   PlusOutlined,
 } from "@ant-design/icons"
@@ -129,13 +129,12 @@ export function DepartmentsPage() {
     Modal.confirm({
       title: `Lưu trữ "${dept.name}"?`,
       content: "Không thể xóa nếu còn phòng ban con.",
-      okType: "danger",
       okText: "Lưu trữ",
       cancelText: "Hủy",
       onOk: async () => {
         try {
           await api.delete(`/records/departments/${dept.id}`)
-          void message.success("Đã xóa")
+          void message.success("Đã lưu trữ")
           await load()
         } catch (err: unknown) {
           void message.error(getApiErrorMessage(err, "Có lỗi xảy ra"))
@@ -187,7 +186,7 @@ export function DepartmentsPage() {
             Thêm con
           </Button>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(row)} />
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => confirmDelete(row)} />
+          <Button type="link" size="small" icon={<InboxOutlined />} onClick={() => confirmDelete(row)} />
         </Space>
       ),
     },

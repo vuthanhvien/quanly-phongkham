@@ -14,6 +14,7 @@ import {
   FolderAddOutlined,
   FolderOpenOutlined,
   GoogleOutlined,
+  InboxOutlined,
   PlusOutlined,
   UploadOutlined,
 } from "@ant-design/icons"
@@ -504,7 +505,7 @@ export function FileFoldersPage() {
           )}
           {fileSource === "system" && hasActionAccess("files", "delete") && (
             <Popconfirm title="Lưu trữ file này?" onConfirm={() => void removeFile(row)}>
-              <Button danger icon={<DeleteOutlined />} />
+              <Button icon={<InboxOutlined />} style={{ color: "#1677ff" }} />
             </Popconfirm>
           )}
           {fileSource === "google" && canConfigureGoogleDrive && (
@@ -695,7 +696,7 @@ export function FileFoldersPage() {
                   )}
                   {hasActionAccess("file-folders", "delete") && (
                     <Popconfirm title="Lưu trữ thư mục này?" onConfirm={() => void removeFolder(selectedFolder)}>
-                      <Button danger icon={<DeleteOutlined />}>
+                      <Button icon={<InboxOutlined />} style={{ color: "#1677ff" }}>
                         Lưu trữ folder
                       </Button>
                     </Popconfirm>

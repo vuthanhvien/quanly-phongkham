@@ -1,4 +1,4 @@
-import { ArrowLeftOutlined, BranchesOutlined, DownOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons"
+import { ArrowLeftOutlined, BranchesOutlined, DownOutlined, EditOutlined, InboxOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons"
 import { CmsBackButton } from "../components/CmsBackButton"
 import { Button, Card, Checkbox, Col, Dropdown, Form, Input, InputNumber, Modal, Row, Select, Space, Table, Tabs, Tag, Tooltip, Typography, message } from "antd"
 import { useEffect, useMemo, useState } from "react"
@@ -464,7 +464,7 @@ export function WorkflowDefinitionDetailPage() {
                         <Space>
                           <Button icon={<PlusOutlined />} onClick={() => openCreateStepAfter(row)}>Thêm sau</Button>
                           <Button icon={<EditOutlined />} onClick={() => openEditStep(row)}>Sửa</Button>
-                          <Button danger onClick={() => void archiveStep(row)}>Lưu trữ</Button>
+                          <Button icon={<InboxOutlined />} style={{ color: "#1677ff" }} onClick={() => void archiveStep(row)}>Lưu trữ</Button>
                         </Space>
                       ),
                     },

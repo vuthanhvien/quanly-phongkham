@@ -45,15 +45,26 @@ export class ZaloService implements OnApplicationBootstrap {
     private readonly tenants: TenantDataSourceService,
   ) {}
 
-  async onApplicationBootstrap() {
+  onApplicationBootstrap() {
+    // Restoring an external Zalo session must never delay the HTTP listener.
+    // In particular, the tenant console needs the backend to be reachable to
+    // run an explicit seed immediately after a tenant is provisioned.
+    void this.restoreEnabledListeners();
+  }
+
+  private async restoreEnabledListeners() {
     for (const tenant of await this.tenants.activeTenants()) {
-      await this.tenants.runWithTenant(tenant, async () => {
-        const accounts = await this.accounts.find({ where: { listenerEnabled: true } });
-        for (const account of accounts) {
-          if (!account.sessionData) continue;
-          void this.restoreAccountRuntime(account);
-        }
-      });
+      try {
+        await this.tenants.runWithTenant(tenant, async () => {
+          const accounts = await this.accounts.find({ where: { listenerEnabled: true } });
+          for (const account of accounts) {
+            if (!account.sessionData) continue;
+            void this.restoreAccountRuntime(account);
+          }
+        });
+      } catch (error) {
+        console.error(`[zalo] Failed to restore listeners for ${tenant.domain}:`, error);
+      }
     }
   }
 

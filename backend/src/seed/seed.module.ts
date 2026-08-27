@@ -7,6 +7,7 @@ import { InternalTenantSeedController } from './internal-tenant-seed.controller'
 @Module({
   imports: [TenantModule, TenantOrmModule.forFeature(ENTITIES)],
   providers: [SeedService],
+  exports: [SeedService],
   controllers: [InternalTenantSeedController],
 })
 export class SeedModule {}

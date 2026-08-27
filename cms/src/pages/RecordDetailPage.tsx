@@ -27,12 +27,12 @@ import {
   AuditOutlined,
   BankOutlined,
   CalendarOutlined,
-  DeleteOutlined,
   EditOutlined,
   EyeOutlined,
   FileTextOutlined,
   HistoryOutlined,
   IdcardOutlined,
+  InboxOutlined,
   PhoneOutlined,
   PlusOutlined,
   PrinterOutlined,
@@ -604,7 +604,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                                 }
                               >
                                 <Tooltip title="Lưu trữ bản ghi">
-                                  <Button danger icon={<DeleteOutlined />} size="small" type="text" />
+                                  <Button icon={<InboxOutlined />} size="small" style={{ color: "#1677ff" }} type="text" />
                                 </Tooltip>
                               </Popconfirm>
                             )}

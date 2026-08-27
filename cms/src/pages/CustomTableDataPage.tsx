@@ -1,4 +1,4 @@
-import { DeleteOutlined, DownloadOutlined, EditOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
+import { DownloadOutlined, EditOutlined, InboxOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons'
 import { Button, Card, Checkbox, Empty, Form, Input, Modal, Popconfirm, Select, Space, Spin, Table, Tooltip, Typography, Upload, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -130,7 +130,7 @@ export function CustomTableDataPage() {
             onChange={(nextId) => nextId === '__new__' ? openSchema() : navigate(`/custom-tables/${nextId}/data`)}
           />
           <Button disabled={!table} icon={<EditOutlined />} onClick={() => openSchema(tables.find((item) => item.id === id))}>Schema</Button>
-          <Popconfirm title="Lưu trữ bảng này?" onConfirm={() => void removeTable()}><Button disabled={!table} danger icon={<DeleteOutlined />}>Xóa</Button></Popconfirm>
+          <Popconfirm title="Lưu trữ bảng này?" onConfirm={() => void removeTable()}><Button disabled={!table} icon={<InboxOutlined />} style={{ color: '#1677ff' }}>Lưu trữ</Button></Popconfirm>
         </Space>
         <Space>
           <Upload accept=".xlsx,.xls" showUploadList={false} beforeUpload={importRows}>
@@ -168,7 +168,7 @@ export function CustomTableDataPage() {
                       await load()
                     }}
                   >
-                    <Tooltip title="Lưu trữ dòng"><Button aria-label="Lưu trữ dòng" danger icon={<DeleteOutlined />} type="text" /></Tooltip>
+                    <Tooltip title="Lưu trữ dòng"><Button aria-label="Lưu trữ dòng" icon={<InboxOutlined />} style={{ color: '#1677ff' }} type="text" /></Tooltip>
                   </Popconfirm>
                 </Space>
               ),
