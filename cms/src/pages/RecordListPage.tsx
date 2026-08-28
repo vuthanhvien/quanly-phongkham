@@ -51,10 +51,7 @@ import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { RecordValueView } from "../components/RecordValueView"
 import { ProtectedFieldRevealModal, type ProtectedFieldRevealTarget } from "../components/ProtectedFieldRevealModal"
-import { ServiceOrderForm } from "../components/ServiceOrderForm"
 import { menuIcons } from "../components/Shell"
-import { ProductForm } from "../components/ProductForm"
-import { StockBatchForm } from "../components/StockBatchForm"
 import { CustomField, entityLabels, normalizeSelectOption } from "../models"
 import { RecordDetailPage } from "./RecordDetailPage"
 import { displayValue, FileLookupMap, getRelationMetaMap, getRelationSpec, hasFileField, loadFileLookupMap, loadRelationOptions, LookupMap, resolveRecordFieldValue } from "../relations"
@@ -476,15 +473,11 @@ export function RecordListPage() {
       ...displayFields.map((field) => ({
         title: advancedSearch ? (
           <Space direction="vertical" size={4} style={{ width: "100%" }}>
-            <Tooltip title={field.label}>
-              <span className="record-table-column-title">{field.label}</span>
-            </Tooltip>
+            <span className="record-table-column-title">{field.label}</span>
             {renderAdvancedFilter(field)}
           </Space>
         ) : (
-          <Tooltip title={field.label}>
-            <span className="record-table-column-title">{field.label}</span>
-          </Tooltip>
+          <span className="record-table-column-title">{field.label}</span>
         ),
         dataIndex: field.key,
         key: field.key,
@@ -987,7 +980,7 @@ export function RecordListPage() {
           } : undefined}
           scroll={{
             x: "max-content",
-            y: screens.md ? (advancedSearch ? "calc(100vh - 308px)" : "calc(100vh - 260px)") : undefined,
+            y: screens.md ? (advancedSearch ? "calc(100vh - 298px)" : "calc(100vh - 250px)") : undefined,
           }}
         />
       </Card>
@@ -1240,45 +1233,14 @@ export function RecordListPage() {
               refresh()
             }}
           />
-        ) : resource === "service-orders" ? (
-          <ServiceOrderForm
-            compact
-            id={editingId || undefined}
-            initialValues={editingId ? undefined : { ...duplicateValues, ...(fixedProductType ? { productType: fixedProductType } : {}) }}
-            onCancel={() => {
-              setCreating(false)
-              setEditingId(null)
-              setDuplicateValues(undefined)
-            }}
-            onSuccess={() => {
-              setCreating(false)
-              setEditingId(null)
-              setDuplicateValues(undefined)
-              refresh()
-            }}
-          />
-        ) : resource === "products" ? (
-          <ProductForm
+        ) : resource === "products" || resource === "service-orders" ? (
+          <RecordFormContent
             compact
             id={editingId || undefined}
             initialValues={editingId ? undefined : duplicateValues}
+            resource={resource}
             onCancel={() => { setCreating(false); setEditingId(null); setDuplicateValues(undefined) }}
             onSuccess={() => { setCreating(false); setEditingId(null); setDuplicateValues(undefined); refresh() }}
-          />
-        ) : resource === "stock-batches" && !editingId ? (
-          <StockBatchForm
-            compact
-            onCancel={() => {
-              setCreating(false)
-              setEditingId(null)
-              setDuplicateValues(undefined)
-            }}
-            onSuccess={() => {
-              setCreating(false)
-              setEditingId(null)
-              setDuplicateValues(undefined)
-              refresh()
-            }}
           />
         ) : (
           <RecordFormContent

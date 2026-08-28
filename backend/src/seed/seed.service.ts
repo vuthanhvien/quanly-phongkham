@@ -5,6 +5,7 @@ import { hash } from 'bcryptjs';
 import { DeepPartial, IsNull, Like, Repository } from 'typeorm';
 import { TenantDataSourceService } from '../tenant/tenant-data-source.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
+import { RecordsService } from '../records/records.service';
 import {
   Appointment,
   Branch,
@@ -22,6 +23,8 @@ import {
   Invoice,
   Lead,
   LeadActivity,
+  LeaveAllocation,
+  LeaveType,
   ManagedFile,
   MedicalEpisode,
   PrintTemplate,
@@ -139,6 +142,7 @@ function boolFlag(index: number, cycle = 2) {
 @Injectable()
 export class SeedService implements OnApplicationBootstrap {
   private readonly defaultWorkspaceSeeds = new Map<string, Promise<boolean>>();
+  private readonly demoDataSeeds = new Map<string, Promise<{ target: number; modules: string[] }>>();
 
   constructor(
     @InjectRepository(Branch) private readonly branches: Repository<Branch>,
@@ -160,6 +164,8 @@ export class SeedService implements OnApplicationBootstrap {
     @InjectRepository(MedicalEpisode) private readonly medicalEpisodes: Repository<MedicalEpisode>,
     @InjectRepository(Appointment) private readonly appointments: Repository<Appointment>,
     @InjectRepository(WorkSchedule) private readonly workSchedules: Repository<WorkSchedule>,
+    @InjectRepository(LeaveType) private readonly leaveTypes: Repository<LeaveType>,
+    @InjectRepository(LeaveAllocation) private readonly leaveAllocations: Repository<LeaveAllocation>,
     @InjectRepository(Consultation) private readonly consultations: Repository<Consultation>,
     @InjectRepository(ServiceOrder) private readonly serviceOrders: Repository<ServiceOrder>,
     @InjectRepository(ServiceOrderItem) private readonly serviceOrderItems: Repository<ServiceOrderItem>,
@@ -174,6 +180,7 @@ export class SeedService implements OnApplicationBootstrap {
     private readonly config: ConfigService,
     private readonly tenants: TenantDataSourceService,
     private readonly tenantContext: TenantContextService,
+    private readonly records: RecordsService,
   ) {}
 
   onApplicationBootstrap() {
@@ -217,6 +224,23 @@ export class SeedService implements OnApplicationBootstrap {
       this.defaultWorkspaceSeeds.delete(tenantId);
     });
     this.defaultWorkspaceSeeds.set(tenantId, task);
+    return task;
+  }
+
+  /** Creates a sizeable, idempotent demo set for the primary CMS modules. */
+  async seedAllDemoData(target = 500) {
+    const tenantId = this.tenantContext.require().id;
+    const pending = this.demoDataSeeds.get(tenantId);
+    if (pending) return pending;
+
+    const normalizedTarget = Math.max(1, Math.min(1000, Math.floor(target) || 500));
+    const task = this.seedLargeData(normalizedTarget, new Set(ALL_BULK_MODULES))
+      .then(async () => {
+        const bundles = await this.records.seedAllDemoBundles(normalizedTarget);
+        return { target: normalizedTarget, modules: [...ALL_BULK_MODULES, ...bundles.map((bundle) => `${bundle.resource}-bundle`)] };
+      })
+      .finally(() => this.demoDataSeeds.delete(tenantId));
+    this.demoDataSeeds.set(tenantId, task);
     return task;
   }
 
@@ -310,6 +334,10 @@ export class SeedService implements OnApplicationBootstrap {
 
     const target = Math.max(1, Number(this.config.get('SEED_LARGE_COUNT', '10000')) || 10000);
     const selectedModules = this.resolveSelectedModules();
+    await this.seedLargeData(target, selectedModules);
+  }
+
+  private async seedLargeData(target: number, selectedModules: Set<BulkModuleName>) {
     const defaultPasswordHash = await hash(this.config.get('SEED_LARGE_DEFAULT_PASSWORD', 'BulkSeed@123'), 10);
 
     console.log(`[seed] Large seed enabled. target=${target} modules=${Array.from(selectedModules).join(', ')}`);
@@ -328,6 +356,8 @@ export class SeedService implements OnApplicationBootstrap {
     if (selectedModules.has('staff')) await this.seedStaff(target, branches, departments, bulkUsers);
     const bulkStaff = await this.loadBulkStaff();
     const doctorStaff = bulkStaff.filter((item) => item.position === 'Bac si');
+
+    await this.seedHrLeavePolicies(bulkStaff);
 
     if (selectedModules.has('branch-role-assignments')) await this.seedBranchRoleAssignments(target, branches, bulkUsers, bulkStaff);
 
@@ -439,7 +469,7 @@ export class SeedService implements OnApplicationBootstrap {
         username: `${LARGE_SEED_PREFIXES.userEmail}${padSerial(index)}`,
         fullName: `Bulk User ${index}`,
         passwordHash: defaultPasswordHash,
-        role: index % 6 === 0 ? 'DOCTOR' : 'STAFF',
+        role: (index - 1) % 6 === 0 ? 'DOCTOR' : 'STAFF',
         branchId: branch.id,
         isActive: boolFlag(index, 9),
       };
@@ -453,12 +483,21 @@ export class SeedService implements OnApplicationBootstrap {
     await this.insertGenerated(this.staff, current + 1, target, (index) => {
       const department = departments[(index - 1) % departments.length];
       const user = users[index - 1];
+      const profile = [
+        { position: 'Bac si', staffType: 'DOCTOR' },
+        { position: 'Dieu duong', staffType: 'STAFF' },
+        { position: 'Le tan', staffType: 'STAFF' },
+        { position: 'Ky thuat vien', staffType: 'STAFF' },
+        { position: 'Tu van vien', staffType: 'STAFF' },
+        { position: 'Quan ly phong kham', staffType: 'ADMIN' },
+      ][(index - 1) % 6];
       return {
         code: `${LARGE_SEED_PREFIXES.staffCode}${padSerial(index)}`,
         fullName: `Bulk Staff ${index}`,
         phone: `091${String(1000000 + index).slice(-7)}`,
         email: `${LARGE_SEED_PREFIXES.userEmail}${padSerial(index)}@clinic.test`,
-        position: index % 6 === 0 ? 'Bac si' : 'Tu van vien',
+        type: profile.staffType,
+        position: profile.position,
         departmentId: department?.id,
         userId: user?.id,
         status: index % 8 === 0 ? 'ON_LEAVE' : 'ACTIVE',
@@ -474,6 +513,26 @@ export class SeedService implements OnApplicationBootstrap {
       .map((user, index) => ({ id: user.id, staffId: refreshedStaff[index].id }));
 
     await this.saveInChunks(this.users, updates);
+  }
+
+  private async seedHrLeavePolicies(staff: Staff[]) {
+    const policies = [
+      { code: 'annual', name: 'Nghỉ phép năm', defaultDays: 12, requiresAllocation: true, isPaid: true, description: '12 ngày phép hưởng lương mỗi năm.' },
+      { code: 'sick', name: 'Nghỉ ốm', defaultDays: 5, requiresAllocation: true, isPaid: true, description: 'Nghỉ do ốm đau, có thể kèm chứng từ.' },
+      { code: 'personal', name: 'Nghỉ việc riêng', defaultDays: 3, requiresAllocation: true, isPaid: false, description: 'Nghỉ giải quyết việc cá nhân.' },
+      { code: 'maternity', name: 'Nghỉ thai sản', defaultDays: undefined, requiresAllocation: false, isPaid: true, description: 'Theo chính sách lao động hiện hành.' },
+    ];
+    for (const policy of policies) {
+      if (await this.leaveTypes.findOne({ where: { code: policy.code } })) continue;
+      await this.leaveTypes.save(this.leaveTypes.create({ ...policy, isActive: true }));
+    }
+
+    const year = new Date().getFullYear();
+    const existing = new Set((await this.leaveAllocations.find({ where: { year } })).map((item) => `${item.staffId}:${item.leaveTypeCode}`));
+    const allocations = staff
+      .filter((item) => item.id && !existing.has(`${item.id}:annual`))
+      .map((item) => this.leaveAllocations.create({ staffId: item.id, leaveTypeCode: 'annual', year, allocatedDays: 12, carriedOverDays: 0, note: 'Cấp phép năm dữ liệu demo' }));
+    await this.saveInChunks(this.leaveAllocations, allocations);
   }
 
   private async seedBranchRoleAssignments(target: number, branches: Branch[], users: User[], staff: Staff[]) {

@@ -65,6 +65,7 @@ import { appModuleLabels, buildGroupedModuleOptions, resolveEnabledModules } fro
 import { useAppUi } from "../app-ui"
 import { getInputPatternLabel } from "../input-patterns"
 import { getApiErrorMessage } from "../utils/apiError"
+import { getCachedCustomFields, getCachedPrintTemplates, getCachedViews, invalidateSettingsCache } from "../utils/settingsCache"
 import { baseFields, CustomField, DynamicRole, entityLabels, FieldSpec, getResourceActionOptions, normalizeSelectOption, relationFields, systemRoleOptions, type SelectOption } from "../models"
 import {
   buildFieldLayoutConfigs,
@@ -939,10 +940,10 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
 
   async function load() {
     const [fieldResponse, viewResponse, moduleViewResponse, templateResponse, roleResponse] = await Promise.all([
-      api.get("/settings/custom-fields", { params: { entityType } }),
-      api.get("/settings/views", { params: { entityType } }),
-      api.get("/settings/views"),
-      api.get("/settings/print-templates", { params: { entityType } }),
+      getCachedCustomFields(entityType),
+      getCachedViews(entityType),
+      getCachedViews(),
+      getCachedPrintTemplates(entityType),
       api.get("/settings/dynamic-roles"),
     ])
     const customFields = fieldResponse.data.data as CustomField[]
@@ -978,6 +979,9 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
           config: serializeViewConfig(viewType, configToSave, true, undefined, viewType === "TABLE"),
         })
       }
+      // The create/edit popups mount RecordFormContent independently. Clear
+      // its cached view data as soon as the saved layout changes.
+      invalidateSettingsCache()
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Không thể tự lưu cấu hình hiển thị"))
       await load()
@@ -1016,6 +1020,7 @@ export function SettingsPage({ section = "roles" }: { section?: "roles" | "print
     await api.delete(`/settings/views/${entityType}`, {
       params: { role: selectedRole },
     })
+    invalidateSettingsCache()
     message.success("Đã xóa config hiện tại. Role này sẽ kế thừa lại theo chuỗi mới")
     await load()
   }

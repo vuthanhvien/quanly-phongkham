@@ -51,8 +51,6 @@ import { useAppUi } from "../app-ui"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { FileUploadPanel } from "../components/FileUploadPanel"
 import { RecordValueView } from "../components/RecordValueView"
-import { ServiceOrderForm } from "../components/ServiceOrderForm"
-import { ProductForm } from "../components/ProductForm"
 import { ProjectManagementCard } from "../components/ProjectManagementCard"
 import { ProtectedFieldRevealModal, type ProtectedFieldRevealTarget } from "../components/ProtectedFieldRevealModal"
 import { CustomField, entityLabels, getFieldLabel } from "../models"
@@ -755,8 +753,9 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
       >
         {quickCreateBlock && (
           quickCreateBlock.resource === "service-orders" ? (
-            <ServiceOrderForm
+            <RecordFormContent
               compact
+              resource="service-orders"
               initialValues={{ [quickCreateBlock.relationField]: id }}
               notifyOnSuccess={false}
               onCancel={() => setQuickCreateBlock(null)}
@@ -803,20 +802,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
         onCancel={() => setMainEdit(null)}
       >
         {mainEdit && (
-          mainEdit.resource === "service-orders" ? (
-            <ServiceOrderForm
-              compact
-              id={mainEdit.recordId}
-              onCancel={() => setMainEdit(null)}
-              onSuccess={async () => {
-                setMainEdit(null)
-                await reloadCurrentRecord()
-                await reloadRelatedBlocks()
-              }}
-            />
-          ) : mainEdit.resource === "products" ? (
-            <ProductForm compact id={mainEdit.recordId} onCancel={() => setMainEdit(null)} onSuccess={async () => { setMainEdit(null); await reloadCurrentRecord(); await reloadRelatedBlocks() }} />
-          ) : (
+          (
             <RecordFormContent
               compact
               id={mainEdit.recordId}
@@ -842,22 +828,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
         onCancel={() => setRelatedEdit(null)}
       >
         {relatedEdit && (
-          relatedEdit.block.resource === "service-orders" ? (
-            <ServiceOrderForm
-              compact
-              id={relatedEdit.recordId}
-              onCancel={() => setRelatedEdit(null)}
-              onSuccess={() => {
-                setRelatedEdit(null)
-                void reloadRelatedBlocks()
-                if (relatedDetail?.record?.id === relatedEdit.recordId) {
-                  void openRelatedDetail(relatedEdit.block, relatedEdit.recordId)
-                }
-              }}
-            />
-          ) : relatedEdit.block.resource === "products" ? (
-            <ProductForm compact id={relatedEdit.recordId} onCancel={() => setRelatedEdit(null)} onSuccess={() => { setRelatedEdit(null); void reloadRelatedBlocks(); if (relatedDetail?.record?.id === relatedEdit.recordId) void openRelatedDetail(relatedEdit.block, relatedEdit.recordId) }} />
-          ) : (
+          (
             <RecordFormContent
               compact
               id={relatedEdit.recordId}

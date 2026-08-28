@@ -15,8 +15,8 @@ import type { DateClickArg, EventResizeDoneArg } from "@fullcalendar/interaction
 import viLocale from "@fullcalendar/core/locales/vi"
 import type { DateSelectArg, EventClickArg, EventDropArg } from "@fullcalendar/core"
 import dayjs, { type Dayjs } from "dayjs"
-import { Avatar, Button, Card, Col, Empty, List, Modal, Row, Segmented, Select, Space, Tag, Typography, message } from "antd"
-import { useEffect, useMemo, useState } from "react"
+import { Avatar, Button, Card, Col, Empty, List, Modal, Row, Segmented, Select, Space, Spin, Tag, Typography, message } from "antd"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { hasActionAccess } from "../access"
 import { api, resolveFileUrl } from "../api"
@@ -81,6 +81,14 @@ interface ScheduleDisplayWindow {
   end: Dayjs
 }
 
+interface DoctorScheduleAvailability {
+  schedule: PlannerEvent
+  attendance?: Record<string, any>
+  leaveRequest?: Record<string, any>
+}
+
+type DoctorTimelineRowStatus = "present" | "absent" | "future"
+
 type QuickCreateResource = "appointments" | "work-schedules" | "leave-requests" | "attendances"
 
 interface QuickActionItem {
@@ -116,21 +124,6 @@ const QUICK_ACTIONS: QuickActionItem[] = [
     title: "Thêm booking",
     description: "Tạo lịch hẹn mới theo ngày đang chọn.",
   },
-  {
-    key: "work-schedules",
-    title: "Thêm ca làm",
-    description: "Phân ca nhanh cho nhân sự trong ngày.",
-  },
-  {
-    key: "leave-requests",
-    title: "Thêm nghỉ phép",
-    description: "Ghi nhận đơn nghỉ ngay trên lịch.",
-  },
-  {
-    key: "attendances",
-    title: "Thêm chấm công",
-    description: "Tạo bản ghi check-in cho ngày đang xem.",
-  },
 ]
 
 const DAY_VIEW_START_HOUR = 6
@@ -151,9 +144,11 @@ async function fetchListSafe<T>(resource: string, pageSize = 500) {
 export function CalendarPage() {
   const navigate = useNavigate()
   const [toast, toastContextHolder] = message.useMessage()
-  const [calendarMode, setCalendarMode] = useState<CalendarMode>("week")
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("day")
   const [selectedDate, setSelectedDate] = useState(clinicNow())
   const [calendarSource, setCalendarSource] = useState<CalendarSourceData | null>(null)
+  const [calendarLoading, setCalendarLoading] = useState(true)
+  const calendarRequestId = useRef(0)
   const [lookups, setLookups] = useState<LookupMap>({})
   const [doctorFilter, setDoctorFilter] = useState<string | undefined>(undefined)
   const [quickCreateResource, setQuickCreateResource] = useState<QuickCreateResource | null>(null)
@@ -168,6 +163,8 @@ export function CalendarPage() {
   }, [])
 
   async function loadCalendar() {
+    const requestId = ++calendarRequestId.current
+    setCalendarLoading(true)
     const [appointments, workSchedules, leaveRequests, attendances, staffRows, customerRows, roomRows, relationLookups] = await Promise.all([
       fetchListSafe<Record<string, any>>("appointments"),
       fetchListSafe<Record<string, any>>("work-schedules"),
@@ -181,6 +178,7 @@ export function CalendarPage() {
       loadRelationOptions(["branchId", "staffId", "customerId", "doctorStaffId", "picStaffId", "roomId", "equipmentId"]).catch(() => ({} as LookupMap)),
     ])
 
+    if (requestId !== calendarRequestId.current) return
     setLookups(relationLookups)
     setCalendarSource({
       appointments,
@@ -191,6 +189,7 @@ export function CalendarPage() {
       customerRows,
       roomRows,
     })
+    setCalendarLoading(false)
   }
 
   const scheduleDisplayWindow = useMemo(
@@ -230,13 +229,57 @@ export function CalendarPage() {
     }
   }, [selectedEvents])
 
-  const selectedScheduleEvents = useMemo(
+  const selectedBookingEvents = useMemo(
+    () =>
+      calendarEvents
+        .filter((item) => parseClinicDateTime(item.start).isSame(selectedDate, "day"))
+        .sort((left, right) => parseClinicDateTime(left.start).valueOf() - parseClinicDateTime(right.start).valueOf()),
+    [calendarEvents, selectedDate],
+  )
+
+  const selectedDoctorScheduleEvents = useMemo(
     () =>
       selectedEvents
-        .filter((item) => item.type === "schedule")
+        .filter((item) => item.type === "schedule" && item.staffType === "DOCTOR" && (!doctorFilter || item.staffId === doctorFilter))
         .sort((left, right) => parseClinicDateTime(left.start).valueOf() - parseClinicDateTime(right.start).valueOf()),
-    [selectedEvents],
+    [doctorFilter, selectedEvents],
   )
+
+  const doctorScheduleAvailability = useMemo(
+    () => getDoctorScheduleAvailability({
+      schedules: selectedDoctorScheduleEvents,
+      attendances: calendarSource?.attendances || [],
+      leaveRequests: calendarSource?.leaveRequests || [],
+      selectedDate,
+    }),
+    [calendarSource?.attendances, calendarSource?.leaveRequests, selectedDate, selectedDoctorScheduleEvents],
+  )
+
+  const scheduledDoctorCount = useMemo(
+    () => new Set(doctorScheduleAvailability.map((item) => item.schedule.staffId)).size,
+    [doctorScheduleAvailability],
+  )
+  const checkedInDoctorCount = useMemo(
+    () => new Set(doctorScheduleAvailability.filter((item) => item.attendance?.checkIn).map((item) => item.schedule.staffId)).size,
+    [doctorScheduleAvailability],
+  )
+  const doctorOnLeaveCount = useMemo(
+    () => new Set(doctorScheduleAvailability.filter((item) => item.leaveRequest).map((item) => item.schedule.staffId)).size,
+    [doctorScheduleAvailability],
+  )
+  const doctorRows = useMemo(
+    () => (calendarSource?.staffRows || []).filter((staff) => String(staff.type) === "DOCTOR" && (!doctorFilter || String(staff.id) === doctorFilter)),
+    [calendarSource?.staffRows, doctorFilter],
+  )
+  const doctorRowStatuses = useMemo(() => {
+    const statusByStaffId = new Map<string, DoctorTimelineRowStatus>()
+    const isFutureDate = selectedDate.startOf("day").isAfter(clinicNow().startOf("day"))
+    doctorScheduleAvailability.forEach(({ schedule, attendance }) => {
+      if (!schedule.staffId) return
+      statusByStaffId.set(String(schedule.staffId), isFutureDate ? "future" : attendance?.checkIn ? "present" : "absent")
+    })
+    return statusByStaffId
+  }, [doctorScheduleAvailability, selectedDate])
 
   const doctorOptions = useMemo(
     () =>
@@ -341,11 +384,13 @@ export function CalendarPage() {
                 <StaffDayCalendar
                   events={calendarEvents}
                   selectedDate={selectedDate}
-                  staffRows={calendarSource?.staffRows || []}
+                  staffRows={doctorRows}
+                  rowStatuses={doctorRowStatuses}
                   onEventClick={openQuickEdit}
                   onEventMove={(event, start, staffId) => void updateAppointmentFromTimeline(event, start, staffId)}
                   onEventResize={(event, start, end) => void updateAppointmentFromTimeline(event, start, event.doctorStaffId || event.staffId, end)}
                   onTimeSelect={(staffId, start) => openBookingAtTimelineSlot(staffId, start)}
+                  onOpenDoctor={(staffId) => navigate(`/staff/${staffId}/full`)}
                 />
               ) : (
                 <FullCalendar
@@ -376,6 +421,7 @@ export function CalendarPage() {
                   eventResize={(arg) => void handleEventTimeChange(arg)}
                 />
               )}
+              {calendarLoading ? <div className="calendar-loading-overlay"><Spin size="large" tip="Đang tải lịch..." /></div> : null}
             </div>
           </Card>
         </div>
@@ -386,24 +432,24 @@ export function CalendarPage() {
               <div className="calendar-summary-grid">
                 <div className="calendar-summary-card">
                   <Typography.Text type="secondary">Booking trong ngày</Typography.Text>
-                  <Typography.Title level={3}>{countsForSelectedDay.appointment}</Typography.Title>
+                  <Typography.Title level={3}>{selectedBookingEvents.length}</Typography.Title>
                 </div>
                 <div className="calendar-summary-card">
-                  <Typography.Text type="secondary">Ca làm trong ngày</Typography.Text>
-                  <Typography.Title level={3}>{countsForSelectedDay.schedule}</Typography.Title>
+                  <Typography.Text type="secondary">Bác sĩ có lịch</Typography.Text>
+                  <Typography.Title level={3}>{scheduledDoctorCount}</Typography.Title>
                 </div>
                 <div className="calendar-summary-card">
-                  <Typography.Text type="secondary">Nhân sự xin nghỉ</Typography.Text>
-                  <Typography.Title level={3}>{countsForSelectedDay.leave}</Typography.Title>
+                  <Typography.Text type="secondary">Bác sĩ đã đến</Typography.Text>
+                  <Typography.Title level={3}>{checkedInDoctorCount}</Typography.Title>
                 </div>
                 <div className="calendar-summary-card">
-                  <Typography.Text type="secondary">Bản ghi chấm công</Typography.Text>
-                  <Typography.Title level={3}>{countsForSelectedDay.attendance}</Typography.Title>
+                  <Typography.Text type="secondary">Bác sĩ nghỉ phép</Typography.Text>
+                  <Typography.Title level={3}>{doctorOnLeaveCount}</Typography.Title>
                 </div>
               </div>
             </Card>
 
-            <Card className="glass-card spacious-card" title={`Chi tiết ngày ${selectedDate.format("DD/MM/YYYY")}`}>
+            <Card className="glass-card spacious-card" title={`Booking ngày ${selectedDate.format("DD/MM/YYYY")}`}>
               {visibleQuickActions.length > 0 ? (
                 <div className="calendar-quick-actions">
                   {visibleQuickActions.map((item) => (
@@ -423,19 +469,12 @@ export function CalendarPage() {
                   ))}
                 </div>
               ) : null}
-              <Space wrap size={[8, 8]} style={{ marginBottom: 12 }}>
-                {EVENT_TYPE_OPTIONS.map((option) => (
-                  <Tag color={EVENT_TYPE_COLOR[option.value]} key={option.value}>
-                    {option.label}: {countsForSelectedDay[option.value]}
-                  </Tag>
-                ))}
-              </Space>
               <List
-                locale={{ emptyText: <Empty description="Ngày này chưa có mục điều phối" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-                dataSource={selectedEvents}
+                locale={{ emptyText: <Empty description="Ngày này chưa có booking" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+                dataSource={selectedBookingEvents}
                 renderItem={(item) => (
                   <List.Item
-                    actions={item.type === "schedule" ? [] : [
+                    actions={[
                       <Button
                         key={`open-${item.id}`}
                         icon={<EyeOutlined />}
@@ -448,12 +487,10 @@ export function CalendarPage() {
                     <List.Item.Meta
                       title={(
                         <Space size={8} wrap>
-                          <Tag color={item.tone}>{EVENT_TYPE_LABEL[item.type]}</Tag>
-                          {item.type === "schedule" ? <span>{item.title}</span> : (
-                            <button className="calendar-event-link" type="button" onClick={() => openQuickEdit(item)}>
-                              {item.title}
-                            </button>
-                          )}
+                          <Tag color={item.tone}>Booking</Tag>
+                          <button className="calendar-event-link" type="button" onClick={() => openQuickEdit(item)}>
+                            {item.title}
+                          </button>
                         </Space>
                       )}
                       description={(
@@ -469,12 +506,12 @@ export function CalendarPage() {
               />
             </Card>
 
-            <Card className="glass-card spacious-card" title="Lịch làm việc nhân sự">
-              {selectedScheduleEvents.length === 0 ? (
-                <Empty description="Chưa có ca làm trong ngày" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            <Card className="glass-card spacious-card" title="Lịch làm việc bác sĩ">
+              {doctorScheduleAvailability.length === 0 ? (
+                <Empty description="Chưa có lịch làm việc của bác sĩ" image={Empty.PRESENTED_IMAGE_SIMPLE} />
               ) : (
                 <div className="calendar-staff-schedule-list">
-                  {selectedScheduleEvents.map((item) => (
+                  {doctorScheduleAvailability.map(({ schedule: item, attendance, leaveRequest }) => (
                     <div
                       key={`schedule-${item.id}`}
                       className="calendar-staff-schedule-card"
@@ -490,14 +527,15 @@ export function CalendarPage() {
                           <strong>{item.staffName || item.title}</strong>
                           <span>{item.shiftLabel || "Ca làm"}</span>
                         </div>
-                        <Tag color={item.staffType === "DOCTOR" ? "green" : "blue"}>
-                          {item.staffType === "DOCTOR" ? "Bác sĩ" : "Nhân viên"}
+                        <Tag color={leaveRequest ? "orange" : attendance?.checkIn ? "green" : "default"}>
+                          {leaveRequest ? "Nghỉ phép" : attendance?.checkIn ? `Đã đến ${formatAttendanceTime(attendance.checkIn)}` : "Chưa đến"}
                         </Tag>
                       </div>
                       <div className="calendar-staff-schedule-card__meta">
                         <span>{formatEventTime(item.start, item.end)}</span>
+                        <span>{formatWorkDuration(item.start, item.end)}</span>
                         {item.roomName ? <span>{item.roomName}</span> : null}
-                        <span>{item.statusLabel}</span>
+                        {leaveRequest ? <span>{getFieldLabel("leave-requests", "status", String(leaveRequest.status || "approved"))}</span> : null}
                       </div>
                     </div>
                   ))}
@@ -779,18 +817,22 @@ function StaffDayCalendar({
   events,
   selectedDate,
   staffRows,
+  rowStatuses,
   onEventClick,
   onEventMove,
   onEventResize,
   onTimeSelect,
+  onOpenDoctor,
 }: {
   events: PlannerEvent[]
   selectedDate: Dayjs
   staffRows: Record<string, any>[]
+  rowStatuses: Map<string, DoctorTimelineRowStatus>
   onEventClick: (event: PlannerEvent) => void
   onEventMove: (event: PlannerEvent, start: number, staffId: string) => void
   onEventResize: (event: PlannerEvent, start: number, end: number) => void
   onTimeSelect: (staffId: string, start: number) => void
+  onOpenDoctor: (staffId: string) => void
 }) {
   const dayEvents = events.filter((event) => parseClinicDateTime(event.start).isSame(selectedDate, "day"))
   const staff = [...staffRows]
@@ -804,16 +846,25 @@ function StaffDayCalendar({
 
   const hasUnassignedBookings = dayEvents.some((event) => !event.doctorStaffId && !event.staffId)
   const groups = [
-    ...staff.map((item) => ({
-      id: String(item.id),
-      title: (
-        <span className="staff-timeline-person">
+    ...staff.map((item) => {
+      const status = rowStatuses.get(String(item.id))
+      return {
+        id: String(item.id),
+        status,
+        title: (
+        <button
+          aria-label={`Mở hồ sơ ${staffDayDisplayName(item)}`}
+          className={`staff-timeline-person${status ? ` staff-timeline-person--${status}` : ""}`}
+          onClick={(event) => { event.stopPropagation(); onOpenDoctor(String(item.id)) }}
+          type="button"
+        >
           <Avatar icon={<TeamOutlined />} size={28} src={item.avatarUrl ? resolveFileUrl(String(item.avatarUrl)) : undefined} />
           <span className="staff-timeline-person__copy"><strong>{staffDayDisplayName(item)}</strong><small>{String(item.type) === "DOCTOR" ? "Bác sĩ" : "Nhân viên"}</small></span>
-        </span>
+        </button>
       ),
-    })),
-    ...(hasUnassignedBookings ? [{ id: "__unassigned__", title: "Chưa phân công" }] : []),
+      }
+    }),
+    ...(hasUnassignedBookings ? [{ id: "__unassigned__", status: undefined as DoctorTimelineRowStatus | undefined, title: "Chưa phân công" }] : []),
   ]
   const items = dayEvents.map((event) => {
     const start = parseClinicDateTime(event.start)
@@ -843,6 +894,7 @@ function StaffDayCalendar({
           defaultTimeStart={dayStart}
           dragSnap={15 * 60 * 1000}
           groups={groups}
+          horizontalLineClassNamesForGroup={(group) => group.status ? [`staff-day-timeline__row--${group.status}`] : []}
           itemHeightRatio={0.76}
           items={items}
           lineHeight={64}
@@ -1458,6 +1510,54 @@ function buildAttendanceStart(item: Record<string, any>) {
   if (!item.checkIn) return `${dateValue}T00:00`
   const normalizedCheckIn = String(item.checkIn).slice(0, 5)
   return `${dateValue}T${normalizedCheckIn}`
+}
+
+function getDoctorScheduleAvailability({
+  schedules,
+  attendances,
+  leaveRequests,
+  selectedDate,
+}: {
+  schedules: PlannerEvent[]
+  attendances: Record<string, any>[]
+  leaveRequests: Record<string, any>[]
+  selectedDate: Dayjs
+}): DoctorScheduleAvailability[] {
+  const attendanceByStaffId = new Map(
+    attendances
+      .filter((item) => dayjs(String(item.date || "")).isSame(selectedDate, "day"))
+      .map((item) => [String(item.staffId), item]),
+  )
+  const approvedLeaveByStaffId = new Map(
+    leaveRequests
+      .filter((item) => {
+        const status = String(item.status || "").toLowerCase()
+        const start = dayjs(String(item.startDate || "")).startOf("day")
+        const end = dayjs(String(item.endDate || item.startDate || "")).endOf("day")
+        return status === "approved" && start.isValid() && end.isValid() && !selectedDate.isBefore(start, "day") && !selectedDate.isAfter(end, "day")
+      })
+      .map((item) => [String(item.staffId), item]),
+  )
+
+  return schedules.map((schedule) => ({
+    schedule,
+    attendance: attendanceByStaffId.get(String(schedule.staffId || "")),
+    leaveRequest: approvedLeaveByStaffId.get(String(schedule.staffId || "")),
+  }))
+}
+
+function formatAttendanceTime(value: unknown) {
+  const match = String(value || "").match(/(?:T|\s)?(\d{1,2}:\d{2})/)
+  return match?.[1] || ""
+}
+
+function formatWorkDuration(start: string, end?: string) {
+  if (!end) return "Chưa xác định thời lượng"
+  const minutes = parseClinicDateTime(end).diff(parseClinicDateTime(start), "minute")
+  if (minutes <= 0) return "Chưa xác định thời lượng"
+  const hours = Math.floor(minutes / 60)
+  const remainder = minutes % 60
+  return remainder ? `${hours} giờ ${remainder} phút` : `${hours} giờ`
 }
 
 function customerDisplayName(record?: Record<string, any>, fallback?: unknown) {

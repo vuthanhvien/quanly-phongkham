@@ -1260,6 +1260,10 @@ export class StockBatch extends ConfigurableEntity {
   @Column()
   branchId: string;
 
+  // Optional sub-location within a branch: main store, procedure room, dental chair, etc.
+  @Column({ nullable: true })
+  storageLocation?: string;
+
   @Column({ nullable: true })
   supplierId?: string;
 
@@ -1910,6 +1914,10 @@ export class AppUiSetting {
   @Column({ default: false })
   hasCustomModuleSelection: boolean;
 
+  /** Progressive clinical/inventory capabilities. All advanced flows are off by default. */
+  @Column({ type: 'simple-json', nullable: true })
+  clinicFeatures?: { profile?: string; lotTracking?: boolean; procedureSupply?: boolean; stockLocations?: boolean; returnAndWaste?: boolean };
+
   @Column({ default: 'Clinic CMS' })
   appName: string;
 
@@ -2431,6 +2439,72 @@ export class StaffTraining extends ConfigurableEntity {
   files?: Array<Record<string, unknown>>;
 }
 
+/** A purchased subscription or perpetual software licence pool (e.g. Microsoft 365, Adobe, Figma). */
+@Entity('software_licenses')
+export class SoftwareLicense extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  name: string;
+
+  @Column()
+  provider: string;
+
+  @Column({ nullable: true })
+  plan?: string;
+
+  @Column({ type: 'int', default: 1 })
+  seatCount: number;
+
+  @Column({ type: 'float', nullable: true })
+  cost?: number;
+
+  @Column({ default: 'VND' })
+  currency: string;
+
+  @Column({ type: 'date', nullable: true })
+  purchasedAt?: string;
+
+  @Column({ type: 'date', nullable: true })
+  renewalDate?: string;
+
+  @Column({ default: 'ACTIVE' })
+  status: string; // ACTIVE | EXPIRED | CANCELLED
+
+  @Column({ nullable: true })
+  contractNumber?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+/** A specific seat granted to one employee. Credentials are deliberately not stored here. */
+@Entity('software_license_assignments')
+@Index(['softwareLicenseId', 'staffId'], { unique: true })
+export class SoftwareLicenseAssignment extends ConfigurableEntity {
+  @Column()
+  softwareLicenseId: string;
+
+  @Column()
+  staffId: string;
+
+  @Column({ nullable: true })
+  accountEmail?: string;
+
+  @Column({ type: 'date' })
+  assignedAt: string;
+
+  @Column({ type: 'date', nullable: true })
+  revokedAt?: string;
+
+  @Column({ default: 'ACTIVE' })
+  status: string; // PENDING | ACTIVE | REVOKED
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
 @Entity('performance_reviews')
 export class PerformanceReview extends ConfigurableEntity {
   @Column()
@@ -2501,7 +2575,9 @@ export class KpiAssignment extends ConfigurableEntity {
   @Column() cycleId: string;
   @Column() metricId: string;
   /** Reference to the canonical employee profile. */
-  @Column() staffId: string;
+  @Column({ nullable: true }) staffId?: string;
+  /** Reference to the canonical department profile for department-level KPIs. */
+  @Column({ nullable: true }) departmentId?: string;
   /** Denormalized for fast KPI reporting and preserving historical display names. */
   @Column() assigneeId: string;
   @Column() assigneeName: string;
@@ -2524,6 +2600,21 @@ export class KpiCheckin extends ConfigurableEntity {
   @Column({ type: 'float' }) actualValue: number;
   @Column({ type: 'text', nullable: true }) comment?: string;
   @Column({ nullable: true }) checkedInById?: string;
+  @Column({ type: 'simple-json', nullable: true }) sourceSnapshot?: Record<string, unknown>;
+}
+
+/** Immutable source rows captured by a system KPI synchronization. */
+@Entity('kpi_checkin_records')
+@Index(['checkinId', 'sourceRecordId'])
+export class KpiCheckinRecord extends ConfigurableEntity {
+  @Column() checkinId: string;
+  @Column() source: string;
+  @Column() sourceRecordId: string;
+  @Column({ nullable: true }) referenceCode?: string;
+  @Column({ type: 'date', nullable: true }) recordDate?: string;
+  @Column({ type: 'text', nullable: true }) description?: string;
+  @Column({ type: 'float', default: 0 }) actualValue: number;
+  @Column({ type: 'simple-json', nullable: true }) sourceSnapshot?: Record<string, unknown>;
 }
 
 @Entity('position_histories')
@@ -3441,11 +3532,14 @@ export const ENTITIES = [
   CustomerAppSetting,
   StaffReward,
   StaffTraining,
+  SoftwareLicense,
+  SoftwareLicenseAssignment,
   PerformanceReview,
   KpiCycle,
   KpiMetric,
   KpiAssignment,
   KpiCheckin,
+  KpiCheckinRecord,
   PositionHistory,
   WorkContract,
   StaffInsurance,

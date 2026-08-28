@@ -10,6 +10,8 @@ import {
   Department,
   LeaveRequest,
   PaymentRequest,
+  SoftwareLicense,
+  SoftwareLicenseAssignment,
   Staff,
   User,
   WorkflowAction,
@@ -23,9 +25,10 @@ type WorkflowTargetResource =
   | 'leave-requests'
   | 'attendance-adjustment-requests'
   | 'business-trip-requests'
-  | 'payment-requests';
+  | 'payment-requests'
+  | 'software-license-assignments';
 
-type TargetRecord = LeaveRequest | AttendanceAdjustmentRequest | BusinessTripRequest | PaymentRequest;
+type TargetRecord = LeaveRequest | AttendanceAdjustmentRequest | BusinessTripRequest | PaymentRequest | SoftwareLicenseAssignment;
 type WorkflowAssignee = { userId?: string; staffId?: string };
 
 const DEFAULT_WORKFLOWS: Array<{
@@ -69,6 +72,16 @@ const DEFAULT_WORKFLOWS: Array<{
         { name: 'Kế toán/Admin xác nhận', approverType: 'ROLE', approverRoleKey: 'ADMIN', boardX: 150, boardY: 0, stateKey: 'accounting_review', stateLabel: 'Chờ kế toán xác nhận' },
       ],
     },
+    {
+      code: 'software-license-assignment-default',
+      name: 'Duyệt cấp phát bản quyền phần mềm',
+      targetResource: 'software-license-assignments',
+      description: 'Leader xác nhận nhu cầu, sau đó IT/Admin cấp seat phần mềm cho nhân viên.',
+      steps: [
+        { name: 'Leader xác nhận nhu cầu', approverType: 'EMPLOYEE_LEADER', boardX: -150, boardY: 0, stateKey: 'PENDING_MANAGER', stateLabel: 'Chờ Leader duyệt' },
+        { name: 'IT/Admin cấp seat', approverType: 'ROLE', approverRoleKey: 'ADMIN', boardX: 150, boardY: 0, stateKey: 'PENDING_IT', stateLabel: 'Chờ IT/Admin cấp' },
+      ],
+    },
   ];
 
 @Injectable()
@@ -81,6 +94,8 @@ export class WorkflowService {
     @InjectRepository(Department) private readonly departments: Repository<Department>,
     @InjectRepository(LeaveRequest) private readonly leaveRequests: Repository<LeaveRequest>,
     @InjectRepository(PaymentRequest) private readonly paymentRequests: Repository<PaymentRequest>,
+    @InjectRepository(SoftwareLicense) private readonly softwareLicenses: Repository<SoftwareLicense>,
+    @InjectRepository(SoftwareLicenseAssignment) private readonly softwareLicenseAssignments: Repository<SoftwareLicenseAssignment>,
     @InjectRepository(Staff) private readonly staff: Repository<Staff>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(WorkflowAction) private readonly actions: Repository<WorkflowAction>,
@@ -100,10 +115,10 @@ export class WorkflowService {
           name: config.name,
           targetResource: config.targetResource,
           description: config.description,
-          submitStatuses: ['pending', 'submitted'],
-          approvedStatus: 'approved',
-          rejectedStatus: 'rejected',
-          cancelledStatus: 'cancelled',
+          submitStatuses: config.targetResource === 'software-license-assignments' ? ['PENDING'] : ['pending', 'submitted'],
+          approvedStatus: config.targetResource === 'software-license-assignments' ? 'ACTIVE' : 'approved',
+          rejectedStatus: config.targetResource === 'software-license-assignments' ? 'REJECTED' : 'rejected',
+          cancelledStatus: config.targetResource === 'software-license-assignments' ? 'CANCELLED' : 'cancelled',
           isActive: true,
         }));
         created.push(definition);
@@ -339,7 +354,7 @@ export class WorkflowService {
   }
 
   private isWorkflowResource (resource: string): resource is WorkflowTargetResource {
-    return ['leave-requests', 'attendance-adjustment-requests', 'business-trip-requests', 'payment-requests'].includes(resource);
+    return ['leave-requests', 'attendance-adjustment-requests', 'business-trip-requests', 'payment-requests', 'software-license-assignments'].includes(resource);
   }
 
   private resolveRequesterStaffId (record: Record<string, unknown>, user?: AuthUser) {
@@ -451,6 +466,9 @@ export class WorkflowService {
     if (status === 'approved') {
       patch.approvedById = user.staffId || user.id;
     }
+    if (status === 'approved' && instance.targetResource === 'software-license-assignments' && finalStatus === 'ACTIVE') {
+      await this.assertSoftwareLicenseSeatAvailable(record as SoftwareLicenseAssignment);
+    }
     await repo.save(patch);
     if (status === 'approved' && instance.targetResource === 'attendance-adjustment-requests') {
       await this.applyAttendanceAdjustment(record as AttendanceAdjustmentRequest);
@@ -504,10 +522,24 @@ export class WorkflowService {
       'attendance-adjustment-requests': this.attendanceAdjustments,
       'business-trip-requests': this.businessTrips,
       'payment-requests': this.paymentRequests,
+      'software-license-assignments': this.softwareLicenseAssignments,
     };
     const repo = map[resource];
     if (!repo) throw new BadRequestException('Loại đơn chưa hỗ trợ workflow');
     return repo;
+  }
+
+  private async assertSoftwareLicenseSeatAvailable(assignment: SoftwareLicenseAssignment) {
+    const license = await this.softwareLicenses.findOne({ where: { id: assignment.softwareLicenseId, isArchived: false } });
+    if (!license || license.status !== 'ACTIVE') {
+      throw new BadRequestException('Gói bản quyền không tồn tại hoặc không còn hoạt động');
+    }
+    const usedSeats = await this.softwareLicenseAssignments.count({
+      where: { softwareLicenseId: license.id, status: 'ACTIVE', isArchived: false },
+    });
+    if (usedSeats >= license.seatCount) {
+      throw new BadRequestException(`Gói bản quyền đã hết seat (${usedSeats}/${license.seatCount}). Không thể hoàn tất phê duyệt.`);
+    }
   }
 
   private async loadTargetRecords (instances: WorkflowInstance[]) {

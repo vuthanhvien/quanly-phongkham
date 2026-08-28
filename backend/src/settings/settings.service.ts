@@ -10,6 +10,7 @@ import { defaultCodeFormula } from '../common/code-generation';
 import { AppUiSetting, BranchRoleAssignment, ChatbotSetting, CodeGenerationSetting, CustomerAppSetting, CustomFieldDefinition, CustomTable, CustomTableColumn, CustomTableRow, DynamicRoleDefinition, GoogleDriveConnection, ItemCategory, LandingDomain, LandingForm, LandingFormSubmission, LandingGlobalSetting, LandingPage, LandingThemeSetting, PrintTemplate, Product, Unit, User, ViewSetting } from '../entities/entities';
 import { generateLandingThemeCss, THEME_PRESETS } from './landing-theme';
 import { RecordsService } from '../records/records.service';
+import { SeedService } from '../seed/seed.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
 import { createGoogleDriveOAuthState } from '../tenant/google-drive-oauth-state';
 import { renderDocxTemplate } from './docx-template';
@@ -250,6 +251,7 @@ export class SettingsService {
     @InjectRepository(ItemCategory) private readonly itemCategories: Repository<ItemCategory>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
     private readonly records: RecordsService,
+    private readonly seed: SeedService,
     private readonly tenantContext: TenantContextService,
   ) {}
 
@@ -697,7 +699,9 @@ export class SettingsService {
   }
 
   async listCustomTables(user?: AuthUser, includeRows = false) {
-    this.assertSettingsAccess(user);
+    // Dynamic-table values are lookup data used by ordinary record forms.
+    // Reading them must not require ADMIN; write operations remain restricted.
+    this.assertResourceReadable(user, 'custom-tables');
     const tables = await this.customTables.find({ where: { isArchived: false }, order: { name: 'ASC' } });
     const tableIds = tables.map((item) => item.id);
     const [columns, rows] = tables.length ? await Promise.all([
@@ -740,7 +744,7 @@ export class SettingsService {
   }
 
   async listCustomTableRows(tableId: string, user?: AuthUser) {
-    this.assertSettingsAccess(user);
+    this.assertResourceReadable(user, 'custom-tables');
     await this.getCustomTable(tableId);
     return this.customTableRows.find({ where: { tableId, isArchived: false }, order: { createdAt: 'DESC' } });
   }
@@ -1023,6 +1027,11 @@ export class SettingsService {
     }
 
     return { companyType: normalizedType, created };
+  }
+
+  async seedAllDemoData(user?: AuthUser) {
+    this.assertSettingsAccess(user);
+    return this.seed.seedAllDemoData();
   }
 
   async getChatbotSettings(user?: AuthUser) {
@@ -2002,6 +2011,13 @@ export class SettingsService {
     const companyType = this.normalizeCompanyType(payload.companyType ?? fallback?.companyType ?? 'clinic');
     const enabledModules = this.normalizeEnabledModules(payload.enabledModules ?? fallback?.enabledModules ?? []);
     const hasCustomModuleSelection = payload.hasCustomModuleSelection ?? fallback?.hasCustomModuleSelection ?? false;
+    const clinicFeatures = {
+      profile: 'aesthetic-procedure',
+      lotTracking: true,
+      procedureSupply: true,
+      stockLocations: true,
+      returnAndWaste: true,
+    };
     const appName = String(payload.appName ?? fallback?.appName ?? 'Clinic CMS').trim();
     if (!appName) {
       throw new BadRequestException('appName là bắt buộc');
@@ -2062,6 +2078,7 @@ export class SettingsService {
       companyType,
       enabledModules,
       hasCustomModuleSelection: Boolean(hasCustomModuleSelection),
+      clinicFeatures,
       appName,
       appDescription,
       appIconUrl,
@@ -2199,6 +2216,7 @@ export class SettingsService {
       current.companyType !== next.companyType ||
       JSON.stringify(current.enabledModules || []) !== JSON.stringify(next.enabledModules || []) ||
       current.hasCustomModuleSelection !== next.hasCustomModuleSelection ||
+      JSON.stringify(current.clinicFeatures || {}) !== JSON.stringify(next.clinicFeatures || {}) ||
       current.appName !== next.appName ||
       current.appDescription !== next.appDescription ||
       current.appIconUrl !== next.appIconUrl ||

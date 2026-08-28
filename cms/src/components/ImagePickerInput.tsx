@@ -1,7 +1,8 @@
 import { PictureOutlined, SearchOutlined } from "@ant-design/icons"
 import { Button, Flex, Input, Modal, Spin, Tooltip, Typography } from "antd"
 import { useEffect, useRef, useState } from "react"
-import { api, resolveFileUrl } from "../api"
+import { resolveFileUrl } from "../api"
+import { loadFileLibraryRows } from "../relations"
 
 interface FileRecord {
   id: string
@@ -37,8 +38,7 @@ export function ImagePickerInput({ value = "", onChange, placeholder = "https://
     if (loaded.current) return
     setLoading(true)
     try {
-      const res = await api.get("/records/files", { params: { pageSize: 500 } })
-      const all = (res.data.data || []) as FileRecord[]
+      const all = await loadFileLibraryRows(500) as unknown as FileRecord[]
       setFiles(all.filter(isImage))
       loaded.current = true
     } finally {

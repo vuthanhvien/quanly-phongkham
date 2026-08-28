@@ -5,9 +5,9 @@ import {
   PictureOutlined,
   SendOutlined,
 } from "@ant-design/icons"
-import { Avatar, Button, Card, Image, Input, Modal, Popconfirm, Select, Space, Tabs, Tag, Typography, Upload, message } from "antd"
+import { Avatar, Button, Card, Empty, Image, Input, Modal, Popconfirm, Select, Space, Spin, Tabs, Tag, Typography, Upload, message } from "antd"
 import type { UploadFile } from "antd"
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useEffect } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -36,6 +36,8 @@ export function CompanyFeed({ currentUser = "Bạn", currentUserId }: { currentU
   const canDelete = hasActionAccess("company-feed", "delete")
   const [posts, setPosts] = useState<FeedPost[]>([])
   const [feedFilter, setFeedFilter] = useState<FeedFilter>("all")
+  const [feedLoading, setFeedLoading] = useState(true)
+  const feedRequestId = useRef(0)
   const [content, setContent] = useState("")
   const [audience, setAudience] = useState<Audience>("company")
   const [files, setFiles] = useState<UploadFile[]>([])
@@ -77,13 +79,17 @@ export function CompanyFeed({ currentUser = "Bạn", currentUserId }: { currentU
   }, [content])
 
   async function loadFeed(silent = false) {
+    const requestId = ++feedRequestId.current
+    setFeedLoading(true)
     try {
       const response = await api.get('/feed', { params: feedFilter === "all" ? undefined : { audience: feedFilter } })
-      setPosts(response.data.data || [])
+      if (requestId === feedRequestId.current) setPosts(response.data.data || [])
       return true
     } catch {
       if (!silent) message.error('Không thể tải Feed')
       return false
+    } finally {
+      if (requestId === feedRequestId.current) setFeedLoading(false)
     }
   }
   async function publish() {
@@ -150,7 +156,9 @@ export function CompanyFeed({ currentUser = "Bạn", currentUserId }: { currentU
       onChange={(key) => setFeedFilter(key as FeedFilter)}
     />
     <div className="feed-stream">
-      {posts.map((post) => <Card className="feed-post" key={post.id} bordered={false}>
+      {feedLoading ? <div className="feed-state"><Spin tip="Đang tải bài viết..." /></div> : null}
+      {!feedLoading && posts.length === 0 ? <div className="feed-state"><Empty description={feedFilter === "all" ? "Chưa có bài viết nào" : `Chưa có bài viết cho mục ${feedFilterItems.find((item) => item.key === feedFilter)?.label.toLowerCase()}`} /></div> : null}
+      {!feedLoading && posts.map((post) => <Card className="feed-post" key={post.id} bordered={false}>
         <div className="feed-post__head"><Avatar className="feed-avatar" src={post.authorAvatarUrl ? resolveFileUrl(post.authorAvatarUrl) : undefined}>{post.authorName.slice(0, 2).toUpperCase()}</Avatar><div><Typography.Text strong>{post.authorName}</Typography.Text><Typography.Text className="feed-post__meta">{new Date(post.createdAt).toLocaleString('vi-VN')} · <Tag>{audienceLabels[post.audience]}</Tag></Typography.Text></div>{post.authorId === currentUserId && canDelete ? <Popconfirm title="Xóa bài viết này?" okText="Xóa" cancelText="Hủy" onConfirm={() => void removePost(post.id)}><Button className="feed-delete" danger size="small" type="text">Xóa</Button></Popconfirm> : null}</div>
         {post.content ? <FeedPostContent content={post.content} /> : null}
         {post.linkPreview ? <FeedLinkPreview preview={post.linkPreview} /> : null}

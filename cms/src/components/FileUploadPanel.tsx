@@ -4,6 +4,7 @@ import type { UploadFile, UploadProps } from "antd"
 import { useEffect, useState } from "react"
 import { api } from "../api"
 import { buildFolderTree, FolderTreeNode, normalizeFileFolderRows } from "../utils/fileFolders"
+import { invalidateMasterDataCache } from "../utils/masterDataCache"
 
 interface UploadedFileRecord {
   id: string
@@ -94,6 +95,7 @@ export function FileUploadPanel({
       })
       const response = await api.post("/records/files/upload", formData)
       const uploaded = Array.isArray(response.data.data) ? response.data.data : [response.data.data]
+      invalidateMasterDataCache("file-library:")
       message.success(`Đã upload ${uploaded.length} file`)
       setSelectedFiles([])
       setFileList([])
@@ -115,6 +117,7 @@ export function FileUploadPanel({
         isActive: true,
       })
       const createdFolder = response.data.data as { id: string }
+      invalidateMasterDataCache("relation:file-folders:")
       await loadFolders()
       form.setFieldValue("folderId", createdFolder.id)
       createFolderForm.resetFields()

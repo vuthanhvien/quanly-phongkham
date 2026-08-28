@@ -163,8 +163,8 @@ export async function loadRelationOptions(fields: Array<string | FieldSpec>, opt
 }
 
 export async function loadFileLookupMap(pageSize = 500) {
-  const response = await api.get('/records/files', { params: { pageSize } }).catch(() => ({ data: { data: [] } }));
-  const entries = (response.data.data || []).map((row: Record<string, unknown>) => [
+  const rows = await loadFileLibraryRows(pageSize)
+  const entries = rows.map((row: Record<string, unknown>) => [
     String(row.id),
     {
       id: String(row.id),
@@ -176,6 +176,15 @@ export async function loadFileLookupMap(pageSize = 500) {
     } satisfies FileLookupItem,
   ] as const);
   return Object.fromEntries(entries) as FileLookupMap;
+}
+
+export async function loadFileLibraryRows(pageSize = 500) {
+  const responseData = await getCachedMasterData(
+    `file-library:${pageSize}`,
+    () => api.get('/records/files', { params: { pageSize } }).then((response) => response.data).catch(() => ({ data: [] })),
+    2 * 60 * 1000,
+  )
+  return (responseData.data || []) as Array<Record<string, unknown>>
 }
 
 export function hasFileField(fields: FieldSpec[]) {

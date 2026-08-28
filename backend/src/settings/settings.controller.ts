@@ -221,6 +221,11 @@ export class SettingsController {
     return { data: await this.settings.initializeIndustryData(payload?.companyType, request?.user) };
   }
 
+  @Post('demo-data/seed-all')
+  async seedAllDemoData(@Request() request?: { user: AuthUser }) {
+    return { data: await this.settings.seedAllDemoData(request?.user) };
+  }
+
   @Get('google-drive')
   async googleDrive(@Request() request?: { user: AuthUser }) {
     return { data: await this.settings.getGoogleDriveConnection(request?.user) };

@@ -65,6 +65,8 @@ export const appModuleGroups: AppModuleGroup[] = [
       "leave-types",
       "staff-rewards",
       "staff-trainings",
+      "software-licenses",
+      "software-license-assignments",
       "performance-reviews",
       "kpi",
       "position-histories",
@@ -515,7 +517,7 @@ export function resolveEnabledModules(
   if (hasCustomModuleSelection) return Array.from(new Set([...normalized, "services", "doctors", "videos"]))
   // Customer app management is a shared User site capability for every
   // industry preset, including tenants created before this module existed.
-  return Array.from(new Set([...companyTypeModulePresets[companyType], "customer-app", "company-feed", "services", "doctors", "videos", "kpi"]))
+  return Array.from(new Set([...companyTypeModulePresets[companyType], "customer-app", "company-feed", "services", "doctors", "videos", "kpi", "software-licenses", "software-license-assignments"]))
 }
 
 export function isModuleEnabled(moduleKey: string, enabledModules: unknown, companyType: CompanyType, hasCustomModuleSelection = false) {

@@ -67,6 +67,8 @@ import {
   StaffInsurance,
   StaffReward,
   StaffTraining,
+  SoftwareLicense,
+  SoftwareLicenseAssignment,
   StockBatch,
   Supplier,
   Task,
@@ -131,7 +133,7 @@ type RequestContext = {
   get?: (name: string) => string | undefined;
 };
 
-type BundleRootResource = 'customers' | 'leads' | 'staff';
+type BundleRootResource = 'customers' | 'leads' | 'staff' | 'products' | 'stock-batches' | 'service-orders';
 type WorkScheduleRecurrenceType = 'NONE' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
 
 type ImportBundleSheetConfig = {
@@ -144,9 +146,12 @@ type ImportBundleSheetConfig = {
   customFields?: Array<Pick<CustomFieldDefinition, 'key' | 'dataType' | 'relationResource' | 'options'>>;
 };
 
+type ImportBundleCommitMode = 'records' | 'product-combo' | 'stock-receipt' | 'service-order';
+
 const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
   main: ImportBundleSheetConfig;
   related: ImportBundleSheetConfig[];
+  commitMode?: ImportBundleCommitMode;
 }> = {
   customers: {
     main: {
@@ -315,6 +320,48 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
       },
     ],
   },
+  products: {
+    commitMode: 'product-combo',
+    main: {
+      sheetName: 'products',
+      resource: 'products',
+      columns: ['code', 'name', 'barcode', 'productType', 'categoryId', 'baseUnitId', 'sellingPrice', 'minStockLevel'],
+    },
+    related: [{
+      sheetName: 'product-combo-items',
+      resource: 'product-combo-items',
+      parentCodeColumn: 'productCode',
+      columns: ['productCode', 'componentProductCode', 'quantity'],
+    }],
+  },
+  'stock-batches': {
+    commitMode: 'stock-receipt',
+    main: {
+      sheetName: 'stock-batches',
+      resource: 'stock-batches',
+      columns: ['code', 'movementType', 'movementDate', 'branchId', 'storageLocation', 'procedureReference', 'supplierId', 'note'],
+    },
+    related: [{
+      sheetName: 'stock-batch-items',
+      resource: 'stock-batch-items',
+      parentCodeColumn: 'receiptCode',
+      columns: ['receiptCode', 'productCode', 'batchNumber', 'expiryDate', 'quantity', 'transferUnitId', 'supplierId'],
+    }],
+  },
+  'service-orders': {
+    commitMode: 'service-order',
+    main: {
+      sheetName: 'service-orders',
+      resource: 'service-orders',
+      columns: ['code', 'customerCode', 'branchId', 'orderDate', 'performerStaffId', 'status', 'note'],
+    },
+    related: [{
+      sheetName: 'service-order-items',
+      resource: 'service-order-items',
+      parentCodeColumn: 'orderCode',
+      columns: ['orderCode', 'productCode', 'quantity', 'transferUnitId', 'unitPrice'],
+    }],
+  },
 };
 
 const FIELD_RELATION_RESOURCES: Record<string, string> = {
@@ -330,6 +377,7 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   mentorStaffId: 'staff',
   assignedStaff: 'staff',
   staffId: 'staff',
+  softwareLicenseId: 'software-licenses',
   assignedStaffId: 'staff',
   ownerStaffId: 'staff',
   consultantStaffId: 'staff',
@@ -360,6 +408,7 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   supplierId: 'suppliers',
   productId: 'products',
   baseUnitId: 'units',
+  transferUnitId: 'units',
   folderId: 'file-folders',
   parentId: 'file-folders',
   periodId: 'accounting-periods',
@@ -524,6 +573,8 @@ export class RecordsService {
     @InjectRepository(Payroll) private readonly payrolls: Repository<Payroll>,
     @InjectRepository(StaffReward) private readonly staffRewards: Repository<StaffReward>,
     @InjectRepository(StaffTraining) private readonly staffTrainings: Repository<StaffTraining>,
+    @InjectRepository(SoftwareLicense) private readonly softwareLicenses: Repository<SoftwareLicense>,
+    @InjectRepository(SoftwareLicenseAssignment) private readonly softwareLicenseAssignments: Repository<SoftwareLicenseAssignment>,
     @InjectRepository(PerformanceReview) private readonly performanceReviews: Repository<PerformanceReview>,
     @InjectRepository(PositionHistory) private readonly positionHistories: Repository<PositionHistory>,
     @InjectRepository(RecordDraft) private readonly recordDrafts: Repository<RecordDraft>,
@@ -590,6 +641,8 @@ export class RecordsService {
       payrolls: this.payrolls,
       'staff-rewards': this.staffRewards,
       'staff-trainings': this.staffTrainings,
+      'software-licenses': this.softwareLicenses,
+      'software-license-assignments': this.softwareLicenseAssignments,
       'performance-reviews': this.performanceReviews,
       'position-histories': this.positionHistories,
     };
@@ -622,6 +675,7 @@ export class RecordsService {
         { key: 'workSchedules', resource: 'work-schedules', parentField: 'staffId' },
         { key: 'staffRewards', resource: 'staff-rewards', parentField: 'staffId' },
         { key: 'staffTrainings', resource: 'staff-trainings', parentField: 'staffId' },
+        { key: 'softwareLicenseAssignments', resource: 'software-license-assignments', parentField: 'staffId' },
         { key: 'performanceReviews', resource: 'performance-reviews', parentField: 'staffId' },
         { key: 'positionHistories', resource: 'position-histories', parentField: 'staffId' },
         { key: 'branchRoleAssignments', resource: 'branch-role-assignments', parentField: 'staffId' },
@@ -776,6 +830,9 @@ export class RecordsService {
   ) {
     await this.assertPermission(user, resource, 'view');
     if (resource === 'leave-types') await this.ensureDefaultLeaveTypes();
+    // Staff codes are the public key used by imports/exports.  Some legacy
+    // records predate automatic code generation and have an empty value.
+    if (resource === 'staff') await this.ensureStaffCodes();
     const repository = this.repository(resource);
     const sortableFields = new Set(repository.metadata.columns.map((column) => column.propertyName));
     const sortField = sort && sortableFields.has(sort) ? sort : 'createdAt';
@@ -789,11 +846,17 @@ export class RecordsService {
       if (!dataScope.viewAll && !dataScope.viewPersonal) {
         throw new ForbiddenException('Bạn không có quyền xem dữ liệu trong phạm vi này');
       }
+      const branchWhere = !dataScope.viewAll && dataScope.viewPersonal
+        ? { ...(includeArchived ? {} : { isArchived }), picId: user?.staffId }
+        : includeArchived ? {} : { isArchived };
+      const branchSearch = String(search || '').trim();
       const [rows, total] = await repository.findAndCount({
-        where: !dataScope.viewAll && dataScope.viewPersonal
-          ? { ...(includeArchived ? {} : { isArchived }), picId: user?.staffId }
-          : includeArchived ? {} : { isArchived },
+        where: branchSearch
+          ? ['name', 'slug'].map((field) => ({ ...branchWhere, [field]: ILike(`%${branchSearch}%`) }))
+          : branchWhere,
         order: { [sortField]: orderDirection },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
       });
       return {
         data: await Promise.all(rows.map((row) => this.protectPasswordFields(resource, this.protect(resource, row, request) as ConfigurableEntity, user))),
@@ -817,6 +880,8 @@ export class RecordsService {
         rooms: ['code', 'name'],
         equipments: ['code', 'name'],
         staff: ['code', 'fullName', 'email', 'phone'],
+        'software-licenses': ['code', 'name', 'provider', 'plan', 'contractNumber', 'status'],
+        'software-license-assignments': ['accountEmail', 'status', 'note'],
         'accounting-periods': ['code', 'name', 'status', 'note'],
         'accounting-chart-accounts': ['accountNumber', 'name', 'shortName', 'accountType', 'legalReference'],
         'accounting-fiscal-settings': ['accountingFramework', 'baseCurrency', 'companyLegalName', 'companyTaxCode'],
@@ -892,6 +957,9 @@ export class RecordsService {
     if (resource === 'projects') {
       hydrated = await this.attachProjectMembersForList(hydrated as Project[]) as unknown as ConfigurableEntity[];
     }
+    if (resource === 'software-licenses') {
+      hydrated = await this.attachSoftwareLicenseUsage(hydrated as SoftwareLicense[]) as unknown as ConfigurableEntity[];
+    }
     return {
       data: await Promise.all(hydrated.map((row) => this.protectPasswordFields(resource, this.protect(resource, row, request) as ConfigurableEntity, user))),
       total,
@@ -917,6 +985,9 @@ export class RecordsService {
     }
     if (resource === 'accounting-vouchers') {
       return this.attachAccountingVoucherLines(hydrated as AccountingVoucher);
+    }
+    if (resource === 'software-licenses') {
+      return (await this.attachSoftwareLicenseUsage([hydrated as SoftwareLicense]))[0];
     }
     return hydrated;
   }
@@ -1025,6 +1096,23 @@ export class RecordsService {
     });
   }
 
+  private async attachSoftwareLicenseUsage(licenses: SoftwareLicense[]) {
+    if (licenses.length === 0) return licenses;
+    const assignments = await this.softwareLicenseAssignments.find({
+      where: { softwareLicenseId: In(licenses.map((license) => license.id)), status: 'ACTIVE', isArchived: false },
+    });
+    const usedByLicense = new Map<string, number>();
+    assignments.forEach((assignment) => usedByLicense.set(
+      assignment.softwareLicenseId,
+      (usedByLicense.get(assignment.softwareLicenseId) || 0) + 1,
+    ));
+    return licenses.map((license) => ({
+      ...license,
+      usedSeats: usedByLicense.get(license.id) || 0,
+      availableSeats: Math.max(0, Number(license.seatCount || 0) - (usedByLicense.get(license.id) || 0)),
+    }));
+  }
+
   async find (resource: string, id: string, user?: AuthUser, request?: RequestContext, include?: string) {
     const record = await this.findRaw(resource, id, include, request);
     await this.assertPermission(user, resource, 'view', this.branchIdOf(resource, record));
@@ -1103,6 +1191,9 @@ export class RecordsService {
 
   async importBundle (resource: string, sheets: Record<string, Array<Record<string, unknown>>>, user: AuthUser) {
     const config = await this.bundleConfig(resource);
+    // The workbook lifecycle is shared for every module. A single commit
+    // function handles the few business-aware bundle modes below.
+    if (config.commitMode !== 'records') return this.commitBundle(config, sheets, user);
     const mainSheetRows = Array.isArray(sheets?.[config.main.sheetName]) ? sheets[config.main.sheetName] : [];
     const parentCache = new Map<string, ConfigurableEntity>();
 
@@ -1132,6 +1223,89 @@ export class RecordsService {
         ],
       },
     };
+  }
+
+  private nonEmptyBundleRows(sheets: Record<string, Array<Record<string, unknown>>>, sheetName: string) {
+    return (Array.isArray(sheets?.[sheetName]) ? sheets[sheetName] : []).filter((row) =>
+      Object.values(row || {}).some((value) => value !== undefined && value !== null && String(value).trim() !== ''),
+    );
+  }
+
+  private async commitBundle(
+    config: { main: ImportBundleSheetConfig; related: ImportBundleSheetConfig[]; commitMode?: ImportBundleCommitMode },
+    sheets: Record<string, Array<Record<string, unknown>>>,
+    user: AuthUser,
+  ) {
+    const headers = this.nonEmptyBundleRows(sheets, config.main.sheetName);
+    const detailConfig = config.related[0];
+    const details = detailConfig ? this.nonEmptyBundleRows(sheets, detailConfig.sheetName) : [];
+    const parentColumn = detailConfig?.parentCodeColumn || 'parentCode';
+    const detailsByParentCode = new Map<string, Array<Record<string, unknown>>>();
+    details.forEach((row) => {
+      const parentCode = String(row[parentColumn] || '').trim();
+      if (!parentCode) throw new BadRequestException(`Sheet ${detailConfig?.sheetName} bắt buộc có cột ${parentColumn}`);
+      detailsByParentCode.set(parentCode, [...(detailsByParentCode.get(parentCode) || []), row]);
+    });
+
+    const resolveItems = async (rows: Array<Record<string, unknown>>, includeBatchFields = false, defaultSupplierId?: unknown) => Promise.all(rows.map(async (row) => {
+      const productCode = String(row.componentProductCode || row.productCode || '').trim();
+      const product = await this.products.findOne({ where: { code: productCode } });
+      if (!product) throw new NotFoundException(`Không tìm thấy SP có mã ${productCode}`);
+      const transferUnitId = row.transferUnitId ? await this.resolveBundleImportValue('transferUnitId', row.transferUnitId) : product.baseUnitId;
+      return includeBatchFields
+        ? { productId: product.id, batchNumber: row.batchNumber, expiryDate: row.expiryDate, quantity: Number(row.quantity || 0), transferUnitId, supplierId: row.supplierId ? await this.resolveBundleImportValue('supplierId', row.supplierId) : defaultSupplierId }
+        : { productId: product.id, quantity: Number(row.quantity || 0), transferUnitId, unitPrice: Number(row.unitPrice ?? product.sellingPrice ?? 0) };
+    }));
+
+    const orderedHeaders = config.commitMode === 'product-combo'
+      ? [...headers.filter((row) => String(row.productType || '').toUpperCase() !== 'COMBO'), ...headers.filter((row) => String(row.productType || '').toUpperCase() === 'COMBO')]
+      : headers;
+    for (const header of orderedHeaders) {
+      const code = String(header.code || '').trim();
+      if (!code) throw new BadRequestException(`Sheet ${config.main.sheetName} bắt buộc có cột code`);
+      const detailRows = detailsByParentCode.get(code) || [];
+      if (config.commitMode === 'product-combo') {
+        const payload = await this.buildBundlePayload(config.main, header);
+        if (String(payload.productType || '').toUpperCase() === 'COMBO') {
+          if (!detailRows.length) throw new BadRequestException(`SP combo ${code} chưa có dòng trên sheet ${detailConfig?.sheetName}`);
+          payload.bundleItems = await resolveItems(detailRows);
+        }
+        await this.importUpsert('products', payload, user);
+        continue;
+      }
+      if (!detailRows.length) throw new BadRequestException(`${config.main.sheetName} ${code} chưa có dòng trên sheet ${detailConfig?.sheetName}`);
+      if (config.commitMode === 'stock-receipt') {
+        if (header.movementType === 'EXPORT' || header.movementType === 'WASTE') throw new BadRequestException('Import nhiều sheet hiện dùng cho phiếu nhập/hoàn kho');
+        const supplierId = header.supplierId ? await this.resolveBundleImportValue('supplierId', header.supplierId) : undefined;
+        await this.receiptStock({ ...header, code, branchId: await this.resolveBundleImportValue('branchId', header.branchId), supplierId, items: await resolveItems(detailRows, true, supplierId) }, user);
+        continue;
+      }
+      const customer = await this.customers.findOne({ where: { code: String(header.customerCode || '').trim() } });
+      if (!customer) throw new NotFoundException(`Không tìm thấy khách hàng có mã ${String(header.customerCode || '').trim()}`);
+      const payload = { code, customerId: customer.id, branchId: await this.resolveBundleImportValue('branchId', header.branchId), orderDate: header.orderDate, performerStaffId: header.performerStaffId ? await this.resolveBundleImportValue('performerStaffId', header.performerStaffId) : undefined, status: header.status, note: header.note, items: await resolveItems(detailRows) } as Record<string, unknown>;
+      const existing = await this.serviceOrders.findOne({ where: { code } });
+      if (existing) await this.update('service-orders', existing.id, payload, user); else await this.create('service-orders', payload, user);
+    }
+    return { data: { resource: config.main.resource, importedSheets: [{ name: config.main.sheetName, count: headers.length }, ...(detailConfig ? [{ name: detailConfig.sheetName, count: details.length }] : [])] } };
+  }
+
+  /** Internal bulk demo generator used by the CMS “seed all” action. */
+  async seedAllDemoBundles(sampleSize = 500) {
+    const systemUser = { id: 'demo-seed-system', role: 'ADMIN', roleMain: 'ADMIN' } as AuthUser;
+    const roots: BundleRootResource[] = ['staff', 'customers', 'leads'];
+    const imported: Array<{ resource: BundleRootResource; sheets: number }> = [];
+
+    for (const resource of roots) {
+      const sheets = await this.buildFakeBundleSheets(resource, undefined, sampleSize);
+      await this.importBundle(
+        resource,
+        Object.fromEntries(sheets.map((sheet) => [sheet.name, sheet.rows])),
+        systemUser,
+      );
+      imported.push({ resource, sheets: sheets.length });
+    }
+
+    return imported;
   }
 
   async importUpsert (resource: string, payload: Record<string, unknown>, user: AuthUser) {
@@ -1183,6 +1357,7 @@ export class RecordsService {
     if (resource === 'leave-requests') await this.prepareLeaveRequest(normalized);
     if (resource === 'work-schedules') return this.saveWorkScheduleSchema(normalized, payload, user);
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
+    if (resource === 'software-license-assignments') await this.ensureSoftwareLicenseSeatAvailable(normalized);
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     if (resource === 'workflow-definitions') await this.releaseArchivedWorkflowCode(String(normalized.code || ''));
     const record = await this.saveRecord(resource, repository.create(normalized), repository);
@@ -1291,6 +1466,7 @@ export class RecordsService {
     if (resource === 'leave-requests') await this.prepareLeaveRequest(normalized, id);
     await this.assertPermission(user, resource, 'update', this.branchIdOf(resource, normalized) || this.branchIdOf(resource, previous));
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized, id);
+    if (resource === 'software-license-assignments') await this.ensureSoftwareLicenseSeatAvailable(normalized, id);
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
     const record = await this.saveRecord(resource, repository.merge(previous, normalized), repository);
@@ -1513,6 +1689,7 @@ export class RecordsService {
     return {
       main: enrichSheet(config.main),
       related: config.related.map(enrichSheet),
+      commitMode: config.commitMode || 'records',
     };
   }
 
@@ -1639,7 +1816,7 @@ export class RecordsService {
     }));
   }
 
-  private async loadBundleReferencePools (config: { main: ImportBundleSheetConfig; related: ImportBundleSheetConfig[] }) {
+  private async loadBundleReferencePools (config: { main: ImportBundleSheetConfig; related: ImportBundleSheetConfig[]; commitMode?: ImportBundleCommitMode }) {
     const relationResources = new Set<string>();
     [config.main, ...config.related].forEach((sheet) => {
       sheet.columns.forEach((column) => {
@@ -2053,6 +2230,9 @@ export class RecordsService {
       customers: 'KH',
       leads: 'LD',
       staff: 'NV',
+      products: 'SP',
+      'stock-batches': 'NK',
+      'service-orders': 'DH',
     };
     return `${prefix[resource]}-IMPORT-${String(index + 1).padStart(3, '0')}`;
   }
@@ -2333,7 +2513,7 @@ export class RecordsService {
     if (!branchId) throw new BadRequestException('Phiếu nhập kho phải có chi nhánh');
     await this.assertPermission(user, 'stock-batches', 'create', branchId);
 
-    const items = await this.normalizeStockReceiptItems(payload.items, branchId, payload.supplierId ? String(payload.supplierId) : undefined);
+    const items = await this.normalizeStockReceiptItems(payload.items, branchId, payload.supplierId ? String(payload.supplierId) : undefined, payload.storageLocation ? String(payload.storageLocation) : undefined);
     const touched: StockBatch[] = [];
 
     for (const item of items) {
@@ -2350,6 +2530,7 @@ export class RecordsService {
       touched.push(await this.stockBatches.save(this.stockBatches.create({
         productId: item.productId,
         branchId: item.branchId,
+        storageLocation: item.storageLocation,
         supplierId: item.supplierId,
         batchNumber: item.batchNumber,
         expiryDate: item.expiryDate,
@@ -2359,10 +2540,12 @@ export class RecordsService {
       })));
     }
 
-    await this.audit(user, 'IMPORT_STOCK', 'stock-batches', touched[0]?.id || branchId, {
+    await this.audit(user, payload.movementType === 'RETURN' ? 'RETURN_STOCK' : 'IMPORT_STOCK', 'stock-batches', touched[0]?.id || branchId, {
       code: String(payload.code || ''),
       movementDate: String(payload.movementDate || ''),
       branchId,
+      storageLocation: payload.storageLocation ? String(payload.storageLocation) : undefined,
+      procedureReference: payload.procedureReference ? String(payload.procedureReference) : undefined,
       supplierId: payload.supplierId ? String(payload.supplierId) : undefined,
       note: payload.note ? String(payload.note) : undefined,
       items: touched.map((item) => ({
@@ -2380,24 +2563,50 @@ export class RecordsService {
 
   async issueStock (payload: Record<string, unknown>, user: AuthUser) {
     await this.assertAnyActionPermission(user, 'stock-batches', ['create', 'update']);
+    const branchId = String(payload.branchId || '');
+    if (!branchId) throw new BadRequestException('Phiếu xuất kho phải có chi nhánh');
+    const storageLocation = String(payload.storageLocation || '').trim();
     const items = await this.normalizeStockIssueItems(payload.items);
     const touched: StockBatch[] = [];
 
     for (const item of items) {
-      const batch = await this.stockBatches.findOne({ where: { id: item.batchId } });
-      if (!batch) throw new NotFoundException('Không tìm thấy lô hàng để xuất kho');
-      await this.assertPermission(user, 'stock-batches', 'update', batch.branchId);
-      const nextQuantity = Number(batch.remainingQuantity || 0) - item.quantity;
-      if (nextQuantity < 0) {
-        throw new BadRequestException(`Lo ${batch.batchNumber} khong du ton de xuat`);
+      const candidateBatches = item.batchId
+        ? [await this.stockBatches.findOne({ where: { id: item.batchId } })]
+        : await this.stockBatches.find({
+          where: { productId: item.productId, branchId, ...(storageLocation ? { storageLocation } : {}), remainingQuantity: MoreThan(0) },
+          order: { expiryDate: 'ASC', createdAt: 'ASC' },
+        });
+      if (candidateBatches.some((batch) => !batch)) throw new NotFoundException('Không tìm thấy lô hàng để xuất kho');
+      if (candidateBatches.some((batch) => batch!.branchId !== branchId)) {
+        throw new BadRequestException('Lô hàng phải thuộc đúng chi nhánh của phiếu xuất');
       }
-      batch.remainingQuantity = nextQuantity;
-      touched.push(await this.stockBatches.save(batch));
+      if (storageLocation && candidateBatches.some((batch) => batch!.storageLocation !== storageLocation)) {
+        throw new BadRequestException('Lô hàng phải thuộc đúng vị trí kho của phiếu xuất');
+      }
+      if ((candidateBatches as StockBatch[]).reduce((total, batch) => total + Number(batch.remainingQuantity || 0), 0) < item.quantity) {
+        const target = item.productId ? 'Sản phẩm' : `Lô ${candidateBatches[0]?.batchNumber || ''}`;
+        throw new BadRequestException(`${target} không đủ tồn để xuất`);
+      }
+      let quantityToIssue = item.quantity;
+      for (const batch of candidateBatches as StockBatch[]) {
+        if (quantityToIssue <= 0) break;
+        await this.assertPermission(user, 'stock-batches', 'update', batch.branchId);
+        const issuedQuantity = Math.min(Number(batch.remainingQuantity || 0), quantityToIssue);
+        batch.remainingQuantity = Number(batch.remainingQuantity || 0) - issuedQuantity;
+        quantityToIssue -= issuedQuantity;
+        touched.push(await this.stockBatches.save(batch));
+      }
+      if (quantityToIssue > 0) {
+        const target = item.productId ? 'Sản phẩm' : `Lô ${candidateBatches[0]?.batchNumber || ''}`;
+        throw new BadRequestException(`${target} không đủ tồn để xuất`);
+      }
     }
 
-    await this.audit(user, 'ISSUE_STOCK', 'stock-batches', touched[0]?.id || String(payload.branchId || ''), {
+    await this.audit(user, payload.movementType === 'WASTE' ? 'WASTE_STOCK' : 'ISSUE_STOCK', 'stock-batches', touched[0]?.id || String(payload.branchId || ''), {
       code: String(payload.code || ''),
       movementDate: String(payload.movementDate || ''),
+      storageLocation: storageLocation || undefined,
+      procedureReference: payload.procedureReference ? String(payload.procedureReference) : undefined,
       note: payload.note ? String(payload.note) : undefined,
       items: touched.map((item) => ({
         id: item.id,
@@ -3618,6 +3827,18 @@ export class RecordsService {
     return `${before}${String(currentMax + 1).padStart(digits, '0')}${after}`;
   }
 
+  private async ensureStaffCodes() {
+    const legacyStaff = await this.staff.find({
+      where: { isArchived: false },
+      select: ['id', 'code'] as (keyof Staff)[],
+    });
+    for (const member of legacyStaff) {
+      if (String(member.code || '').trim()) continue;
+      member.code = await this.generateCode('staff', this.staff);
+      await this.staff.save(member);
+    }
+  }
+
   private async normalize (resource: string, payload: Record<string, unknown>, creating = false) {
     const value = { ...payload };
     delete value.id;
@@ -4417,6 +4638,26 @@ export class RecordsService {
   }
 
   private async validateAccountingResource (resource: string, value: Record<string, unknown>, creating: boolean) {
+    if (resource === 'software-licenses') {
+      if (!String(value.name || '').trim()) throw new BadRequestException('Gói bản quyền bắt buộc có tên');
+      if (!String(value.provider || '').trim()) throw new BadRequestException('Nhà cung cấp bản quyền là bắt buộc');
+      if (!Number.isInteger(Number(value.seatCount)) || Number(value.seatCount) < 1) {
+        throw new BadRequestException('Số lượng seat phải là số nguyên lớn hơn 0');
+      }
+      if (value.renewalDate && value.purchasedAt && String(value.renewalDate) < String(value.purchasedAt)) {
+        throw new BadRequestException('Ngày gia hạn phải sau hoặc bằng ngày mua');
+      }
+    }
+
+    if (resource === 'software-license-assignments') {
+      if (!String(value.softwareLicenseId || '').trim()) throw new BadRequestException('Vui lòng chọn gói bản quyền');
+      if (!String(value.staffId || '').trim()) throw new BadRequestException('Vui lòng chọn nhân viên');
+      if (!String(value.assignedAt || '').trim()) throw new BadRequestException('Ngày cấp là bắt buộc');
+      if (value.revokedAt && String(value.revokedAt) < String(value.assignedAt)) {
+        throw new BadRequestException('Ngày thu hồi không thể trước ngày cấp');
+      }
+    }
+
     if (resource === 'accounting-vouchers') {
       if (!String(value.code || '').trim()) throw new BadRequestException('Chứng từ kế toán bắt buộc có mã');
       if (!String(value.voucherDate || '').trim()) throw new BadRequestException('Chứng từ kế toán bắt buộc có ngày chứng từ');
@@ -4759,7 +5000,7 @@ export class RecordsService {
     });
   }
 
-  private async normalizeStockReceiptItems (value: unknown, branchId: string, defaultSupplierId?: string) {
+  private async normalizeStockReceiptItems (value: unknown, branchId: string, defaultSupplierId?: string, storageLocation?: string) {
     if (!Array.isArray(value) || value.length === 0) {
       throw new BadRequestException('Phiếu nhập kho phải có ít nhất 1 sản phẩm');
     }
@@ -4788,11 +5029,11 @@ export class RecordsService {
       if (!transferUnit || (transferUnit.baseUnitId || transferUnit.id) !== baseUnit.id) {
         throw new BadRequestException(`Đơn vị nhập của ${product.name} không cùng nhóm quy đổi`);
       }
-      const batchNumber = String(item.batchNumber || '').trim();
-      if (!batchNumber) throw new BadRequestException(`Chua nhap so lo cho ${product.name}`);
+      const batchNumber = String(item.batchNumber || 'MAC_DINH').trim();
       return {
         productId: product.id,
         branchId,
+        storageLocation,
         supplierId: item.supplierId ? String(item.supplierId) : defaultSupplierId,
         batchNumber,
         expiryDate: item.expiryDate ? String(item.expiryDate) : undefined,
@@ -4810,16 +5051,18 @@ export class RecordsService {
     return value.map((rawItem) => {
       const item = rawItem as Record<string, unknown>;
       const batchId = String(item.batchId || '');
+      const productId = String(item.productId || '');
       const quantity = Number(item.quantity || 0);
-      if (!batchId) throw new BadRequestException('Phiếu xuất kho phải chọn lô hàng');
+      if (!batchId && !productId) throw new BadRequestException('Phiếu xuất kho phải chọn sản phẩm hoặc lô hàng');
       if (quantity <= 0) throw new BadRequestException('Số lượng xuất kho phải lớn hơn 0');
-      return { batchId, quantity };
+      return { batchId: batchId || undefined, productId: productId || undefined, quantity };
     });
   }
 
   private async findMatchingStockBatch (item: {
     productId: string;
     branchId: string;
+    storageLocation?: string;
     supplierId?: string;
     batchNumber: string;
     expiryDate?: string;
@@ -4838,6 +5081,7 @@ export class RecordsService {
     return rows.find((row) =>
       String(row.supplierId || '') === String(item.supplierId || '')
       && String(row.expiryDate || '') === String(item.expiryDate || '')
+      && String(row.storageLocation || '') === String(item.storageLocation || '')
       && String(row.baseUnitId || '') === String(item.baseUnitId || ''),
     );
   }
@@ -4991,6 +5235,24 @@ export class RecordsService {
         ),
     );
     if (conflict) throw new BadRequestException('Bác sĩ hoặc phòng đã có lịch trong khung giờ này');
+  }
+
+  private async ensureSoftwareLicenseSeatAvailable (payload: Record<string, unknown>, ignoredId?: string) {
+    // Revoked and pending requests do not consume a seat. This keeps the ERP
+    // as the source of allocation control without storing vendor credentials.
+    if (String(payload.status || 'ACTIVE') !== 'ACTIVE') return;
+    const licenseId = String(payload.softwareLicenseId || '').trim();
+    if (!licenseId) return;
+    const license = await this.softwareLicenses.findOne({ where: { id: licenseId, isArchived: false } });
+    if (!license) throw new BadRequestException('Gói bản quyền không tồn tại hoặc đã bị lưu trữ');
+    if (license.status !== 'ACTIVE') throw new BadRequestException('Chỉ có thể cấp phát gói bản quyền đang hoạt động');
+    const activeAssignments = await this.softwareLicenseAssignments.find({
+      where: { softwareLicenseId: licenseId, status: 'ACTIVE', isArchived: false },
+    });
+    const usedSeats = activeAssignments.filter((assignment) => assignment.id !== ignoredId).length;
+    if (usedSeats >= license.seatCount) {
+      throw new BadRequestException(`Gói bản quyền đã hết seat (${usedSeats}/${license.seatCount}). Hãy tăng số seat hoặc thu hồi một cấp phát.`);
+    }
   }
 
   private async assertPermission (user: AuthUser | undefined, resource: string, action: string, branchId?: string) {

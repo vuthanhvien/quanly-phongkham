@@ -6,6 +6,9 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
     "lint": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report playwright-report",
     "copy:tinymce": "node scripts/copy-tinymce-assets.mjs",
     "postinstall": "npm run copy:tinymce"
   },
@@ -42,6 +45,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",
     "@types/three": "^0.185.3",

@@ -7,6 +7,22 @@ export const api = axios.create({ baseURL: API_URL });
 const APP_BASE_PATH = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '') || '/';
 const GLOBAL_BRANCH_FILTER_KEY = 'clinic-global-branch-ids';
 const GLOBAL_BRANCH_FILTER_EVENT = 'clinic-global-branch-filter-change';
+const SETTINGS_CACHE_TTL_MS = 30 * 60 * 1000;
+const settingsResponseCache = new Map<string, { expiresAt: number; data: unknown; headers: any; status: number; statusText: string }>();
+
+function settingsCacheKey(config: { url?: string; params?: unknown }) {
+  return `${localStorage.getItem('clinic-token') || 'anonymous'}:${config.url || ''}:${JSON.stringify(config.params || {})}`;
+}
+
+function isCacheableSettingsGet(config: { method?: string; url?: string; responseType?: string }) {
+  const url = config.url || '';
+  if ((config.method || 'get').toLowerCase() !== 'get' || !url.startsWith('/settings/') || config.responseType === 'blob') return false;
+  return !/\/(render|docx|pdf|source|download)$/.test(url) && !url.startsWith('/settings/google-drive/files');
+}
+
+function clearSettingsResponseCache() {
+  settingsResponseCache.clear();
+}
 
 function resolveAppPath(path: string) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
@@ -17,6 +33,7 @@ function resolveAppPath(path: string) {
 function clearAuthSession() {
   localStorage.removeItem('clinic-token');
   localStorage.removeItem('clinic-user');
+  clearSettingsResponseCache();
 }
 
 function redirectToLogin() {
@@ -115,11 +132,35 @@ api.interceptors.request.use((config) => {
       };
     }
   }
+  if (isCacheableSettingsGet(config)) {
+    const key = settingsCacheKey(config);
+    const cached = settingsResponseCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+      config.adapter = async () => ({
+        data: cached.data,
+        status: cached.status,
+        statusText: cached.statusText,
+        headers: cached.headers,
+        config,
+        request: undefined,
+      });
+    }
+  }
   return config;
 });
 
 api.interceptors.response.use(
   (response) => {
+    if (isCacheableSettingsGet(response.config)) {
+      settingsResponseCache.set(settingsCacheKey(response.config), {
+        data: response.data,
+        headers: response.headers,
+        status: response.status,
+        statusText: response.statusText,
+        expiresAt: Date.now() + SETTINGS_CACHE_TTL_MS,
+      });
+    }
+    if ((response.config.method || '').toLowerCase() !== 'get' && response.config.url?.startsWith('/settings/')) clearSettingsResponseCache();
     if (isNotifiableMutation(response.config.url, response.config.method)) {
       toastSuccess(getMutationSuccessMessage(response.config.method));
     }

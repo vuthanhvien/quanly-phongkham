@@ -56,6 +56,24 @@
   text-rendering: geometricPrecision;
 }
 
+/* Secondary copy stays visually subordinate without becoming hard to read. */
+.ant-typography.ant-typography-secondary {
+  color: #5f6878 !important;
+  font-weight: 500;
+}
+
+/* The KPI add form is intentionally separate from the history list modal. */
+.kpi-history-modal .kpi-history-table { display: none; }
+.kpi-history-modal .ant-form-item:has(.ant-radio-group) { display: none; }
+.kpi-history-modal .ant-modal-title { font-size: 0; }
+.kpi-history-modal .ant-modal-title::after { content: "Thêm cập nhật KPI"; font-size: 18px; }
+.kpi-history-toolbar { align-items: center; display: flex; justify-content: space-between; margin-bottom: 16px; }
+
+@media (max-width: 640px) {
+  .kpi-actions .kpi-action-label { display: none; }
+  .kpi-actions .ant-btn { min-width: 36px; padding-inline: 9px; }
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -1270,6 +1288,7 @@ body {
 .feed-image-preview img, .feed-album img { height: 100%; object-fit: cover; width: 100%; }
 .feed-gallery__more { align-items: center; background: rgba(15, 23, 42, .64); color: #fff; display: flex; font-size: 21px; font-weight: 800; inset: 0; justify-content: center; pointer-events: none; position: absolute; }
 .feed-stream { display: grid; gap: 14px; margin-top: 14px; }
+.feed-state { align-items: center; background: var(--app-surface); border: 1px solid var(--app-line); border-radius: var(--app-radius); display: flex; justify-content: center; min-height: 180px; padding: 24px; }
 .feed-filter-tabs { margin-top: 14px; }
 .feed-filter-tabs .ant-tabs-nav { margin-bottom: 0 !important; }
 .feed-filter-tabs .ant-tabs-tab { font-weight: 700; padding: 7px 12px !important; }
@@ -1352,6 +1371,21 @@ body {
 .feed-comment-box .ant-input-affix-wrapper { background: #f4f6f9; border: 0; border-radius: 18px; }
 .feed-comment-box .anticon-send { color: var(--app-primary); cursor: pointer; }
 .dashboard-widgets { display: grid; gap: 0; min-width: 0; }
+.feed-workflow-card { margin-bottom: 8px; }
+.feed-workflow-card .ant-card-body { padding: 11px 12px !important; }
+.feed-workflow-quick-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.feed-workflow-todo-title { align-items: center; border-top: 1px solid var(--app-line); display: flex; gap: 6px; justify-content: space-between; padding-top: 10px; }
+.feed-workflow-empty { margin: 8px 0 0 !important; }
+.feed-workflow-empty .ant-empty-image { height: 30px; margin-bottom: 3px; }
+.feed-workflow-empty .ant-empty-description { font-size: 12px; }
+.feed-workflow-tasks .feed-workflow-task { display: block; padding: 10px 0; }
+.feed-workflow-task__body { display: grid; gap: 7px; min-width: 0; }
+.feed-workflow-task__title { display: block; font-size: 14px; line-height: 1.4; }
+.feed-workflow-task__meta { align-items: center; display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.feed-workflow-task__meta .ant-typography { font-size: 12px; line-height: 1.35; }
+.feed-workflow-task__meta .ant-tag { margin-inline-end: 0; }
+.feed-workflow-task__actions { display: grid; gap: 7px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.feed-workflow-task__actions .ant-btn { min-width: 0; padding-inline: 6px; }
 .dashboard-widgets > .ant-row { margin-inline: 0 !important; }
 .dashboard-widgets > .ant-row > .ant-col { padding-inline: 0 !important; }
 .dashboard-widgets > .ant-row > .ant-col.ant-col-md-12,
@@ -4827,6 +4861,18 @@ textarea.ant-input {
   --fc-event-border-color: transparent;
   --fc-now-indicator-color: var(--app-primary);
   height: max(720px, calc(100vh - 178px));
+  position: relative;
+}
+
+.calendar-loading-overlay {
+  align-items: center;
+  backdrop-filter: blur(1px);
+  background: color-mix(in srgb, var(--app-surface) 78%, transparent);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+  z-index: 10;
 }
 
 .coordination-calendar .fc {
@@ -5072,6 +5118,18 @@ textarea.ant-input {
   border-color: var(--app-line);
 }
 
+.staff-day-timeline .rct-horizontal-lines .staff-day-timeline__row--present {
+  background: color-mix(in srgb, #52c41a 13%, var(--app-surface));
+}
+
+.staff-day-timeline .rct-horizontal-lines .staff-day-timeline__row--absent {
+  background: color-mix(in srgb, #ff4d4f 11%, var(--app-surface));
+}
+
+.staff-day-timeline .rct-horizontal-lines .staff-day-timeline__row--future {
+  background: color-mix(in srgb, #1677ff 10%, var(--app-surface));
+}
+
 .staff-day-timeline .rct-item {
   background: var(--app-primary);
   border: 0;
@@ -5086,12 +5144,26 @@ textarea.ant-input {
 
 .staff-timeline-person {
   align-items: center;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
   display: flex;
   gap: 9px;
   height: 100%;
   line-height: normal;
   padding: 0 10px;
+  text-align: left;
+  width: 100%;
 }
+
+.staff-timeline-person:hover { filter: brightness(0.97); }
+.staff-timeline-person:focus-visible { outline: 2px solid var(--app-primary); outline-offset: -2px; }
+
+.staff-timeline-person--present { background: color-mix(in srgb, #52c41a 13%, var(--app-surface)); }
+.staff-timeline-person--absent { background: color-mix(in srgb, #ff4d4f 11%, var(--app-surface)); }
+.staff-timeline-person--future { background: color-mix(in srgb, #1677ff 10%, var(--app-surface)); }
 
 .staff-timeline-person__copy {
   display: grid;
@@ -5718,6 +5790,37 @@ textarea.ant-input {
   .mobile-menu-drawer {
     display: block;
   }
+
+  /* Mobile navigation is a short bottom sheet, not a desktop-like dialog. */
+  .mobile-menu-drawer.ant-modal {
+    bottom: 0;
+    margin: 0;
+    max-width: none;
+    padding-bottom: 0;
+    top: auto;
+    width: 100% !important;
+  }
+
+  .mobile-menu-drawer .ant-modal-content {
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -12px 36px color-mix(in srgb, #000 22%, transparent);
+    height: min(72dvh, 620px);
+  }
+
+  .mobile-menu-drawer .ant-modal-header {
+    border-bottom: 1px solid var(--app-line);
+    padding: 14px 18px 12px;
+  }
+
+  .mobile-menu-drawer .ant-modal-body {
+    gap: 8px;
+    max-height: calc(min(72dvh, 620px) - 60px);
+    padding: 10px 14px 14px !important;
+  }
+
+  .mobile-menu-drawer .mobile-menu-brand { display: none; }
+  .mobile-menu-drawer .mobile-menu-scroll { overscroll-behavior: contain; }
+  .mobile-menu-drawer .mobile-menu-footer { padding-top: 8px; }
 
   .template-layout,
   .template-editor-layout,
@@ -6774,4 +6877,52 @@ input[type="color"]::-moz-color-swatch { border: 0; border-radius: inherit; }
 @media (max-width: 767px) {
   .clinical-command-dashboard .dashboard-home-heading { padding: 17px; }
   .clinical-command-dashboard .dashboard-home-heading h2 { font-size: 25px !important; }
+
+  .kpi-dashboard .kpi-actions {
+    display: grid;
+    gap: 8px !important;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .kpi-dashboard .kpi-actions .ant-space-item,
+  .kpi-dashboard .kpi-actions .ant-btn {
+    width: 100%;
+  }
+
+  .kpi-dashboard .kpi-table-card .ant-card-head {
+    min-height: 0;
+    padding: 12px 14px;
+  }
+
+  .kpi-dashboard .kpi-table-card .ant-card-head-title,
+  .kpi-dashboard .kpi-table-card .ant-card-extra {
+    overflow: visible;
+    padding: 0;
+    white-space: normal;
+  }
+
+  .kpi-dashboard .kpi-table-card .ant-card-extra {
+    display: block;
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  .kpi-dashboard .kpi-table-card .ant-card-body { padding: 12px; }
+  .kpi-dashboard .kpi-table-card .ant-typography { word-break: break-word; }
+  .kpi-dashboard .kpi-table .ant-table-thead > tr > th,
+  .kpi-dashboard .kpi-table .ant-table-tbody > tr > td { padding: 9px 7px; }
+  .kpi-dashboard .kpi-table .ant-progress { margin: 0; }
+  .kpi-dashboard .kpi-table .ant-tag { font-size: 11px; line-height: 18px; margin-inline-end: 0; }
+
+  .kpi-history-modal { max-width: calc(100vw - 24px) !important; top: 12px; }
+  .kpi-history-modal .ant-modal-content { max-height: calc(100vh - 24px); overflow: auto; }
+  .kpi-history-modal .ant-modal-header,
+  .kpi-history-modal .ant-modal-body,
+  .kpi-history-modal .ant-modal-footer { padding-inline: 14px; }
+  .kpi-history-modal .ant-modal-title { font-size: 16px; padding-right: 20px; }
+  .kpi-history-modal .ant-modal-footer { display: flex; gap: 8px; }
+  .kpi-history-modal .ant-modal-footer .ant-btn { flex: 1; margin-inline-start: 0 !important; }
+  .kpi-history-table .ant-table-thead > tr > th,
+  .kpi-history-table .ant-table-tbody > tr > td { padding: 8px 6px; }
 }

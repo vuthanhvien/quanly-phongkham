@@ -5,6 +5,7 @@ import {
   FilePdfOutlined,
   FileTextOutlined,
   InboxOutlined,
+  DeleteOutlined,
   PlusOutlined,
 } from "@ant-design/icons"
 import {
@@ -39,8 +40,8 @@ import { api, resolveFileUrl } from "../api"
 import { hasActionAccess } from "../access"
 import { controlHeightBySize, useAppUi } from "../app-ui"
 import { FileUploadPanel } from "./FileUploadPanel"
-import { CustomField, entityLabels, FieldSpec, relationFields } from "../models"
-import { getRelationMetaMap, loadRelationOptions, LookupMap, RelationLookupRecord } from "../relations"
+import { CustomField, entityLabels, FieldSpec, RelationSpec, relationFields } from "../models"
+import { getRelationMetaMap, loadFileLibraryRows, loadRelationOptions, LookupMap, RelationLookupRecord } from "../relations"
 import { getCachedMasterData } from "../utils/masterDataCache"
 import { getApiErrorMessage } from "../utils/apiError"
 import { formatNumberInput, parseNumberInput } from "../utils/numberInput"
@@ -132,6 +133,7 @@ export function RecordFormContent({
   const slugWasEdited = useRef(false)
   const { mutate: create } = useCreate()
   const { mutate: update } = useUpdate()
+  const { settings } = useAppUi()
   const isAppointmentForm = resource === "appointments"
   const isWorkScheduleForm = resource === "work-schedules"
   const isAddressForm = resource === "customers" || resource === "leads"
@@ -203,7 +205,8 @@ export function RecordFormContent({
           ? fieldsWithMasterData.map((field) => field.key === "leaveType" || field.key === "leaveTypeCode" ? { ...field, options: leaveTypeOptions } : field)
           : fieldsWithMasterData
         setFields(fieldsWithLeaveTypes)
-        return loadRelationOptions(fieldsWithLeaveTypes)
+        // Staff can be very large; its picker searches remotely and resolves only selected IDs.
+        return loadRelationOptions(fieldsWithLeaveTypes.filter((field) => (field.relation || relationFields[field.key])?.resource !== "staff"))
       })
       .then(setLookups)
   }, [relationReloadKey, resource, viewRole])
@@ -351,6 +354,30 @@ export function RecordFormContent({
       if (notifyOnSuccess) toastSuccess("Đã lưu dữ liệu")
       onSuccess?.()
     }
+    if (resource === "stock-batches" && !editing) {
+      const stockItems = Array.isArray(payload.items) ? payload.items as Array<Record<string, unknown>> : []
+      const isExport = payload.movementType === "EXPORT" || payload.movementType === "WASTE"
+      const normalizedItems = stockItems
+        .map((item) => isExport
+          ? { batchId: item.batchId ? String(item.batchId) : undefined, productId: item.productId ? String(item.productId) : undefined, quantity: Number(item.quantity || 0) }
+          : { productId: item.productId ? String(item.productId) : undefined, batchNumber: item.batchNumber ? String(item.batchNumber) : undefined, expiryDate: item.expiryDate, quantity: Number(item.quantity || 0), transferUnitId: item.transferUnitId ? String(item.transferUnitId) : undefined, supplierId: item.supplierId ? String(item.supplierId) : undefined })
+        .filter((item) => isExport ? Boolean(item.batchId || item.productId) : Boolean(item.productId))
+      if (!normalizedItems.length || normalizedItems.some((item) => item.quantity <= 0)) {
+        const errorMessage = isExport ? "Chọn ít nhất một sản phẩm/lô hàng và số lượng xuất hợp lệ" : "Chọn ít nhất một sản phẩm và số lượng nhập hợp lệ"
+        setSubmitError(errorMessage)
+        toastError(errorMessage)
+        return
+      }
+      void api.post(isExport ? "/records/stock-batches/issue" : "/records/stock-batches/receipt", {
+        ...payload,
+        items: normalizedItems,
+      }).then(done).catch((error) => {
+        const errorMessage = getApiErrorMessage(error, "Không thể lưu phiếu kho")
+        setSubmitError(errorMessage)
+        toastError(errorMessage)
+      })
+      return
+    }
     if (editing)
       update(
         { resource, id: id!, values: payload },
@@ -436,10 +463,12 @@ export function RecordFormContent({
       if (isWorkScheduleForm && (field.key === "workDate" || field.key === "startTime" || field.key === "endTime" || field.key === "recurrenceUntil")) return false
       // The server derives this summary from the editable assignments below.
       if (resource === "user-accounts" && field.key === "branchRoleSummary") return false
+      if (resource === "stock-batches" && field.key === "procedureReference" && !settings.clinicFeatures.procedureSupply) return false
+      if (resource === "stock-batches" && field.key === "storageLocation" && !settings.clinicFeatures.stockLocations) return false
       if (hiddenFieldKeys.includes(field.key)) return false
       return true
     }),
-    [fields, hiddenFieldKeys, isAddressForm, isAppointmentForm, isWorkScheduleForm, resource],
+    [fields, hiddenFieldKeys, isAddressForm, isAppointmentForm, isWorkScheduleForm, resource, settings.clinicFeatures.procedureSupply, settings.clinicFeatures.stockLocations],
   )
   const isSystemAdminAccount = resource === "user-accounts"
     && ["admin", "admin-system"].includes(String(recordQuery.result?.data?.username || recordQuery.query?.data?.data?.username || recordQuery.data?.data?.data?.username || "").trim().toLowerCase())
@@ -914,6 +943,53 @@ function ClinicDateInput({
   )
 }
 
+function StaffRelationInput({
+  relation,
+  lookups,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  multiple = false,
+}: {
+  relation: RelationSpec
+  lookups: LookupMap
+  value?: unknown
+  onChange?: (value: unknown) => void
+  disabled?: boolean
+  placeholder?: string
+  multiple?: boolean
+}) {
+  const lookupKey = relation.lookupKey || relation.resource
+  const selectedIds = Array.isArray(value) ? value.map(String) : value ? [String(value)] : []
+  const selectedSignature = selectedIds.join(",")
+  const [options, setOptions] = useState<Array<{ value: string; label: string }>>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const labels = lookups[lookupKey] || lookups.staff || {}
+    const missingIds = selectedIds.filter((id) => !labels[id])
+    const fromLookup = selectedIds.flatMap((id) => labels[id] ? [{ value: id, label: labels[id] }] : [])
+    if (!missingIds.length) { setOptions((current) => [...fromLookup, ...current.filter((item) => !selectedIds.includes(item.value))]); return }
+    void Promise.all(missingIds.map((id) => api.get(`/records/staff/${id}`).then((response) => response.data.data).catch(() => null))).then((rows) => {
+      const resolved = rows.filter(Boolean).map((row: Record<string, unknown>) => ({ value: String(row.id), label: [row.code, row.fullName].filter(Boolean).join(" · ") || String(row.id) }))
+      setOptions((current) => [...fromLookup, ...resolved, ...current.filter((item) => !selectedIds.includes(item.value))])
+    })
+  }, [lookupKey, lookups, selectedSignature])
+
+  const search = async (keyword: string) => {
+    setLoading(true)
+    try {
+      const response = await api.get("/records/staff", { params: { pageSize: 30, search: keyword, ...relation.params } })
+      const rows = response.data.data || []
+      const found = rows.map((row: Record<string, unknown>) => ({ value: String(row.id), label: [row.code, row.fullName].filter(Boolean).join(" · ") || String(row.id) }))
+      setOptions((current) => [...current.filter((item) => selectedIds.includes(item.value)), ...found.filter((item: { value: string }) => !selectedIds.includes(item.value))])
+    } finally { setLoading(false) }
+  }
+
+  return <Select allowClear disabled={disabled} filterOption={false} loading={loading} mode={multiple ? "multiple" : undefined} options={options} placeholder={placeholder} showSearch value={value as string | string[] | undefined} onChange={onChange} onSearch={(keyword) => void search(keyword)} />
+}
+
 function FieldInput({
   field,
   lookups,
@@ -932,7 +1008,18 @@ function FieldInput({
   const { settings } = useAppUi()
   const placeholder = field.placeholder?.trim() || getDefaultFieldPlaceholder(field)
   const relation = field.relation || relationFields[field.key]
+  if (resource === "stock-batches" && field.key === "movementType") {
+    const options = (field.options || []).filter((option) => {
+      const value = typeof option === "string" ? option : option.value
+      return settings.clinicFeatures.returnAndWaste || (value !== "RETURN" && value !== "WASTE")
+    })
+    return <Select disabled={field.disabled} options={options.map((option) => typeof option === "string" ? { value: option, label: option } : option)} placeholder={placeholder} value={value} onChange={onChange} />
+  }
+  if (resource === "products" && field.key === "categoryId") return <ProductCategoryInput disabled={field.disabled} value={value} onChange={onChange} />
+  if (relation?.resource === "staff") return <StaffRelationInput disabled={field.disabled} lookups={lookups} multiple={field.type === "multi-select"} onChange={onChange} placeholder={placeholder} relation={relation} value={value} />
   if (field.type === "table") return <InlineTableInput columns={field.tableColumns || []} value={value} onChange={onChange} disabled={field.disabled} />
+  if (field.type === "combo") return <ComboItemsInput disabled={field.disabled} value={value} onChange={onChange} />
+  if (field.type === "service-order-items") return <ServiceOrderItemsInput disabled={field.disabled} resource={resource} value={value} onChange={onChange} />
   if (field.type === "number")
     return (
       <InputNumber
@@ -1158,6 +1245,159 @@ function InlineTableInput({ columns, value, onChange, disabled }: { columns: Non
   </Space>
 }
 
+function ComboItemsInput({ value, onChange, disabled }: { value?: unknown; onChange?: (value: unknown) => void; disabled?: boolean }) {
+  const [options, setOptions] = useState<Array<{ value: string; label: string }>>([])
+  const rows = Array.isArray(value) ? value as Array<{ productId?: string; quantity?: number }> : []
+
+  useEffect(() => {
+    api.get("/records/products", { params: { pageSize: 500 } })
+      .then((response) => setOptions((response.data.data || [])
+        .filter((item: Record<string, unknown>) => String(item.productType || "").toUpperCase() !== "COMBO")
+        .map((item: Record<string, unknown>) => ({ value: String(item.id), label: [item.code, item.name].filter(Boolean).join(" · ") || String(item.id) }))))
+      .catch(() => setOptions([]))
+  }, [])
+
+  const updateRow = (index: number, patch: Partial<{ productId: string; quantity: number }>) => onChange?.(rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row))
+  return <Space direction="vertical" size={8} style={{ width: "100%" }}>
+    <Table
+      size="small"
+      dataSource={rows.map((row, index) => ({ ...row, key: index, index }))}
+      pagination={false}
+      scroll={{ x: 560 }}
+      columns={[
+        { title: "Sản phẩm / dịch vụ", dataIndex: "productId", render: (current: string | undefined, row: { index: number }) => <Select disabled={disabled} showSearch optionFilterProp="label" options={options} placeholder="Chọn sản phẩm / dịch vụ" style={{ width: "100%" }} value={current} onChange={(productId) => updateRow(row.index, { productId })} /> },
+        { title: "Số lượng", dataIndex: "quantity", width: 140, render: (current: number | undefined, row: { index: number }) => <InputNumber disabled={disabled} min={1} style={{ width: "100%" }} value={current} onChange={(quantity) => updateRow(row.index, { quantity: Number(quantity || 0) })} /> },
+        { title: "", width: 64, render: (_: unknown, row: { index: number }) => <Button aria-label="Xóa thành phần" danger disabled={disabled} type="text" onClick={() => onChange?.(rows.filter((_, rowIndex) => rowIndex !== row.index))}>Xóa</Button> },
+      ]}
+    />
+    <Button disabled={disabled} icon={<PlusOutlined />} size="small" type="dashed" onClick={() => onChange?.([...rows, { quantity: 1 }])}>Thêm thành phần</Button>
+  </Space>
+}
+
+function ProductCategoryInput({ value, onChange, disabled }: { value?: unknown; onChange?: (value: unknown) => void; disabled?: boolean }) {
+  const [options, setOptions] = useState<Array<{ value: string; label: string }>>([])
+
+  useEffect(() => {
+    api.get("/product-categories").then((response) => {
+      const rows = (response.data.data || []).filter((item: Record<string, unknown>) => item.isActive !== false)
+      const byId = new Map(rows.map((item: Record<string, unknown>) => [String(item.id), item]))
+      const labelFor = (item: Record<string, unknown>) => {
+        const labels = [String(item.name || "")]
+        const seen = new Set([String(item.id)])
+        let parentId = item.parentId ? String(item.parentId) : ""
+        while (parentId && !seen.has(parentId)) {
+          seen.add(parentId)
+          const parent = byId.get(parentId) as Record<string, unknown> | undefined
+          if (!parent) break
+          labels.unshift(String(parent.name || ""))
+          parentId = parent.parentId ? String(parent.parentId) : ""
+        }
+        return labels.filter(Boolean).join(" / ")
+      }
+      setOptions(rows.map((item: Record<string, unknown>) => ({ value: String(item.id), label: labelFor(item) })).sort((left: { label: string }, right: { label: string }) => left.label.localeCompare(right.label, "vi")))
+    }).catch(() => setOptions([]))
+  }, [])
+
+  return <Select allowClear disabled={disabled} showSearch optionFilterProp="label" options={options} placeholder="Chọn ngành / nhóm / loại" value={value as string | undefined} onChange={onChange} />
+}
+
+type ServiceOrderItemValue = { productId?: string; variantId?: string; variantCode?: string; variantAttributes?: Record<string, string>; itemName?: string; quantity?: number; unitPrice?: number; transferUnitId?: string; isComboComponent?: boolean; parentComboProductId?: string }
+type ServiceOrderProductOption = { value: string; label: string; name: string; sellingPrice: number; productType: string; bundleItems: Array<{ productId: string; quantity: number }>; baseUnitId?: string; variantId?: string; variantCode?: string; variantAttributes?: Record<string, string> }
+
+function ServiceOrderItemsInput({ resource, value, onChange, disabled }: { resource: string; value?: unknown; onChange?: (value: unknown) => void; disabled?: boolean }) {
+  if (resource === "stock-batches") return <StockBatchItemsInput disabled={disabled} value={value} onChange={onChange} />
+  const [products, setProducts] = useState<ServiceOrderProductOption[]>([])
+  const [units, setUnits] = useState<Array<{ value: string; label: string }>>([])
+  const rows = Array.isArray(value) ? value as ServiceOrderItemValue[] : []
+
+  useEffect(() => {
+    Promise.all([api.get("/records/service-orders/product-options"), api.get("/records/units", { params: { pageSize: 500 } })]).then(([productsResponse, unitsResponse]) => {
+      setProducts((productsResponse.data.data || []).map((row: Record<string, unknown>) => ({
+        value: String(row.id), label: `${row.code || ""}${row.variantCode ? ` / ${row.variantCode}` : ""} - ${row.name || row.id}${row.variantName ? ` - ${row.variantName}` : ""}`,
+        name: String(row.variantName ? `${row.name || ""} - ${row.variantName}` : row.name || row.id), sellingPrice: Number(row.sellingPrice || 0), productType: String(row.productType || ""),
+        bundleItems: Array.isArray(row.bundleItems) ? row.bundleItems as Array<{ productId: string; quantity: number }> : [], baseUnitId: row.baseUnitId ? String(row.baseUnitId) : undefined,
+        variantId: row.variantId ? String(row.variantId) : undefined, variantCode: row.variantCode ? String(row.variantCode) : undefined, variantAttributes: row.variantAttributes as Record<string, string> | undefined,
+      })))
+      setUnits((unitsResponse.data.data || []).map((row: Record<string, unknown>) => ({ value: String(row.id), label: String(row.name || row.id) })))
+    }).catch(() => { setProducts([]); setUnits([]) })
+  }, [])
+
+  const updateRows = (nextRows: ServiceOrderItemValue[]) => onChange?.(nextRows)
+  const updateRow = (index: number, patch: Partial<ServiceOrderItemValue>) => updateRows(rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row))
+  const selectProduct = (index: number, productId?: string) => {
+    const product = products.find((item) => item.value === productId)
+    const selectedQuantity = Number(rows[index]?.quantity || 1)
+    const nextRows = [...rows]
+    nextRows[index] = { ...nextRows[index], productId, variantId: product?.variantId, variantCode: product?.variantCode, variantAttributes: product?.variantAttributes, itemName: product?.name, quantity: selectedQuantity, unitPrice: product ? Number(nextRows[index]?.unitPrice || product.sellingPrice) : nextRows[index]?.unitPrice, transferUnitId: product?.baseUnitId, isComboComponent: false, parentComboProductId: undefined }
+    if (product?.productType === "COMBO" && product.bundleItems.length) {
+      const components = product.bundleItems.flatMap((component) => {
+        const componentProduct = products.find((item) => item.value === component.productId)
+        return componentProduct ? [{ productId: componentProduct.value, variantId: componentProduct.variantId, variantCode: componentProduct.variantCode, variantAttributes: componentProduct.variantAttributes, itemName: componentProduct.name, quantity: selectedQuantity * Number(component.quantity || 1), unitPrice: 0, transferUnitId: componentProduct.baseUnitId, isComboComponent: true, parentComboProductId: product.value }] : []
+      })
+      nextRows.splice(index + 1, 0, ...components)
+    }
+    updateRows(nextRows)
+  }
+  const source = rows.length ? rows : []
+  return <Space direction="vertical" size={8} style={{ width: "100%" }}>
+    <Table size="small" dataSource={source.map((row, index) => ({ ...row, key: index, index }))} pagination={false} scroll={{ x: 900 }} columns={[
+      { title: "Sản phẩm", dataIndex: "productId", width: 270, render: (current: string | undefined, row: ServiceOrderItemValue & { index: number }) => <Select disabled={disabled || row.isComboComponent} showSearch optionFilterProp="label" options={products} placeholder="Chọn sản phẩm" style={{ width: "100%" }} value={current} onChange={(next) => selectProduct(row.index, next)} /> },
+      { title: "Đơn vị", dataIndex: "transferUnitId", width: 150, render: (current: string | undefined, row: ServiceOrderItemValue & { index: number }) => <Select disabled={disabled || row.isComboComponent} options={units} placeholder="Đơn vị" style={{ width: "100%" }} value={current} onChange={(next) => updateRow(row.index, { transferUnitId: next })} /> },
+      { title: "SL", dataIndex: "quantity", width: 100, render: (current: number | undefined, row: ServiceOrderItemValue & { index: number }) => <InputNumber disabled={disabled} min={1} style={{ width: "100%" }} value={current} onChange={(next) => updateRow(row.index, { quantity: Number(next || 0) })} /> },
+      { title: "Đơn giá", dataIndex: "unitPrice", width: 140, render: (current: number | undefined, row: ServiceOrderItemValue & { index: number }) => <InputNumber disabled={disabled || row.isComboComponent} min={0} style={{ width: "100%" }} value={current} onChange={(next) => updateRow(row.index, { unitPrice: Number(next || 0) })} /> },
+      { title: "", width: 56, render: (_: unknown, row: ServiceOrderItemValue & { index: number }) => <Button aria-label="Xóa dòng" danger disabled={disabled} icon={<DeleteOutlined />} type="text" onClick={() => updateRows(rows.filter((_, rowIndex) => rowIndex !== row.index))} /> },
+    ]} />
+    <Button disabled={disabled} icon={<PlusOutlined />} size="small" type="dashed" onClick={() => updateRows([...rows, { quantity: 1 }])}>Thêm sản phẩm</Button>
+  </Space>
+}
+
+type StockBatchItem = { productId?: string; batchNumber?: string; expiryDate?: string; batchId?: string; quantity?: number; transferUnitId?: string; supplierId?: string }
+
+function StockBatchItemsInput({ value, onChange, disabled }: { value?: unknown; onChange?: (value: unknown) => void; disabled?: boolean }) {
+  const { settings } = useAppUi()
+  const movementType = Form.useWatch("movementType") as "IMPORT" | "EXPORT" | undefined
+  const branchId = Form.useWatch("branchId") as string | undefined
+  const [products, setProducts] = useState<Array<{ value: string; label: string; baseUnitId?: string }>>([])
+  const [units, setUnits] = useState<Array<{ value: string; label: string; baseUnitId?: string }>>([])
+  const storageLocation = Form.useWatch("storageLocation") as string | undefined
+  const [batches, setBatches] = useState<Array<{ value: string; label: string; branchId: string; storageLocation?: string }>>([])
+  const rows = Array.isArray(value) ? value as StockBatchItem[] : []
+
+  useEffect(() => {
+    api.get("/records/stock-batches/form-options").then((response) => {
+      const data = response.data.data || {}
+      setProducts((data.products || []).map((row: Record<string, unknown>) => ({ value: String(row.id), label: `${row.code || ""} - ${row.name || row.id}`, baseUnitId: row.baseUnitId ? String(row.baseUnitId) : undefined })))
+      setUnits((data.units || []).map((row: Record<string, unknown>) => ({ value: String(row.id), label: String(row.name || row.id), baseUnitId: row.baseUnitId ? String(row.baseUnitId) : undefined })))
+      setBatches((data.batches || []).map((row: Record<string, unknown>) => ({ value: String(row.id), label: `${row.batchNumber || row.id} · tồn ${Number(row.remainingQuantity || 0).toLocaleString("vi-VN")} ${row.unit || ""}`, branchId: String(row.branchId || ""), storageLocation: row.storageLocation ? String(row.storageLocation) : undefined })))
+    }).catch(() => { setProducts([]); setUnits([]); setBatches([]) })
+  }, [])
+
+  const updateRows = (nextRows: StockBatchItem[]) => onChange?.(nextRows)
+  const updateRow = (index: number, patch: Partial<StockBatchItem>) => updateRows(rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row))
+  const visibleBatches = batches.filter((batch) => (!branchId || batch.branchId === branchId) && (!storageLocation || batch.storageLocation === storageLocation))
+  const isExport = movementType === "EXPORT"
+  const lotTracking = settings.clinicFeatures.lotTracking
+  const addRow = () => updateRows([...rows, { quantity: 1 }])
+  const removeRow = (index: number) => updateRows(rows.filter((_, rowIndex) => rowIndex !== index))
+  const source = rows.map((row, index) => ({ ...row, key: index, index }))
+  const columns = isExport ? (lotTracking ? [
+    { title: "Lô hàng", dataIndex: "batchId", width: 410, render: (current: string | undefined, row: StockBatchItem & { index: number }) => <Select disabled={disabled} showSearch optionFilterProp="label" options={visibleBatches} placeholder="Chọn lô hàng để xuất" style={{ width: "100%" }} value={current} onChange={(next) => updateRow(row.index, { batchId: next })} /> },
+    { title: "SL xuất", dataIndex: "quantity", width: 130, render: (current: number | undefined, row: StockBatchItem & { index: number }) => <InputNumber disabled={disabled} min={1} style={{ width: "100%" }} value={current} onChange={(next) => updateRow(row.index, { quantity: Number(next || 0) })} /> },
+  ] : [
+    { title: "SP", dataIndex: "productId", width: 410, render: (current: string | undefined, row: StockBatchItem & { index: number }) => <Select disabled={disabled} showSearch optionFilterProp="label" options={products} placeholder="Chọn SP để xuất" style={{ width: "100%" }} value={current} onChange={(next) => updateRow(row.index, { productId: next, batchId: undefined })} /> },
+    { title: "SL xuất", dataIndex: "quantity", width: 130, render: (current: number | undefined, row: StockBatchItem & { index: number }) => <InputNumber disabled={disabled} min={1} style={{ width: "100%" }} value={current} onChange={(next) => updateRow(row.index, { quantity: Number(next || 0) })} /> },
+  ]) : [
+    { title: "Sản phẩm", dataIndex: "productId", width: 250, render: (current: string | undefined, row: StockBatchItem & { index: number }) => <Select disabled={disabled} showSearch optionFilterProp="label" options={products} placeholder="Chọn sản phẩm" style={{ width: "100%" }} value={current} onChange={(next) => { const product = products.find((item) => item.value === next); updateRow(row.index, { productId: next, transferUnitId: product?.baseUnitId }) }} /> },
+    ...(lotTracking ? [
+      { title: "Số lô", dataIndex: "batchNumber", width: 160, render: (current: string | undefined, row: StockBatchItem & { index: number }) => <Input disabled={disabled} placeholder="VD: LO-0627" value={current} onChange={(event) => updateRow(row.index, { batchNumber: event.target.value })} /> },
+      { title: "Hạn dùng", dataIndex: "expiryDate", width: 155, render: (current: string | undefined, row: StockBatchItem & { index: number }) => <DatePicker disabled={disabled} format="DD/MM/YYYY" style={{ width: "100%" }} value={current ? dayjs(current) : null} onChange={(next) => updateRow(row.index, { expiryDate: next?.format("YYYY-MM-DD") })} /> },
+    ] : []),
+    { title: "SL nhập", dataIndex: "quantity", width: 120, render: (current: number | undefined, row: StockBatchItem & { index: number }) => <InputNumber disabled={disabled} min={1} style={{ width: "100%" }} value={current} onChange={(next) => updateRow(row.index, { quantity: Number(next || 0) })} /> },
+    { title: "Đơn vị", dataIndex: "transferUnitId", width: 150, render: (current: string | undefined, row: StockBatchItem & { index: number }) => { const product = products.find((item) => item.value === row.productId); return <Select disabled={disabled || !product} options={units.filter((unit) => unit.value === product?.baseUnitId || unit.baseUnitId === product?.baseUnitId)} placeholder="Chọn đơn vị" style={{ width: "100%" }} value={current} onChange={(next) => updateRow(row.index, { transferUnitId: next })} /> } },
+  ]
+  return <Space direction="vertical" size={8} style={{ width: "100%" }}><Table size="small" dataSource={source} pagination={false} scroll={{ x: 880 }} columns={[...columns, { title: "", width: 56, render: (_: unknown, row: StockBatchItem & { index: number }) => <Button aria-label="Xóa dòng" danger disabled={disabled} icon={<DeleteOutlined />} type="text" onClick={() => removeRow(row.index)} /> }]} /><Button disabled={disabled} icon={<PlusOutlined />} size="small" type="dashed" onClick={addRow}>{isExport ? "Thêm lô xuất" : "Thêm sản phẩm"}</Button></Space>
+}
+
 function getDefaultFieldPlaceholder(field: FieldSpec) {
   const label = field.label.trim().toLowerCase()
   if (field.type === "select" || field.type === "multi-select" || field.type === "dynamic-table" || field.type === "relative" || field.type === "file" || field.type === "image" || field.type === "images" || field.relation || relationFields[field.key] || field.key === "imageUrl") {
@@ -1331,8 +1571,8 @@ function FileSelectInput({
   }, [openPicker, value])
 
   async function loadOptions() {
-    const [filesResponse, foldersResponse] = await Promise.all([
-      api.get("/records/files", { params: { pageSize: 200 } }),
+    const [fileRows, foldersResponse] = await Promise.all([
+      loadFileLibraryRows(200),
       api.get("/records/file-folders", { params: { pageSize: 200 } }),
     ])
     const folderRows = normalizeFileFolderRows(foldersResponse.data.data || [])
@@ -1341,7 +1581,7 @@ function FileSelectInput({
     setFolderChildrenMap(buildFolderChildrenMap(folderRows))
     setFolderPathMap(folders)
     setOptions(
-      (filesResponse.data.data || []).map((row: Record<string, unknown>) => ({
+      fileRows.map((row: Record<string, unknown>) => ({
         value: String(row.id),
         title: String(row.title || row.originalName || row.id),
         previewUrl: resolveFileUrl(String(row.publicUrl || "")),
@@ -1740,8 +1980,8 @@ export function ImageLibrarySelectInput({
   }, [openPicker, value])
 
   async function loadOptions() {
-    const [filesResponse, foldersResponse] = await Promise.all([
-      api.get("/records/files", { params: { pageSize: 200 } }),
+    const [fileRows, foldersResponse] = await Promise.all([
+      loadFileLibraryRows(200),
       api.get("/records/file-folders", { params: { pageSize: 200 } }),
     ])
     const folderRows = normalizeFileFolderRows(foldersResponse.data.data || [])
@@ -1749,7 +1989,7 @@ export function ImageLibrarySelectInput({
     setTreeData(buildFolderTree(folderRows))
     setFolderChildrenMap(buildFolderChildrenMap(folderRows))
     setFolderPathMap(folders)
-    const nextOptions = (filesResponse.data.data || [])
+    const nextOptions = fileRows
       .filter((row: Record<string, unknown>) => isImageFile(row))
       .map((row: Record<string, unknown>) => {
         const title = String(row.title || row.originalName || row.id)

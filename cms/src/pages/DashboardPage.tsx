@@ -15,6 +15,7 @@ import { DashboardMetricGrid } from "../components/dashboard/DashboardMetricGrid
 import { DashboardOperationsSection } from "../components/dashboard/DashboardOperationsSection"
 import { DashboardStaffSection } from "../components/dashboard/DashboardStaffSection"
 import { CompanyFeed } from "../components/dashboard/CompanyFeed"
+import { FeedWorkflowPanel } from "../components/dashboard/FeedWorkflowPanel"
 import { RecordFormContent } from "../components/RecordFormContent"
 import { getFieldLabel } from "../models"
 import { hasActionAccess, hasResourceAccess } from "../access"
@@ -266,6 +267,7 @@ export function DashboardPage() {
       <div className="dashboard-feed-layout">
         {hasResourceAccess("company-feed") ? <CompanyFeed currentUser={staffDashboard?.staffName || identity?.fullName || identity?.username || "Bạn"} currentUserId={identity?.id} /> : null}
         <aside className="dashboard-widgets">
+          <FeedWorkflowPanel identity={identity} />
           {staffDashboard ? <DashboardStaffSection actionLoading={staffActionLoading} canCreateAttendance={hasActionAccess("attendances", "create")} canCreateLeaveRequest={hasActionAccess("leave-requests", "create")} canUpdateAttendance={hasActionAccess("attendances", "update")} data={staffDashboard} onCheckIn={() => void handleCheckIn()} onCheckOut={() => void handleCheckOut()} onOpenLeaveRequest={() => setLeaveDrawerOpen(true)} /> : null}
           <DashboardMetricGrid metrics={metrics} />
           <DashboardOperationsSection operationsTitle={dashboardCopy.operationsTitle} pipeline={pipeline} quickStats={quickStats} quickStatsTitle={dashboardCopy.quickStatsTitle} />

@@ -62,7 +62,7 @@ type WorkflowStepTemplate = {
   }>
 }
 
-const TARGET_RESOURCES = ["leave-requests", "attendance-adjustment-requests", "business-trip-requests", "payment-requests"]
+const TARGET_RESOURCES = ["leave-requests", "attendance-adjustment-requests", "business-trip-requests", "payment-requests", "software-license-assignments"]
 const APPROVER_TYPES = [
   { value: "EMPLOYEE_LEADER", label: "Leader nhân viên" },
   { value: "EMPLOYEE_MENTOR", label: "Mentor nhân viên" },
@@ -653,7 +653,9 @@ export function WorkflowDefinitionDetailPage() {
 }
 
 function buildStatusOptions(resource?: string) {
-  const fallback = ["draft", "pending", "submitted", "approved", "rejected", "cancelled", "paid"]
+  const fallback = resource === "software-license-assignments"
+    ? ["PENDING", "PENDING_MANAGER", "PENDING_IT", "ACTIVE", "REVOKED", "REJECTED", "CANCELLED"]
+    : ["draft", "pending", "submitted", "approved", "rejected", "cancelled", "paid"]
   return fallback.map((value) => ({
     value,
     label: resource ? getFieldLabel(resource, "status", value) : value,

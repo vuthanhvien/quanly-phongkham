@@ -14,8 +14,8 @@ import { baseFields, CustomField, entityLabels, FieldSpec, relationFields } from
 import { displayValue, loadRelationOptions, LookupMap } from "../relations"
 import { getFieldCatalog } from "../view-settings"
 
-const UNSUPPORTED_RESOURCES = new Set(["files", "service-orders"])
-const BUNDLE_RESOURCES = new Set(["customers", "leads", "staff"])
+const UNSUPPORTED_RESOURCES = new Set(["files"])
+const BUNDLE_RESOURCES = new Set(["customers", "leads", "staff", "products", "stock-batches", "service-orders"])
 const PRODUCT_CATEGORY_FIELDS: FieldSpec[] = [
   { key: "code", label: "Mã", required: true, tableWidth: 150 },
   { key: "name", label: "Tên danh mục", required: true, tableWidth: 220 },
@@ -32,7 +32,7 @@ interface BundleSheetDefinition {
   parentCodeColumn?: string
 }
 
-const BUNDLE_IMPORT_CONFIGS: Record<string, { related: BundleSheetDefinition[] }> = {
+const BUNDLE_IMPORT_CONFIGS: Record<string, { mainColumns?: string[]; related: BundleSheetDefinition[] }> = {
   customers: {
     related: [
       { sheetName: "appointments", resource: "appointments", parentCodeColumn: "customerCode", columns: ["customerCode", "branchId", "type", "startTime", "endTime", "doctorStaffId", "roomId", "equipmentId", "picStaffId", "status", "note"] },
@@ -63,6 +63,18 @@ const BUNDLE_IMPORT_CONFIGS: Record<string, { related: BundleSheetDefinition[] }
       { sheetName: "branch-role-assignments", resource: "branch-role-assignments", parentCodeColumn: "staffCode", columns: ["staffCode", "userId", "branchId", "roleName", "roleKeys", "isActive"] },
       { sheetName: "user-accounts", resource: "user-accounts", parentCodeColumn: "staffCode", columns: ["staffCode", "email", "username", "password", "fullName", "role", "branchId"] },
     ],
+  },
+  products: {
+    mainColumns: ["code", "name", "barcode", "productType", "categoryId", "baseUnitId", "sellingPrice", "minStockLevel"],
+    related: [{ sheetName: "product-combo-items", resource: "product-combo-items", parentCodeColumn: "productCode", columns: ["productCode", "componentProductCode", "quantity"] }],
+  },
+  "stock-batches": {
+    mainColumns: ["code", "movementType", "movementDate", "branchId", "storageLocation", "procedureReference", "supplierId", "note"],
+    related: [{ sheetName: "stock-batch-items", resource: "stock-batch-items", parentCodeColumn: "receiptCode", columns: ["receiptCode", "productCode", "batchNumber", "expiryDate", "quantity", "transferUnitId", "supplierId"] }],
+  },
+  "service-orders": {
+    mainColumns: ["code", "customerCode", "branchId", "orderDate", "performerStaffId", "status", "note"],
+    related: [{ sheetName: "service-order-items", resource: "service-order-items", parentCodeColumn: "orderCode", columns: ["orderCode", "productCode", "quantity", "transferUnitId", "unitPrice"] }],
   },
 }
 
@@ -106,6 +118,11 @@ export function RecordImportPage({ resource: resourceOverride }: { resource?: st
     () => (bundleMode ? buildBundleSheetDefinitions(resource, importableFields) : []),
     [bundleMode, importableFields, resource],
   )
+  const bundleMainFields = useMemo(() => {
+    const mainColumns = new Set(bundleDefinitions[0]?.columns || [])
+    return importableFields.filter((field) => mainColumns.has(field.key))
+  }, [bundleDefinitions, importableFields])
+  const previewFields = bundleMode ? bundleMainFields : importableFields
 
   useEffect(() => {
     setDraftRows([])
@@ -150,7 +167,7 @@ export function RecordImportPage({ resource: resourceOverride }: { resource?: st
       try {
         if (bundleMode) {
           const definitions = buildBundleSheetDefinitions(resource, importableFields)
-          const parsed = await parseBundleImportFile(file, definitions, baseKeySet, importableFields)
+          const parsed = await parseBundleImportFile(file, definitions, baseKeySet, bundleMainFields)
           if (parsed.previewRows.length === 0 && parsed.stats.every((item) => item.count === 0)) {
             message.warning("Tệp nhập chưa có dữ liệu hợp lệ")
             return false
@@ -213,7 +230,7 @@ export function RecordImportPage({ resource: resourceOverride }: { resource?: st
             </Typography.Text>
           ),
       },
-      ...importableFields.map((field) => ({
+      ...previewFields.map((field) => ({
         title: field.label,
         key: field.key,
         width: field.tableWidth,
@@ -239,7 +256,7 @@ export function RecordImportPage({ resource: resourceOverride }: { resource?: st
         ),
       },
     ],
-    [importableFields, lookups, bundleMode, resource],
+    [previewFields, lookups, bundleMode, resource],
   )
 
   const bundleTabItems = useMemo(
@@ -269,15 +286,19 @@ export function RecordImportPage({ resource: resourceOverride }: { resource?: st
     setDraftRows((current) => current.filter((item) => item.__rowKey !== row.__rowKey))
     if (!bundleMode) return
 
-    const customerCode = String(row.payload.code || row.preview.code || "").trim()
-    if (!customerCode) return
+    const parentCode = String(row.payload.code || row.preview.code || "").trim()
+    if (!parentCode) return
     setBundleSheets((current) => {
       const next = Object.fromEntries(
         Object.entries(current).map(([sheetName, rows]) => [
           sheetName,
           sheetName === resource
-            ? rows.filter((item) => String(item.code || "").trim() !== customerCode)
-            : rows.filter((item) => String(item.customerCode || "").trim() !== customerCode),
+            ? rows.filter((item) => String(item.code || "").trim() !== parentCode)
+            : rows.filter((item) => {
+              const definition = bundleDefinitions.find((item) => item.sheetName === sheetName)
+              const parentColumn = definition?.parentCodeColumn || "customerCode"
+              return String(item[parentColumn] || "").trim() !== parentCode
+            }),
         ]),
       )
       setBundleSheetStats(Object.entries(next).map(([name, rows]) => ({ name, count: rows.length })))
@@ -728,8 +749,9 @@ function buildImportWorkbook(
 }
 
 function buildBundleSheetDefinitions(resource: string, mainFields: FieldSpec[]): BundleSheetDefinition[] {
-  const mainColumns = mainFields.map((field) => field.key)
-  const related = BUNDLE_IMPORT_CONFIGS[resource]?.related || []
+  const config = BUNDLE_IMPORT_CONFIGS[resource]
+  const mainColumns = config?.mainColumns || mainFields.map((field) => field.key)
+  const related = config?.related || []
   return [
     {
       sheetName: resource,

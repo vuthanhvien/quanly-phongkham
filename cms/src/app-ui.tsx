@@ -8,6 +8,7 @@ export interface AppUiSettings {
   companyType: 'clinic' | 'retail' | 'cafe' | 'agriculture' | 'general'
   enabledModules: string[]
   hasCustomModuleSelection: boolean
+  clinicFeatures: { profile: 'basic' | 'aesthetic-procedure' | 'dental'; lotTracking: boolean; procedureSupply: boolean; stockLocations: boolean; returnAndWaste: boolean }
   appName: string
   appDescription?: string
   appIconUrl?: string
@@ -100,6 +101,7 @@ export const defaultAppUiSettings: AppUiSettings = {
   companyType: 'clinic',
   enabledModules: [],
   hasCustomModuleSelection: false,
+  clinicFeatures: { profile: 'aesthetic-procedure', lotTracking: true, procedureSupply: true, stockLocations: true, returnAndWaste: true },
   appName: 'Clinic CMS',
   appIconUrl: '',
   primaryColor: '#e889ae',
@@ -163,6 +165,15 @@ export function normalizeAppUiSettings(payload?: Partial<AppUiSettings> | null):
     ? Array.from(new Set(normalized.enabledModules.map((item) => String(item || "").trim()).filter(Boolean)))
     : []
   normalized.hasCustomModuleSelection = normalized.hasCustomModuleSelection === true
+  normalized.clinicFeatures = {
+    // All clinic inventory capabilities are active by default. Keeping this
+    // out of tenant settings avoids a hard-to-understand feature checklist.
+    profile: 'aesthetic-procedure',
+    lotTracking: true,
+    procedureSupply: true,
+    stockLocations: true,
+    returnAndWaste: true,
+  }
 
   normalized.appDescription = normalized.appDescription?.trim() || undefined
   normalized.appIconUrl = normalized.appIconUrl?.trim() || undefined

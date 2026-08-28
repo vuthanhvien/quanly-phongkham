@@ -121,6 +121,8 @@ export const menuIcons: Record<string, React.ReactNode> = {
   'staff-insurances': <AuditOutlined />,
   'staff-rewards': <GiftOutlined />,
   'staff-trainings': <ExperimentOutlined />,
+  'software-licenses': <GoldOutlined />,
+  'software-license-assignments': <AuditOutlined />,
   'performance-reviews': <LineChartOutlined />,
   kpi: <FundOutlined />,
   'position-histories': <DeploymentUnitOutlined />,
@@ -373,6 +375,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
         icon: menuGroupIcons[group.key] || <SolutionOutlined />,
         label: group.label,
         children: [
+          ...(group.key === "inventory" && canShowMenuModule("stock-batches")
+            ? [{ key: "/inventory", icon: <DatabaseOutlined />, label: <Link to="/inventory">Tồn kho</Link> }]
+            : []),
           ...group.resources.map((key) => ({
             key: moduleNavigation[key]?.path || `/${key}`,
             icon: menuIcons[key] || <SolutionOutlined />,
@@ -592,7 +597,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
         className="mobile-menu-drawer"
         open={mobileMenuOpen}
         title={settings.appName || 'CMS'}
-        width={320}
+        width="100%"
+        style={{ bottom: 0, margin: 0, paddingBottom: 0, top: 'auto' }}
         footer={null}
         onCancel={() => setMobileMenuOpen(false)}
       >

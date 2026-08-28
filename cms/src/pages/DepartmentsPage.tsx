@@ -27,6 +27,7 @@ interface Department {
   code: string
   name: string
   managerStaffId?: string
+  managerStaff?: { fullName?: string; code?: string }
   description?: string
   parentId?: string
   sortOrder: number
@@ -61,6 +62,7 @@ function buildTree(flat: Department[]): Department[] {
 export function DepartmentsPage() {
   const [flat, setFlat] = useState<Department[]>([])
   const [staffList, setStaffList] = useState<Staff[]>([])
+  const [staffLoading, setStaffLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Department | null>(null)
@@ -71,12 +73,8 @@ export function DepartmentsPage() {
   async function load() {
     setLoading(true)
     try {
-      const [deptRes, staffRes] = await Promise.all([
-        api.get("/records/departments", { params: { pageSize: 500 } }),
-        api.get("/records/staff", { params: { pageSize: 500 } }),
-      ])
+      const deptRes = await api.get("/records/departments", { params: { pageSize: 500, include: "managerStaff" } })
       setFlat(deptRes.data.data as Department[])
-      setStaffList(staffRes.data.data.map((r: Record<string, unknown>) => ({ id: String(r.id), fullName: String(r.fullName || r.code), code: String(r.code) })))
     } finally {
       setLoading(false)
     }
@@ -87,6 +85,7 @@ export function DepartmentsPage() {
     form.resetFields()
     form.setFieldsValue({ parentId: parentId ?? null, isActive: true, sortOrder: 0 })
     setModalOpen(true)
+    void loadStaffOptions()
   }
 
   function openEdit(dept: Department) {
@@ -101,6 +100,18 @@ export function DepartmentsPage() {
       isActive: dept.isActive,
     })
     setModalOpen(true)
+    void loadStaffOptions()
+  }
+
+  async function loadStaffOptions() {
+    if (staffList.length || staffLoading) return
+    setStaffLoading(true)
+    try {
+      const response = await api.get("/records/staff", { params: { pageSize: 500 } })
+      setStaffList((response.data.data || []).map((row: Record<string, unknown>) => ({ id: String(row.id), fullName: String(row.fullName || row.code), code: String(row.code || "") })))
+    } finally {
+      setStaffLoading(false)
+    }
   }
 
   async function save(values: Record<string, unknown>) {
@@ -145,8 +156,6 @@ export function DepartmentsPage() {
 
   const tree = buildTree(flat)
 
-  const staffMap = Object.fromEntries(staffList.map((s) => [s.id, s.fullName]))
-
   const parentOptions = flat
     .filter((d) => d.id !== editing?.id)
     .map((d) => ({ value: d.id, label: d.name }))
@@ -167,7 +176,7 @@ export function DepartmentsPage() {
       dataIndex: "managerStaffId",
       key: "managerStaffId",
       width: 180,
-      render: (v?: string) => v ? staffMap[v] || v : "—",
+      render: (v: string | undefined, row: Department) => v ? row.managerStaff?.fullName || row.managerStaff?.code || "Đã chọn" : "—",
     },
     {
       title: "Trạng thái",
@@ -247,6 +256,7 @@ export function DepartmentsPage() {
             <Select
               allowClear
               placeholder="Chọn nhân viên..."
+              loading={staffLoading}
               options={staffList.map((s) => ({ value: s.id, label: `${s.fullName} (${s.code})` }))}
               showSearch
               optionFilterProp="label"
