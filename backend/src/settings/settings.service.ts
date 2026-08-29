@@ -120,6 +120,7 @@ const APP_MODULE_KEYS = [
   'units',
   'product-categories',
   'stock-batches',
+  'warehouses',
   'file-folders',
   'files',
   'work-contracts',
@@ -136,6 +137,24 @@ const APP_MODULE_KEYS = [
   'performance-reviews',
   'kpi',
   'position-histories',
+  'software-licenses',
+  'software-license-assignments',
+  'company-feed',
+  'business-monitor',
+  'hr-monitor',
+  'project-monitor',
+  'inventory-monitor',
+  'recruitment',
+  'recruitment-positions',
+  'candidates',
+  'candidate-applications',
+  'recruitment-interviews',
+  'recruitment-scorecards',
+  'recruitment-offers',
+  'asset-categories',
+  'assets',
+  'asset-movements',
+  'asset-maintenances',
   'staff',
   'departments',
   'invoices',
@@ -159,6 +178,18 @@ const APP_MODULE_KEYS = [
   'workflow-instances',
   'workflow-tasks',
   'workflow-actions',
+] as const;
+
+// These modules are part of the base CMS experience. They used to be added
+// only by the browser at runtime, which made GET /settings/app-ui look
+// incomplete and caused a later PATCH to drop them from enabledModules.
+const CORE_APP_MODULE_KEYS = [
+  'customer-app', 'company-feed', 'services', 'doctors', 'videos', 'kpi',
+  'warehouses', 'software-licenses', 'software-license-assignments', 'business-monitor',
+  'hr-monitor', 'project-monitor', 'inventory-monitor',
+  'recruitment', 'recruitment-positions', 'candidates', 'candidate-applications',
+  'recruitment-interviews', 'recruitment-scorecards', 'recruitment-offers',
+  'asset-categories', 'assets', 'asset-movements', 'asset-maintenances',
 ] as const;
 
 const INDUSTRY_DATASETS = {
@@ -2009,8 +2040,11 @@ export class SettingsService {
 
   private normalizeAppUiPayload(payload: Partial<AppUiSetting>, fallback?: Partial<AppUiSetting>) {
     const companyType = this.normalizeCompanyType(payload.companyType ?? fallback?.companyType ?? 'clinic');
-    const enabledModules = this.normalizeEnabledModules(payload.enabledModules ?? fallback?.enabledModules ?? []);
     const hasCustomModuleSelection = payload.hasCustomModuleSelection ?? fallback?.hasCustomModuleSelection ?? false;
+    const selectedModules = this.normalizeEnabledModules(payload.enabledModules ?? fallback?.enabledModules ?? []);
+    const enabledModules = hasCustomModuleSelection
+      ? selectedModules
+      : Array.from(new Set([...selectedModules, ...CORE_APP_MODULE_KEYS]));
     const clinicFeatures = {
       profile: 'aesthetic-procedure',
       lotTracking: true,

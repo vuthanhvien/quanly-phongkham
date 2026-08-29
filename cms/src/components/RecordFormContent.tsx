@@ -134,6 +134,7 @@ export function RecordFormContent({
   const { mutate: create } = useCreate()
   const { mutate: update } = useUpdate()
   const { settings } = useAppUi()
+  const stockMovementType = Form.useWatch("movementType", form) as string | undefined
   const isAppointmentForm = resource === "appointments"
   const isWorkScheduleForm = resource === "work-schedules"
   const isAddressForm = resource === "customers" || resource === "leads"
@@ -179,12 +180,10 @@ export function RecordFormContent({
           "FORM",
           viewRole || getStoredUserRole(),
         )
-        const customFieldKeys = new Set(customFields.map((field: CustomField) => field.key))
-        // Static options (for example DRAFT/PUBLISHED) belong to the form
-        // configuration. Only custom select fields are populated from master
-        // data, otherwise an empty master-data group would erase the options.
+        // Built-in and custom select fields share Master Data. Static options
+        // remain as a fallback until the corresponding group is seeded.
         const masterFields = nextFields.filter((field: FieldSpec) =>
-          !field.relation && customFieldKeys.has(field.key) && (field.type === "select" || field.type === "multi-select"),
+          !field.relation && (field.type === "select" || field.type === "multi-select"),
         )
         const masterOptions = await Promise.all(masterFields.map(async (field) => {
           const rows = await getCachedMasterData(`master-data:${resource}.${field.key}`, () => api.get("/master-data", { params: { group: `${resource}.${field.key}` } }).then((response) => response.data.data || []))
@@ -193,7 +192,7 @@ export function RecordFormContent({
         const masterOptionMap = new Map(masterOptions)
         const fieldsWithMasterData = nextFields.map((field) => {
           const options = masterOptionMap.get(field.key)
-          if (!options) return field
+          if (!options || options.length === 0) return field
           return {
             ...field,
             options: Array.isArray(field.visibleOptionValues)
@@ -356,7 +355,8 @@ export function RecordFormContent({
     }
     if (resource === "stock-batches" && !editing) {
       const stockItems = Array.isArray(payload.items) ? payload.items as Array<Record<string, unknown>> : []
-      const isExport = payload.movementType === "EXPORT" || payload.movementType === "WASTE"
+      const isExport = payload.movementType === "EXPORT" || payload.movementType === "WASTE" || payload.movementType === "TRANSFER"
+      const isTransfer = payload.movementType === "TRANSFER"
       const normalizedItems = stockItems
         .map((item) => isExport
           ? { batchId: item.batchId ? String(item.batchId) : undefined, productId: item.productId ? String(item.productId) : undefined, quantity: Number(item.quantity || 0) }
@@ -368,7 +368,7 @@ export function RecordFormContent({
         toastError(errorMessage)
         return
       }
-      void api.post(isExport ? "/records/stock-batches/issue" : "/records/stock-batches/receipt", {
+      void api.post(isTransfer ? "/records/stock-batches/transfer" : isExport ? "/records/stock-batches/issue" : "/records/stock-batches/receipt", {
         ...payload,
         items: normalizedItems,
       }).then(done).catch((error) => {
@@ -464,11 +464,11 @@ export function RecordFormContent({
       // The server derives this summary from the editable assignments below.
       if (resource === "user-accounts" && field.key === "branchRoleSummary") return false
       if (resource === "stock-batches" && field.key === "procedureReference" && !settings.clinicFeatures.procedureSupply) return false
-      if (resource === "stock-batches" && field.key === "storageLocation" && !settings.clinicFeatures.stockLocations) return false
+      if (resource === "stock-batches" && ["destinationBranchId", "destinationWarehouseId"].includes(field.key) && stockMovementType !== "TRANSFER") return false
       if (hiddenFieldKeys.includes(field.key)) return false
       return true
     }),
-    [fields, hiddenFieldKeys, isAddressForm, isAppointmentForm, isWorkScheduleForm, resource, settings.clinicFeatures.procedureSupply, settings.clinicFeatures.stockLocations],
+    [fields, hiddenFieldKeys, isAddressForm, isAppointmentForm, isWorkScheduleForm, resource, settings.clinicFeatures.procedureSupply, settings.clinicFeatures.stockLocations, stockMovementType],
   )
   const isSystemAdminAccount = resource === "user-accounts"
     && ["admin", "admin-system"].includes(String(recordQuery.result?.data?.username || recordQuery.query?.data?.data?.username || recordQuery.data?.data?.data?.username || "").trim().toLowerCase())
@@ -1355,12 +1355,12 @@ type StockBatchItem = { productId?: string; batchNumber?: string; expiryDate?: s
 
 function StockBatchItemsInput({ value, onChange, disabled }: { value?: unknown; onChange?: (value: unknown) => void; disabled?: boolean }) {
   const { settings } = useAppUi()
-  const movementType = Form.useWatch("movementType") as "IMPORT" | "EXPORT" | undefined
+  const movementType = Form.useWatch("movementType") as "IMPORT" | "EXPORT" | "TRANSFER" | undefined
   const branchId = Form.useWatch("branchId") as string | undefined
   const [products, setProducts] = useState<Array<{ value: string; label: string; baseUnitId?: string }>>([])
   const [units, setUnits] = useState<Array<{ value: string; label: string; baseUnitId?: string }>>([])
-  const storageLocation = Form.useWatch("storageLocation") as string | undefined
-  const [batches, setBatches] = useState<Array<{ value: string; label: string; branchId: string; storageLocation?: string }>>([])
+  const warehouseId = Form.useWatch("warehouseId") as string | undefined
+  const [batches, setBatches] = useState<Array<{ value: string; label: string; branchId: string; warehouseId?: string }>>([])
   const rows = Array.isArray(value) ? value as StockBatchItem[] : []
 
   useEffect(() => {
@@ -1368,14 +1368,14 @@ function StockBatchItemsInput({ value, onChange, disabled }: { value?: unknown; 
       const data = response.data.data || {}
       setProducts((data.products || []).map((row: Record<string, unknown>) => ({ value: String(row.id), label: `${row.code || ""} - ${row.name || row.id}`, baseUnitId: row.baseUnitId ? String(row.baseUnitId) : undefined })))
       setUnits((data.units || []).map((row: Record<string, unknown>) => ({ value: String(row.id), label: String(row.name || row.id), baseUnitId: row.baseUnitId ? String(row.baseUnitId) : undefined })))
-      setBatches((data.batches || []).map((row: Record<string, unknown>) => ({ value: String(row.id), label: `${row.batchNumber || row.id} · tồn ${Number(row.remainingQuantity || 0).toLocaleString("vi-VN")} ${row.unit || ""}`, branchId: String(row.branchId || ""), storageLocation: row.storageLocation ? String(row.storageLocation) : undefined })))
+      setBatches((data.batches || []).map((row: Record<string, unknown>) => ({ value: String(row.id), label: `${row.batchNumber || row.id} · tồn ${Number(row.remainingQuantity || 0).toLocaleString("vi-VN")} ${row.unit || ""}`, branchId: String(row.branchId || ""), warehouseId: row.warehouseId ? String(row.warehouseId) : undefined })))
     }).catch(() => { setProducts([]); setUnits([]); setBatches([]) })
   }, [])
 
   const updateRows = (nextRows: StockBatchItem[]) => onChange?.(nextRows)
   const updateRow = (index: number, patch: Partial<StockBatchItem>) => updateRows(rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row))
-  const visibleBatches = batches.filter((batch) => (!branchId || batch.branchId === branchId) && (!storageLocation || batch.storageLocation === storageLocation))
-  const isExport = movementType === "EXPORT"
+  const visibleBatches = batches.filter((batch) => (!branchId || batch.branchId === branchId) && (!warehouseId || batch.warehouseId === warehouseId))
+  const isExport = movementType === "EXPORT" || movementType === "TRANSFER"
   const lotTracking = settings.clinicFeatures.lotTracking
   const addRow = () => updateRows([...rows, { quantity: 1 }])
   const removeRow = (index: number) => updateRows(rows.filter((_, rowIndex) => rowIndex !== index))
@@ -1395,7 +1395,7 @@ function StockBatchItemsInput({ value, onChange, disabled }: { value?: unknown; 
     { title: "SL nhập", dataIndex: "quantity", width: 120, render: (current: number | undefined, row: StockBatchItem & { index: number }) => <InputNumber disabled={disabled} min={1} style={{ width: "100%" }} value={current} onChange={(next) => updateRow(row.index, { quantity: Number(next || 0) })} /> },
     { title: "Đơn vị", dataIndex: "transferUnitId", width: 150, render: (current: string | undefined, row: StockBatchItem & { index: number }) => { const product = products.find((item) => item.value === row.productId); return <Select disabled={disabled || !product} options={units.filter((unit) => unit.value === product?.baseUnitId || unit.baseUnitId === product?.baseUnitId)} placeholder="Chọn đơn vị" style={{ width: "100%" }} value={current} onChange={(next) => updateRow(row.index, { transferUnitId: next })} /> } },
   ]
-  return <Space direction="vertical" size={8} style={{ width: "100%" }}><Table size="small" dataSource={source} pagination={false} scroll={{ x: 880 }} columns={[...columns, { title: "", width: 56, render: (_: unknown, row: StockBatchItem & { index: number }) => <Button aria-label="Xóa dòng" danger disabled={disabled} icon={<DeleteOutlined />} type="text" onClick={() => removeRow(row.index)} /> }]} /><Button disabled={disabled} icon={<PlusOutlined />} size="small" type="dashed" onClick={addRow}>{isExport ? "Thêm lô xuất" : "Thêm sản phẩm"}</Button></Space>
+  return <Space direction="vertical" size={8} style={{ width: "100%" }}><Table size="small" dataSource={source} pagination={false} scroll={{ x: 880 }} columns={[...columns, { title: "", width: 56, render: (_: unknown, row: StockBatchItem & { index: number }) => <Button aria-label="Xóa dòng" danger disabled={disabled} icon={<DeleteOutlined />} type="text" onClick={() => removeRow(row.index)} /> }]} /><Button disabled={disabled} icon={<PlusOutlined />} size="small" type="dashed" onClick={addRow}>{movementType === "TRANSFER" ? "Thêm lô chuyển" : isExport ? "Thêm lô xuất" : "Thêm sản phẩm"}</Button></Space>
 }
 
 function getDefaultFieldPlaceholder(field: FieldSpec) {

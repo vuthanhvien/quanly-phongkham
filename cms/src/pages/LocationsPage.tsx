@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { baseFields, normalizeSelectOption } from '../models'
+import { invalidateMasterDataCache } from '../utils/masterDataCache'
 
 type MasterData = { id: string; group: string; name: string; value: string; parentValue?: string; sortOrder: number; isActive: boolean }
 const MODULES = [
@@ -13,7 +14,7 @@ const MODULES = [
 ]
 
 const RESOURCE_LABELS: Record<string, string> = {
-  posts: 'Bài viết', news: 'Tin tức', staff: 'Nhân sự', customers: 'Khách hàng', leads: 'Khách tiềm năng', products: 'Sản phẩm', appointments: 'Lịch hẹn', consultations: 'Tư vấn', treatments: 'Điều trị', invoices: 'Hóa đơn', expenses: 'Chi phí', payrolls: 'Bảng lương', commissions: 'Hoa hồng', projects: 'Dự án', tasks: 'Công việc', attendances: 'Chấm công', 'work-schedules': 'Lịch làm việc', 'work-contracts': 'Hợp đồng lao động', 'staff-insurances': 'Bảo hiểm', 'staff-rewards': 'Khen thưởng & kỷ luật', 'staff-trainings': 'Đào tạo', 'performance-reviews': 'Đánh giá năng lực', 'leave-requests': 'Đơn nghỉ phép', 'leave-types': 'Loại nghỉ phép', 'payment-requests': 'Đề nghị thanh toán', 'business-trip-requests': 'Đơn công tác', 'attendance-adjustment-requests': 'Điều chỉnh chấm công', 'lead-activities': 'Hoạt động khách tiềm năng', 'medical-episodes': 'Hồ sơ điều trị', 'service-orders': 'Đơn dịch vụ', 'customer-images': 'Hình ảnh - chẩn đoán', 'stock-batches': 'Lô hàng', 'accounting-periods': 'Kỳ kế toán', 'accounting-chart-accounts': 'Hệ thống tài khoản', 'accounting-cash-flow-mappings': 'Luồng tiền kế toán', 'accounting-vouchers': 'Chứng từ kế toán', 'workflow-definitions': 'Định nghĩa workflow', 'workflow-steps': 'Bước workflow', 'workflow-instances': 'Phiên workflow', 'workflow-tasks': 'Việc workflow',
+  posts: 'Bài viết', news: 'Tin tức', staff: 'Nhân sự', customers: 'Khách hàng', leads: 'Khách tiềm năng', products: 'Sản phẩm', 'asset-categories': 'Danh mục tài sản', assets: 'Tài sản', 'asset-movements': 'Phiếu tài sản', 'asset-maintenances': 'Bảo trì tài sản', appointments: 'Lịch hẹn', consultations: 'Tư vấn', treatments: 'Điều trị', invoices: 'Hóa đơn', expenses: 'Chi phí', payrolls: 'Bảng lương', commissions: 'Hoa hồng', projects: 'Dự án', tasks: 'Công việc', attendances: 'Chấm công', 'work-schedules': 'Lịch làm việc', 'work-contracts': 'Hợp đồng lao động', 'staff-insurances': 'Bảo hiểm', 'staff-rewards': 'Khen thưởng & kỷ luật', 'staff-trainings': 'Đào tạo', 'performance-reviews': 'Đánh giá năng lực', 'leave-requests': 'Đơn nghỉ phép', 'leave-types': 'Loại nghỉ phép', 'payment-requests': 'Đề nghị thanh toán', 'business-trip-requests': 'Đơn công tác', 'attendance-adjustment-requests': 'Điều chỉnh chấm công', 'lead-activities': 'Hoạt động khách tiềm năng', 'medical-episodes': 'Hồ sơ điều trị', 'service-orders': 'Đơn dịch vụ', 'customer-images': 'Hình ảnh - chẩn đoán', 'stock-batches': 'Lô hàng', 'accounting-periods': 'Kỳ kế toán', 'accounting-chart-accounts': 'Hệ thống tài khoản', 'accounting-cash-flow-mappings': 'Luồng tiền kế toán', 'accounting-vouchers': 'Chứng từ kế toán', 'workflow-definitions': 'Định nghĩa workflow', 'workflow-steps': 'Bước workflow', 'workflow-instances': 'Phiên workflow', 'workflow-tasks': 'Việc workflow',
 }
 
 const FIELD_LABELS: Record<string, string> = { status: 'Trạng thái', gender: 'Giới tính', isFeatured: 'Nổi bật', productType: 'Loại sản phẩm', type: 'Loại', method: 'Phương thức thanh toán', paymentMethod: 'Phương thức thanh toán', requestType: 'Loại đề nghị', mediaType: 'Loại hình ảnh', priority: 'Độ ưu tiên', contractType: 'Loại hợp đồng', insuranceType: 'Loại bảo hiểm', accountType: 'Loại tài khoản', normalBalance: 'Tính chất số dư', cashFlowGroup: 'Nhóm dòng tiền', voucherType: 'Loại chứng từ', direction: 'Chiều dòng tiền', section: 'Phân loại', activityType: 'Loại hoạt động', approverType: 'Kiểu người duyệt', rejectBehavior: 'Xử lý từ chối', targetResource: 'Model áp dụng', requiresAllocation: 'Quản lý số dư', isPaid: 'Hưởng lương', isActive: 'Đang áp dụng' }
@@ -90,8 +91,8 @@ export function LocationsPage() {
     void seedAndLoadGroups()
   }, [])
   const showForm = (item?: MasterData) => { setEditing(item || null); form.setFieldsValue(item || { group, isActive: true, sortOrder: rows.length }); setOpen(true) }
-  const save = async (values: MasterData) => { try { if (editing) await api.patch(`/master-data/${editing.id}`, values); else await api.post('/master-data', { ...values, group }); message.success('Đã lưu dữ liệu'); setOpen(false); void load() } catch { message.error('Không thể lưu dữ liệu') } }
-  const remove = async (id: string) => { await api.delete(`/master-data/${id}`); message.success('Đã xoá dữ liệu'); void load() }
+  const save = async (values: MasterData) => { try { if (editing) await api.patch(`/master-data/${editing.id}`, values); else await api.post('/master-data', { ...values, group }); invalidateMasterDataCache(`master-data:${group}`); message.success('Đã lưu dữ liệu'); setOpen(false); void load() } catch { message.error('Không thể lưu dữ liệu') } }
+  const remove = async (id: string) => { await api.delete(`/master-data/${id}`); invalidateMasterDataCache(`master-data:${group}`); message.success('Đã xoá dữ liệu'); void load() }
 
   return <>
     <div className="page-header">

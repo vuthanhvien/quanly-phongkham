@@ -1260,6 +1260,9 @@ export class StockBatch extends ConfigurableEntity {
   @Column()
   branchId: string;
 
+  @Column({ nullable: true })
+  warehouseId?: string;
+
   // Optional sub-location within a branch: main store, procedure room, dental chair, etc.
   @Column({ nullable: true })
   storageLocation?: string;
@@ -1283,6 +1286,158 @@ export class StockBatch extends ConfigurableEntity {
 
   @Column({ default: 'cai' })
   unit: string;
+}
+
+@Entity('warehouses')
+export class Warehouse extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  name: string;
+
+  @Column()
+  branchId: string;
+
+  @Column({ nullable: true })
+  address?: string;
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
+}
+
+@Entity('recruitment_positions')
+export class RecruitmentPosition extends ConfigurableEntity {
+  @Column({ unique: true }) code: string;
+  @Column() name: string;
+  @Column({ nullable: true }) branchId?: string;
+  @Column({ nullable: true }) departmentId?: string;
+  @Column({ nullable: true }) hiringManagerId?: string;
+  @Column({ default: 1 }) headcount: number;
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true }) salaryMin?: number;
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true }) salaryMax?: number;
+  @Column({ default: 'OPEN' }) status: string;
+  @Column({ type: 'text', nullable: true }) description?: string;
+}
+
+@Entity('candidates')
+export class Candidate extends ConfigurableEntity {
+  @Column({ unique: true }) code: string;
+  @Column() fullName: string;
+  @Column({ nullable: true }) phone?: string;
+  @Column({ nullable: true }) email?: string;
+  @Column({ nullable: true }) source?: string;
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true }) expectedSalary?: number;
+  @Column({ nullable: true }) cvUrl?: string;
+  @Column({ default: 'ACTIVE' }) status: string;
+  @Column({ type: 'text', nullable: true }) note?: string;
+}
+
+@Entity('candidate_applications')
+@Index(['candidateId', 'recruitmentPositionId'], { unique: true })
+export class CandidateApplication extends ConfigurableEntity {
+  @Column() candidateId: string;
+  @Column() recruitmentPositionId: string;
+  @Column({ default: 'NEW' }) stage: string;
+  @Column({ type: 'date', nullable: true }) appliedAt?: string;
+  @Column({ nullable: true }) ownerStaffId?: string;
+  @Column({ type: 'text', nullable: true }) note?: string;
+}
+
+@Entity('recruitment_interviews')
+export class RecruitmentInterview extends ConfigurableEntity {
+  @Column() candidateApplicationId: string;
+  @Column({ type: 'datetime' }) scheduledAt: Date;
+  @Column({ type: 'simple-json', nullable: true }) interviewerStaffIds?: string[];
+  @Column({ nullable: true }) location?: string;
+  @Column({ default: 'SCHEDULED' }) status: string;
+  @Column({ type: 'text', nullable: true }) note?: string;
+}
+
+@Entity('recruitment_scorecards')
+export class RecruitmentScorecard extends ConfigurableEntity {
+  @Column() candidateApplicationId: string;
+  @Column({ nullable: true }) recruitmentInterviewId?: string;
+  @Column() interviewerStaffId: string;
+  @Column({ type: 'int', nullable: true }) technicalRating?: number;
+  @Column({ type: 'int', nullable: true }) serviceRating?: number;
+  @Column({ type: 'int', nullable: true }) attitudeRating?: number;
+  @Column({ type: 'int' }) overallRating: number;
+  @Column() recommendation: string;
+  @Column({ type: 'text', nullable: true }) note?: string;
+}
+
+@Entity('recruitment_offers')
+export class RecruitmentOffer extends ConfigurableEntity {
+  @Column({ unique: true }) code: string;
+  @Column() candidateApplicationId: string;
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true }) offeredSalary?: number;
+  @Column({ type: 'date', nullable: true }) proposedStartDate?: string;
+  @Column({ default: 'DRAFT' }) status: string;
+  @Column({ type: 'text', nullable: true }) note?: string;
+}
+
+@Entity('asset_categories')
+export class AssetCategory extends ConfigurableEntity {
+  @Column({ unique: true }) code: string;
+  @Column() name: string;
+  @Column({ default: false }) requiresSerial: boolean;
+  @Column({ default: false }) maintenanceRequired: boolean;
+  @Column({ default: false }) depreciationEnabled: boolean;
+  @Column({ default: true }) isActive: boolean;
+  @Column({ type: 'text', nullable: true }) note?: string;
+}
+
+@Entity('assets')
+export class Asset extends ConfigurableEntity {
+  @Column({ unique: true }) code: string;
+  @Column() name: string;
+  @Column() assetCategoryId: string;
+  @Column({ nullable: true }) serialNumber?: string;
+  @Column({ nullable: true }) model?: string;
+  @Column({ nullable: true }) branchId?: string;
+  @Column({ nullable: true }) warehouseId?: string;
+  @Column({ nullable: true }) roomId?: string;
+  @Column({ nullable: true }) custodianStaffId?: string;
+  @Column({ type: 'date', nullable: true }) purchaseDate?: string;
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true }) purchaseCost?: number;
+  @Column({ type: 'date', nullable: true }) warrantyUntil?: string;
+  @Column({ default: 'AVAILABLE' }) status: string;
+  @Column({ type: 'text', nullable: true }) note?: string;
+}
+
+@Entity('asset_movements')
+export class AssetMovement extends ConfigurableEntity {
+  @Column({ unique: true }) code: string;
+  @Column() assetId: string;
+  @Column() movementType: string;
+  @Column({ type: 'datetime' }) movementAt: Date;
+  @Column({ nullable: true }) fromBranchId?: string;
+  @Column({ nullable: true }) fromWarehouseId?: string;
+  @Column({ nullable: true }) fromRoomId?: string;
+  @Column({ nullable: true }) fromCustodianStaffId?: string;
+  @Column({ nullable: true }) toBranchId?: string;
+  @Column({ nullable: true }) toWarehouseId?: string;
+  @Column({ nullable: true }) toRoomId?: string;
+  @Column({ nullable: true }) toCustodianStaffId?: string;
+  @Column({ type: 'text', nullable: true }) note?: string;
+}
+
+@Entity('asset_maintenances')
+export class AssetMaintenance extends ConfigurableEntity {
+  @Column({ unique: true }) code: string;
+  @Column() assetId: string;
+  @Column() maintenanceType: string;
+  @Column({ type: 'date' }) scheduledDate: string;
+  @Column({ type: 'date', nullable: true }) completedDate?: string;
+  @Column({ nullable: true }) assigneeStaffId?: string;
+  @Column({ nullable: true }) supplierId?: string;
+  @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true }) cost?: number;
+  @Column({ default: 'SCHEDULED' }) status: string;
+  @Column({ type: 'text', nullable: true }) note?: string;
 }
 
 @Entity('invoices')
@@ -3481,6 +3636,17 @@ export const ENTITIES = [
   Appointment,
   WorkSchedule,
   StockBatch,
+  Warehouse,
+  RecruitmentPosition,
+  Candidate,
+  CandidateApplication,
+  RecruitmentInterview,
+  RecruitmentScorecard,
+  RecruitmentOffer,
+  AssetCategory,
+  Asset,
+  AssetMovement,
+  AssetMaintenance,
   Consultation,
   ServiceOrder,
   ServiceOrderItem,

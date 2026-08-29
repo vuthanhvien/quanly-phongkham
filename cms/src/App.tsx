@@ -47,6 +47,8 @@ import { ProjectBoardPage } from './pages/ProjectBoardPage';
 import { KpiDashboardPage } from './pages/KpiDashboardPage';
 import { KpiImportExportPage } from './pages/KpiImportExportPage';
 import { InventoryPage } from './pages/InventoryPage';
+import { OperationsMonitorPage } from './pages/OperationsMonitorPage';
+import { RecruitmentPipelinePage } from './pages/RecruitmentPipelinePage';
 import { registerToastApi } from './toast';
 
 const resources = Object.entries(entityLabels).map(([name, label]) => ({
@@ -364,6 +366,21 @@ export function App() {
               </Route>
               <Route element={<StaticResourceGuard resource="stock-batches" />}>
                 <Route path="/inventory" element={<InventoryPage />} />
+              </Route>
+              <Route element={<ModuleGuard moduleKey="business-monitor" />}>
+                <Route path="/business-monitor" element={<OperationsMonitorPage kind="business" />} />
+              </Route>
+              <Route element={<ModuleGuard moduleKey="hr-monitor" />}>
+                <Route path="/hr-monitor" element={<OperationsMonitorPage kind="hr" />} />
+              </Route>
+              <Route element={<ModuleGuard moduleKey="project-monitor" />}>
+                <Route path="/project-monitor" element={<OperationsMonitorPage kind="projects" />} />
+              </Route>
+              <Route element={<ModuleGuard moduleKey="inventory-monitor" />}>
+                <Route path="/inventory-monitor" element={<OperationsMonitorPage kind="inventory" />} />
+              </Route>
+              <Route element={<ModuleGuard moduleKey="recruitment" />}>
+                <Route path="/recruitment" element={<RecruitmentPipelinePage />} />
               </Route>
               <Route element={<StaticResourceGuard resource="projects" />}>
                 <Route path="/projects/:id/board" element={<ProjectBoardPage />} />

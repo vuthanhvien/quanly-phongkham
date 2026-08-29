@@ -11,18 +11,13 @@ export type AppModuleGroup = {
   modules: AppModuleKey[]
 }
 
-export const appStandaloneModules: AppModuleKey[] = ["dashboard", "calendar"]
+export const appStandaloneModules: AppModuleKey[] = ["dashboard", "calendar", "business-monitor", "hr-monitor", "project-monitor", "inventory-monitor"]
 
 export const companyTypeLabels = Object.fromEntries(
   companyTypeOptions.map((item) => [item.value, item.label]),
 ) as Record<CompanyType, string>
 
 export const appModuleGroups: AppModuleGroup[] = [
-  {
-    key: "internal",
-    label: "Không gian nội bộ",
-    modules: ["company-feed"],
-  },
   {
     key: "front-office",
     label: "Lễ tân & CRM",
@@ -37,7 +32,12 @@ export const appModuleGroups: AppModuleGroup[] = [
   {
     key: "inventory",
     label: "Kho & mua hàng",
-    modules: ["products", "stock-batches", "suppliers", "product-categories", "units"],
+    modules: ["products", "stock-batches", "warehouses", "suppliers", "product-categories", "units"],
+  },
+  {
+    key: "assets",
+    label: "Tài sản",
+    modules: ["assets", "asset-categories", "asset-movements", "asset-maintenances"],
   },
   {
     key: "documents",
@@ -53,12 +53,13 @@ export const appModuleGroups: AppModuleGroup[] = [
     key: "hr",
     label: "Nhân sự",
     modules: [
+      "staff",
+      "departments",
       "attendances",
       "leave-requests",
       "attendance-adjustment-requests",
       "work-schedules",
       "business-trip-requests",
-      "staff",
       "work-contracts",
       "staff-insurances",
       "leave-allocations",
@@ -70,7 +71,19 @@ export const appModuleGroups: AppModuleGroup[] = [
       "performance-reviews",
       "kpi",
       "position-histories",
-      "departments",
+    ],
+  },
+  {
+    key: "recruitment",
+    label: "Tuyển dụng",
+    modules: [
+      "recruitment",
+      "recruitment-positions",
+      "candidates",
+      "candidate-applications",
+      "recruitment-interviews",
+      "recruitment-scorecards",
+      "recruitment-offers",
     ],
   },
   {
@@ -120,6 +133,11 @@ export const appModuleLabels: Record<AppModuleKey, string> = {
   "landing-config": "Cài đặt site",
   "customer-app": "App khách hàng",
   kpi: "KPI & Hiệu suất",
+  "business-monitor": "Monitor kinh doanh",
+  "hr-monitor": "Monitor nhân sự",
+  "project-monitor": "Monitor dự án",
+  "inventory-monitor": "Monitor kho – hàng hoá",
+  recruitment: "Tuyển dụng",
   services: "Dịch vụ",
   doctors: "Bác sĩ",
   videos: "Video ngắn",
@@ -239,6 +257,7 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
     "product-categories",
     "units",
     "stock-batches",
+    "warehouses",
     "file-folders",
     "files",
     "work-contracts",
@@ -295,6 +314,7 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
     "product-categories",
     "units",
     "stock-batches",
+    "warehouses",
     "file-folders",
     "files",
     "work-contracts",
@@ -352,6 +372,7 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
     "product-categories",
     "units",
     "stock-batches",
+    "warehouses",
     "file-folders",
     "files",
     "work-contracts",
@@ -405,6 +426,7 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
     "product-categories",
     "units",
     "stock-batches",
+    "warehouses",
     "file-folders",
     "files",
     "work-contracts",
@@ -461,6 +483,7 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
     "product-categories",
     "units",
     "stock-batches",
+    "warehouses",
     "file-folders",
     "files",
     "work-contracts",
@@ -514,10 +537,10 @@ export function resolveEnabledModules(
   hasCustomModuleSelection = false,
 ) {
   const normalized = normalizeEnabledModules(enabledModules)
-  if (hasCustomModuleSelection) return Array.from(new Set([...normalized, "services", "doctors", "videos"]))
+  if (hasCustomModuleSelection) return Array.from(new Set([...normalized, "services", "doctors", "videos", "assets", "asset-categories", "asset-movements", "asset-maintenances"]))
   // Customer app management is a shared User site capability for every
   // industry preset, including tenants created before this module existed.
-  return Array.from(new Set([...companyTypeModulePresets[companyType], "customer-app", "company-feed", "services", "doctors", "videos", "kpi", "software-licenses", "software-license-assignments"]))
+  return Array.from(new Set([...companyTypeModulePresets[companyType], "customer-app", "company-feed", "services", "doctors", "videos", "kpi", "software-licenses", "software-license-assignments", "business-monitor", "hr-monitor", "project-monitor", "inventory-monitor", "recruitment", "recruitment-positions", "candidates", "candidate-applications", "recruitment-interviews", "recruitment-scorecards", "recruitment-offers", "assets", "asset-categories", "asset-movements", "asset-maintenances"]))
 }
 
 export function isModuleEnabled(moduleKey: string, enabledModules: unknown, companyType: CompanyType, hasCustomModuleSelection = false) {

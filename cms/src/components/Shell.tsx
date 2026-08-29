@@ -95,6 +95,7 @@ export const menuIcons: Record<string, React.ReactNode> = {
   "product-categories": <ApartmentOutlined />,
   units: <DeploymentUnitOutlined />,
   "stock-batches": <DatabaseOutlined />,
+  warehouses: <DatabaseOutlined />,
   treatments: <ExperimentOutlined />,
   invoices: <FileDoneOutlined />,
   expenses: <DollarOutlined />,
@@ -126,6 +127,21 @@ export const menuIcons: Record<string, React.ReactNode> = {
   'performance-reviews': <LineChartOutlined />,
   kpi: <FundOutlined />,
   'position-histories': <DeploymentUnitOutlined />,
+  'business-monitor': <LineChartOutlined />,
+  'hr-monitor': <LineChartOutlined />,
+  'project-monitor': <LineChartOutlined />,
+  'inventory-monitor': <DatabaseOutlined />,
+  recruitment: <TeamOutlined />,
+  'recruitment-positions': <SolutionOutlined />,
+  candidates: <TeamOutlined />,
+  'candidate-applications': <FileDoneOutlined />,
+  'recruitment-interviews': <CalendarOutlined />,
+  'recruitment-scorecards': <AuditOutlined />,
+  'recruitment-offers': <FileDoneOutlined />,
+  'asset-categories': <AppstoreOutlined />,
+  assets: <GoldOutlined />,
+  'asset-movements': <InteractionOutlined />,
+  'asset-maintenances': <ExperimentOutlined />,
 }
 
 const menuGroupIcons: Record<AppModuleGroup["key"], React.ReactNode> = {
@@ -134,6 +150,8 @@ const menuGroupIcons: Record<AppModuleGroup["key"], React.ReactNode> = {
   inventory: <DatabaseOutlined />,
   documents: <FolderOpenOutlined />,
   hr: <TeamOutlined />,
+  recruitment: <TeamOutlined />,
+  assets: <GoldOutlined />,
   finance: <DollarOutlined />,
   workflow: <AuditOutlined />,
   projects: <ApartmentOutlined />,
@@ -155,6 +173,11 @@ const moduleNavigation: Record<string, { path: string; label: string; screen?: s
   "zalo-inbox": { path: "/zalo-inbox", label: "Hộp thư Zalo", screen: "zalo-inbox" },
   "accounting-reports": { path: "/accounting-reports", label: "Báo cáo kế toán", screen: "accounting-reports" },
   kpi: { path: "/kpi", label: "KPI & Hiệu suất" },
+  'business-monitor': { path: "/business-monitor", label: "Monitor kinh doanh" },
+  'hr-monitor': { path: "/hr-monitor", label: "Monitor nhân sự" },
+  'project-monitor': { path: "/project-monitor", label: "Monitor dự án" },
+  'inventory-monitor': { path: "/inventory-monitor", label: "Monitor kho – hàng hoá" },
+  recruitment: { path: "/recruitment", label: "Tuyển dụng" },
 }
 
 const resourceToGroup = Object.fromEntries(
@@ -358,7 +381,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
       .filter(canShowMenuModule)
       .map((key, index) => ({
         key: `single:${key}`,
-        order: getModuleOrder(key, index),
+        // Global monitors are navigation roots, kept directly below Feed and
+        // Calendar regardless of the optional ordering of grouped modules.
+        order: index,
         index,
         item: {
           key: moduleNavigation[key]?.path || `/${key}`,

@@ -39,6 +39,11 @@ export class RecordsController {
     return this.records.convertLeadToCustomer(id, request.user);
   }
 
+  @Post('records/candidates/:id/convert-to-staff')
+  convertCandidateToStaff(@Param('id') id: string, @Request() request: { user: AuthUser }) {
+    return this.records.convertCandidateToStaff(id, request.user);
+  }
+
   @Post('records/accounting-vouchers/:id/post')
   postAccountingVoucher(@Param('id') id: string, @Request() request: { user: AuthUser }) {
     return this.records.postAccountingVoucher(id, request.user);
@@ -111,6 +116,11 @@ export class RecordsController {
   @Post('records/stock-batches/issue')
   issueStock(@Body() payload: Record<string, unknown>, @Request() request: { user: AuthUser }) {
     return this.records.issueStock(payload, request.user);
+  }
+
+  @Post('records/stock-batches/transfer')
+  transferStock(@Body() payload: Record<string, unknown>, @Request() request: { user: AuthUser }) {
+    return this.records.transferStock(payload, request.user);
   }
 
   @Get('records/:resource/import-bundle')

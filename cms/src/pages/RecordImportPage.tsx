@@ -15,7 +15,7 @@ import { displayValue, loadRelationOptions, LookupMap } from "../relations"
 import { getFieldCatalog } from "../view-settings"
 
 const UNSUPPORTED_RESOURCES = new Set(["files"])
-const BUNDLE_RESOURCES = new Set(["customers", "leads", "staff", "products", "stock-batches", "service-orders"])
+const BUNDLE_RESOURCES = new Set(["customers", "leads", "staff", "products", "stock-batches", "service-orders", "assets"])
 const PRODUCT_CATEGORY_FIELDS: FieldSpec[] = [
   { key: "code", label: "Mã", required: true, tableWidth: 150 },
   { key: "name", label: "Tên danh mục", required: true, tableWidth: 220 },
@@ -75,6 +75,14 @@ const BUNDLE_IMPORT_CONFIGS: Record<string, { mainColumns?: string[]; related: B
   "service-orders": {
     mainColumns: ["code", "customerCode", "branchId", "orderDate", "performerStaffId", "status", "note"],
     related: [{ sheetName: "service-order-items", resource: "service-order-items", parentCodeColumn: "orderCode", columns: ["orderCode", "productCode", "quantity", "transferUnitId", "unitPrice"] }],
+  },
+  assets: {
+    mainColumns: ["code", "name", "assetCategoryId", "serialNumber", "model", "branchId", "warehouseId", "roomId", "custodianStaffId", "purchaseDate", "purchaseCost", "warrantyUntil", "status", "note"],
+    related: [
+      { sheetName: "asset-categories", resource: "asset-categories", columns: ["code", "name", "requiresSerial", "maintenanceRequired", "depreciationEnabled", "isActive", "note"] },
+      { sheetName: "asset-movements", resource: "asset-movements", parentCodeColumn: "assetCode", columns: ["assetCode", "code", "movementType", "movementAt", "toBranchId", "toWarehouseId", "toRoomId", "toCustodianStaffId", "note"] },
+      { sheetName: "asset-maintenances", resource: "asset-maintenances", parentCodeColumn: "assetCode", columns: ["assetCode", "code", "maintenanceType", "scheduledDate", "completedDate", "assigneeStaffId", "supplierId", "cost", "status", "note"] },
+    ],
   },
 }
 
@@ -589,7 +597,9 @@ export function RecordImportPage({ resource: resourceOverride }: { resource?: st
               <Typography.Text strong>{definition.sheetName} ({rows.length})</Typography.Text>
               {rows.length ? (
                 <Table
-                  columns={buildBundlePreviewColumns(definition, rows, (index) => removeBundleRow(definition.sheetName, index))}
+                  bordered
+                  className="record-import-child-table"
+                  columns={buildBundlePreviewColumns(definition, rows, (index) => removeBundleRow(definition.sheetName, index), { alignWithParent: true })}
                   dataSource={rows.map((item) => ({ ...item, __bundleIndex: (bundleSheets[definition.sheetName] || []).indexOf(item), __rowKey: `${definition.sheetName}-${String(item[definition.parentCodeColumn || "parentCode"] || "")}-${String(item.productCode || item.code || "")}` }))}
                   pagination={false}
                   rowKey="__rowKey"
@@ -724,12 +734,19 @@ function buildBundlePreviewColumns(
   definition: BundleSheetDefinition,
   rows: Array<Record<string, unknown>>,
   onRemove: (rowIndex: number) => void,
+  options?: { alignWithParent?: boolean },
 ): ColumnsType<Record<string, unknown>> {
   const columns = Array.from(new Set([
     ...definition.columns,
     ...rows.flatMap((row) => Object.keys(row)),
   ])).filter((column) => !column.startsWith("__"))
   return [
+    ...(options?.alignWithParent ? [{
+      title: "",
+      key: "__parentSpacing",
+      width: 105,
+      render: () => null,
+    }] : []),
     {
       title: "Trạng thái",
       key: "__importStatus",
@@ -889,6 +906,8 @@ function serializeWorkbookCell(value: unknown) {
 
 function buildBundleFieldGuide(sheetName: string, column: string) {
   if (column === "recordId") return "Giữ nguyên để update dòng liên kết đã export. Để trống để tạo mới."
+  if (column === "assetCode") return "Nhập mã tài sản từ sheet assets, ví dụ: TS-IMPORT-001."
+  if (column === "assetCategoryId") return "Nhập mã danh mục tài sản từ sheet asset-categories."
   if (column.endsWith("Code")) return "Nhập code của bản ghi cha để map liên kết."
   if (column === "branchId" || column === "defaultBranchId") return "Nhập slug chi nhánh."
   if (column === "userId") return "Nhập email tài khoản."

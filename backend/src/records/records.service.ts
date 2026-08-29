@@ -70,6 +70,17 @@ import {
   SoftwareLicense,
   SoftwareLicenseAssignment,
   StockBatch,
+  Warehouse,
+  RecruitmentPosition,
+  Candidate,
+  CandidateApplication,
+  RecruitmentInterview,
+  RecruitmentScorecard,
+  RecruitmentOffer,
+  AssetCategory,
+  Asset,
+  AssetMovement,
+  AssetMaintenance,
   Supplier,
   Task,
   Treatment,
@@ -99,6 +110,7 @@ const RESOURCE_ACTIONS: Record<string, string[]> = {
   customers: DEFAULT_RESOURCE_ACTIONS,
   projects: [...DEFAULT_RESOURCE_ACTIONS, 'board'],
   leads: [...DEFAULT_RESOURCE_ACTIONS, 'convert-to-customer'],
+  candidates: [...DEFAULT_RESOURCE_ACTIONS, 'convert-to-staff'],
   invoices: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
   expenses: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
   payrolls: [...DEFAULT_RESOURCE_ACTIONS, 'generate-accounting-voucher'],
@@ -133,7 +145,7 @@ type RequestContext = {
   get?: (name: string) => string | undefined;
 };
 
-type BundleRootResource = 'customers' | 'leads' | 'staff' | 'products' | 'stock-batches' | 'service-orders';
+type BundleRootResource = 'customers' | 'leads' | 'staff' | 'products' | 'stock-batches' | 'service-orders' | 'assets';
 type WorkScheduleRecurrenceType = 'NONE' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
 
 type ImportBundleSheetConfig = {
@@ -146,7 +158,7 @@ type ImportBundleSheetConfig = {
   customFields?: Array<Pick<CustomFieldDefinition, 'key' | 'dataType' | 'relationResource' | 'options'>>;
 };
 
-type ImportBundleCommitMode = 'records' | 'product-combo' | 'stock-receipt' | 'service-order';
+type ImportBundleCommitMode = 'records' | 'product-combo' | 'stock-receipt' | 'service-order' | 'asset-register';
 
 type ImportBundleRowError = {
   sheet: string;
@@ -369,10 +381,50 @@ const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
       columns: ['orderCode', 'productCode', 'quantity', 'transferUnitId', 'unitPrice'],
     }],
   },
+  assets: {
+    main: {
+      sheetName: 'assets',
+      resource: 'assets',
+      columns: ['code', 'name', 'assetCategoryId', 'serialNumber', 'model', 'branchId', 'warehouseId', 'roomId', 'custodianStaffId', 'purchaseDate', 'purchaseCost', 'warrantyUntil', 'status', 'note'],
+    },
+    related: [
+      {
+        sheetName: 'asset-categories',
+        resource: 'asset-categories',
+        columns: ['code', 'name', 'requiresSerial', 'maintenanceRequired', 'depreciationEnabled', 'isActive', 'note'],
+      },
+      {
+        sheetName: 'asset-movements',
+        resource: 'asset-movements',
+        parentField: 'assetId',
+        parentCodeColumn: 'assetCode',
+        columns: ['assetCode', 'code', 'movementType', 'movementAt', 'toBranchId', 'toWarehouseId', 'toRoomId', 'toCustodianStaffId', 'note'],
+      },
+      {
+        sheetName: 'asset-maintenances',
+        resource: 'asset-maintenances',
+        parentField: 'assetId',
+        parentCodeColumn: 'assetCode',
+        columns: ['assetCode', 'code', 'maintenanceType', 'scheduledDate', 'completedDate', 'assigneeStaffId', 'supplierId', 'cost', 'status', 'note'],
+      },
+    ],
+    commitMode: 'asset-register',
+  },
 };
 
 const FIELD_RELATION_RESOURCES: Record<string, string> = {
   branchId: 'branches',
+  warehouseId: 'warehouses',
+  destinationWarehouseId: 'warehouses',
+  destinationBranchId: 'branches',
+  candidateId: 'candidates',
+  recruitmentPositionId: 'recruitment-positions',
+  candidateApplicationId: 'candidate-applications',
+  recruitmentInterviewId: 'recruitment-interviews',
+  assetCategoryId: 'asset-categories',
+  assetId: 'assets',
+  hiringManagerId: 'staff',
+  interviewerStaffId: 'staff',
   defaultBranchId: 'branches',
   departmentId: 'departments',
   fromDepartmentId: 'departments',
@@ -387,6 +439,15 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   softwareLicenseId: 'software-licenses',
   assignedStaffId: 'staff',
   ownerStaffId: 'staff',
+  custodianStaffId: 'staff',
+  fromBranchId: 'branches',
+  fromWarehouseId: 'warehouses',
+  fromRoomId: 'rooms',
+  fromCustodianStaffId: 'staff',
+  toBranchId: 'branches',
+  toWarehouseId: 'warehouses',
+  toRoomId: 'rooms',
+  toCustodianStaffId: 'staff',
   consultantStaffId: 'staff',
   doctorStaffId: 'staff',
   picStaffId: 'staff',
@@ -437,6 +498,8 @@ const RESOURCE_EXTERNAL_KEYS: Record<string, string> = {
   leads: 'code',
   suppliers: 'code',
   products: 'code',
+  'asset-categories': 'code',
+  assets: 'code',
   units: 'name',
   invoices: 'code',
   'user-accounts': 'email',
@@ -466,6 +529,9 @@ const RESOURCE_IMPORT_KEYS: Record<string, string> = {
   'lead-activities': 'id',
   suppliers: 'code',
   products: 'code',
+  'asset-categories': 'code',
+  assets: 'code',
+  'asset-maintenances': 'code',
   units: 'name',
   'medical-episodes': 'id',
   appointments: 'id',
@@ -538,6 +604,17 @@ export class RecordsService {
     @InjectRepository(Appointment) private readonly appointments: Repository<Appointment>,
     @InjectRepository(WorkSchedule) private readonly workSchedules: Repository<WorkSchedule>,
     @InjectRepository(StockBatch) private readonly stockBatches: Repository<StockBatch>,
+    @InjectRepository(Warehouse) private readonly warehouses: Repository<Warehouse>,
+    @InjectRepository(RecruitmentPosition) private readonly recruitmentPositions: Repository<RecruitmentPosition>,
+    @InjectRepository(Candidate) private readonly candidates: Repository<Candidate>,
+    @InjectRepository(CandidateApplication) private readonly candidateApplications: Repository<CandidateApplication>,
+    @InjectRepository(RecruitmentInterview) private readonly recruitmentInterviews: Repository<RecruitmentInterview>,
+    @InjectRepository(RecruitmentScorecard) private readonly recruitmentScorecards: Repository<RecruitmentScorecard>,
+    @InjectRepository(RecruitmentOffer) private readonly recruitmentOffers: Repository<RecruitmentOffer>,
+    @InjectRepository(AssetCategory) private readonly assetCategories: Repository<AssetCategory>,
+    @InjectRepository(Asset) private readonly assets: Repository<Asset>,
+    @InjectRepository(AssetMovement) private readonly assetMovements: Repository<AssetMovement>,
+    @InjectRepository(AssetMaintenance) private readonly assetMaintenances: Repository<AssetMaintenance>,
     @InjectRepository(Consultation) private readonly consultations: Repository<Consultation>,
     @InjectRepository(ServiceOrder) private readonly serviceOrders: Repository<ServiceOrder>,
     @InjectRepository(CustomerImage) private readonly customerImages: Repository<CustomerImage>,
@@ -614,6 +691,17 @@ export class RecordsService {
       appointments: this.appointments,
       'work-schedules': this.workSchedules,
       'stock-batches': this.stockBatches,
+      warehouses: this.warehouses,
+      'recruitment-positions': this.recruitmentPositions,
+      candidates: this.candidates,
+      'candidate-applications': this.candidateApplications,
+      'recruitment-interviews': this.recruitmentInterviews,
+      'recruitment-scorecards': this.recruitmentScorecards,
+      'recruitment-offers': this.recruitmentOffers,
+      'asset-categories': this.assetCategories,
+      assets: this.assets,
+      'asset-movements': this.assetMovements,
+      'asset-maintenances': this.assetMaintenances,
       consultations: this.consultations,
       'service-orders': this.serviceOrders,
       'customer-images': this.customerImages,
@@ -1200,6 +1288,7 @@ export class RecordsService {
     const config = await this.bundleConfig(resource);
     // The workbook lifecycle is shared for every module. A single commit
     // function handles the few business-aware bundle modes below.
+    if (config.commitMode === 'asset-register') return this.commitAssetRegisterBundle(config, sheets, user);
     if (config.commitMode !== 'records') return this.commitBundle(config, sheets, user);
     const mainSheetRows = Array.isArray(sheets?.[config.main.sheetName]) ? sheets[config.main.sheetName] : [];
     const parentCache = new Map<string, ConfigurableEntity>();
@@ -1337,6 +1426,60 @@ export class RecordsService {
     return { data: { resource: config.main.resource, importedSheets: [{ name: config.main.sheetName, count: importedHeaders }, ...(detailConfig ? [{ name: detailConfig.sheetName, count: details.length }] : [])], errors } };
   }
 
+  private async commitAssetRegisterBundle(
+    config: { main: ImportBundleSheetConfig; related: ImportBundleSheetConfig[]; commitMode?: ImportBundleCommitMode },
+    sheets: Record<string, Array<Record<string, unknown>>>,
+    user: AuthUser,
+  ) {
+    const categories = config.related.find((sheet) => sheet.resource === 'asset-categories');
+    const movements = config.related.find((sheet) => sheet.resource === 'asset-movements');
+    const maintenances = config.related.find((sheet) => sheet.resource === 'asset-maintenances');
+    const orderedSheets = [categories, config.main, movements, maintenances].filter(Boolean) as ImportBundleSheetConfig[];
+    const counts = new Map<string, number>();
+    const errors: ImportBundleRowError[] = [];
+
+    for (const sheetConfig of orderedSheets) {
+      const rows = this.nonEmptyBundleRows(sheets, sheetConfig.sheetName);
+      for (const [rowIndex, row] of rows.entries()) {
+        try {
+          if (sheetConfig.resource === 'asset-categories' || sheetConfig.resource === 'assets' || sheetConfig.resource === 'asset-maintenances') {
+            const payload = await this.buildBundlePayload(sheetConfig, row);
+            if (sheetConfig.resource === 'asset-maintenances') {
+              const assetCode = String(row.assetCode || '').trim();
+              const asset = await this.assets.findOne({ where: { code: assetCode, isArchived: false } });
+              if (!asset) throw new NotFoundException(`Không tìm thấy tài sản có mã ${assetCode}`);
+              payload.assetId = asset.id;
+            }
+            await this.importUpsert(sheetConfig.resource, payload, user);
+          } else if (sheetConfig.resource === 'asset-movements') {
+            const assetCode = String(row.assetCode || '').trim();
+            if (!assetCode) throw new BadRequestException('Sheet asset-movements bắt buộc có cột assetCode');
+            const asset = await this.assets.findOne({ where: { code: assetCode, isArchived: false } });
+            if (!asset) throw new NotFoundException(`Không tìm thấy tài sản có mã ${assetCode}`);
+            const movementCode = String(row.code || '').trim();
+            if (!movementCode) throw new BadRequestException('Sheet asset-movements bắt buộc có cột code');
+            const exists = await this.assetMovements.findOne({ where: { code: movementCode } });
+            if (!exists) {
+              const payload = await this.buildBundlePayload(sheetConfig, row);
+              await this.createAssetMovement({ ...payload, assetId: asset.id, code: movementCode }, user);
+            }
+          }
+          counts.set(sheetConfig.sheetName, (counts.get(sheetConfig.sheetName) || 0) + 1);
+        } catch (error) {
+          errors.push(this.bundleImportRowError(sheetConfig.sheetName, rowIndex, row, error));
+        }
+      }
+    }
+
+    return {
+      data: {
+        resource: config.main.resource,
+        importedSheets: [config.main, ...config.related].map((sheet) => ({ name: sheet.sheetName, count: counts.get(sheet.sheetName) || 0 })),
+        errors,
+      },
+    };
+  }
+
   /** Internal bulk demo generator used by the CMS “seed all” action. */
   async seedAllDemoBundles(sampleSize = 500) {
     const systemUser = { id: 'demo-seed-system', role: 'ADMIN', roleMain: 'ADMIN' } as AuthUser;
@@ -1384,6 +1527,7 @@ export class RecordsService {
     if (resource === 'files') {
       throw new BadRequestException('Hãy dùng endpoint upload file để tạo tệp mới');
     }
+    if (resource === 'asset-movements') return this.createAssetMovement(payload, user);
     payload = await this.applyCreateDataScope(user, resource, payload);
     await this.assertPermission(user, resource, 'create', this.branchIdOf(resource, payload));
     await this.assertProtectedAdminAssignment(resource, payload);
@@ -1420,6 +1564,31 @@ export class RecordsService {
     await this.audit(user, 'CREATE', resource, record.id, { submitted: payload, saved: normalized });
     const hydrated = await this.findRaw(resource, record.id);
     return { data: await this.protectPasswordFields(resource, this.protect(resource, hydrated) as ConfigurableEntity, user) };
+  }
+
+  private async createAssetMovement (payload: Record<string, unknown>, user: AuthUser) {
+    const assetId = String(payload.assetId || '').trim();
+    const asset = await this.assets.findOne({ where: { id: assetId, isArchived: false } });
+    if (!asset) throw new NotFoundException('Không tìm thấy tài sản');
+    await this.assertPermission(user, 'assets', 'update', asset.branchId);
+    const movementType = String(payload.movementType || '').toUpperCase();
+    if (!['TRANSFER', 'ASSIGN', 'RETURN', 'REPORT_DAMAGE', 'DISPOSE'].includes(movementType)) throw new BadRequestException('Loại phiếu tài sản không hợp lệ');
+    const nextBranchId = String(payload.toBranchId || asset.branchId || '').trim() || undefined;
+    const nextWarehouseId = String(payload.toWarehouseId || asset.warehouseId || '').trim() || undefined;
+    const nextRoomId = String(payload.toRoomId || asset.roomId || '').trim() || undefined;
+    const nextCustodianStaffId = movementType === 'RETURN' ? undefined : (String(payload.toCustodianStaffId || '').trim() || undefined);
+    if (movementType === 'TRANSFER' && !nextBranchId) throw new BadRequestException('Phiếu điều chuyển cần có chi nhánh đích');
+    if (movementType === 'ASSIGN' && !nextCustodianStaffId) throw new BadRequestException('Phiếu bàn giao cần chọn người nhận');
+    const movement = await this.assetMovements.save(this.assetMovements.create({
+      code: String(payload.code || '').trim() || await this.generateCode('asset-movements', this.assetMovements),
+      assetId, movementType, movementAt: payload.movementAt ? new Date(String(payload.movementAt)) : new Date(),
+      fromBranchId: asset.branchId, fromWarehouseId: asset.warehouseId, fromRoomId: asset.roomId, fromCustodianStaffId: asset.custodianStaffId,
+      toBranchId: nextBranchId, toWarehouseId: nextWarehouseId, toRoomId: nextRoomId, toCustodianStaffId: nextCustodianStaffId, note: payload.note ? String(payload.note) : undefined,
+    }));
+    const status = movementType === 'REPORT_DAMAGE' ? 'OUT_OF_SERVICE' : movementType === 'DISPOSE' ? 'DISPOSED' : nextCustodianStaffId ? 'ASSIGNED' : 'AVAILABLE';
+    await this.assets.save(this.assets.merge(asset, { branchId: nextBranchId, warehouseId: nextWarehouseId, roomId: nextRoomId, custodianStaffId: nextCustodianStaffId, status }));
+    await this.audit(user, 'ASSET_MOVEMENT', 'assets', asset.id, { movementId: movement.id, movementType, before: { branchId: movement.fromBranchId, warehouseId: movement.fromWarehouseId, roomId: movement.fromRoomId, custodianStaffId: movement.fromCustodianStaffId }, after: { branchId: nextBranchId, warehouseId: nextWarehouseId, roomId: nextRoomId, custodianStaffId: nextCustodianStaffId, status } });
+    return { data: movement };
   }
 
   async createStaffAccount(staffId: string, payload: { email?: string; username?: string; password?: string; role?: string; branchId?: string }, user: AuthUser) {
@@ -1487,6 +1656,9 @@ export class RecordsService {
   }
 
   async update (resource: string, id: string, payload: Record<string, unknown>, user: AuthUser) {
+    if (resource === 'asset-movements') {
+      throw new BadRequestException('Phiếu tài sản đã ghi nhận không thể sửa; hãy tạo phiếu điều chỉnh mới');
+    }
     const previous = await this.findStored(resource, id);
     await this.assertDataViewScope(user, resource, previous);
     this.assertSystemAdminIdentity(resource, previous, payload);
@@ -1602,6 +1774,33 @@ export class RecordsService {
 
     await this.audit(user, 'CONVERT_TO_CUSTOMER', 'leads', lead.id, { customerId: customer.id });
     return { data: await this.findRaw('customers', customer.id) };
+  }
+
+  async convertCandidateToStaff (id: string, user: AuthUser) {
+    const candidate = await this.candidates.findOne({ where: { id, isArchived: false } });
+    if (!candidate) throw new NotFoundException('Không tìm thấy ứng viên');
+    await this.assertPermission(user, 'staff', 'create');
+    const application = await this.candidateApplications.findOne({ where: { candidateId: id, isArchived: false } });
+    if (!application) throw new BadRequestException('Ứng viên chưa có hồ sơ ứng tuyển');
+    const position = await this.recruitmentPositions.findOne({ where: { id: application.recruitmentPositionId, isArchived: false } });
+    const existing = await this.staff.findOne({ where: [{ email: candidate.email || '__none__' }, { phone: candidate.phone || '__none__' }] });
+    if (existing) return { data: await this.findRaw('staff', existing.id) };
+    const staff = await this.create('staff', {
+      fullName: candidate.fullName,
+      phone: candidate.phone,
+      email: candidate.email,
+      position: position?.name,
+      departmentId: position?.departmentId,
+      defaultBranchId: position?.branchId,
+      joinedAt: new Date().toISOString().slice(0, 10),
+      status: 'ACTIVE',
+    }, user);
+    application.stage = 'HIRED';
+    await this.candidateApplications.save(application);
+    candidate.status = 'HIRED';
+    await this.candidates.save(candidate);
+    await this.audit(user, 'CONVERT_TO_STAFF', 'candidates', id, { staffId: staff.data?.id, applicationId: application.id });
+    return staff;
   }
 
   private async saveRecord (resource: string, entity: any, repository: ResourceRepository) {
@@ -1752,7 +1951,8 @@ export class RecordsService {
   }
 
   private async listRelatedBundleRows (sheetConfig: ImportBundleSheetConfig, parentIds: string[], user?: AuthUser) {
-    if (parentIds.length === 0 || !sheetConfig.parentField) return [];
+    if (!sheetConfig.parentField) return this.listBundleRows(sheetConfig.resource, user);
+    if (parentIds.length === 0) return [];
     let scopedWhere = this.applyBranchScope(
       sheetConfig.resource,
       { [sheetConfig.parentField]: In(parentIds) } as FindOptionsWhere<ConfigurableEntity>,
@@ -1811,6 +2011,7 @@ export class RecordsService {
   private async buildFakeBundleSheets (resource: BundleRootResource, request?: RequestContext, requestedSize = 5) {
     const config = await this.bundleConfig(resource);
     const sampleSize = Math.max(1, Math.min(500, Math.floor(Number(requestedSize) || 5)));
+    if (resource === 'assets') return this.buildFakeAssetRegisterBundleSheets(config, sampleSize, request);
     const referencePools = await this.loadBundleReferencePools(config);
     const parentCodes = Array.from({ length: sampleSize }, (_, index) => this.generateBundleCode(resource, index));
 
@@ -1876,6 +2077,65 @@ export class RecordsService {
         Object.fromEntries(
           Object.entries(row).map(([key, value]) => [key, this.serializeFakeBundleCellValue(key, value, request)]),
         ),
+      ),
+    }));
+  }
+
+  private async buildFakeAssetRegisterBundleSheets (
+    config: { main: ImportBundleSheetConfig; related: ImportBundleSheetConfig[] },
+    sampleSize: number,
+    request?: RequestContext,
+  ) {
+    const categories = config.related.find((sheet) => sheet.resource === 'asset-categories');
+    const movements = config.related.find((sheet) => sheet.resource === 'asset-movements');
+    const maintenances = config.related.find((sheet) => sheet.resource === 'asset-maintenances');
+    const categoryRows = [
+      { code: 'TS-VAN-PHONG', name: 'Thiết bị văn phòng', requiresSerial: true, maintenanceRequired: false, depreciationEnabled: true, isActive: true, note: 'Bàn ghế, tủ, máy in và thiết bị dùng chung' },
+      { code: 'TS-THIET-BI', name: 'Thiết bị chuyên môn', requiresSerial: true, maintenanceRequired: true, depreciationEnabled: true, isActive: true, note: 'Thiết bị cần theo dõi bảo trì định kỳ' },
+    ];
+    const assetRows = Array.from({ length: sampleSize }, (_, index) => {
+      const code = this.generateBundleCode('assets', index);
+      return {
+        code,
+        name: `Tài sản mẫu ${index + 1}`,
+        assetCategoryId: categoryRows[index % categoryRows.length].code,
+        serialNumber: `SN-${String(index + 1).padStart(5, '0')}`,
+        model: `MODEL-${index + 1}`,
+        purchaseDate: this.fakeDate(index),
+        purchaseCost: (index + 1) * 1000000,
+        warrantyUntil: this.fakeDate(index + 365),
+        status: 'AVAILABLE',
+        note: 'Dữ liệu mẫu tài sản',
+      };
+    });
+    const movementRows = assetRows.map((asset, index) => ({
+      assetCode: asset.code,
+      code: `PTS-IMPORT-${String(index + 1).padStart(3, '0')}`,
+      movementType: 'RETURN',
+      movementAt: this.fakeDateTime(index),
+      note: 'Phiếu thu hồi mẫu',
+    }));
+    const maintenanceRows = assetRows.map((asset, index) => ({
+      assetCode: asset.code,
+      code: `BT-IMPORT-${String(index + 1).padStart(3, '0')}`,
+      maintenanceType: index % 2 === 0 ? 'PREVENTIVE' : 'CALIBRATION',
+      scheduledDate: this.fakeDate(index + 30),
+      cost: (index + 1) * 100000,
+      status: 'SCHEDULED',
+      note: 'Lịch bảo trì mẫu',
+    }));
+    const rowsByResource: Record<string, Array<Record<string, unknown>>> = {
+      assets: assetRows,
+      'asset-categories': categoryRows,
+      'asset-movements': movementRows,
+      'asset-maintenances': maintenanceRows,
+    };
+    return [config.main, ...config.related].map((sheet) => ({
+      name: sheet.sheetName,
+      resource: sheet.resource,
+      columns: sheet.columns,
+      rows: (rowsByResource[sheet.resource] || []).map((row) =>
+        Object.fromEntries(sheet.columns.map((column) => [column, this.serializeFakeBundleCellValue(column, row[column], request)])),
       ),
     }));
   }
@@ -2303,6 +2563,7 @@ export class RecordsService {
       products: 'SP',
       'stock-batches': 'NK',
       'service-orders': 'DH',
+      assets: 'TS',
     };
     return `${prefix[resource]}-IMPORT-${String(index + 1).padStart(3, '0')}`;
   }
@@ -2337,9 +2598,9 @@ export class RecordsService {
     const iso = value.toISOString();
     const dateColumns = new Set([
       'joinedAt', 'dateOfBirth', 'idCardIssuedDate', 'orderDate', 'operationDate', 'workDate', 'date', 'startDate', 'endDate',
-      'effectiveDate', 'expiryDate',
+      'effectiveDate', 'expiryDate', 'purchaseDate', 'warrantyUntil', 'scheduledDate', 'completedDate',
     ]);
-    const datetimeColumns = new Set(['startTime', 'endTime', 'consultedAt', 'capturedAt', 'scheduledAt']);
+    const datetimeColumns = new Set(['startTime', 'endTime', 'consultedAt', 'capturedAt', 'scheduledAt', 'movementAt']);
     if (dateColumns.has(column)) return clinicDate;
     if (datetimeColumns.has(column)) return clinicDateTime;
     if (resource === 'lead-activities' && column === 'scheduledAt') return clinicDateTime;
@@ -2565,6 +2826,7 @@ export class RecordsService {
       this.stockBatches.find({ order: { createdAt: 'DESC' }, take: 500 }),
       this.units.find({ order: { name: 'ASC' }, take: 500 }),
     ]);
+    const warehouses = await this.ensureDefaultWarehousesForExistingStock(branches, batches);
 
     return {
       data: {
@@ -2573,6 +2835,7 @@ export class RecordsService {
         suppliers: suppliers.map((item) => this.protect('suppliers', item as unknown as ConfigurableEntity)),
         batches: batches.map((item) => this.protect('stock-batches', item as unknown as ConfigurableEntity)),
         units: units.map((item) => this.protect('units', item as unknown as ConfigurableEntity)),
+        warehouses: warehouses.map((item) => this.protect('warehouses', item as unknown as ConfigurableEntity)),
       },
     };
   }
@@ -2582,8 +2845,9 @@ export class RecordsService {
     const branchId = String(payload.branchId || '');
     if (!branchId) throw new BadRequestException('Phiếu nhập kho phải có chi nhánh');
     await this.assertPermission(user, 'stock-batches', 'create', branchId);
+    const warehouseId = await this.assertWarehouseForBranch(payload.warehouseId, branchId, 'Kho nhập');
 
-    const items = await this.normalizeStockReceiptItems(payload.items, branchId, payload.supplierId ? String(payload.supplierId) : undefined, payload.storageLocation ? String(payload.storageLocation) : undefined);
+    const items = await this.normalizeStockReceiptItems(payload.items, branchId, payload.supplierId ? String(payload.supplierId) : undefined, payload.storageLocation ? String(payload.storageLocation) : undefined, warehouseId);
     const touched: StockBatch[] = [];
 
     for (const item of items) {
@@ -2600,6 +2864,7 @@ export class RecordsService {
       touched.push(await this.stockBatches.save(this.stockBatches.create({
         productId: item.productId,
         branchId: item.branchId,
+        warehouseId: item.warehouseId,
         storageLocation: item.storageLocation,
         supplierId: item.supplierId,
         batchNumber: item.batchNumber,
@@ -2615,6 +2880,7 @@ export class RecordsService {
       movementDate: String(payload.movementDate || ''),
       branchId,
       storageLocation: payload.storageLocation ? String(payload.storageLocation) : undefined,
+      warehouseId,
       procedureReference: payload.procedureReference ? String(payload.procedureReference) : undefined,
       supplierId: payload.supplierId ? String(payload.supplierId) : undefined,
       note: payload.note ? String(payload.note) : undefined,
@@ -2636,6 +2902,7 @@ export class RecordsService {
     const branchId = String(payload.branchId || '');
     if (!branchId) throw new BadRequestException('Phiếu xuất kho phải có chi nhánh');
     const storageLocation = String(payload.storageLocation || '').trim();
+    const warehouseId = await this.assertWarehouseForBranch(payload.warehouseId, branchId, 'Kho xuất');
     const items = await this.normalizeStockIssueItems(payload.items);
     const touched: StockBatch[] = [];
 
@@ -2643,7 +2910,7 @@ export class RecordsService {
       const candidateBatches = item.batchId
         ? [await this.stockBatches.findOne({ where: { id: item.batchId } })]
         : await this.stockBatches.find({
-          where: { productId: item.productId, branchId, ...(storageLocation ? { storageLocation } : {}), remainingQuantity: MoreThan(0) },
+          where: { productId: item.productId, branchId, ...(warehouseId ? { warehouseId } : {}), ...(storageLocation ? { storageLocation } : {}), remainingQuantity: MoreThan(0) },
           order: { expiryDate: 'ASC', createdAt: 'ASC' },
         });
       if (candidateBatches.some((batch) => !batch)) throw new NotFoundException('Không tìm thấy lô hàng để xuất kho');
@@ -2652,6 +2919,9 @@ export class RecordsService {
       }
       if (storageLocation && candidateBatches.some((batch) => batch!.storageLocation !== storageLocation)) {
         throw new BadRequestException('Lô hàng phải thuộc đúng vị trí kho của phiếu xuất');
+      }
+      if (warehouseId && candidateBatches.some((batch) => batch!.warehouseId !== warehouseId)) {
+        throw new BadRequestException('Lô hàng phải thuộc đúng kho của phiếu xuất');
       }
       if ((candidateBatches as StockBatch[]).reduce((total, batch) => total + Number(batch.remainingQuantity || 0), 0) < item.quantity) {
         const target = item.productId ? 'Sản phẩm' : `Lô ${candidateBatches[0]?.batchNumber || ''}`;
@@ -2676,6 +2946,7 @@ export class RecordsService {
       code: String(payload.code || ''),
       movementDate: String(payload.movementDate || ''),
       storageLocation: storageLocation || undefined,
+      warehouseId,
       procedureReference: payload.procedureReference ? String(payload.procedureReference) : undefined,
       note: payload.note ? String(payload.note) : undefined,
       items: touched.map((item) => ({
@@ -2689,6 +2960,51 @@ export class RecordsService {
     return {
       data: touched.map((item) => this.protect('stock-batches', item as unknown as ConfigurableEntity)),
     };
+  }
+
+  async transferStock (payload: Record<string, unknown>, user: AuthUser) {
+    await this.assertAnyActionPermission(user, 'stock-batches', ['create', 'update']);
+    const sourceBranchId = String(payload.branchId || '');
+    const destinationBranchId = String(payload.destinationBranchId || '');
+    if (!sourceBranchId || !destinationBranchId) throw new BadRequestException('Phiếu chuyển kho phải chọn kho nguồn và kho đích');
+    const sourceWarehouseId = await this.assertWarehouseForBranch(payload.warehouseId, sourceBranchId, 'Kho nguồn');
+    const destinationWarehouseId = await this.assertWarehouseForBranch(payload.destinationWarehouseId, destinationBranchId, 'Kho đích');
+    if (!sourceWarehouseId || !destinationWarehouseId) throw new BadRequestException('Phiếu chuyển kho phải chọn kho nguồn và kho đích');
+    if (sourceWarehouseId === destinationWarehouseId) throw new BadRequestException('Kho nguồn và kho đích phải khác nhau');
+    await this.assertPermission(user, 'stock-batches', 'create', sourceBranchId);
+    await this.assertPermission(user, 'stock-batches', 'create', destinationBranchId);
+    const items = await this.normalizeStockIssueItems(payload.items);
+    const touched: StockBatch[] = [];
+
+    for (const item of items) {
+      const candidates = item.batchId
+        ? [await this.stockBatches.findOne({ where: { id: item.batchId } })]
+        : await this.stockBatches.find({ where: { productId: item.productId, branchId: sourceBranchId, warehouseId: sourceWarehouseId, remainingQuantity: MoreThan(0) }, order: { expiryDate: 'ASC', createdAt: 'ASC' } });
+      if (candidates.some((batch) => !batch)) throw new NotFoundException('Không tìm thấy lô hàng để chuyển kho');
+      if (candidates.some((batch) => batch!.branchId !== sourceBranchId || batch!.warehouseId !== sourceWarehouseId)) throw new BadRequestException('Lô hàng phải thuộc kho nguồn');
+      if ((candidates as StockBatch[]).reduce((sum, batch) => sum + Number(batch.remainingQuantity || 0), 0) < item.quantity) throw new BadRequestException('Sản phẩm không đủ tồn để chuyển kho');
+      let remaining = item.quantity;
+      for (const source of candidates as StockBatch[]) {
+        if (remaining <= 0) break;
+        const quantity = Math.min(Number(source.remainingQuantity || 0), remaining);
+        source.remainingQuantity = Number(source.remainingQuantity || 0) - quantity;
+        await this.stockBatches.save(source);
+        const destination = await this.findMatchingStockBatch({
+          productId: source.productId, branchId: destinationBranchId, warehouseId: destinationWarehouseId,
+          storageLocation: undefined, supplierId: source.supplierId, batchNumber: source.batchNumber,
+          expiryDate: source.expiryDate, baseUnitId: String(source.baseUnitId || ''), unit: source.unit,
+        });
+        if (destination) {
+          destination.remainingQuantity = Number(destination.remainingQuantity || 0) + quantity;
+          touched.push(await this.stockBatches.save(destination));
+        } else {
+          touched.push(await this.stockBatches.save(this.stockBatches.create({ ...source, id: undefined, branchId: destinationBranchId, warehouseId: destinationWarehouseId, storageLocation: undefined, remainingQuantity: quantity })));
+        }
+        remaining -= quantity;
+      }
+    }
+    await this.audit(user, 'TRANSFER_STOCK', 'stock-batches', touched[0]?.id || sourceWarehouseId, { code: String(payload.code || ''), movementDate: String(payload.movementDate || ''), sourceBranchId, sourceWarehouseId, destinationBranchId, destinationWarehouseId, note: payload.note ? String(payload.note) : undefined, items: payload.items });
+    return { data: touched.map((item) => this.protect('stock-batches', item as unknown as ConfigurableEntity)) };
   }
 
   async postAccountingVoucher (id: string, user: AuthUser) {
@@ -5070,7 +5386,7 @@ export class RecordsService {
     });
   }
 
-  private async normalizeStockReceiptItems (value: unknown, branchId: string, defaultSupplierId?: string, storageLocation?: string) {
+  private async normalizeStockReceiptItems (value: unknown, branchId: string, defaultSupplierId?: string, storageLocation?: string, warehouseId?: string) {
     if (!Array.isArray(value) || value.length === 0) {
       throw new BadRequestException('Phiếu nhập kho phải có ít nhất 1 sản phẩm');
     }
@@ -5103,6 +5419,7 @@ export class RecordsService {
       return {
         productId: product.id,
         branchId,
+        warehouseId,
         storageLocation,
         supplierId: item.supplierId ? String(item.supplierId) : defaultSupplierId,
         batchNumber,
@@ -5132,6 +5449,7 @@ export class RecordsService {
   private async findMatchingStockBatch (item: {
     productId: string;
     branchId: string;
+    warehouseId?: string;
     storageLocation?: string;
     supplierId?: string;
     batchNumber: string;
@@ -5152,8 +5470,42 @@ export class RecordsService {
       String(row.supplierId || '') === String(item.supplierId || '')
       && String(row.expiryDate || '') === String(item.expiryDate || '')
       && String(row.storageLocation || '') === String(item.storageLocation || '')
+      && String(row.warehouseId || '') === String(item.warehouseId || '')
       && String(row.baseUnitId || '') === String(item.baseUnitId || ''),
     );
+  }
+
+  private async assertWarehouseForBranch (value: unknown, branchId: string, label: string) {
+    const warehouseId = String(value || '').trim();
+    if (!warehouseId) return undefined;
+    const warehouse = await this.warehouses.findOne({ where: { id: warehouseId, isArchived: false, isActive: true } });
+    if (!warehouse) throw new NotFoundException(`${label} không tồn tại hoặc đã ngừng sử dụng`);
+    if (warehouse.branchId !== branchId) throw new BadRequestException(`${label} phải thuộc đúng chi nhánh`);
+    return warehouse.id;
+  }
+
+  private async ensureDefaultWarehousesForExistingStock (branches: Branch[], batches: StockBatch[]) {
+    const existing = await this.warehouses.find({ where: { isArchived: false }, order: { name: 'ASC' }, take: 500 });
+    const byBranch = new Map(existing.map((warehouse) => [warehouse.branchId, warehouse]));
+    const branchesNeedingDefault = new Set(batches.filter((batch) => !batch.warehouseId).map((batch) => batch.branchId));
+    for (const branchId of branchesNeedingDefault) {
+      if (byBranch.has(branchId)) continue;
+      const branch = branches.find((item) => item.id === branchId);
+      const warehouse = await this.warehouses.save(this.warehouses.create({
+        code: `KHO-MAC-DINH-${branchId.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
+        name: 'Kho mặc định',
+        branchId,
+        note: `Tạo tự động khi nâng cấp dữ liệu tồn kho${branch?.name ? ` · ${branch.name}` : ''}`,
+      }));
+      existing.push(warehouse);
+      byBranch.set(branchId, warehouse);
+    }
+    const legacyBatches = batches.filter((batch) => !batch.warehouseId && byBranch.has(batch.branchId));
+    if (legacyBatches.length) {
+      await this.stockBatches.save(legacyBatches.map((batch) => ({ ...batch, warehouseId: byBranch.get(batch.branchId)!.id })));
+      legacyBatches.forEach((batch) => { batch.warehouseId = byBranch.get(batch.branchId)!.id; });
+    }
+    return existing.filter((warehouse) => warehouse.isActive !== false);
   }
 
   private async normalizeProductBaseUnit (value: Record<string, unknown>) {

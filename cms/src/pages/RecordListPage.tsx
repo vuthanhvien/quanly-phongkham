@@ -81,6 +81,7 @@ function menuActionKey(key: string) {
   if (["archive", "delete"].includes(key)) return "delete"
   if (["copy", "add-child"].includes(key)) return "create"
   if (key === "convert") return "convert-to-customer"
+  if (key === "convert-to-staff") return "convert-to-staff"
   if (key === "voucher") return "generate-accounting-voucher"
   return key
 }
@@ -181,7 +182,7 @@ export function RecordListPage() {
   }
   const canCreateRecord = hasActionAccess(resource, "create")
   const canImportRecords = canCreateRecord && !["files", "service-orders"].includes(resource)
-  const canShowRecordActions = ["view", "update", "delete", "clone", "print", "board", "convert-to-customer", "generate-accounting-voucher", "post", "unpost"]
+  const canShowRecordActions = ["view", "update", "delete", "clone", "print", "board", "convert-to-customer", "convert-to-staff", "generate-accounting-voucher", "post", "unpost"]
     .some((action) => hasActionAccess(resource, action))
   const canManageSelectedRecords = hasActionAccess(resource, "delete") || hasActionAccess(resource, "duplicate")
   useEffect(() => {
@@ -569,6 +570,7 @@ export function RecordListPage() {
           if (isUnitRoot && recordStatus === "active" && hasActionAccess(resource, "create")) menuItems.push({ key: "add-child", icon: <PlusOutlined />, label: "Thêm đơn vị quy đổi", onClick: () => createChildUnit(recordId) })
           if (recordStatus === "active" && hasActionAccess(resource, "clone") && resource !== "files") menuItems.push({ key: "copy", icon: <CopyOutlined />, label: "Nhân bản", onClick: () => void duplicateRecord(recordId) })
           if (resource === "leads" && !row.convertedCustomerId && hasActionAccess(resource, "convert-to-customer")) menuItems.push({ key: "convert", icon: <SwapOutlined />, label: "Chuyển thành khách hàng", onClick: () => void convertLead(recordId) })
+          if (resource === "candidates" && row.status !== "HIRED" && hasActionAccess(resource, "convert-to-staff")) menuItems.push({ key: "convert-to-staff", icon: <UserAddOutlined />, label: "Tạo nhân viên", onClick: () => void convertCandidateToStaff(recordId) })
           if (resource === "staff" && !row.linkedAccount && recordStatus === "active" && hasActionAccess("user-accounts", "create")) menuItems.push({ key: "create-account", icon: <UserAddOutlined />, label: "Tạo tài khoản", onClick: () => openStaffAccountModal(row) })
           if (["invoices", "expenses", "payrolls"].includes(resource) && hasActionAccess(resource, "generate-accounting-voucher")) menuItems.push({ key: "voucher", icon: <AuditOutlined />, label: "Tạo chứng từ kế toán", onClick: () => void generateAccountingVoucher(resource, recordId) })
           if (resource === "accounting-vouchers" && row.status !== "POSTED" && hasActionAccess(resource, "post")) menuItems.push({ key: "post", icon: <AuditOutlined />, label: "Ghi sổ", onClick: () => void postAccountingVoucher(recordId) })
@@ -674,6 +676,13 @@ export function RecordListPage() {
     message.success("Đã chuyển khách tiềm năng thành khách hàng")
     refresh()
     navigate(`/customers?detail=${response.data.data.id}`)
+  }
+
+  async function convertCandidateToStaff(recordId: string) {
+    const response = await api.post(`/records/candidates/${recordId}/convert-to-staff`)
+    message.success("Đã tạo nhân viên từ ứng viên")
+    refresh()
+    navigate(`/staff?detail=${response.data.data.id}`)
   }
 
   function openStaffAccountModal(staff: Record<string, any>) {

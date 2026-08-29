@@ -772,6 +772,28 @@ body {
   padding: 10px;
 }
 
+/* The expanded child table shares the parent table's left/right grid: its
+   spacer occupies the parent expand + row-number area, while the table itself
+   reaches the same right edge so status, note, and actions form vertical rails. */
+.record-import-linked-sheet .record-import-child-table {
+  margin: 0 -10px -10px;
+}
+
+.record-import-linked-sheet .record-import-child-table .ant-table {
+  border-left: 0;
+  border-right: 0;
+}
+
+.monitor-bars { display: grid; gap: 13px; }
+.monitor-bar { align-items: center; display: grid; gap: 10px; grid-template-columns: 82px minmax(120px, 1fr) 150px; }
+.monitor-bar-track { background: color-mix(in srgb, var(--app-primary) 12%, var(--app-surface)); border-radius: 999px; height: 10px; overflow: hidden; }
+.monitor-bar-fill { background: var(--app-primary); border-radius: inherit; height: 100%; min-width: 3px; }
+@media (max-width: 680px) { .monitor-bar { grid-template-columns: 1fr; gap: 5px; } }
+.recruitment-shortcuts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.recruitment-board { display: grid; gap: 12px; grid-template-columns: repeat(7, minmax(210px, 1fr)); overflow-x: auto; padding-bottom: 8px; }
+.recruitment-column { background: color-mix(in srgb, var(--app-primary) 4%, var(--app-surface)); border: 1px solid var(--app-surface-border); border-radius: 10px; display: grid; gap: 10px; min-height: 300px; padding: 10px; }
+.recruitment-card .ant-typography-paragraph { margin: 4px 0; }
+
 .detail-page-header {
   align-items: center;
 }
