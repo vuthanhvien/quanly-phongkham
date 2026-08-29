@@ -1,4 +1,4 @@
-import { CheckOutlined, CloseOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons"
+import { CheckCircleOutlined, CheckOutlined, CloseOutlined, LogoutOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons"
 import { Button, Card, Empty, Input, List, Modal, Tag, Tooltip, Typography, message } from "antd"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../../api"
@@ -15,6 +15,7 @@ type WorkflowTask = {
   step?: { name?: string; stateLabel?: string; approveActionLabel?: string; rejectActionLabel?: string }
   targetRecord?: Record<string, unknown>
 }
+type SentRequest = { id: string; resource: string; record: Record<string, unknown> }
 
 const QUICK_REQUESTS = [
   { resource: "leave-requests", label: "Xin nghỉ", title: "Tạo đơn xin nghỉ", hidden: ["staffId", "branchId", "status", "approvedById", "requestedDays"], initial: () => ({ leaveType: "annual", status: "pending" }) },
@@ -24,8 +25,9 @@ const QUICK_REQUESTS = [
   { resource: "software-license-assignments", label: "Cấp bản quyền", title: "Đề nghị cấp bản quyền", hidden: ["status"], initial: () => ({ status: "PENDING" }) },
 ] as const
 
-export function FeedWorkflowPanel({ identity }: { identity?: Identity }) {
+export function FeedWorkflowPanel({ identity, attendance }: { identity?: Identity; attendance?: { checkedIn?: boolean; checkedOut?: boolean; loading?: "checkin" | "checkout"; canCreate?: boolean; canUpdate?: boolean; onCheckIn: () => void; onCheckOut: () => void } }) {
   const [tasks, setTasks] = useState<WorkflowTask[]>([])
+  const [sentRequests, setSentRequests] = useState<SentRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [actingId, setActingId] = useState<string>()
   const [requestResource, setRequestResource] = useState<string>()
@@ -34,10 +36,17 @@ export function FeedWorkflowPanel({ identity }: { identity?: Identity }) {
   async function load() {
     setLoading(true)
     try {
-      const response = await api.get("/workflow/tasks/my")
+      const [response, ...requestResponses] = await Promise.all([
+        api.get("/workflow/tasks/my"),
+        ...(identity?.staffId ? QUICK_REQUESTS.filter((item) => item.resource !== "software-license-assignments").map((item) =>
+          api.get(`/records/${item.resource}`, { params: { staffId: identity.staffId, pageSize: 5, sort: "createdAt", order: "desc" } }).then((result) => ({ resource: item.resource, rows: result.data?.data || [] })),
+        ) : []),
+      ])
       setTasks(response.data?.data || [])
+      setSentRequests(requestResponses.flatMap((result) => result.rows.map((record: Record<string, unknown>) => ({ id: String(record.id), resource: result.resource, record }))).sort((a, b) => String(b.record.createdAt || "").localeCompare(String(a.record.createdAt || ""))).slice(0, 5))
     } catch {
       setTasks([])
+      setSentRequests([])
     } finally {
       setLoading(false)
     }
@@ -87,6 +96,14 @@ export function FeedWorkflowPanel({ identity }: { identity?: Identity }) {
 
   return <>
     <Card className="feed-workflow-card" size="small" title="Yêu cầu & phê duyệt" extra={<Button aria-label="Tải lại việc cần duyệt" icon={<ReloadOutlined />} size="small" type="text" loading={loading} onClick={() => void load()} />}>
+      {attendance ? <div className="feed-workflow-attendance">
+        <Typography.Text type="secondary">Chấm công hôm nay</Typography.Text>
+        <div className="feed-workflow-quick-actions">
+          <Button className="primary-glow" disabled={!attendance.canCreate || attendance.checkedIn} icon={<CheckCircleOutlined />} loading={attendance.loading === "checkin"} size="small" type="primary" onClick={attendance.onCheckIn}>{attendance.checkedIn ? "Đã check-in" : "Check-in"}</Button>
+          <Button disabled={!attendance.canUpdate || !attendance.checkedIn || attendance.checkedOut} icon={<LogoutOutlined />} loading={attendance.loading === "checkout"} size="small" onClick={attendance.onCheckOut}>{attendance.checkedOut ? "Đã check-out" : "Check-out"}</Button>
+        </div>
+      </div> : null}
+      <div className="feed-workflow-requests">
       <Typography.Text type="secondary">Gửi yêu cầu nhanh</Typography.Text>
       <div className="feed-workflow-quick-actions">
         {QUICK_REQUESTS.map((item) => {
@@ -99,6 +116,7 @@ export function FeedWorkflowPanel({ identity }: { identity?: Identity }) {
             <Button disabled={!canCreate} icon={<PlusOutlined />} size="small" onClick={() => setRequestResource(item.resource)}>{item.label}</Button>
           </Tooltip>
         })}
+      </div>
       </div>
       <div className="feed-workflow-todo-title"><Typography.Text strong>Việc cần bạn duyệt</Typography.Text>{tasks.length ? <Tag color="orange">{tasks.length}</Tag> : null}</div>
       {loading ? <Typography.Text type="secondary">Đang tải…</Typography.Text> : null}
@@ -124,6 +142,9 @@ export function FeedWorkflowPanel({ identity }: { identity?: Identity }) {
           </List.Item>
         }}
       /> : null}
+      <div className="feed-workflow-todo-title"><Typography.Text strong>Yêu cầu đã gửi</Typography.Text>{sentRequests.length ? <Tag color="blue">{sentRequests.length}</Tag> : null}</div>
+      {!loading && sentRequests.length === 0 ? <Typography.Text type="secondary">Chưa có yêu cầu đã gửi</Typography.Text> : null}
+      {!loading && sentRequests.length > 0 ? <List className="feed-workflow-tasks" dataSource={sentRequests} renderItem={(item) => <List.Item className="feed-workflow-task"><div className="feed-workflow-task__body"><Typography.Text className="feed-workflow-task__title" ellipsis strong>{requestTitle(item.resource, item.record)}</Typography.Text><div className="feed-workflow-task__meta"><Tag>{entityLabels[item.resource] || item.resource}</Tag><Typography.Text type="secondary">{String(item.record.status || "Đã gửi")}</Typography.Text></div></div></List.Item>} /> : null}
     </Card>
     <Modal destroyOnHidden footer={null} open={Boolean(currentRequest)} title={currentRequest?.title} width={720} onCancel={() => setRequestResource(undefined)}>
       {currentRequest ? <RecordFormContent

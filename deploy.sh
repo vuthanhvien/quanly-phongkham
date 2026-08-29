@@ -102,8 +102,8 @@ ssh "$DEPLOY_HOST" "
   cd '$DEPLOY_DIR'
   echo '[server] Pulling Docker image...'
   docker compose pull
-  echo '[server] Starting containers...'
-  docker compose up -d
+  echo '[server] Recreating containers from the pulled image...'
+  docker compose up -d --force-recreate --remove-orphans
   echo '[server] Container status:'
   docker compose ps
   echo '[server] Deploy succeeded.'

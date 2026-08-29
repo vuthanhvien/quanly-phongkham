@@ -11,7 +11,9 @@ export type AppModuleGroup = {
   modules: AppModuleKey[]
 }
 
-export const appStandaloneModules: AppModuleKey[] = ["dashboard", "calendar", "business-monitor", "hr-monitor", "project-monitor", "inventory-monitor"]
+// Global monitor pages are the first operational entry points in the default
+// sidebar, immediately after Feed.
+export const appStandaloneModules: AppModuleKey[] = ["dashboard", "business-monitor", "hr-monitor", "project-monitor", "inventory-monitor", "calendar"]
 
 export const companyTypeLabels = Object.fromEntries(
   companyTypeOptions.map((item) => [item.value, item.label]),
@@ -43,11 +45,6 @@ export const appModuleGroups: AppModuleGroup[] = [
     key: "documents",
     label: "Tài liệu & file",
     modules: ["file-folders", "files"],
-  },
-  {
-    key: "landing",
-    label: "Nội dung",
-    modules: ["landing-pages", "landing-forms", "posts", "news", "services", "doctors", "videos", "landing-config", "landing-domains", "customer-app"],
   },
   {
     key: "hr",
@@ -113,6 +110,11 @@ export const appModuleGroups: AppModuleGroup[] = [
     key: "workflow",
     label: "Workflow duyệt",
     modules: ["workflow-tasks", "workflow-instances", "workflow-definitions", "workflow-steps", "workflow-actions"],
+  },
+  {
+    key: "landing",
+    label: "Nội dung",
+    modules: ["landing-pages", "landing-forms", "posts", "news", "services", "doctors", "videos", "landing-config", "landing-domains", "customer-app"],
   },
   {
     key: "admin",
@@ -537,10 +539,14 @@ export function resolveEnabledModules(
   hasCustomModuleSelection = false,
 ) {
   const normalized = normalizeEnabledModules(enabledModules)
-  if (hasCustomModuleSelection) return Array.from(new Set([...normalized, "services", "doctors", "videos", "assets", "asset-categories", "asset-movements", "asset-maintenances"]))
+  // A custom selection is the tenant's source of truth. Do not append modules
+  // here: doing so makes an item remain visible after an admin switches it off.
+  if (hasCustomModuleSelection) return normalized
   // Customer app management is a shared User site capability for every
   // industry preset, including tenants created before this module existed.
-  return Array.from(new Set([...companyTypeModulePresets[companyType], "customer-app", "company-feed", "services", "doctors", "videos", "kpi", "software-licenses", "software-license-assignments", "business-monitor", "hr-monitor", "project-monitor", "inventory-monitor", "recruitment", "recruitment-positions", "candidates", "candidate-applications", "recruitment-interviews", "recruitment-scorecards", "recruitment-offers", "assets", "asset-categories", "asset-movements", "asset-maintenances"]))
+  // A tenant starts with the complete product. Industry presets are retained
+  // for reference, but no feature is hidden until an admin explicitly does so.
+  return allAppModuleKeys
 }
 
 export function isModuleEnabled(moduleKey: string, enabledModules: unknown, companyType: CompanyType, hasCustomModuleSelection = false) {

@@ -2042,9 +2042,11 @@ export class SettingsService {
     const companyType = this.normalizeCompanyType(payload.companyType ?? fallback?.companyType ?? 'clinic');
     const hasCustomModuleSelection = payload.hasCustomModuleSelection ?? fallback?.hasCustomModuleSelection ?? false;
     const selectedModules = this.normalizeEnabledModules(payload.enabledModules ?? fallback?.enabledModules ?? []);
+    // The default experience exposes every shipped module. A tenant only gets
+    // a reduced menu after an administrator explicitly saves a custom choice.
     const enabledModules = hasCustomModuleSelection
       ? selectedModules
-      : Array.from(new Set([...selectedModules, ...CORE_APP_MODULE_KEYS]));
+      : Array.from(APP_MODULE_KEYS);
     const clinicFeatures = {
       profile: 'aesthetic-procedure',
       lotTracking: true,

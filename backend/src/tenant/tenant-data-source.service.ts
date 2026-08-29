@@ -129,6 +129,21 @@ export class TenantDataSourceService implements OnModuleInit, OnModuleDestroy {
     return saved;
   }
 
+  /** Upserts a tenant supplied by the authenticated platform console and invalidates its live host cache. */
+  async syncTenantFromPlatform(input: Pick<Tenant, 'domain' | 'databaseUrl' | 'isActive'>) {
+    if (!this.isMultiTenant) throw new Error('Backend chưa cấu hình management database');
+    const domain = normalizeDomain(input.domain);
+    if (!domain || !input.databaseUrl) throw new Error('Thiếu domain hoặc databaseUrl tenant');
+    const repository = this.managementDataSource().getRepository(Tenant);
+    const existing = await repository.findOne({ where: { domain } });
+    const saved = existing
+      ? await repository.save({ ...existing, databaseUrl: input.databaseUrl, isActive: input.isActive !== false })
+      : await repository.save(repository.create({ domain, databaseUrl: input.databaseUrl, isActive: input.isActive !== false }));
+    if (existing) this.invalidateTenant(existing);
+    this.invalidateTenant(saved);
+    return saved;
+  }
+
   private async findActiveTenantByDomain(domain: string) {
     const cached = this.domainCache.get(domain);
     if (cached && cached.expiresAt > Date.now()) return cached.tenant;

@@ -19,6 +19,10 @@ export class TenantMiddleware implements NestMiddleware {
     try { originHost = origin ? new URL(origin).host : ''; } catch { /* fall back to proxy/direct host */ }
     const isGoogleDriveCallback = req.originalUrl.split('?')[0].endsWith('/settings/google-drive/callback');
     const isInternalTenantSeed = req.originalUrl.split('?')[0].endsWith('/internal/tenants/seed');
+    const isInternalTenantSync = req.originalUrl.split('?')[0].endsWith('/internal/tenants/sync');
+    // Sync is the recovery path when the console and backend management DBs
+    // drift. It cannot resolve a tenant before registering that tenant.
+    if (isInternalTenantSync) return next();
     const callbackDomain = isGoogleDriveCallback ? parseGoogleDriveOAuthState(typeof req.query.state === 'string' ? req.query.state : undefined)?.domain : undefined;
     const seedDomain = isInternalTenantSeed ? String(req.headers['x-tenant-domain'] || '').trim() : undefined;
     // Google redirects to the one shared API domain and has no browser Origin.

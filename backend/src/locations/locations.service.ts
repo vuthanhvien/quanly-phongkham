@@ -55,7 +55,11 @@ export class LocationsService {
   }
 
   async masterData(group: string) {
-    await this.ensureMasterData()
+    // A select such as candidate-applications.stage must be a cheap lookup.
+    // Previously every master-data request initialized the full geographic
+    // dataset (countries/provinces/wards), which could block ordinary forms
+    // for a long time on a new tenant.
+    if (String(group || '').startsWith('LOCATION_')) await this.ensureMasterData()
     return this.masterDataRepo.find({ where: { group }, order: { sortOrder: 'ASC', name: 'ASC' } })
   }
 
@@ -64,7 +68,6 @@ export class LocationsService {
   }
 
   async createMasterData(payload: Partial<MasterData>) {
-    await this.ensureMasterData()
     return this.masterDataRepo.save(this.masterDataRepo.create({ ...payload, group: String(payload.group || ''), name: String(payload.name || ''), value: String(payload.value || '') }))
   }
 

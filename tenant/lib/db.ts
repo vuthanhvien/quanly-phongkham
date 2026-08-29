@@ -7,6 +7,8 @@ export class Tenant {
   @Column({ unique: true }) domain!: string
   @Column({ type: 'text' }) databaseUrl!: string
   @Column({ default: true }) isActive!: boolean
+  @Column({ type: 'simple-json', nullable: true }) databaseSummary?: TenantDatabaseSummary | null
+  @Column({ type: 'timestamp', nullable: true }) databaseSummarySyncedAt?: Date | null
   @CreateDateColumn() createdAt!: Date
   @UpdateDateColumn() updatedAt!: Date
 }
@@ -41,9 +43,9 @@ export function databaseNameFromUrl(databaseUrl: string) {
 }
 
 function normalizeDatabaseName(value: string) {
-  const rawName = String(value || '').trim().replace(/^clinic_/i, '')
-  if (!rawName || !/^[A-Za-z0-9_-]{1,57}$/.test(rawName)) throw new Error('Tên database chỉ gồm chữ, số, dấu gạch dưới hoặc gạch ngang (tối đa 57 ký tự)')
-  return `clinic_${rawName}`
+  const databaseName = String(value || '').trim()
+  if (!databaseName || !/^[A-Za-z0-9_-]{1,64}$/.test(databaseName)) throw new Error('Tên database chỉ gồm chữ, số, dấu gạch dưới hoặc gạch ngang (tối đa 64 ký tự)')
+  return databaseName
 }
 
 /** Creates a tenant database on the shared DB server and returns its private URL. */
@@ -98,7 +100,25 @@ export async function cloneTenantDatabase(sourceDatabaseUrl: string, targetValue
 }
 
 /** Requests schema creation and the standard base data through the private backend network. */
-export async function seedTenantDatabase(domain: string) {
+export async function syncTenantWithBackend(domain: string, databaseUrl: string, isActive = true) {
+  const baseUrl = (process.env.INTERNAL_BACKEND_URL || 'http://backend:9998').replace(/\/$/, '')
+  const secret = process.env.PLATFORM_INTERNAL_SEED_SECRET || process.env.PLATFORM_JWT_SECRET || process.env.JWT_SECRET
+  if (!secret) throw new Error('PLATFORM_INTERNAL_SEED_SECRET chưa được cấu hình')
+  const response = await fetch(`${baseUrl}/api/internal/tenants/sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-platform-internal-secret': secret },
+    body: JSON.stringify({ domain, databaseUrl, isActive }),
+    signal: AbortSignal.timeout(30_000),
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { message?: string | string[] }
+    const message = Array.isArray(body.message) ? body.message.join(', ') : body.message
+    throw new Error(message || 'Không thể đồng bộ tenant với Backend')
+  }
+}
+
+export async function seedTenantDatabase(domain: string, databaseUrl?: string) {
+  if (databaseUrl) await syncTenantWithBackend(domain, databaseUrl)
   const baseUrl = (process.env.INTERNAL_BACKEND_URL || 'http://backend:9998').replace(/\/$/, '')
   const secret = process.env.PLATFORM_INTERNAL_SEED_SECRET || process.env.PLATFORM_JWT_SECRET || process.env.JWT_SECRET
   if (!secret) throw new Error('PLATFORM_INTERNAL_SEED_SECRET chưa được cấu hình')
@@ -135,6 +155,37 @@ export async function checkTenantDatabase(databaseUrl: string) {
     return { status: 'healthy' as const, latencyMs: Date.now() - startedAt }
   } catch {
     return { status: 'unreachable' as const, latencyMs: Date.now() - startedAt }
+  } finally {
+    if (source.isInitialized) await source.destroy()
+  }
+}
+
+export type TenantDatabaseSummary = {
+  databaseName: string
+  engine: 'mysql' | 'postgres'
+  version: string
+  totalTables: number
+  estimatedRows: number
+  sizeBytes: number
+  largestTables: Array<{ name: string; rows: number; sizeBytes: number }>
+}
+
+/** Lightweight, read-only database inventory for the Tenant Console. */
+export async function summarizeTenantDatabase(databaseUrl: string): Promise<TenantDatabaseSummary> {
+  const url = String(databaseUrl || '')
+  const engine = url.startsWith('postgres') ? 'postgres' : 'mysql'
+  const source = new DataSource({ type: engine, url })
+  try {
+    await source.initialize()
+    if (engine === 'postgres') {
+      const [size] = await source.query('SELECT current_database() AS "databaseName", pg_database_size(current_database()) AS "sizeBytes", version() AS version') as Array<Record<string, unknown>>
+      const tables = await source.query('SELECT schemaname || \'.\' || relname AS name, n_live_tup AS rows, pg_total_relation_size(relid) AS "sizeBytes" FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC') as Array<Record<string, unknown>>
+      return { databaseName: String(size?.databaseName || databaseNameFromUrl(url)), engine, version: String(size?.version || ''), totalTables: tables.length, estimatedRows: tables.reduce((sum, table) => sum + Number(table.rows || 0), 0), sizeBytes: Number(size?.sizeBytes || 0), largestTables: tables.slice(0, 12).map((table) => ({ name: String(table.name), rows: Number(table.rows || 0), sizeBytes: Number(table.sizeBytes || 0) })) }
+    }
+    const [size] = await source.query('SELECT DATABASE() AS databaseName, COALESCE(SUM(data_length + index_length), 0) AS sizeBytes FROM information_schema.tables WHERE table_schema = DATABASE()') as Array<Record<string, unknown>>
+    const [version] = await source.query('SELECT VERSION() AS version') as Array<Record<string, unknown>>
+    const tables = await source.query('SELECT table_name AS name, table_rows AS rowCount, data_length + index_length AS sizeBytes FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = \'BASE TABLE\' ORDER BY data_length + index_length DESC') as Array<Record<string, unknown>>
+    return { databaseName: String(size?.databaseName || databaseNameFromUrl(url)), engine, version: String(version?.version || ''), totalTables: tables.length, estimatedRows: tables.reduce((sum, table) => sum + Number(table.rowCount || 0), 0), sizeBytes: Number(size?.sizeBytes || 0), largestTables: tables.slice(0, 12).map((table) => ({ name: String(table.name), rows: Number(table.rowCount || 0), sizeBytes: Number(table.sizeBytes || 0) })) }
   } finally {
     if (source.isInitialized) await source.destroy()
   }

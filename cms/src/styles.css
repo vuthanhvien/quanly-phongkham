@@ -1448,6 +1448,9 @@ body {
 .feed-workflow-card { margin-bottom: 8px; }
 .feed-workflow-card .ant-card-body { padding: 11px 12px !important; }
 .feed-workflow-quick-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.feed-workflow-attendance { border-bottom: 1px solid var(--app-line); margin-bottom: 10px; padding-bottom: 2px; }
+.feed-workflow-attendance .feed-workflow-quick-actions { margin-bottom: 10px; }
+.feed-workflow-requests .feed-workflow-quick-actions { margin-bottom: 12px; }
 .feed-workflow-todo-title { align-items: center; border-top: 1px solid var(--app-line); display: flex; gap: 6px; justify-content: space-between; padding-top: 10px; }
 .feed-workflow-empty { margin: 8px 0 0 !important; }
 .feed-workflow-empty .ant-empty-image { height: 30px; margin-bottom: 3px; }

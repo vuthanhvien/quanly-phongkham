@@ -4,6 +4,9 @@
 backend/node_modules
 backend/dist
 backend/storage/uploads
+tenant/node_modules
+tenant/.next
+tenant/*.tsbuildinfo
 cms/node_modules
 cms/dist
 landing/node_modules

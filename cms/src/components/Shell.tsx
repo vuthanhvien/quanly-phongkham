@@ -393,7 +393,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
       })),
     ...visibleGroups.map((group) => ({
       key: group.key,
-      order: getGroupOrder(group.resources),
+      // Default tenants follow the product navigation order. A tenant that
+      // explicitly arranged modules in Settings keeps that arrangement.
+      order: settings.hasCustomModuleSelection ? getGroupOrder(group.resources) : appStandaloneModules.length + group.groupIndex,
       index: appStandaloneModules.length + group.groupIndex,
       item: {
         key: group.key,
