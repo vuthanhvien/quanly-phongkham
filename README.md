@@ -6,14 +6,14 @@ Mỗi tenant được nhận diện theo **hostname** và có database nghiệp 
 
 ## Thành phần hệ thống
 
-| Thư mục | Công nghệ | Vai trò |
-| --- | --- | --- |
-| `backend/` | NestJS 11, TypeORM, MySQL, JWT | REST API, xác thực, phân quyền, nghiệp vụ và kết nối tenant database |
-| `cms/` | React 19, Refine, Ant Design, Vite | CMS nội bộ cho nhân viên và quản trị viên tenant |
-| `landing/` | Next.js 15 | Website/landing page công khai, form đăng ký và chatbot |
-| `tenant/` | Next.js 15 | Console nền tảng: tạo, clone, seed và theo dõi tenant |
-| `docker/` | Docker, PM2 | Runtime production chạy bốn ứng dụng trong một container |
-| `docs/` | Markdown | Phạm vi nghiệp vụ, lịch sử công việc và tài liệu schema |
+| Thư mục    | Công nghệ                        | Vai trò                                                                      |
+| ------------ | ---------------------------------- | ----------------------------------------------------------------------------- |
+| `backend/` | NestJS 11, TypeORM, MySQL, JWT     | REST API, xác thực, phân quyền, nghiệp vụ và kết nối tenant database |
+| `cms/`     | React 19, Refine, Ant Design, Vite | CMS nội bộ cho nhân viên và quản trị viên tenant                      |
+| `landing/` | Next.js 15                         | Website/landing page công khai, form đăng ký và chatbot                  |
+| `tenant/`  | Next.js 15                         | Console nền tảng: tạo, clone, seed và theo dõi tenant                    |
+| `docker/`  | Docker, PM2                        | Runtime production chạy bốn ứng dụng trong một container                 |
+| `docs/`    | Markdown                           | Phạm vi nghiệp vụ, lịch sử công việc và tài liệu schema             |
 
 ```mermaid
 flowchart LR
@@ -46,10 +46,10 @@ flowchart LR
 
 Hệ thống hoạt động theo một trong hai chế độ:
 
-| Chế độ | Biến môi trường | Cách dùng |
-| --- | --- | --- |
-| Một database | `DATABASE_URL` | Phù hợp local/dev hoặc một cơ sở. Mọi request dùng chung database này. |
-| Multi-tenant | `MANAGEMENT_DATABASE_URL`, `TENANTS_JSON` hoặc bảng `tenants` | Backend đọc `Host`/`X-Forwarded-Host`, xác định tenant rồi mở database riêng của tenant đó. |
+| Chế độ     | Biến môi trường                                                   | Cách dùng                                                                                               |
+| ------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Một database | `DATABASE_URL`                                                      | Phù hợp local/dev hoặc một cơ sở. Mọi request dùng chung database này.                           |
+| Multi-tenant  | `MANAGEMENT_DATABASE_URL`, `TENANTS_JSON` hoặc bảng `tenants` | Backend đọc`Host`/`X-Forwarded-Host`, xác định tenant rồi mở database riêng của tenant đó. |
 
 Database quản trị chỉ có hai bảng: `tenants` (domain, connection string, trạng thái) và `platform_admins` (quản trị viên nền tảng). Chúng không được sao chép sang database tenant.
 
@@ -71,16 +71,16 @@ erDiagram
   workflow_instances ||--o{ workflow_tasks : instanceId
 ```
 
-| Nhóm bảng | Ví dụ bảng |
-| --- | --- |
-| Nền tảng | `branches`, `users`, `dynamic_role_definitions`, `branch_permissions`, `departments`, `rooms` |
-| CRM | `customers`, `leads`, `lead_activities`, `zalo_*`, `customer_images` |
-| Khám và điều trị | `staff`, `medical_episodes`, `appointments`, `consultations`, `service_orders`, `treatments` |
-| Kho | `suppliers`, `products`, `product_variants`, `stock_batches` |
-| Kế toán | `invoices`, `expenses`, `accounting_*` |
-| Nhân sự | `attendances`, `leave_*`, `payrolls`, `work_contracts`, `staff_*` |
-| Cấu hình và nội dung | `custom_*`, `view_settings`, `print_templates`, `landing_*`, `files` |
-| Vận hành | `projects`, `tasks`, `workflow_*`, `audit_logs`, `record_drafts`, `admin_chatbot_*` |
+| Nhóm bảng              | Ví dụ bảng                                                                                             |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Nền tảng               | `branches`, `users`, `dynamic_role_definitions`, `branch_permissions`, `departments`, `rooms` |
+| CRM                      | `customers`, `leads`, `lead_activities`, `zalo_*`, `customer_images`                            |
+| Khám và điều trị    | `staff`, `medical_episodes`, `appointments`, `consultations`, `service_orders`, `treatments`  |
+| Kho                      | `suppliers`, `products`, `product_variants`, `stock_batches`                                      |
+| Kế toán                | `invoices`, `expenses`, `accounting_*`                                                              |
+| Nhân sự                | `attendances`, `leave_*`, `payrolls`, `work_contracts`, `staff_*`                               |
+| Cấu hình và nội dung | `custom_*`, `view_settings`, `print_templates`, `landing_*`, `files`                            |
+| Vận hành               | `projects`, `tasks`, `workflow_*`, `audit_logs`, `record_drafts`, `admin_chatbot_*`           |
 
 Nguồn chuẩn của schema là [entities.ts](/Users/vienvu/Work/erp-clinic/backend/src/entities/entities.ts). Danh mục đầy đủ từng bảng/entity có trong [docs/DATABASE_SCHEMA.md](/Users/vienvu/Work/erp-clinic/docs/DATABASE_SCHEMA.md).
 
@@ -99,16 +99,16 @@ cp .env.example .env
 ### 2. Chạy chế độ development
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.dev.yml up --build -d
 ```
 
-| Dịch vụ | URL mặc định |
-| --- | --- |
-| Tenant console | [http://localhost:9996](http://localhost:9996) |
-| Landing | [http://localhost:9997](http://localhost:9997) |
-| API | [http://localhost:9998/api](http://localhost:9998/api) |
-| API Swagger | [http://localhost:9998/api/docs](http://localhost:9998/api/docs) |
-| CMS | [http://localhost:9999](http://localhost:9999) |
+| Dịch vụ      | URL mặc định                                                 |
+| -------------- | --------------------------------------------------------------- |
+| Tenant console | [http://localhost:9996](http://localhost:9996)                   |
+| Landing        | [http://localhost:9997](http://localhost:9997)                   |
+| API            | [http://localhost:9998/api](http://localhost:9998/api)           |
+| API Swagger    | [http://localhost:9998/api/docs](http://localhost:9998/api/docs) |
+| CMS            | [http://localhost:9999](http://localhost:9999)                   |
 
 Source của backend, CMS và landing được mount vào container nên tự reload khi thay đổi. Tenant console hiện chạy từ build image; cần build lại compose nếu sửa mã trong `tenant/`.
 
@@ -144,15 +144,15 @@ TYPEORM_SYNCHRONIZE=true
 
 Mọi route bên dưới có prefix `/api`; phần lớn yêu cầu JWT Bearer token.
 
-| Nhóm | Endpoint tiêu biểu |
-| --- | --- |
-| Auth | `POST /auth/login`, `GET /auth/me`, đổi password/PIN |
-| CRUD nghiệp vụ | `GET/POST/PATCH/DELETE /records/:resource` |
-| Cấu hình | `/settings/custom-fields`, `/settings/views`, `/settings/print-templates`, `/settings/landing-*` |
-| Workflow | `/workflow/definitions`, `/workflow/tasks/my`, approve/reject/cancel instance |
-| Báo cáo | `/reports/accounting/general-ledger`, trial balance, cash flow, công nợ, sổ quỹ/ngân hàng |
-| Khách hàng | `/customer-portal/auth/*`, `/customer-portal/appointments`, invoices |
-| Công khai | `/public/landing-pages/*`, `/public/chatbot/*` |
+| Nhóm            | Endpoint tiêu biểu                                                                                     |
+| ---------------- | -------------------------------------------------------------------------------------------------------- |
+| Auth             | `POST /auth/login`, `GET /auth/me`, đổi password/PIN                                               |
+| CRUD nghiệp vụ | `GET/POST/PATCH/DELETE /records/:resource`                                                             |
+| Cấu hình       | `/settings/custom-fields`, `/settings/views`, `/settings/print-templates`, `/settings/landing-*` |
+| Workflow         | `/workflow/definitions`, `/workflow/tasks/my`, approve/reject/cancel instance                        |
+| Báo cáo        | `/reports/accounting/general-ledger`, trial balance, cash flow, công nợ, sổ quỹ/ngân hàng        |
+| Khách hàng     | `/customer-portal/auth/*`, `/customer-portal/appointments`, invoices                                 |
+| Công khai       | `/public/landing-pages/*`, `/public/chatbot/*`                                                       |
 
 Swagger là nguồn tra cứu API chính xác nhất ở `/api/docs` của môi trường đang chạy.
 

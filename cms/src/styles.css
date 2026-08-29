@@ -720,6 +720,58 @@ body {
   margin: 0 !important;
 }
 
+.record-import-empty-state {
+  margin: 0 auto;
+  max-width: 760px;
+  padding: 24px 8px 12px;
+}
+
+.record-import-empty-state .ant-typography {
+  margin-bottom: 10px;
+}
+
+.record-import-steps {
+  color: var(--app-text-muted);
+  line-height: 1.7;
+  margin: 0 0 18px;
+  padding-left: 22px;
+}
+
+.record-import-dragger.ant-upload-wrapper .ant-upload-drag {
+  background: color-mix(in srgb, var(--app-primary) 5%, var(--app-surface));
+  border-color: color-mix(in srgb, var(--app-primary) 50%, var(--app-surface-border));
+  min-height: 190px;
+  padding: 30px 20px;
+}
+
+.record-import-dragger .ant-upload-drag-icon {
+  color: var(--app-primary);
+  font-size: 38px;
+  margin-bottom: 8px;
+}
+
+.record-import-empty-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.record-import-linked-rows {
+  display: grid;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.record-import-linked-sheet {
+  background: color-mix(in srgb, var(--app-primary) 4%, var(--app-surface));
+  border: 1px solid var(--app-surface-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  overflow: hidden;
+  padding: 10px;
+}
+
 .detail-page-header {
   align-items: center;
 }

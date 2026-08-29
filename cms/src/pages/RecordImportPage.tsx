@@ -1,4 +1,4 @@
-import { ArrowLeftOutlined, DeleteOutlined, DownloadOutlined, ImportOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons"
+import { ArrowLeftOutlined, DeleteOutlined, DownloadOutlined, ImportOutlined, InboxOutlined, MinusSquareOutlined, PlusSquareOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons"
 import { CmsBackButton } from "../components/CmsBackButton"
 import { faker } from "@faker-js/faker"
 import { Alert, Button, Card, Dropdown, Select, Space, Table, Tabs, Tag, Typography, Upload, message } from "antd"
@@ -85,6 +85,13 @@ interface ImportDraftRow {
   payload: Record<string, unknown>
   preview: Record<string, unknown>
   errors: string[]
+}
+
+interface BundleImportRowError {
+  sheet: string
+  rowIndex: number
+  rowNumber: number
+  message: string
 }
 
 export function RecordImportPage({ resource: resourceOverride }: { resource?: string }) {
@@ -434,12 +441,15 @@ export function RecordImportPage({ resource: resourceOverride }: { resource?: st
       try {
         const response = await api.post(`/records/${resource}/import-bundle`, { sheets: bundleSheets })
         const importedSheets = response.data?.data?.importedSheets || []
-        message.success(
-          importedSheets.length > 0
-            ? `Đã import ${importedSheets.reduce((sum: number, item: { count: number }) => sum + Number(item.count || 0), 0)} dòng`
-            : "Đã nhập dữ liệu",
-        )
-        setTimeout(() => navigate(`/${resource}`), 400)
+        const errors = (response.data?.data?.errors || []) as BundleImportRowError[]
+        applyBundleImportErrors(errors)
+        const savedCount = importedSheets.reduce((sum: number, item: { count: number }) => sum + Number(item.count || 0), 0)
+        if (savedCount > 0) message.success(`Đã import ${savedCount} dòng`)
+        if (errors.length > 0) {
+          message.error(`${errors.length} dòng chưa được lưu. Xem lỗi ngay trên từng sheet.`)
+        } else {
+          setTimeout(() => navigate(`/${resource}`), 400)
+        }
       } catch (error: any) {
         message.error(getApiErrorMessage(error, "Nhập dữ liệu thất bại"))
       } finally {
@@ -510,6 +520,90 @@ export function RecordImportPage({ resource: resourceOverride }: { resource?: st
     }
   }
 
+  function applyBundleImportErrors(errors: BundleImportRowError[]) {
+    const errorsBySheetRow = new Map(errors.map((error) => [`${error.sheet}:${error.rowIndex}`, error.message]))
+    setBundleSheets((current) => Object.fromEntries(
+      Object.entries(current).map(([sheetName, rows]) => [
+        sheetName,
+        rows.map((row, rowIndex) => {
+          const error = errorsBySheetRow.get(`${sheetName}:${rowIndex}`)
+          return { ...row, __importErrors: error ? [error] : [], __saved: !error }
+        }),
+      ]),
+    ))
+    const mainSheetName = bundleDefinitions[0]?.sheetName || resource
+    setDraftRows((current) => current.map((row) => {
+      const error = errorsBySheetRow.get(`${mainSheetName}:${row.__lineNumber - 2}`)
+      return error ? { ...row, errors: [...row.errors, error], __saved: false } : { ...row, __saved: true }
+    }))
+  }
+
+  const hasPreviewData = draftRows.length > 0
+  const importToolbar = (
+    <Space wrap>
+      <Select
+        aria-label="Số dòng dữ liệu mẫu"
+        options={[
+          { value: 1, label: '1 dòng' },
+          { value: 10, label: '10 dòng' },
+          { value: 50, label: '50 dòng' },
+          { value: 100, label: '100 dòng' },
+          { value: 250, label: '250 dòng' },
+        ]}
+        value={testRowCount}
+        onChange={setTestRowCount}
+        style={{ width: 120 }}
+      />
+      <Dropdown
+        menu={{
+          items: [
+            { key: "template", icon: <DownloadOutlined />, label: bundleMode ? "Tải data mẫu" : "Tải file mẫu", onClick: () => void downloadTemplate() },
+            { key: "export", icon: <ImportOutlined />, label: "Xuất dữ liệu hiện có", onClick: () => void downloadExportData() },
+            { key: "upload", icon: <UploadOutlined />, label: <Upload {...uploadProps}><span>Tải tệp lên</span></Upload> },
+          ],
+        }}
+        trigger={["click"]}
+      >
+        <Button icon={<UploadOutlined />}>Tệp dữ liệu</Button>
+      </Dropdown>
+      <Button className="primary-glow" disabled={bundleMode ? Object.values(bundleSheets).every((rows) => rows.length === 0) : readyRows.length === 0} icon={<SaveOutlined />} loading={saving} type="primary" onClick={() => void saveRows()}>
+        Lưu dữ liệu
+      </Button>
+    </Space>
+  )
+
+  function linkedRowsForMainRow(row: ImportDraftRow, definition: BundleSheetDefinition) {
+    const parentCode = String(row.payload.code || row.preview.code || "").trim()
+    const parentCodeColumn = definition.parentCodeColumn || "parentCode"
+    return (bundleSheets[definition.sheetName] || []).filter((item) => String(item[parentCodeColumn] || "").trim() === parentCode)
+  }
+
+  function renderLinkedRows(row: ImportDraftRow) {
+    const linkedDefinitions = bundleDefinitions.slice(1)
+    return (
+      <div className="record-import-linked-rows">
+        {linkedDefinitions.map((definition) => {
+          const rows = linkedRowsForMainRow(row, definition)
+          return (
+            <div className="record-import-linked-sheet" key={definition.sheetName}>
+              <Typography.Text strong>{definition.sheetName} ({rows.length})</Typography.Text>
+              {rows.length ? (
+                <Table
+                  columns={buildBundlePreviewColumns(definition, rows, (index) => removeBundleRow(definition.sheetName, index))}
+                  dataSource={rows.map((item) => ({ ...item, __bundleIndex: (bundleSheets[definition.sheetName] || []).indexOf(item), __rowKey: `${definition.sheetName}-${String(item[definition.parentCodeColumn || "parentCode"] || "")}-${String(item.productCode || item.code || "")}` }))}
+                  pagination={false}
+                  rowKey="__rowKey"
+                  scroll={{ x: "max-content" }}
+                  size="small"
+                />
+              ) : <Typography.Text type="secondary">Chưa có dòng liên kết.</Typography.Text>}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="page-header">
@@ -519,47 +613,7 @@ export function RecordImportPage({ resource: resourceOverride }: { resource?: st
             Import {entityLabels[resource] || resource}
           </Typography.Title>
         </Space>
-        <Space wrap>
-          <Select
-            aria-label="Số dòng dữ liệu mẫu"
-            options={[
-              { value: 1, label: '1 dòng' },
-              { value: 10, label: '10 dòng' },
-              { value: 50, label: '50 dòng' },
-              { value: 100, label: '100 dòng' },
-              { value: 250, label: '250 dòng' },
-            ]}
-            value={testRowCount}
-            onChange={setTestRowCount}
-            style={{ width: 120 }}
-          />
-          <Dropdown
-            menu={{
-              items: [
-                { key: "template", icon: <DownloadOutlined />, label: bundleMode ? "Tải data mẫu" : "Tải file mẫu", onClick: () => void downloadTemplate() },
-                { key: "export", icon: <ImportOutlined />, label: "Xuất dữ liệu hiện có", onClick: () => void downloadExportData() },
-                {
-                  key: "upload",
-                  icon: <UploadOutlined />,
-                  label: <Upload {...uploadProps}><span>Tải tệp lên</span></Upload>,
-                },
-              ],
-            }}
-            trigger={["click"]}
-          >
-            <Button icon={<UploadOutlined />}>Tệp dữ liệu</Button>
-          </Dropdown>
-          <Button
-            className="primary-glow"
-            disabled={bundleMode ? Object.values(bundleSheets).every((rows) => rows.length === 0) : readyRows.length === 0}
-            icon={<SaveOutlined />}
-            loading={saving}
-            type="primary"
-            onClick={() => void saveRows()}
-          >
-            Lưu dữ liệu
-          </Button>
-        </Space>
+        {hasPreviewData ? importToolbar : null}
       </div>
 
       {/* <div className="template-layout">
@@ -613,20 +667,40 @@ export function RecordImportPage({ resource: resourceOverride }: { resource?: st
             ))}
           </Space>
         ) : null}
-        {draftRows.length === 0 ? (
-          <Alert
-            message="Chưa có dữ liệu xem trước"
-            description={productCategoryMode
-              ? 'Dùng cột "parentCode" để xác định cha-con. Mã và tên danh mục là bắt buộc; mỗi cấp tối đa 3 cấp.'
-              : "Sau khi tải tệp Excel lên, hệ thống sẽ hiển thị bảng xem trước tại đây trước khi lưu."}
-            showIcon
-            type="info"
-          />
+        {!hasPreviewData ? (
+          <div className="record-import-empty-state">
+            <Typography.Title level={4}>Nhập {entityLabels[resource] || resource} từ Excel</Typography.Title>
+            <Typography.Paragraph type="secondary">
+              {bundleMode
+                ? 'Tệp gồm sheet chính và sheet chi tiết. Các dòng chi tiết liên kết bằng mã phiếu, mã đơn hoặc mã sản phẩm.'
+                : productCategoryMode
+                  ? 'Dùng cột parentCode để xác định cha-con. Mã và tên danh mục là bắt buộc; mỗi cấp tối đa 3 cấp.'
+                  : 'Tải file mẫu, điền dữ liệu theo hướng dẫn rồi kéo thả file Excel vào đây để xem trước trước khi lưu.'}
+            </Typography.Paragraph>
+            <ol className="record-import-steps">
+              <li>Tải file mẫu để xem đúng cột dữ liệu.</li>
+              <li>Điền dữ liệu và kéo thả file <strong>.xlsx</strong> hoặc <strong>.xls</strong> vào vùng bên dưới.</li>
+              <li>Kiểm tra bảng xem trước, sau đó bấm <strong>Lưu dữ liệu</strong>.</li>
+            </ol>
+            <Upload.Dragger {...uploadProps} className="record-import-dragger">
+              <p className="ant-upload-drag-icon"><InboxOutlined /></p>
+              <p className="ant-upload-text">Kéo thả file Excel vào đây</p>
+              <p className="ant-upload-hint">Hoặc bấm để chọn file từ máy tính</p>
+            </Upload.Dragger>
+            <div className="record-import-empty-actions">{importToolbar}</div>
+          </div>
         ) : (
           <>
             <Table
               columns={columns}
               dataSource={draftRows}
+              expandable={bundleMode && bundleDefinitions.length > 1 ? {
+                rowExpandable: () => true,
+                expandedRowRender: renderLinkedRows,
+                expandIcon: ({ expanded, onExpand, record }) => (
+                  <Button aria-label={expanded ? "Thu gọn dữ liệu liên kết" : "Mở dữ liệu liên kết"} icon={expanded ? <MinusSquareOutlined /> : <PlusSquareOutlined />} size="small" type="text" onClick={(event) => onExpand(record, event)} />
+                ),
+              } : undefined}
               pagination={{ pageSize: 20, showSizeChanger: true }}
               rowKey="__rowKey"
               scroll={{ x: "max-content" }}
@@ -654,8 +728,27 @@ function buildBundlePreviewColumns(
   const columns = Array.from(new Set([
     ...definition.columns,
     ...rows.flatMap((row) => Object.keys(row)),
-  ]))
+  ])).filter((column) => !column.startsWith("__"))
   return [
+    {
+      title: "Trạng thái",
+      key: "__importStatus",
+      width: 150,
+      fixed: "left",
+      render: (_: unknown, row) => Array.isArray(row.__importErrors) && row.__importErrors.length > 0
+        ? <Tag color="error">Có lỗi</Tag>
+        : row.__saved
+          ? <Tag color="success">Đã lưu</Tag>
+          : <Tag color="processing">Sẵn sàng</Tag>,
+    },
+    {
+      title: "Ghi chú",
+      key: "__importErrors",
+      width: 320,
+      render: (_: unknown, row) => Array.isArray(row.__importErrors) && row.__importErrors.length > 0
+        ? <Typography.Text type="danger">{row.__importErrors.join("; ")}</Typography.Text>
+        : <Typography.Text type="secondary">{row.__saved ? "Đã lưu thành công" : "Có thể lưu"}</Typography.Text>,
+    },
     ...columns.map((column) => ({
     title: column,
     dataIndex: column,
@@ -1070,8 +1163,8 @@ async function parseBundleImportFile(
 
     const sheetFields = buildBundleSheetFields(definition)
     sheets[definition.sheetName] = rows
-      .map((row) => normalizeBundleSheetRow(row, sheetFields))
-      .filter((row) => Object.values(row).some((value) => !isEmptyValue(value)))
+      .map((row, index) => ({ ...normalizeBundleSheetRow(row, sheetFields), __importRowNumber: index + 2 }))
+      .filter((row) => Object.entries(row).some(([key, value]) => key !== "__importRowNumber" && !isEmptyValue(value)))
   }
 
   return {

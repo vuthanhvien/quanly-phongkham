@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { compare, hash } from 'bcryptjs';
 import { randomUUID } from 'crypto';
@@ -147,6 +147,13 @@ type ImportBundleSheetConfig = {
 };
 
 type ImportBundleCommitMode = 'records' | 'product-combo' | 'stock-receipt' | 'service-order';
+
+type ImportBundleRowError = {
+  sheet: string;
+  rowIndex: number;
+  rowNumber: number;
+  message: string;
+};
 
 const IMPORT_BUNDLE_CONFIGS: Record<BundleRootResource, {
   main: ImportBundleSheetConfig;
@@ -1196,17 +1203,31 @@ export class RecordsService {
     if (config.commitMode !== 'records') return this.commitBundle(config, sheets, user);
     const mainSheetRows = Array.isArray(sheets?.[config.main.sheetName]) ? sheets[config.main.sheetName] : [];
     const parentCache = new Map<string, ConfigurableEntity>();
+    const errors: ImportBundleRowError[] = [];
+    let importedMainRows = 0;
+    const importedRelatedRows = new Map<string, number>();
 
-    for (const row of mainSheetRows) {
-      const saved = await this.upsertBundleMainRow(config.main, row, user);
-      parentCache.set(String((saved as unknown as Record<string, unknown>).code || ''), saved as ConfigurableEntity);
+    for (const [rowIndex, row] of mainSheetRows.entries()) {
+      if (this.bundleRowIsEmpty(row, config.main.columns)) continue;
+      try {
+        const saved = await this.upsertBundleMainRow(config.main, row, user);
+        parentCache.set(String((saved as unknown as Record<string, unknown>).code || ''), saved as ConfigurableEntity);
+        importedMainRows += 1;
+      } catch (error) {
+        errors.push(this.bundleImportRowError(config.main.sheetName, rowIndex, row, error));
+      }
     }
 
     for (const sheetConfig of config.related) {
       const rows = Array.isArray(sheets?.[sheetConfig.sheetName]) ? sheets[sheetConfig.sheetName] : [];
-      for (const row of rows) {
+      for (const [rowIndex, row] of rows.entries()) {
         if (this.bundleRowIsEmpty(row, sheetConfig.columns)) continue;
-        await this.upsertBundleRelatedRow(resource as BundleRootResource, sheetConfig, row, parentCache, user);
+        try {
+          await this.upsertBundleRelatedRow(resource as BundleRootResource, sheetConfig, row, parentCache, user);
+          importedRelatedRows.set(sheetConfig.sheetName, (importedRelatedRows.get(sheetConfig.sheetName) || 0) + 1);
+        } catch (error) {
+          errors.push(this.bundleImportRowError(sheetConfig.sheetName, rowIndex, row, error));
+        }
       }
     }
 
@@ -1214,14 +1235,31 @@ export class RecordsService {
       data: {
         resource,
         importedSheets: [
-          { name: config.main.sheetName, count: mainSheetRows.filter((row) => !this.bundleRowIsEmpty(row, config.main.columns)).length },
+          { name: config.main.sheetName, count: importedMainRows },
           ...config.related.map((sheetConfig) => ({
             name: sheetConfig.sheetName,
-            count: (Array.isArray(sheets?.[sheetConfig.sheetName]) ? sheets[sheetConfig.sheetName] : [])
-              .filter((row) => !this.bundleRowIsEmpty(row, sheetConfig.columns)).length,
+            count: importedRelatedRows.get(sheetConfig.sheetName) || 0,
           })),
         ],
+        errors,
       },
+    };
+  }
+
+  private bundleImportRowError (sheet: string, rowIndex: number, row: Record<string, unknown>, error: unknown): ImportBundleRowError {
+    const response = error instanceof HttpException ? error.getResponse() : undefined;
+    const responseMessage = typeof response === 'object' && response !== null
+      ? (response as { message?: unknown }).message
+      : undefined;
+    const message = Array.isArray(responseMessage)
+      ? responseMessage.join('; ')
+      : String(responseMessage || (error instanceof Error ? error.message : 'Lưu dữ liệu thất bại'));
+    const sourceRow = Number(row.__importRowNumber);
+    return {
+      sheet,
+      rowIndex,
+      rowNumber: Number.isFinite(sourceRow) && sourceRow > 0 ? sourceRow : rowIndex + 2,
+      message,
     };
   }
 
@@ -1260,33 +1298,43 @@ export class RecordsService {
     const orderedHeaders = config.commitMode === 'product-combo'
       ? [...headers.filter((row) => String(row.productType || '').toUpperCase() !== 'COMBO'), ...headers.filter((row) => String(row.productType || '').toUpperCase() === 'COMBO')]
       : headers;
+    const errors: ImportBundleRowError[] = [];
+    let importedHeaders = 0;
     for (const header of orderedHeaders) {
+      const rowIndex = headers.indexOf(header);
       const code = String(header.code || '').trim();
-      if (!code) throw new BadRequestException(`Sheet ${config.main.sheetName} bắt buộc có cột code`);
-      const detailRows = detailsByParentCode.get(code) || [];
-      if (config.commitMode === 'product-combo') {
-        const payload = await this.buildBundlePayload(config.main, header);
-        if (String(payload.productType || '').toUpperCase() === 'COMBO') {
-          if (!detailRows.length) throw new BadRequestException(`SP combo ${code} chưa có dòng trên sheet ${detailConfig?.sheetName}`);
-          payload.bundleItems = await resolveItems(detailRows);
+      try {
+        if (!code) throw new BadRequestException(`Sheet ${config.main.sheetName} bắt buộc có cột code`);
+        const detailRows = detailsByParentCode.get(code) || [];
+        if (config.commitMode === 'product-combo') {
+          const payload = await this.buildBundlePayload(config.main, header);
+          if (String(payload.productType || '').toUpperCase() === 'COMBO') {
+            if (!detailRows.length) throw new BadRequestException(`SP combo ${code} chưa có dòng trên sheet ${detailConfig?.sheetName}`);
+            payload.bundleItems = await resolveItems(detailRows);
+          }
+          await this.importUpsert('products', payload, user);
+          importedHeaders += 1;
+          continue;
         }
-        await this.importUpsert('products', payload, user);
-        continue;
+        if (!detailRows.length) throw new BadRequestException(`${config.main.sheetName} ${code} chưa có dòng trên sheet ${detailConfig?.sheetName}`);
+        if (config.commitMode === 'stock-receipt') {
+          if (header.movementType === 'EXPORT' || header.movementType === 'WASTE') throw new BadRequestException('Import nhiều sheet hiện dùng cho phiếu nhập/hoàn kho');
+          const supplierId = header.supplierId ? await this.resolveBundleImportValue('supplierId', header.supplierId) : undefined;
+          await this.receiptStock({ ...header, code, branchId: await this.resolveBundleImportValue('branchId', header.branchId), supplierId, items: await resolveItems(detailRows, true, supplierId) }, user);
+          importedHeaders += 1;
+          continue;
+        }
+        const customer = await this.customers.findOne({ where: { code: String(header.customerCode || '').trim() } });
+        if (!customer) throw new NotFoundException(`Không tìm thấy khách hàng có mã ${String(header.customerCode || '').trim()}`);
+        const payload = { code, customerId: customer.id, branchId: await this.resolveBundleImportValue('branchId', header.branchId), orderDate: header.orderDate, performerStaffId: header.performerStaffId ? await this.resolveBundleImportValue('performerStaffId', header.performerStaffId) : undefined, status: header.status, note: header.note, items: await resolveItems(detailRows) } as Record<string, unknown>;
+        const existing = await this.serviceOrders.findOne({ where: { code } });
+        if (existing) await this.update('service-orders', existing.id, payload, user); else await this.create('service-orders', payload, user);
+        importedHeaders += 1;
+      } catch (error) {
+        errors.push(this.bundleImportRowError(config.main.sheetName, rowIndex, header, error));
       }
-      if (!detailRows.length) throw new BadRequestException(`${config.main.sheetName} ${code} chưa có dòng trên sheet ${detailConfig?.sheetName}`);
-      if (config.commitMode === 'stock-receipt') {
-        if (header.movementType === 'EXPORT' || header.movementType === 'WASTE') throw new BadRequestException('Import nhiều sheet hiện dùng cho phiếu nhập/hoàn kho');
-        const supplierId = header.supplierId ? await this.resolveBundleImportValue('supplierId', header.supplierId) : undefined;
-        await this.receiptStock({ ...header, code, branchId: await this.resolveBundleImportValue('branchId', header.branchId), supplierId, items: await resolveItems(detailRows, true, supplierId) }, user);
-        continue;
-      }
-      const customer = await this.customers.findOne({ where: { code: String(header.customerCode || '').trim() } });
-      if (!customer) throw new NotFoundException(`Không tìm thấy khách hàng có mã ${String(header.customerCode || '').trim()}`);
-      const payload = { code, customerId: customer.id, branchId: await this.resolveBundleImportValue('branchId', header.branchId), orderDate: header.orderDate, performerStaffId: header.performerStaffId ? await this.resolveBundleImportValue('performerStaffId', header.performerStaffId) : undefined, status: header.status, note: header.note, items: await resolveItems(detailRows) } as Record<string, unknown>;
-      const existing = await this.serviceOrders.findOne({ where: { code } });
-      if (existing) await this.update('service-orders', existing.id, payload, user); else await this.create('service-orders', payload, user);
     }
-    return { data: { resource: config.main.resource, importedSheets: [{ name: config.main.sheetName, count: headers.length }, ...(detailConfig ? [{ name: detailConfig.sheetName, count: details.length }] : [])] } };
+    return { data: { resource: config.main.resource, importedSheets: [{ name: config.main.sheetName, count: importedHeaders }, ...(detailConfig ? [{ name: detailConfig.sheetName, count: details.length }] : [])], errors } };
   }
 
   /** Internal bulk demo generator used by the CMS “seed all” action. */
@@ -1786,17 +1834,33 @@ export class RecordsService {
     ];
 
     for (const sheetConfig of config.related) {
-      const rows = parentCodes.flatMap((parentCode, parentIndex) =>
-        Array.from({ length: 2 }, (_, offset) =>
-          this.buildFakeBundleRow(sheetConfig, {
-            resource,
-            index: parentIndex * 2 + offset,
-            code: `${parentCode}-${sheetConfig.sheetName}-${offset + 1}`.toUpperCase(),
-            parentCode,
-            referencePools,
-          }),
-        ),
-      );
+      const rows = config.commitMode === 'product-combo'
+        ? parentCodes.flatMap((parentCode, parentIndex) => {
+          // Odd rows are COMBO samples; each references the preceding normal SP.
+          if (parentIndex === 0 || parentIndex % 2 === 0) return [];
+          return [{ productCode: parentCode, componentProductCode: parentCodes[parentIndex - 1], quantity: parentIndex + 1 }];
+        })
+        : config.commitMode === 'stock-receipt'
+          ? parentCodes.flatMap((parentCode, parentIndex) => {
+            const productCodes = referencePools.products || [];
+            return productCodes.length ? [{ receiptCode: parentCode, productCode: productCodes[parentIndex % productCodes.length], batchNumber: `LO-MAU-${String(parentIndex + 1).padStart(3, '0')}`, expiryDate: this.fakeDate(parentIndex), quantity: parentIndex + 1, transferUnitId: (referencePools.units || [])[parentIndex % Math.max(1, (referencePools.units || []).length)] || '' }] : [];
+          })
+          : config.commitMode === 'service-order'
+            ? parentCodes.flatMap((parentCode, parentIndex) => {
+              const productCodes = referencePools.products || [];
+              return productCodes.length ? [{ orderCode: parentCode, productCode: productCodes[parentIndex % productCodes.length], quantity: parentIndex + 1, transferUnitId: (referencePools.units || [])[parentIndex % Math.max(1, (referencePools.units || []).length)] || '', unitPrice: (parentIndex + 1) * 100000 }] : [];
+            })
+            : parentCodes.flatMap((parentCode, parentIndex) =>
+              Array.from({ length: 2 }, (_, offset) =>
+                this.buildFakeBundleRow(sheetConfig, {
+                  resource,
+                  index: parentIndex * 2 + offset,
+                  code: `${parentCode}-${sheetConfig.sheetName}-${offset + 1}`.toUpperCase(),
+                  parentCode,
+                  referencePools,
+                }),
+              ),
+            );
 
       sheets.push({
         name: sheetConfig.sheetName,
@@ -1894,6 +1958,12 @@ export class RecordsService {
     }
 
     if (column === 'code') return context.code;
+    if (resource === 'products' && column === 'productType') return context.index % 2 === 0 ? 'CONSUMABLE' : 'COMBO';
+    if (resource === 'stock-batches' && column === 'movementType') return 'IMPORT';
+    if (resource === 'service-orders' && column === 'customerCode') {
+      const customers = context.referencePools.customers || [];
+      return customers.length ? customers[context.index % customers.length] : '';
+    }
     if (column === 'fullName') return `Mau ${this.resourceLabel(resource)} ${context.index + 1}`;
     if (column === 'phone' || column === 'emergencyContactPhone') return `09${String(10000000 + context.index).padStart(8, '0')}`;
     if (column === 'email') return `${context.code.toLowerCase()}@example.com`;
