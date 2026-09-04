@@ -965,6 +965,7 @@ function StaffRelationInput({
   const selectedSignature = selectedIds.join(",")
   const [options, setOptions] = useState<Array<{ value: string; label: string }>>([])
   const [loading, setLoading] = useState(false)
+  const [hasLoadedInitialOptions, setHasLoadedInitialOptions] = useState(false)
 
   useEffect(() => {
     const labels = lookups[lookupKey] || lookups.staff || {}
@@ -987,7 +988,7 @@ function StaffRelationInput({
     } finally { setLoading(false) }
   }
 
-  return <Select allowClear disabled={disabled} filterOption={false} loading={loading} mode={multiple ? "multiple" : undefined} options={options} placeholder={placeholder} showSearch value={value as string | string[] | undefined} onChange={onChange} onSearch={(keyword) => void search(keyword)} />
+  return <Select allowClear disabled={disabled} filterOption={false} loading={loading} mode={multiple ? "multiple" : undefined} options={options} placeholder={placeholder} showSearch value={value as string | string[] | undefined} onChange={onChange} onOpenChange={(open) => { if (open && !hasLoadedInitialOptions) { setHasLoadedInitialOptions(true); void search("") } }} onSearch={(keyword) => void search(keyword)} />
 }
 
 function FieldInput({

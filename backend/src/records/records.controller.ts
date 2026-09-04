@@ -12,7 +12,7 @@ export class RecordsController {
   list(
     @Param('resource') resource: string,
     @Query('page', new ParseIntPipe({ optional: true })) page = 1,
-    @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize = 20,
+    @Query('pageSize', new ParseIntPipe({ optional: true })) pageSize = 25,
     @Query('search') search?: string,
     @Query('advanced') advanced?: string,
     @Query() query?: Record<string, string>,

@@ -29,7 +29,7 @@ export const appModuleGroups: AppModuleGroup[] = [
     key: "clinical",
     label: "Chuyên môn điều trị",
     companyTypes: ["clinic"],
-    modules: ["consultations", "medical-episodes", "service-orders", "treatments", "customer-images", "rooms", "equipments"],
+    modules: ["patient-visits", "consultations", "medical-episodes", "service-orders", "treatments", "customer-images", "rooms", "equipments"],
   },
   {
     key: "inventory",
@@ -246,6 +246,7 @@ export const companyTypeModulePresets: Record<CompanyType, AppModuleKey[]> = {
     "lead-activities",
     "customers",
     "appointments",
+    "patient-visits",
     "zalo-inbox",
     "medical-episodes",
     "consultations",

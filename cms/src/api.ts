@@ -218,7 +218,7 @@ export const dataProvider: DataProvider = {
     const current = (pagination as { currentPage?: number; current?: number })?.currentPage
       || (pagination as { current?: number })?.current
       || 1;
-    const pageSize = (pagination as { pageSize?: number })?.pageSize || 20;
+    const pageSize = (pagination as { pageSize?: number })?.pageSize || 25;
     const logicalFilters = (filters || []).filter(isLogicalFilter);
     const search = logicalFilters.find((filter) => filter.field === 'search');
     const requestFilters = Object.fromEntries(

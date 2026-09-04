@@ -75,6 +75,11 @@ type SavedTableTab = {
   filters: Array<{ field: string; operator: string; value: string | number | string[] }>
 }
 
+type LinkedVisitRecordCreate = {
+  resource: string
+  initialValues: Record<string, unknown>
+}
+
 function menuActionKey(key: string) {
   if (["quick-view", "full-view"].includes(key)) return "view"
   if (key === "edit") return "update"
@@ -133,6 +138,7 @@ export function RecordListPage() {
   const [printTarget, setPrintTarget] = useState<{ recordId: string; templateId?: string } | null>(null)
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [linkedVisitRecordCreate, setLinkedVisitRecordCreate] = useState<LinkedVisitRecordCreate | null>(null)
   const [duplicateValues, setDuplicateValues] = useState<Record<string, unknown> | undefined>(undefined)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [lookups, setLookups] = useState<LookupMap>({})
@@ -572,6 +578,24 @@ export function RecordListPage() {
           if (resource === "leads" && !row.convertedCustomerId && hasActionAccess(resource, "convert-to-customer")) menuItems.push({ key: "convert", icon: <SwapOutlined />, label: "Chuyển thành khách hàng", onClick: () => void convertLead(recordId) })
           if (resource === "candidates" && row.status !== "HIRED" && hasActionAccess(resource, "convert-to-staff")) menuItems.push({ key: "convert-to-staff", icon: <UserAddOutlined />, label: "Tạo nhân viên", onClick: () => void convertCandidateToStaff(recordId) })
           if (resource === "staff" && !row.linkedAccount && recordStatus === "active" && hasActionAccess("user-accounts", "create")) menuItems.push({ key: "create-account", icon: <UserAddOutlined />, label: "Tạo tài khoản", onClick: () => openStaffAccountModal(row) })
+          if (resource === "patient-visits" && recordStatus === "active") {
+            const initialValues = {
+              customerId: String(row.customerId || ""),
+              branchId: String(row.branchId || ""),
+              visitId: recordId,
+            }
+            const linkedResources = [
+              { resource: "consultations", label: "Tạo phiếu thăm khám" },
+              { resource: "customer-images", label: "Thêm hình ảnh / chẩn đoán" },
+              { resource: "medical-episodes", label: "Tạo hồ sơ bệnh án / ca mổ" },
+              { resource: "treatments", label: "Tạo liệu trình" },
+              { resource: "service-orders", label: "Tạo đơn hàng / dịch vụ" },
+              { resource: "invoices", label: "Tạo phiếu thu / hóa đơn" },
+            ]
+            const permittedActions = linkedResources.filter((item) => hasActionAccess(item.resource, "create"))
+            if (permittedActions.length > 0) menuItems.push({ type: "divider" })
+            permittedActions.forEach((item) => menuItems.push({ key: `new-${item.resource}`, icon: <PlusOutlined />, label: item.label, onClick: () => setLinkedVisitRecordCreate({ resource: item.resource, initialValues }) }))
+          }
           if (["invoices", "expenses", "payrolls"].includes(resource) && hasActionAccess(resource, "generate-accounting-voucher")) menuItems.push({ key: "voucher", icon: <AuditOutlined />, label: "Tạo chứng từ kế toán", onClick: () => void generateAccountingVoucher(resource, recordId) })
           if (resource === "accounting-vouchers" && row.status !== "POSTED" && hasActionAccess(resource, "post")) menuItems.push({ key: "post", icon: <AuditOutlined />, label: "Ghi sổ", onClick: () => void postAccountingVoucher(recordId) })
           if (resource === "accounting-vouchers" && row.status === "POSTED" && hasActionAccess(resource, "unpost")) menuItems.push({ key: "unpost", icon: <SwapOutlined />, label: "Bỏ ghi sổ", onClick: () => void unpostAccountingVoucher(recordId) })
@@ -1270,6 +1294,30 @@ export function RecordListPage() {
             }}
           />
         )}
+      </Modal>
+      <Modal
+        className="quick-drawer"
+        centered
+        destroyOnHidden
+        maskClosable={false}
+        open={Boolean(linkedVisitRecordCreate)}
+        title={linkedVisitRecordCreate ? `Tạo ${entityLabels[linkedVisitRecordCreate.resource] || linkedVisitRecordCreate.resource}` : "Tạo bản ghi liên kết"}
+        width={screens.md ? (linkedVisitRecordCreate?.resource === "service-orders" ? 1100 : 760) : "calc(100vw - 16px)"}
+        footer={null}
+        onCancel={() => setLinkedVisitRecordCreate(null)}
+      >
+        {linkedVisitRecordCreate ? (
+          <RecordFormContent
+            compact
+            initialValues={linkedVisitRecordCreate.initialValues}
+            resource={linkedVisitRecordCreate.resource}
+            onCancel={() => setLinkedVisitRecordCreate(null)}
+            onSuccess={() => {
+              setLinkedVisitRecordCreate(null)
+              refresh()
+            }}
+          />
+        ) : null}
       </Modal>
     </>
   )

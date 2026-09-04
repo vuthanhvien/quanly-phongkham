@@ -33,6 +33,7 @@ import {
   HistoryOutlined,
   IdcardOutlined,
   InboxOutlined,
+  MoreOutlined,
   PhoneOutlined,
   PlusOutlined,
   PrinterOutlined,
@@ -45,7 +46,7 @@ import { api } from "../api"
 import { resolveFileUrl } from "../api"
 import { CMS_DATA_REFRESH_EVENT, type CmsDataRefreshDetail } from "../utils/dataRefresh"
 import { printHtmlInPlace } from "../utils/printHtml"
-import { hasActionAccess, hasResourceAccess } from "../access"
+import { getActionPresentation, hasActionAccess, hasResourceAccess } from "../access"
 import { isModuleEnabled } from "../company-types"
 import { useAppUi } from "../app-ui"
 import { RecordFormContent } from "../components/RecordFormContent"
@@ -66,6 +67,7 @@ import {
 
 interface RelatedBlock {
   title: string
+  description: string
   resource: string
   relationField: string
   rows: Record<string, unknown>[]
@@ -87,6 +89,11 @@ interface RelatedRecordEditState {
 interface MainRecordEditState {
   resource: string
   recordId: string
+}
+
+interface LinkedVisitQuickCreateState {
+  resource: string
+  initialValues: Record<string, unknown>
 }
 
 interface RecordHistoryItem {
@@ -145,6 +152,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
   const [relatedEdit, setRelatedEdit] = useState<RelatedRecordEditState | null>(null)
   const [mainEdit, setMainEdit] = useState<MainRecordEditState | null>(null)
   const [quickCreateBlock, setQuickCreateBlock] = useState<RelatedBlock | null>(null)
+  const [linkedVisitQuickCreate, setLinkedVisitQuickCreate] = useState<LinkedVisitQuickCreateState | null>(null)
   const [protectedFieldTarget, setProtectedFieldTarget] = useState<ProtectedFieldRevealTarget | null>(null)
   const [revealedValues, setRevealedValues] = useState<Record<string, unknown>>({})
   const { mutate: deleteRecord } = useDelete()
@@ -156,6 +164,64 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
       settings.hasCustomModuleSelection,
     ) && hasResourceAccess(relatedResource),
   [settings.companyType, settings.enabledModules, settings.hasCustomModuleSelection])
+
+  function relatedActionKey(key: string) {
+    if (key === 'full-view') return 'view'
+    if (key === 'edit') return 'update'
+    if (key === 'archive') return 'delete'
+    return key
+  }
+
+  function relatedRowMenuItems(block: RelatedBlock, row: Record<string, any>): any[] {
+    const recordId = String(row.id)
+    const items: Array<{ key: string; icon: ReactNode; label: string; onClick: () => void }> = []
+    const linkedItems: Array<{ key: string; icon: ReactNode; label: string; onClick: () => void }> = []
+    if (hasActionAccess(block.resource, 'view')) items.push({ key: 'full-view', icon: <EyeOutlined />, label: 'Xem đầy đủ', onClick: () => navigate(`/${block.resource}/${recordId}/full`) })
+    if (hasActionAccess(block.resource, 'update')) items.push({ key: 'edit', icon: <EditOutlined />, label: 'Chỉnh sửa', onClick: () => setRelatedEdit({ block, recordId }) })
+    if (block.resource === 'leads' && !row.convertedCustomerId && hasActionAccess(block.resource, 'convert-to-customer')) items.push({ key: 'convert-to-customer', icon: <SwapOutlined />, label: 'Chuyển thành khách hàng', onClick: () => void convertRelatedLead(recordId) })
+    if (block.printTemplateId && hasActionAccess(block.resource, 'print')) items.push({ key: 'print', icon: <PrinterOutlined />, label: 'In biểu mẫu', onClick: () => void printRecord(block.printTemplateId!, recordId) })
+    if (hasActionAccess(block.resource, 'delete')) items.push({
+      key: 'archive',
+      icon: <InboxOutlined />,
+      label: 'Lưu trữ',
+      onClick: () => Modal.confirm({
+        title: 'Lưu trữ bản ghi này?',
+        content: 'Bản ghi sẽ bị ẩn khỏi danh sách hiện tại, không bị xóa khỏi cơ sở dữ liệu.',
+        okText: 'Lưu trữ',
+        onOk: () => new Promise<void>((resolve) => deleteRecord(
+          { resource: block.resource, id: recordId },
+          {
+            onSuccess: () => {
+              message.success('Đã lưu trữ')
+              if (relatedDetail?.record?.id === recordId) setRelatedDetail(null)
+              void reloadRelatedBlocks()
+              resolve()
+            },
+            onError: () => resolve(),
+          },
+        )),
+      }),
+    })
+    if (block.resource === 'patient-visits') {
+      ['consultations', 'customer-images', 'medical-episodes', 'treatments', 'service-orders', 'invoices']
+        .filter((linkedResource) => hasActionAccess(linkedResource, 'create'))
+        .forEach((linkedResource) => linkedItems.push({
+          key: `new-${linkedResource}`,
+          icon: <PlusOutlined />,
+          label: getQuickCreateLabel(linkedResource, linkedResource),
+          onClick: () => setLinkedVisitQuickCreate({
+            resource: linkedResource,
+            initialValues: { customerId: String(row.customerId || ''), branchId: String(row.branchId || ''), visitId: recordId },
+          }),
+        }))
+    }
+    const presentation = getActionPresentation(block.resource)
+    const standardItems = items
+      .map((item, index) => ({ ...item, actionKey: relatedActionKey(item.key), index }))
+      .sort((left, right) => Number(presentation.orders?.[left.actionKey] ?? left.index) - Number(presentation.orders?.[right.actionKey] ?? right.index))
+      .map((item) => ({ ...item, label: presentation.labels?.[item.actionKey]?.trim() || item.label }))
+    return linkedItems.length ? [...standardItems, { type: 'divider' }, ...linkedItems] : standardItems
+  }
 
   function renderDetailValue(field: FieldLayoutConfig, source: Record<string, any> | null) {
     const value = Object.prototype.hasOwnProperty.call(revealedValues, field.key)
@@ -328,7 +394,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                     .map((block) => ({
                       key: block.resource,
                       icon: getCustomerHistoryIcon(block.resource),
-                      label: entityLabels[block.resource] || block.title,
+                      label: getQuickCreateLabel(block.resource, block.title),
                       onClick: () => setQuickCreateBlock(block),
                     })),
                 }}
@@ -511,6 +577,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                 <div>
                   {hasActionAccess(block.resource, "create") && (
                     <div className="related-tab-toolbar">
+                      <Typography.Text type="secondary">{block.description}</Typography.Text>
                       <Button size="small" type="primary" onClick={() => setQuickCreateBlock(block)}>
                         Thêm nhanh
                       </Button>
@@ -540,7 +607,7 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                         title: "",
                         key: "action",
                         fixed: "right" as const,
-                        width: 140,
+                        width: 172,
                         render: (_: unknown, row: any) => (
                           <Space size={2}>
                             {hasActionAccess(block.resource, "view") && (
@@ -606,6 +673,18 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                                 </Tooltip>
                               </Popconfirm>
                             )}
+                            {relatedRowMenuItems(block, row).length > 0 && (
+                              <Dropdown
+                                menu={{
+                                  items: relatedRowMenuItems(block, row),
+                                }}
+                                trigger={["click"]}
+                              >
+                                <Tooltip title="Tạo bản ghi liên kết">
+                                  <Button aria-label="Tạo bản ghi liên kết" icon={<MoreOutlined />} size="small" type="text" />
+                                </Tooltip>
+                              </Dropdown>
+                            )}
                           </Space>
                         ),
                       },
@@ -640,7 +719,9 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
                 }]
               : []
 
-            const allTabs = [...infoTabs, ...recordHistoryTab, ...accountingVoucherLinesTab, ...relatedTabs, ...serviceOrderItemsTab]
+            const allTabs = resource === "customers"
+              ? [...infoTabs, ...relatedTabs, ...recordHistoryTab, ...accountingVoucherLinesTab, ...serviceOrderItemsTab]
+              : [...infoTabs, ...recordHistoryTab, ...accountingVoucherLinesTab, ...relatedTabs, ...serviceOrderItemsTab]
             if (allTabs.length === 0) {
               return <Card className="glass-card detail-card" loading={loading}><Empty description="Không có dữ liệu liên kết" /></Card>
             }
@@ -739,6 +820,29 @@ export function RecordDetailPage(props: RecordDetailPageProps = {}) {
               ))}
             </Row>
           </div>
+        )}
+      </Modal>
+
+      <Modal
+        destroyOnHidden
+        maskClosable={false}
+        open={Boolean(linkedVisitQuickCreate)}
+        title={linkedVisitQuickCreate ? getQuickCreateLabel(linkedVisitQuickCreate.resource, linkedVisitQuickCreate.resource) : "Tạo bản ghi liên kết"}
+        width={linkedVisitQuickCreate?.resource === "service-orders" ? 980 : 620}
+        footer={null}
+        onCancel={() => setLinkedVisitQuickCreate(null)}
+      >
+        {linkedVisitQuickCreate && (
+          <RecordFormContent
+            compact
+            initialValues={linkedVisitQuickCreate.initialValues}
+            resource={linkedVisitQuickCreate.resource}
+            onCancel={() => setLinkedVisitQuickCreate(null)}
+            onSuccess={() => {
+              setLinkedVisitQuickCreate(null)
+              void reloadRelatedBlocks()
+            }}
+          />
         )}
       </Modal>
 
@@ -930,7 +1034,22 @@ async function loadRelated(
         field: "customerId",
       },
       {
-        title: "Hồ sơ bệnh án",
+        title: "Ca khám",
+        resource: "patient-visits",
+        field: "customerId",
+      },
+      {
+        title: "Thăm khám",
+        resource: "consultations",
+        field: "customerId",
+      },
+      {
+        title: "Hình ảnh - chẩn đoán",
+        resource: "customer-images",
+        field: "customerId",
+      },
+      {
+        title: "Hồ sơ bệnh án / Ca mổ",
         resource: "medical-episodes",
         field: "customerId",
       },
@@ -940,18 +1059,8 @@ async function loadRelated(
         field: "customerId",
       },
       {
-        title: "Thăm khám",
-        resource: "consultations",
-        field: "customerId",
-      },
-      {
         title: "Đơn hàng / dịch vụ sử dụng",
         resource: "service-orders",
-        field: "customerId",
-      },
-      {
-        title: "Hình ảnh - chẩn đoán",
-        resource: "customer-images",
         field: "customerId",
       },
       {
@@ -961,6 +1070,23 @@ async function loadRelated(
       },
     ]
     return loadBlocks(specs, id, role, canShowResource)
+  }
+  if (resource === "patient-visits") {
+    const specs = [
+      { title: "Lịch hẹn nguồn", resource: "appointments", field: "visitId" },
+      { title: "Thăm khám", resource: "consultations", field: "visitId" },
+      { title: "Hình ảnh - chẩn đoán", resource: "customer-images", field: "visitId" },
+      { title: "Hồ sơ bệnh án / Ca mổ", resource: "medical-episodes", field: "visitId" },
+      { title: "Liệu trình", resource: "treatments", field: "visitId" },
+      { title: "Đơn hàng / dịch vụ sử dụng", resource: "service-orders", field: "visitId" },
+      { title: "Phiếu thu / hóa đơn", resource: "invoices", field: "visitId" },
+    ]
+    return loadBlocks(specs, id, role, canShowResource)
+  }
+  if (resource === "treatments") {
+    return loadBlocks([
+      { title: "Ca khám thuộc liệu trình", resource: "patient-visits", field: "treatmentId" },
+    ], id, role, canShowResource)
   }
   if (resource === "staff") {
     const specs = [
@@ -1117,6 +1243,7 @@ async function loadBlocks(
   )
   return responses.flatMap((response, index) => response ? [{
     title: specs[index].title,
+    description: getRelatedBlockDescription(specs[index].resource),
     resource: specs[index].resource,
     relationField: specs[index].field,
     rows: response.rows,
@@ -1124,6 +1251,52 @@ async function loadBlocks(
     detailFields: response.detailFields,
     printTemplateId: response.printTemplateId,
   }] : [])
+}
+
+function getRelatedBlockDescription(resource: string) {
+  const descriptions: Record<string, string> = {
+    appointments: 'Lưu lịch hẹn và nguồn lực dự kiến của khách.',
+    'patient-visits': 'Gom toàn bộ hoạt động phát sinh trong một ca khách đến clinic.',
+    consultations: 'Ghi nhận khám, chẩn đoán và hướng xử lý chuyên môn.',
+    'customer-images': 'Lưu ảnh trước/sau, ảnh tiến trình và ghi chú chẩn đoán.',
+    'medical-episodes': 'Lưu hồ sơ bệnh án, chỉ định và thông tin ca mổ.',
+    treatments: 'Theo dõi liệu trình và tiến độ các buổi điều trị.',
+    'service-orders': 'Ghi nhận dịch vụ hoặc sản phẩm khách sử dụng.',
+    invoices: 'Quản lý phiếu thu, hóa đơn và trạng thái thanh toán.',
+    'lead-activities': 'Theo dõi lịch sử chăm sóc và trao đổi với khách tiềm năng.',
+    'work-contracts': 'Lưu hợp đồng và thông tin làm việc của nhân sự.',
+    'staff-insurances': 'Quản lý thông tin bảo hiểm của nhân sự.',
+    attendances: 'Ghi nhận thời gian vào/ra và công làm việc.',
+    'leave-requests': 'Theo dõi các đơn nghỉ phép của nhân sự.',
+    'attendance-adjustment-requests': 'Ghi nhận yêu cầu điều chỉnh chấm công.',
+    'business-trip-requests': 'Quản lý các đơn công tác.',
+    'payment-requests': 'Theo dõi đề nghị thanh toán.',
+    payrolls: 'Quản lý bảng lương theo kỳ.',
+    'work-schedules': 'Sắp xếp lịch và ca làm việc.',
+    'staff-rewards': 'Lưu khen thưởng và kỷ luật.',
+    'staff-trainings': 'Theo dõi đào tạo và chứng chỉ.',
+    'performance-reviews': 'Ghi nhận đánh giá hiệu suất.',
+    'position-histories': 'Theo dõi lịch sử chức danh và thăng tiến.',
+    'branch-role-assignments': 'Phân quyền vai trò theo chi nhánh.',
+    'user-accounts': 'Quản lý tài khoản đăng nhập liên kết.',
+    files: 'Lưu tài liệu và tệp đính kèm.',
+    commissions: 'Theo dõi khoản hoa hồng liên quan.',
+  }
+  return descriptions[resource] || `Quản lý ${entityLabels[resource] || resource} liên quan.`
+}
+
+function getQuickCreateLabel(resource: string, fallback: string) {
+  const labels: Record<string, string> = {
+    appointments: 'Tạo lịch hẹn',
+    'patient-visits': 'Tạo ca khám',
+    consultations: 'Tạo phiếu thăm khám',
+    'customer-images': 'Thêm hình ảnh / chẩn đoán',
+    'medical-episodes': 'Tạo hồ sơ bệnh án / ca mổ',
+    treatments: 'Tạo liệu trình',
+    'service-orders': 'Tạo đơn hàng / dịch vụ',
+    invoices: 'Tạo phiếu thu / hóa đơn',
+  }
+  return labels[resource] || `Tạo ${entityLabels[resource] || fallback}`
 }
 
 function RecordHistoryTimeline({

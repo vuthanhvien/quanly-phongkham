@@ -52,6 +52,7 @@ import {
   MasterData,
   Payroll,
   PaymentRequest,
+  PatientVisit,
   PerformanceReview,
   PositionHistory,
   Project,
@@ -97,6 +98,15 @@ import {
 import { WorkflowService } from '../workflow/workflow.service';
 
 const DEFAULT_RESOURCE_ACTIONS = ['view', 'create', 'update', 'delete', 'print'];
+const VISIT_LINKED_RESOURCES = new Set([
+  'appointments',
+  'consultations',
+  'medical-episodes',
+  'treatments',
+  'service-orders',
+  'customer-images',
+  'invoices',
+]);
 const PROTECTED_ADMIN_EMAIL = 'admin@admin.com';
 const SYSTEM_ADMIN_USERNAMES = new Set(['admin', 'admin-system']);
 const DEFAULT_KANBAN_COLUMNS = [
@@ -456,6 +466,9 @@ const FIELD_RELATION_RESOURCES: Record<string, string> = {
   reviewerId: 'staff',
   picId: 'staff',
   customerId: 'customers',
+  appointmentId: 'appointments',
+  treatmentId: 'treatments',
+  visitId: 'patient-visits',
   convertedCustomerId: 'customers',
   leadId: 'leads',
   userId: 'user-accounts',
@@ -535,6 +548,7 @@ const RESOURCE_IMPORT_KEYS: Record<string, string> = {
   units: 'name',
   'medical-episodes': 'id',
   appointments: 'id',
+  'patient-visits': 'code',
   'work-schedules': 'id',
   'stock-batches': 'id',
   consultations: 'id',
@@ -602,6 +616,7 @@ export class RecordsService {
     @InjectRepository(ServiceOrderItem) private readonly serviceOrderItems: Repository<ServiceOrderItem>,
     @InjectRepository(MedicalEpisode) private readonly episodes: Repository<MedicalEpisode>,
     @InjectRepository(Appointment) private readonly appointments: Repository<Appointment>,
+    @InjectRepository(PatientVisit) private readonly patientVisits: Repository<PatientVisit>,
     @InjectRepository(WorkSchedule) private readonly workSchedules: Repository<WorkSchedule>,
     @InjectRepository(StockBatch) private readonly stockBatches: Repository<StockBatch>,
     @InjectRepository(Warehouse) private readonly warehouses: Repository<Warehouse>,
@@ -689,6 +704,7 @@ export class RecordsService {
       units: this.units,
       'medical-episodes': this.episodes,
       appointments: this.appointments,
+      'patient-visits': this.patientVisits,
       'work-schedules': this.workSchedules,
       'stock-batches': this.stockBatches,
       warehouses: this.warehouses,
@@ -913,7 +929,7 @@ export class RecordsService {
   async list (
     resource: string,
     page = 1,
-    pageSize = 20,
+    pageSize = 25,
     search?: string,
     filters: Record<string, string> = {},
     user?: AuthUser,
@@ -1546,6 +1562,7 @@ export class RecordsService {
     }
     const normalized = await this.normalizeInput(resource, payloadWithAutoCode, true);
     delete normalized.variants;
+    await this.validateVisitLink(resource, normalized);
     if (resource === 'leave-requests') await this.prepareLeaveRequest(normalized);
     if (resource === 'work-schedules') return this.saveWorkScheduleSchema(normalized, payload, user);
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized);
@@ -1553,6 +1570,7 @@ export class RecordsService {
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     if (resource === 'workflow-definitions') await this.releaseArchivedWorkflowCode(String(normalized.code || ''));
     const record = await this.saveRecord(resource, repository.create(normalized), repository);
+    if (resource === 'patient-visits') await this.syncAppointmentToVisit(record as PatientVisit);
     if (resource === 'projects' && Array.isArray(payload.memberStaffIds)) await this.syncProjectMembers(record.id, payload.memberStaffIds);
     if (resource === 'products') await this.syncProductVariants(record.id, productVariants);
     await this.syncStaffTypeToUserRole(resource, record);
@@ -1683,6 +1701,7 @@ export class RecordsService {
       ...payload,
     }, false);
     delete normalized.variants;
+    await this.validateVisitLink(resource, normalized);
     if (resource === 'leave-requests') await this.prepareLeaveRequest(normalized, id);
     await this.assertPermission(user, resource, 'update', this.branchIdOf(resource, normalized) || this.branchIdOf(resource, previous));
     if (resource === 'appointments') await this.ensureAppointmentAvailable(normalized, id);
@@ -1690,6 +1709,7 @@ export class RecordsService {
     if (resource === 'service-orders') this.computeServiceOrderTotals(normalized, serviceOrderItems);
     const repository = this.repository(resource);
     const record = await this.saveRecord(resource, repository.merge(previous, normalized), repository);
+    if (resource === 'patient-visits') await this.syncAppointmentToVisit(record as PatientVisit, String(previous.appointmentId || ''));
     if (resource === 'projects' && Array.isArray(payload.memberStaffIds)) await this.syncProjectMembers(record.id, payload.memberStaffIds);
     if (resource === 'products' && productVariants) await this.syncProductVariants(record.id, productVariants);
     await this.syncStaffTypeToUserRole(resource, record);
@@ -5659,6 +5679,62 @@ export class RecordsService {
     if (conflict) throw new BadRequestException('Bác sĩ hoặc phòng đã có lịch trong khung giờ này');
   }
 
+  private async validateVisitLink (resource: string, payload: Record<string, unknown>) {
+    if (resource === 'patient-visits') {
+      const appointmentId = String(payload.appointmentId || '').trim();
+      if (appointmentId) {
+        const appointment = await this.appointments.findOne({ where: { id: appointmentId } });
+        if (!appointment) throw new NotFoundException('Không tìm thấy booking nguồn');
+        if (String(payload.customerId || '') !== appointment.customerId) {
+          throw new BadRequestException('Khách hàng của ca khám phải trùng với booking nguồn');
+        }
+        if (String(payload.branchId || '') !== appointment.branchId) {
+          throw new BadRequestException('Chi nhánh của ca khám phải trùng với booking nguồn');
+        }
+      }
+      const treatmentId = String(payload.treatmentId || '').trim();
+      if (!treatmentId) return;
+      const treatment = await this.treatments.findOne({ where: { id: treatmentId } });
+      if (!treatment) throw new NotFoundException('Không tìm thấy liệu trình');
+      if (String(payload.customerId || '') !== treatment.customerId) {
+        throw new BadRequestException('Ca khám phải thuộc cùng khách hàng với liệu trình');
+      }
+      if (String(payload.branchId || '') !== treatment.branchId) {
+        throw new BadRequestException('Ca khám phải thuộc cùng chi nhánh với liệu trình');
+      }
+      return;
+    }
+
+    if (!VISIT_LINKED_RESOURCES.has(resource)) return;
+    const visitId = String(payload.visitId || '').trim();
+    if (!visitId) return;
+    const visit = await this.patientVisits.findOne({ where: { id: visitId } });
+    if (!visit) throw new NotFoundException('Không tìm thấy ca khám');
+    if (String(payload.customerId || '') !== visit.customerId) {
+      throw new BadRequestException('Ca khám phải thuộc cùng khách hàng với bản ghi này');
+    }
+    const branchId = String(payload.branchId || '').trim();
+    if (branchId && branchId !== visit.branchId) {
+      throw new BadRequestException('Ca khám phải thuộc cùng chi nhánh với bản ghi này');
+    }
+  }
+
+  private async syncAppointmentToVisit (visit: PatientVisit, previousAppointmentId = '') {
+    const appointmentId = String(visit.appointmentId || '').trim();
+    if (previousAppointmentId && previousAppointmentId !== appointmentId) {
+      const previousAppointment = await this.appointments.findOne({ where: { id: previousAppointmentId } });
+      if (previousAppointment?.visitId === visit.id) {
+        previousAppointment.visitId = undefined;
+        await this.appointments.save(previousAppointment);
+      }
+    }
+    if (!appointmentId) return;
+    const appointment = await this.appointments.findOne({ where: { id: appointmentId } });
+    if (!appointment || appointment.visitId === visit.id) return;
+    appointment.visitId = visit.id;
+    await this.appointments.save(appointment);
+  }
+
   private async ensureSoftwareLicenseSeatAvailable (payload: Record<string, unknown>, ignoredId?: string) {
     // Revoked and pending requests do not consume a seat. This keeps the ERP
     // as the source of allocation control without storing vendor credentials.
@@ -5883,6 +5959,7 @@ export class RecordsService {
       'lead-activities': 'branchId',
       'medical-episodes': 'branchId',
       appointments: 'branchId',
+      'patient-visits': 'branchId',
       'work-schedules': 'branchId',
       'stock-batches': 'branchId',
       consultations: 'branchId',

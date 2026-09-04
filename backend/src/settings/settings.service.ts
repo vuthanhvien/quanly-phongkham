@@ -107,6 +107,7 @@ const APP_MODULE_KEYS = [
   'lead-activities',
   'customers',
   'appointments',
+  'patient-visits',
   'zalo-inbox',
   'medical-episodes',
   'consultations',

@@ -765,6 +765,9 @@ export class MedicalEpisode extends ConfigurableEntity {
   @Column()
   branchId: string;
 
+  @Column({ nullable: true })
+  visitId?: string;
+
   @Column()
   serviceName: string;
 
@@ -795,6 +798,9 @@ export class Appointment extends ConfigurableEntity {
   @Column()
   branchId: string;
 
+  @Column({ nullable: true })
+  visitId?: string;
+
   @Column({ default: 'CONSULTATION' })
   type: string;
 
@@ -824,6 +830,43 @@ export class Appointment extends ConfigurableEntity {
 
   @Column({ type: 'simple-json', nullable: true })
   files?: Array<Record<string, unknown>>;
+}
+
+@Entity('patient_visits')
+export class PatientVisit extends ConfigurableEntity {
+  @Column({ unique: true })
+  code: string;
+
+  @Column()
+  customerId: string;
+
+  @Column()
+  branchId: string;
+
+  // The appointment is optional because walk-in patients do not have one.
+  @Column({ nullable: true })
+  appointmentId?: string;
+
+  @Column({ nullable: true })
+  treatmentId?: string;
+
+  @Column({ type: 'datetime' })
+  visitedAt: Date;
+
+  @Column({ default: 'CONSULTATION' })
+  type: string;
+
+  @Column({ default: 'CHECKED_IN' })
+  status: string;
+
+  @Column({ nullable: true })
+  doctorStaffId?: string;
+
+  @Column({ nullable: true })
+  roomId?: string;
+
+  @Column({ type: 'text', nullable: true })
+  note?: string;
 }
 
 @Entity('work_schedules')
@@ -887,6 +930,9 @@ export class Consultation extends ConfigurableEntity {
   @Column()
   branchId: string;
 
+  @Column({ nullable: true })
+  visitId?: string;
+
   @Column({ type: 'timestamp' })
   consultedAt: Date;
 
@@ -919,6 +965,9 @@ export class ServiceOrder extends ConfigurableEntity {
 
   @Column()
   branchId: string;
+
+  @Column({ nullable: true })
+  visitId?: string;
 
   @Column({ type: 'date' })
   orderDate: string;
@@ -1006,6 +1055,9 @@ export class CustomerImage extends ConfigurableEntity {
 
   @Column()
   branchId: string;
+
+  @Column({ nullable: true })
+  visitId?: string;
 
   @Column({ default: 'BEFORE' })
   mediaType: string;
@@ -1451,6 +1503,9 @@ export class Invoice extends ConfigurableEntity {
   @Column()
   branchId: string;
 
+  @Column({ nullable: true })
+  visitId?: string;
+
   @Column({ type: 'decimal', precision: 15, scale: 2 })
   totalAmount: number;
 
@@ -1760,6 +1815,9 @@ export class Treatment extends ConfigurableEntity {
 
   @Column()
   branchId: string;
+
+  @Column({ nullable: true })
+  visitId?: string;
 
   @Column()
   name: string;
@@ -3634,6 +3692,7 @@ export const ENTITIES = [
   Unit,
   MedicalEpisode,
   Appointment,
+  PatientVisit,
   WorkSchedule,
   StockBatch,
   Warehouse,

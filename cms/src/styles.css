@@ -2608,8 +2608,14 @@ body {
 
 .related-tab-toolbar {
   display: flex;
+  align-items: center;
+  gap: 12px;
   justify-content: flex-end;
   margin-bottom: 10px;
+}
+
+.related-tab-toolbar .ant-typography {
+  margin-right: auto;
 }
 
 .customer-history-empty {

@@ -1,4 +1,4 @@
-import { BgColorsOutlined, BorderOutlined, DatabaseOutlined, DownOutlined, FontSizeOutlined, HolderOutlined, UndoOutlined } from '@ant-design/icons'
+import { BgColorsOutlined, BorderOutlined, DownOutlined, FontSizeOutlined, HolderOutlined, UndoOutlined } from '@ant-design/icons'
 import {
   closestCenter,
   DndContext,
@@ -21,7 +21,6 @@ import { useEffect, useState } from 'react'
 import { buildShadowValue, companyTypeOptions, defaultAppUiSettings, fontFamilyOptions, syncDocumentBranding, useAppUi, type AppUiSettings } from '../app-ui'
 import { appModuleGroups, appModuleLabels, appStandaloneModules, companyTypeModulePresets, resolveMenuGroupLabel, type AppModuleGroup, type CompanyType } from '../company-types'
 import { ImagePickerInput } from '../components/ImagePickerInput'
-import { api } from '../api'
 
 type UiSettingsFormValues = AppUiSettings
 type ModuleDndSection = AppModuleGroup & { standalone?: boolean }
@@ -286,7 +285,6 @@ export function UiSettingsPage() {
   const [selectedModules, setSelectedModules] = useState<string[]>([])
   const [moduleGroups, setModuleGroups] = useState<ModuleDndSection[]>(() => buildOrderedModuleGroups([]))
   const [hasCustomModuleSelection, setHasCustomModuleSelection] = useState(false)
-  const [demoDataSeeding, setDemoDataSeeding] = useState(false)
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -334,19 +332,6 @@ export function UiSettingsPage() {
     setSelectedModules(presetModules)
     setModuleGroups(buildOrderedModuleGroups(presetModules))
     setHasCustomModuleSelection(false)
-  }
-
-  async function handleSeedAllDemoData() {
-    setDemoDataSeeding(true)
-    try {
-      const response = await api.post('/settings/demo-data/seed-all')
-      const result = response.data?.data
-      message.success(`Đã tạo dữ liệu demo lớn cho ${result?.modules?.length || 'tất cả'} module (mục tiêu ${result?.target || 500} bản ghi/module)`)
-    } catch {
-      message.error('Không thể tạo dữ liệu demo. Vui lòng thử lại.')
-    } finally {
-      setDemoDataSeeding(false)
-    }
   }
 
   function setGroupModules(moduleKeys: string[], checked: boolean) {
@@ -477,17 +462,6 @@ export function UiSettingsPage() {
                     </SortableContext>
                   </DndContext>
                 </Space>
-              </SettingsBlock>
-
-              <SettingsBlock title="Dữ liệu demo">
-                <Flex align="center" gap={16} justify="space-between" wrap>
-                  <Typography.Paragraph style={{ margin: 0, maxWidth: 620 }}>
-                    Tạo một bộ dữ liệu giả lớn, có liên kết giữa các module chính như nhân sự, khách hàng, booking, lịch làm việc, hàng hóa, đơn hàng, hóa đơn và kho.
-                  </Typography.Paragraph>
-                  <Button icon={<DatabaseOutlined />} loading={demoDataSeeding} onClick={() => void handleSeedAllDemoData()} type="primary">
-                    Tạo data demo tất cả module
-                  </Button>
-                </Flex>
               </SettingsBlock>
 
               <SettingsBlock title="Màu sắc giao diện">

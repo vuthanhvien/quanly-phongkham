@@ -165,6 +165,17 @@ export function normalizeAppUiSettings(payload?: Partial<AppUiSettings> | null):
     ? Array.from(new Set(normalized.enabledModules.map((item) => String(item || "").trim()).filter(Boolean)))
     : []
   normalized.hasCustomModuleSelection = normalized.hasCustomModuleSelection === true
+  // Ca khám is a new clinic workflow module. Existing tenants that had already
+  // customized their menu could not have explicitly disabled it, so include it
+  // when they already use the clinical workflow.
+  if (
+    normalized.companyType === 'clinic'
+    && normalized.hasCustomModuleSelection
+    && ['appointments', 'consultations', 'medical-episodes', 'treatments'].some((module) => normalized.enabledModules.includes(module))
+    && !normalized.enabledModules.includes('patient-visits')
+  ) {
+    normalized.enabledModules.push('patient-visits')
+  }
   normalized.clinicFeatures = {
     // All clinic inventory capabilities are active by default. Keeping this
     // out of tenant settings avoids a hard-to-understand feature checklist.
