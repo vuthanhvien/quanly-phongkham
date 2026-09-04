@@ -804,7 +804,7 @@ const rawBaseFields: Record<string, FieldSpec[]> = {
     { key: 'customerId', label: 'Khách hàng', required: true, width: '50', tableWidth: 220 },
     { key: 'branchId', label: 'Chi nhánh', required: true, width: '50', tableWidth: 190 },
     { key: 'visitId', label: 'Mã ca khám', width: '50', tableWidth: 180 },
-    { key: 'serviceName', label: 'Dịch vụ', required: true, width: '66', tableWidth: 240 },
+    { key: 'serviceName', label: 'Dịch vụ', type: 'select', required: true, options: ['Xét nghiệm', 'Khám tiền mê', 'Hậu phẫu'], width: '66', tableWidth: 240 },
     { key: 'doctorName', label: 'Bác sĩ', width: '50', tableWidth: 180 },
     { key: 'status', label: 'Trạng thái', type: 'select', options: [{ value: 'ACTIVE', label: 'Đang điều trị' }, { value: 'COMPLETED', label: 'Hoàn thành' }, { value: 'CANCELLED', label: 'Đã hủy' }], width: '33', tableWidth: 140 },
     { key: 'chiefComplaint', label: 'Bệnh sử', type: 'textarea', width: '100', tableWidth: 320 },
